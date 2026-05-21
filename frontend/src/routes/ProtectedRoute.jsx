@@ -7,7 +7,7 @@ const ProtectedRoute = () => {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return <Loader fullScreen />; // Premium spinner during auth verification
+    return <Loader fullScreen />; 
   }
 
   return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;

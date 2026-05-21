@@ -6,7 +6,7 @@ const AuthLayout = ({ children }) => {
       <div className="lp-card">
         <div className="lp-logo">
           <div className="lp-logo-mark">H</div>
-          <div className="lp-brand">HostPilot</div>
+          <div className="lp-brand">HostOps</div>
         </div>
         {children}
       </div>

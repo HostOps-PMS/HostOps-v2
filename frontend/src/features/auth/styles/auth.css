@@ -176,3 +176,389 @@
 .lp-back-home:hover {
     color: #26a676;
 }
+
+/* Password Reset Page Styles */
+.rs-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #eaf8f1 0%, #d4f0e4 100%);
+  padding: 20px;
+}
+
+.rs-card {
+  background: #fff;
+  border-radius: 24px;
+  padding: 40px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(4, 14, 9, 0.08);
+}
+
+.rs-h1 {
+  font-family: 'Sora', sans-serif;
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: #0c1c14;
+  margin: 0 0 8px;
+  letter-spacing: -0.5px;
+}
+
+.rs-sub {
+  color: #6a8b7c;
+  font-size: 0.9rem;
+  margin: 0 0 24px;
+  text-align: left;
+}
+
+.rs-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #2a4e3c;
+  margin-bottom: 6px;
+  text-align: left;
+}
+
+.rs-input {
+  width: 100%;
+  padding: 13px 16px;
+  border: 1.5px solid #e3ede8;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: #0c1c14;
+  background: #f8fbf9;
+  outline: none;
+  margin-bottom: 16px;
+  transition: all 0.2s;
+}
+
+.rs-input:focus {
+  border-color: #26a676;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(38, 166, 118, 0.1);
+}
+
+.rs-input.input-error {
+  border-color: #c13515;
+  background: #fff0ee;
+}
+
+.rs-btn {
+  width: 100%;
+  padding: 14px;
+  background: #26a676;
+  color: #fff;
+  border: none;
+  border-radius: 100px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.95rem;
+  box-shadow: 0 6px 18px rgba(38, 166, 118, 0.3);
+  transition: all 0.2s;
+  font-family: inherit;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.rs-btn:hover:not(:disabled) {
+  background: #1e8760;
+  transform: translateY(-1px);
+}
+
+.rs-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rs-msg {
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.rs-msg.error {
+  background: #fff0ee;
+  color: #c13515;
+  border: 1px solid #ffd5ce;
+}
+
+.rs-msg.success {
+  background: #d4f0e4;
+  color: #1e8760;
+  border: 1px solid #b7e4cf;
+}
+
+/* Email Verification Page Styles */
+.vf-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #eaf8f1 0%, #d4f0e4 100%);
+  padding: 20px;
+}
+
+.vf-card {
+  background: #fff;
+  border-radius: 24px;
+  padding: 48px 40px;
+  max-width: 460px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(4, 14, 9, 0.08);
+}
+
+.vf-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24px;
+  background: #d4f0e4;
+  color: #26a676;
+}
+
+.vf-icon.error {
+  background: #fff0ee;
+  color: #c13515;
+}
+
+.vf-icon.loading {
+  background: #f0f5f2;
+  color: #9ab8a9;
+}
+
+.vf-icon.success {
+  background: #26a676;
+  color: #fff;
+}
+
+.vf-h1 {
+  font-family: 'Sora', sans-serif;
+  font-weight: 800;
+  font-size: 1.5rem;
+  color: #0c1c14;
+  margin: 0 0 12px;
+  letter-spacing: -0.5px;
+}
+
+.vf-p {
+  color: #6a8b7c;
+  line-height: 1.6;
+  margin: 0 0 28px;
+  font-size: 0.95rem;
+}
+
+.vf-btn {
+  display: inline-block;
+  padding: 14px 32px;
+  background: #26a676;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 100px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  box-shadow: 0 6px 18px rgba(38, 166, 118, 0.3);
+  transition: all 0.2s;
+  cursor: pointer;
+  border: none;
+}
+
+.vf-btn:hover {
+  background: #1e8760;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(38, 166, 118, 0.4);
+}
+
+.vf-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   RESPONSIVENESS & MOBILE-FIRST OPTIMIZATIONS
+   ────────────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .lp-wrap,
+  .rs-wrap,
+  .vf-wrap {
+    padding: 12px;
+  }
+
+  .lp-card,
+  .rs-card,
+  .vf-card {
+    padding: 28px 20px;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(4, 14, 9, 0.05);
+  }
+
+  .lp-logo {
+    margin-bottom: 24px;
+  }
+
+  .lp-logo-mark {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    border-radius: 8px;
+  }
+
+  .lp-brand {
+    font-size: 1.2rem;
+  }
+
+  .lp-h1,
+  .rs-h1,
+  .vf-h1 {
+    font-size: 1.25rem;
+    letter-spacing: -0.3px;
+  }
+
+  .lp-sub,
+  .rs-sub,
+  .vf-p {
+    font-size: 0.85rem;
+    margin-bottom: 20px;
+  }
+
+  .lp-tabs {
+    margin-bottom: 20px;
+  }
+
+  .lp-tab {
+    padding: 9px;
+    font-size: 0.8rem;
+  }
+
+  .lp-field {
+    margin-bottom: 12px;
+  }
+
+  .lp-label,
+  .rs-label {
+    font-size: 0.75rem;
+    margin-bottom: 4px;
+  }
+
+  .lp-input,
+  .rs-input {
+    padding: 11px 14px;
+    font-size: 0.9rem;
+    border-radius: 10px;
+  }
+
+  .lp-btn,
+  .rs-btn,
+  .vf-btn {
+    padding: 12px;
+    font-size: 0.9rem;
+  }
+
+  .lp-link,
+  .lp-back-home {
+    margin-top: 14px;
+    font-size: 0.78rem;
+  }
+
+  .vf-icon {
+    width: 68px;
+    height: 68px;
+    margin-bottom: 16px;
+  }
+
+  .vf-icon svg {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+@media (max-width: 360px) {
+  .lp-card,
+  .rs-card,
+  .vf-card {
+    padding: 24px 16px;
+  }
+  
+  .lp-tabs {
+    flex-direction: column;
+    border-radius: 12px;
+    background: #f0f5f2;
+    padding: 6px;
+    gap: 4px;
+  }
+  
+  .lp-tab {
+    border-radius: 8px;
+    padding: 8px;
+  }
+}
+
+.back-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  width: 100%;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #94a3b8;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 400;
+  font-size: 0.82rem;
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.back-link:hover {
+  color: #1e8760;
+}
+
+.back-link__icon {
+  display: inline-block;
+  width: 8px;
+  height: 2px;
+  background: currentColor;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.back-link__icon::before,
+.back-link__icon::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 2px;
+  background: currentColor;
+  left: -3px;
+  top: 50%;
+  transform-origin: left center;
+}
+
+.back-link__icon::before {
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.back-link__icon::after {
+  transform: translateY(-50%) rotate(-45deg);
+}

@@ -150,9 +150,13 @@ const LoginPage = ({ defaultTab = 'login' }) => {
         />
       )}
 
-      <a href="https://hostops.online/" className="lp-back-home">
-        ← Back to homepage
-      </a>
+      <div className="back-links">
+        <a href="https://hostops.online/" className="back-link">
+          <span className="back-link__icon" aria-hidden="true" />
+          <span>Homepage</span>
+        </a>
+      </div>
+
     </AuthLayout>
   );
 };

@@ -4,12 +4,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSchema } from '../utils/validators';
 import Input from '../../../components/ui/Input';
 import Button from '../../../components/ui/Button';
+import PasswordStrengthIndicator from './PasswordStrengthIndicator';
 
 const RegisterForm = ({ onSubmit, isLoading }) => {
   const {
     register,
     handleSubmit,
     formState: { errors },
+    watch,
   } = useForm({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -17,8 +19,12 @@ const RegisterForm = ({ onSubmit, isLoading }) => {
       lastName: '',
       email: '',
       password: '',
+      confirm: '',
     },
   });
+
+  const passwordValue = watch('password');
+  const confirmValue = watch('confirm');
 
   const handleFormSubmit = (data) => {
     onSubmit(data);
@@ -55,13 +61,25 @@ const RegisterForm = ({ onSubmit, isLoading }) => {
           {...register('email')}
         />
         
+        <div>
+          <Input
+            label="Password"
+            type="password"
+            id="register-password"
+            autoComplete="new-password"
+            error={errors.password?.message}
+            {...register('password')}
+          />
+          <PasswordStrengthIndicator password={passwordValue} confirmPassword={confirmValue} />
+        </div>
+
         <Input
-          label="Password (min 8 characters)"
+          label="Confirm password"
           type="password"
-          id="register-password"
+          id="register-confirm"
           autoComplete="new-password"
-          error={errors.password?.message}
-          {...register('password')}
+          error={errors.confirm?.message}
+          {...register('confirm')}
         />
         
         <Button type="submit" isLoading={isLoading}>

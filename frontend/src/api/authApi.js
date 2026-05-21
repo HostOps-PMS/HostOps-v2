@@ -19,3 +19,13 @@ export const getCurrentUserRequest = async () => {
   const response = await axiosClient.get('/auth/me');
   return response.data;
 };
+
+export const resetPasswordRequest = async (email, token, newPassword) => {
+  const response = await axiosClient.post('/auth/reset-password', { email, token, newPassword });
+  return response.data;
+};
+
+export const verifyEmailRequest = async (email, token) => {
+  const response = await axiosClient.post('/auth/verify', { email, token });
+  return response.data;
+};
