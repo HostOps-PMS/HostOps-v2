@@ -22,7 +22,7 @@ const Home = () => {
           marginBottom: '16px',
           letterSpacing: '-1px'
         }}>
-          Welcome to HostPilot
+          Welcome to HostOps
         </h1>
         <p style={{
           fontSize: '1.15rem',
