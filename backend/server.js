@@ -1,23 +1,51 @@
 const express = require('express');
 const cors = require('cors');
+const mongoose = require('mongoose');
 require('dotenv').config();
 
-// Initialize the app
 const app = express();
 
-// Middleware
-app.use(cors());
-app.use(express.json()); // Allows us to parse JSON in request bodies
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true
+}));
+app.use(express.json());
 
-// Basic Route for testing
-app.get('/', (req, res) => {
-    res.send('API is running successfully!');
+const PORT = process.env.PORT || 5000;
+const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/your-db';
+
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('MongoDB connected'))
+  .catch((err) => console.error('MongoDB connection error', err));
+
+const authRouter = express.Router();
+
+authRouter.post('/register', async (req, res) => {
+  // TODO: create user, hash password, save to DB
+  res.status(501).json({ error: 'Register not implemented' });
 });
 
-// Define the port (uses .env file if available, otherwise 5000)
-const PORT = process.env.PORT || 5000;
+authRouter.post('/login', async (req, res) => {
+  // TODO: verify user, compare password, return token
+  res.status(501).json({ error: 'Login not implemented' });
+});
 
-// Start the server
+authRouter.post('/forgot-password', async (req, res) => {
+  // TODO: send reset email or reset token
+  res.status(501).json({ error: 'Forgot password not implemented' });
+});
+
+authRouter.get('/me', async (req, res) => {
+  // TODO: verify auth token, return current user
+  res.status(501).json({ error: 'Get current user not implemented' });
+});
+
+app.use('/auth', authRouter);
+
+app.get('/', (req, res) => {
+  res.send('API is running successfully!');
+});
+
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
