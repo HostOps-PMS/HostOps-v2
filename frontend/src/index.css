@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Sora:wght@700;800&display=swap');
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -13,9 +15,61 @@ html {
 
 body {
   min-height: 100vh;
-  background: #F7F5F1;
+  background: #f8fbf9;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #0c1c14;
 }
 
 #root {
   isolation: isolate;
+}
+
+/* Auth Layout Styles */
+.lp-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #eaf8f1 0%, #d4f0e4 100%);
+  padding: 20px;
+}
+
+.lp-card {
+  background: #fff;
+  border-radius: 24px;
+  padding: 40px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(4, 14, 9, 0.08);
+}
+
+.lp-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+  justify-content: center;
+}
+
+.lp-logo-mark {
+  width: 42px;
+  height: 42px;
+  background: #26a676;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-family: 'Sora', sans-serif;
+  font-size: 20px;
+  box-shadow: 0 6px 16px rgba(38, 166, 118, 0.3);
+}
+
+.lp-brand {
+  font-family: 'Sora', sans-serif;
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: #0c1c14;
+  letter-spacing: -0.5px;
 }
