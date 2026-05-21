@@ -2,7 +2,9 @@ import {
   loginRequest,
   registerRequest,
   forgotPasswordRequest,
-  getCurrentUserRequest
+  getCurrentUserRequest,
+  resetPasswordRequest,
+  verifyEmailRequest
 } from '../../../api/authApi';
 
 export const authService = {
@@ -20,6 +22,14 @@ export const authService = {
 
   getCurrentUser: async () => {
     return await getCurrentUserRequest();
+  },
+
+  resetPassword: async (email, token, newPassword) => {
+    return await resetPasswordRequest(email, token, newPassword);
+  },
+
+  verifyEmail: async (email, token) => {
+    return await verifyEmailRequest(email, token);
   },
 };
 

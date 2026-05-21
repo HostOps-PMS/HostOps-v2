@@ -40,13 +40,13 @@ const ForgotPasswordForm = ({ onSubmit, isLoading, onBackToLoginClick }) => {
           Send Reset Link
         </Button>
         
-        <button
-          type="button"
-          className="lp-link"
-          onClick={onBackToLoginClick}
-        >
-          ← Back to sign in
-        </button>
+        <div className="back-links">
+          <button type="button" className="back-link" onClick={onBackToLoginClick}>
+            <span className="back-link__icon" aria-hidden="true" />
+            <span>Sign in</span>
+          </button>
+        </div>
+
       </form>
     </div>
   );

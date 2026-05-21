@@ -1,12 +1,10 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Home from '../pages/Home';
 import LoginPage from '../features/auth/pages/LoginPage';
 import RegisterPage from '../features/auth/pages/RegisterPage';
-import Dashboard from '../pages/Dashboard';
+import ResetPasswordPage from '../features/auth/pages/ResetPasswordPage';
+import EmailVerificationPage from '../features/auth/pages/EmailVerificationPage';
 import NotFound from '../pages/NotFound';
-import ProtectedRoute from '../routes/ProtectedRoute';
-import PublicRoute from '../routes/PublicRoute';
 
 export const AppRouter = () => {
   return (
@@ -15,6 +13,8 @@ export const AppRouter = () => {
         {/* Root is now the Login Page directly */}
         <Route path="/" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/reset" element={<ResetPasswordPage />} />
+        <Route path="/verify" element={<EmailVerificationPage />} />
 
         {/* Fallback 404 Route */}
         <Route path="*" element={<NotFound />} />
