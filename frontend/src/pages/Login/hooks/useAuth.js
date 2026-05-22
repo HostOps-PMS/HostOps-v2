@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { checkSession } from '../services/authService';
 
-const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL || '/dashboard';
-
 export function useAutoRedirect() {
+  const navigate = useNavigate();
+
   useEffect(() => {
     checkSession().then((isValid) => {
-      if (isValid) window.location.href = DASHBOARD_URL;
+      if (isValid) navigate('/dashboard', { replace: true });
     });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
-export function useAuthSubmit(asyncFn, { onSuccess, onError, resetOnSuccess = false } = {}) {
+export function useAuthSubmit(asyncFn, { onSuccess, onError } = {}) {
   const [loading, setLoading] = useState(false);
 
   const submit = async (formData) => {
