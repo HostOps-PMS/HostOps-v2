@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { loginUser } from '../services/authService';
 import { useAuthSubmit } from '../hooks/useAuth';
 
-const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL || '/dashboard';
-
 export default function LoginForm({ showMsg, hideMsg, onForgot }) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -13,7 +13,7 @@ export default function LoginForm({ showMsg, hideMsg, onForgot }) {
       sessionStorage.setItem('hp_access_token', data.accessToken);
       sessionStorage.setItem('hp_user', JSON.stringify(data.user));
       showMsg(`Welcome back, ${data.user.firstName}! Redirecting...`, 'success');
-      setTimeout(() => { window.location.href = DASHBOARD_URL; }, 800);
+      setTimeout(() => navigate('/dashboard', { replace: true }), 800);
     },
     onError: (msg) => showMsg(msg),
   });
