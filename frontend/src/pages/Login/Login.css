@@ -1,0 +1,219 @@
+/* ─── LOGIN PAGE ─────────────────────────────────────────── */
+.lp-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: linear-gradient(135deg, #eaf8f1 0%, #d4f0e4 100%);
+  padding: 20px;
+  width: 100vw;
+}
+
+.lp-card {
+  background: #fff;
+  border-radius: 24px;
+  padding: 40px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(4, 14, 9, 0.08);
+}
+
+/* ─── LOGO ───────────────────────────────────────────────── */
+.lp-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+  justify-content: center;
+}
+
+.lp-logo-mark {
+  width: 42px;
+  height: 42px;
+  background: #26a676;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-family: 'Sora', sans-serif;
+  font-size: 20px;
+  box-shadow: 0 6px 16px rgba(38, 166, 118, 0.3);
+}
+
+.lp-brand {
+  font-family: 'Sora', sans-serif;
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: #0c1c14;
+  letter-spacing: -0.5px;
+}
+
+/* ─── TABS ───────────────────────────────────────────────── */
+.lp-tabs {
+  display: flex;
+  background: #f0f5f2;
+  border-radius: 100px;
+  padding: 4px;
+  margin-bottom: 28px;
+}
+
+.lp-tab {
+  flex: 1;
+  padding: 11px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #6a8b7c;
+  cursor: pointer;
+  border-radius: 100px;
+  transition: all 0.2s;
+}
+
+.lp-tab.active {
+  background: #fff;
+  color: #0c1c14;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* ─── TYPOGRAPHY ─────────────────────────────────────────── */
+.lp-h1 {
+  font-family: 'Sora', sans-serif;
+  font-weight: 800;
+  font-size: 1.5rem;
+  color: #0c1c14;
+  margin: 0 0 8px;
+  letter-spacing: -0.5px;
+}
+
+.lp-sub {
+  color: #6a8b7c;
+  font-size: 0.92rem;
+  margin: 0 0 24px;
+  line-height: 1.5;
+}
+
+/* ─── FORM FIELDS ────────────────────────────────────────── */
+.lp-field {
+  margin-bottom: 16px;
+}
+
+.lp-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #2a4e3c;
+  margin-bottom: 6px;
+  letter-spacing: 0.2px;
+}
+
+.lp-input {
+  width: 100%;
+  padding: 13px 16px;
+  border: 1.5px solid #e3ede8;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: #0c1c14;
+  background: #f8fbf9;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.lp-input:focus {
+  border-color: #26a676;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(38, 166, 118, 0.1);
+}
+
+/* ─── BUTTON ─────────────────────────────────────────────── */
+.lp-btn {
+  width: 100%;
+  padding: 14px;
+  background: #26a676;
+  color: #fff;
+  border: none;
+  border-radius: 100px;
+  font-family: inherit;
+  font-size: 0.98rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all 0.2s;
+  box-shadow: 0 6px 18px rgba(38, 166, 118, 0.3);
+}
+
+.lp-btn:hover:not(:disabled) {
+  background: #1e8760;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(38, 166, 118, 0.4);
+}
+
+.lp-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── LINK BUTTON ────────────────────────────────────────── */
+.lp-link {
+  display: block;
+  text-align: center;
+  margin-top: 18px;
+  font-size: 0.85rem;
+  color: #26a676;
+  text-decoration: none;
+  font-weight: 600;
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  font-family: inherit;
+}
+
+.lp-link:hover {
+  text-decoration: underline;
+}
+
+/* ─── MESSAGE ────────────────────────────────────────────── */
+.lp-msg {
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+  display: none;
+  line-height: 1.4;
+}
+
+.lp-msg.error {
+  background: #fff0ee;
+  color: #c13515;
+  border: 1px solid #ffd5ce;
+}
+
+.lp-msg.success {
+  background: #d4f0e4;
+  color: #1e8760;
+  border: 1px solid #b7e4cf;
+}
+
+.lp-msg.show {
+  display: block;
+}
+
+/* ─── BACK HOME ──────────────────────────────────────────── */
+.lp-back-home {
+  display: block;
+  text-align: center;
+  margin-top: 24px;
+  font-size: 0.82rem;
+  color: #9ab8a9;
+  text-decoration: none;
+}
+
+.lp-back-home:hover {
+  color: #26a676;
+}
