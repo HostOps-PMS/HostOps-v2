@@ -1,13 +1,8 @@
 import React from 'react';
-import AppProviders from './app/providers';
-import AppRouter from './app/router';
+import LoginPage from './pages/Login';
 
 function App() {
-  return (
-    <AppProviders>
-      <AppRouter />
-    </AppProviders>
-  );
+  return <LoginPage />;
 }
 
 export default App;
