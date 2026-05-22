@@ -1,18 +1,23 @@
 import React, { useState } from 'react';
 import { registerUser } from '../services/authService';
 import { useAuthSubmit } from '../hooks/useAuth';
+import { validateRegistration } from '../utils/validators';
+import PasswordStrengthIndicator from './PasswordStrengthIndicator';
 
 export default function RegisterForm({ showMsg, hideMsg, onSuccess }) {
   const [fields, setFields] = useState({
-    firstName: '', lastName: '', email: '', password: '',
+    firstName: '', lastName: '', email: '', password: '', confirmPassword: '',
   });
 
-  const set = (key) => (e) => setFields((prev) => ({ ...prev, [key]: e.target.value }));
+  const set = (key) => (e) => {
+    setFields((prev) => ({ ...prev, [key]: e.target.value }));
+    hideMsg(); // clear errors on typing
+  };
 
   const { submit, loading } = useAuthSubmit(registerUser, {
     onSuccess: () => {
       showMsg('Account created! Check your email for a verification link before signing in.', 'success');
-      setFields({ firstName: '', lastName: '', email: '', password: '' });
+      setFields({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '' });
       onSuccess();
     },
     onError: (msg) => showMsg(msg),
@@ -21,7 +26,20 @@ export default function RegisterForm({ showMsg, hideMsg, onSuccess }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     hideMsg();
-    submit(fields);
+    
+    // Security protection: strict validation before submission
+    const validation = validateRegistration(fields);
+    if (!validation.isValid) {
+      const firstError = Object.values(validation.errors)[0];
+      showMsg(firstError, 'error');
+      return;
+    }
+    
+    // Omit confirmPassword from the actual API payload
+    const payload = { ...fields };
+    delete payload.confirmPassword;
+    
+    submit(payload);
   };
 
   return (
@@ -29,7 +47,7 @@ export default function RegisterForm({ showMsg, hideMsg, onSuccess }) {
       <h1 className="lp-h1">Create your account</h1>
       <p className="lp-sub">We'll email you a verification link.</p>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} autoComplete="off">
         <div className="lp-field">
           <label className="lp-label">First name</label>
           <input className="lp-input" type="text" required value={fields.firstName} onChange={set('firstName')} />
@@ -43,15 +61,29 @@ export default function RegisterForm({ showMsg, hideMsg, onSuccess }) {
           <input className="lp-input" type="email" required autoComplete="email" value={fields.email} onChange={set('email')} />
         </div>
         <div className="lp-field">
-          <label className="lp-label">Password (min 8 characters)</label>
+          <label className="lp-label">Password</label>
           <input
             className="lp-input"
             type="password"
             required
-            minLength={8}
             autoComplete="new-password"
             value={fields.password}
             onChange={set('password')}
+          />
+          <PasswordStrengthIndicator 
+            password={fields.password} 
+            confirmPassword={fields.confirmPassword} 
+          />
+        </div>
+        <div className="lp-field">
+          <label className="lp-label">Confirm password</label>
+          <input
+            className="lp-input"
+            type="password"
+            required
+            autoComplete="new-password"
+            value={fields.confirmPassword}
+            onChange={set('confirmPassword')}
           />
         </div>
         <button className="lp-btn" type="submit" disabled={loading}>

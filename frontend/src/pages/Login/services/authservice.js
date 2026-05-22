@@ -35,10 +35,31 @@ export async function forgotPassword({ email }) {
 }
 
 export async function checkSession() {
-  const token = sessionStorage.getItem('hp_access_token');
-  if (!token) return false;
-  const res = await fetch(`${API_BASE}/auth/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return res.ok;
+  let token = sessionStorage.getItem('hp_access_token');
+  
+  // First try with existing access token
+  if (token) {
+    const res = await fetch(`${API_BASE}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) return true;
+  }
+  
+  // If access token is missing or expired, attempt silent refresh via HttpOnly cookie
+  try {
+    const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include', // Crucial to send the HttpOnly 'rt' cookie
+    });
+    
+    if (refreshRes.ok) {
+      const data = await refreshRes.json();
+      sessionStorage.setItem('hp_access_token', data.accessToken);
+      return true;
+    }
+  } catch (error) {
+    console.error('Silent refresh failed:', error);
+  }
+  
+  return false;
 }

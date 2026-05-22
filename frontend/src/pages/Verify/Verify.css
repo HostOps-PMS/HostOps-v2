@@ -1,0 +1,86 @@
+.vf-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f4f7f6;
+  padding: 1rem;
+}
+
+.vf-card {
+  background: white;
+  padding: 2.5rem 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
+
+.vf-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  margin: 0 auto 1.5rem;
+}
+
+.vf-icon.success {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.vf-icon.error {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.vf-icon.loading {
+  color: #1976d2;
+}
+
+.vf-spinner {
+  animation: vf-spin 1s linear infinite;
+}
+
+@keyframes vf-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.vf-h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.75rem;
+}
+
+.vf-p {
+  color: #6b7280;
+  font-size: 0.95rem;
+  margin-bottom: 2rem;
+  line-height: 1.5;
+}
+
+.vf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: #2563eb;
+  color: white;
+  font-weight: 500;
+  border-radius: 6px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-size: 0.95rem;
+}
+
+.vf-btn:hover {
+  background-color: #1d4ed8;
+}
