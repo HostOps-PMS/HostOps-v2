@@ -136,44 +136,7 @@ return (
                 To see your live bookings, revenue, and calendar, add your Smoobu API key. You can find it in your Smoobu account under <strong>Settings → API</strong>.
               </p>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <a
-                  href="/settings/smoobu"
-                  style={{
-                    display: 'block',
-                    padding: '13px 24px',
-                    background: '#26a676',
-                    color: '#fff',
-                    borderRadius: 10,
-                    fontFamily: 'DM Sans, sans-serif',
-                    fontWeight: 700,
-                    fontSize: '.9rem',
-                    textDecoration: 'none',
-                    transition: 'background .15s',
-                  }}
-                >
-                  Add Smoobu API Key →
-                </a>
-
-                <a
-                  href="https://login.smoobu.com/en/cockpit/settings/api-settings"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'block',
-                    padding: '13px 24px',
-                    background: '#f0f5f2',
-                    color: '#2a4e3c',
-                    borderRadius: 10,
-                    fontFamily: 'DM Sans, sans-serif',
-                    fontWeight: 600,
-                    fontSize: '.9rem',
-                    textDecoration: 'none',
-                  }}
-                >
-                  Open Smoobu API Settings ↗
-                </a>
-              </div>
+              
 
               <p style={{ color: '#b0c9bc', fontSize: '.75rem', marginTop: 24 }}>
                 Your API key is stored securely and never shared.
