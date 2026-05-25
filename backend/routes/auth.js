@@ -14,21 +14,25 @@ const router = express.Router();
 
 // ── Validation schemas ──────────────────────────────────────────
 const registerSchema = z.object({
-  email: z.string().email().max(254),
-  password: z.string().min(8).max(128),
-  firstName: z.string().min(1).max(50),
-  lastName: z.string().max(50).optional().default(''),
+  email:             z.string().email().max(254),
+  password:          z.string().min(8).max(128),
+  firstName:         z.string().min(1).max(50),
+  lastName:          z.string().max(50).optional().default(''),
   propertyTagPrefix: z.string().optional().default(''),
+  // Each user connects their own Smoobu account via their API key.
+  // The login email must match the email on the Smoobu account.
+  // This key is stored with select:false and is loaded only on
+  // authenticated requests (see middleware/auth.js).
+  smoobuApiKey:      z.string().max(512).optional().default(''),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email:    z.string().email(),
   password: z.string().min(1),
 });
 
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/register
-// Create user, send verification email
 // ─────────────────────────────────────────────────────────────────
 router.post('/register', async (req, res, next) => {
   try {
@@ -39,32 +43,26 @@ router.post('/register', async (req, res, next) => {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
-    //const rawToken = randomToken();
-    //const hashed = hashToken(rawToken);
-
+    // smoobuApiKey and propertyTagPrefix are both optional at registration.
+    // Users with neither will see an empty dashboard (smoobuNotConnected)
+    // until they connect their Smoobu account via PATCH /auth/smoobu-key.
+    // belongsToUser() in smoobu.js correctly returns false for accounts
+    // with no key and no prefix — no data leak risk.
     const user = await User.create({
-      email: data.email.toLowerCase(),
-      password: data.password,
-      firstName: data.firstName,
-      lastName: data.lastName || '',
+      email:             data.email.toLowerCase(),
+      password:          data.password,
+      firstName:         data.firstName,
+      lastName:          data.lastName || '',
       propertyTagPrefix: data.propertyTagPrefix || '',
-      isVerified: true,
+      // Store the user's personal Smoobu API key so the smoobu service
+      // can use it to fetch only their properties and bookings.
+      smoobuApiKey:      data.smoobuApiKey || null,
+      isVerified:        true,
     });
 
-    /*const link = `${process.env.FRONTEND_URL}/verify?token=${rawToken}&email=${encodeURIComponent(user.email)}`;
-    try {
-      await sendVerificationEmail(user.email, user.firstName, link);
-    } catch (e) {
-      console.error('Email send failed:', e);
-      return res.status(500).json({
-        error: 'Account created but verification email failed to send. Check email service config.',
-        details: e.message
-      });
-    }*/
-
     res.status(201).json({
-      message: 'Account created. Please check your email to verify.',
-      userId: user._id,
+      message: 'Account created successfully.',
+      userId:  user._id,
     });
   } catch (err) {
     if (err.name === 'ZodError') {
@@ -76,6 +74,7 @@ router.post('/register', async (req, res, next) => {
 
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/verify
+// ─────────────────────────────────────────────────────────────────
 router.post('/verify', async (req, res, next) => {
   try {
     const { email, token } = req.body;
@@ -86,16 +85,14 @@ router.post('/verify', async (req, res, next) => {
     const hashed = hashToken(token);
     const user = await User.findOne({
       email: email.toLowerCase(),
-      //verifyToken: hashed,
-      //verifyTokenExpiry: { $gt: new Date() },
     }).select('+verifyToken +verifyTokenExpiry');
 
     if (!user) {
       return res.status(400).json({ error: 'Invalid or expired token' });
     }
 
-    user.isVerified = true;
-    user.verifyToken = undefined;
+    user.isVerified        = true;
+    user.verifyToken       = undefined;
     user.verifyTokenExpiry = undefined;
     await user.save();
 
@@ -105,6 +102,7 @@ router.post('/verify', async (req, res, next) => {
 
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/login
+// ─────────────────────────────────────────────────────────────────
 router.post('/login', async (req, res, next) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
@@ -117,12 +115,12 @@ router.post('/login', async (req, res, next) => {
       return res.status(403).json({ error: 'Please verify your email first' });
     }
 
-    const accessToken = signAccessToken(user);
+    const accessToken  = signAccessToken(user);
     const refreshToken = signRefreshToken(user);
 
     await RefreshToken.create({
-      userId: user._id,
-      token: hashToken(refreshToken),
+      userId:    user._id,
+      token:     hashToken(refreshToken),
       expiresAt: refreshTokenExpiry(),
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
@@ -133,10 +131,10 @@ router.post('/login', async (req, res, next) => {
 
     res.cookie('rt', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure:   process.env.NODE_ENV === 'production',
       sameSite: 'none',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/auth',
+      maxAge:   7 * 24 * 60 * 60 * 1000,
+      path:     '/auth',
     });
 
     res.json({
@@ -153,6 +151,7 @@ router.post('/login', async (req, res, next) => {
 
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/refresh
+// ─────────────────────────────────────────────────────────────────
 router.post('/refresh', async (req, res, next) => {
   try {
     const rawToken = req.cookies?.rt;
@@ -174,13 +173,13 @@ router.post('/refresh', async (req, res, next) => {
     if (!user) return res.status(401).json({ error: 'User not found' });
 
     const newRefreshToken = signRefreshToken(user);
-    stored.revokedAt = new Date();
-    stored.replacedBy = hashToken(newRefreshToken);
+    stored.revokedAt   = new Date();
+    stored.replacedBy  = hashToken(newRefreshToken);
     await stored.save();
 
     await RefreshToken.create({
-      userId: user._id,
-      token: hashToken(newRefreshToken),
+      userId:    user._id,
+      token:     hashToken(newRefreshToken),
       expiresAt: refreshTokenExpiry(),
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
@@ -188,10 +187,10 @@ router.post('/refresh', async (req, res, next) => {
 
     res.cookie('rt', newRefreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure:   process.env.NODE_ENV === 'production',
       sameSite: 'none',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/auth',
+      maxAge:   7 * 24 * 60 * 60 * 1000,
+      path:     '/auth',
     });
 
     res.json({ accessToken: signAccessToken(user) });
@@ -200,6 +199,7 @@ router.post('/refresh', async (req, res, next) => {
 
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/logout
+// ─────────────────────────────────────────────────────────────────
 router.post('/logout', async (req, res, next) => {
   try {
     const rawToken = req.cookies?.rt;
@@ -216,12 +216,36 @@ router.post('/logout', async (req, res, next) => {
 
 // ─────────────────────────────────────────────────────────────────
 // GET /auth/me
+// ─────────────────────────────────────────────────────────────────
 router.get('/me', requireAuth, (req, res) => {
   res.json({ user: req.user.toJSON() });
 });
 
 // ─────────────────────────────────────────────────────────────────
+// PATCH /auth/smoobu-key  — Update / connect Smoobu API key
+// Allows an already-registered user to add or rotate their key
+// without re-registering.
+// ─────────────────────────────────────────────────────────────────
+router.patch('/smoobu-key', requireAuth, async (req, res, next) => {
+  try {
+    const { smoobuApiKey } = req.body;
+    if (!smoobuApiKey || typeof smoobuApiKey !== 'string' || !smoobuApiKey.trim()) {
+      return res.status(400).json({ error: 'smoobuApiKey is required' });
+    }
+
+    // Load the user with the key field explicitly (select: false in schema)
+    const user = await User.findById(req.user._id).select('+smoobuApiKey');
+    user.smoobuApiKey      = smoobuApiKey.trim();
+    user.smoobuConnectedAt = new Date();
+    await user.save();
+
+    res.json({ message: 'Smoobu API key updated successfully.' });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────
 // POST /auth/forgot-password
+// ─────────────────────────────────────────────────────────────────
 router.post('/forgot-password', async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -229,8 +253,8 @@ router.post('/forgot-password', async (req, res, next) => {
 
     const user = await User.findOne({ email: email.toLowerCase() });
     if (user) {
-    const rawToken = randomToken();
-      user.resetToken = hashToken(rawToken);
+      const rawToken = randomToken();
+      user.resetToken       = hashToken(rawToken);
       user.resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
       await user.save();
 
@@ -248,6 +272,7 @@ router.post('/forgot-password', async (req, res, next) => {
 
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/reset-password
+// ─────────────────────────────────────────────────────────────────
 router.post('/reset-password', async (req, res, next) => {
   try {
     const { email, token, newPassword } = req.body;
@@ -259,15 +284,15 @@ router.post('/reset-password', async (req, res, next) => {
     }
 
     const user = await User.findOne({
-      email: email.toLowerCase(),
-      resetToken: hashToken(token),
+      email:            email.toLowerCase(),
+      resetToken:       hashToken(token),
       resetTokenExpiry: { $gt: new Date() },
     }).select('+resetToken +resetTokenExpiry');
 
     if (!user) return res.status(400).json({ error: 'Invalid or expired token' });
 
-    user.password = newPassword;
-    user.resetToken = undefined;
+    user.password         = newPassword;
+    user.resetToken       = undefined;
     user.resetTokenExpiry = undefined;
     await user.save();
 
