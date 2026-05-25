@@ -1,6 +1,4 @@
-import React from 'react';
-import { fmtMoney } from '../../utils/dateHelpers';
-import { getChannelColor } from '../utils/channelHelpers';
+import React, { useState } from 'react';
 
 const PLATFORM_COLORS = {
   Airbnb: '#FF5A5F',
@@ -8,126 +6,367 @@ const PLATFORM_COLORS = {
   VRBO: '#8b5cf6',
   Direct: '#56c299',
   'Direct booking': '#56c299',
-  Agoda: '#64748b',
+  Agoda: '#8b5cf6',
   Website: '#94a3b8',
 };
 
-function DonutChart({ segments, size = 80 }) {
-  const total = segments.reduce((s, seg) => s + seg.value, 0) || 1;
-  let cumulative = 0;
-  const innerSize = size * 0.675;
+const META = {
+  revenue: {
+    label: 'Total revenue',
+    fmt: (v) => '₱' + v.toLocaleString(),
+    sub: 'this period',
+  },
+  bookings: {
+    label: 'Total bookings',
+    fmt: (v) => String(v),
+    sub: 'confirmed',
+  },
+  nights: {
+    label: 'Total nights',
+    fmt: (v) => String(v),
+    sub: 'booked',
+  },
+};
 
-  const paths = segments.map((seg, i) => {
-    const pct = seg.value / total;
-    const start = cumulative;
-    cumulative += pct;
-
-    const startAngle = start * 2 * Math.PI - Math.PI / 2;
-    const endAngle = cumulative * 2 * Math.PI - Math.PI / 2;
-    const r = size / 2;
-    const cx = size / 2;
-    const cy = size / 2;
-    const x1 = cx + r * Math.cos(startAngle);
-    const y1 = cy + r * Math.sin(startAngle);
-    const x2 = cx + r * Math.cos(endAngle);
-    const y2 = cy + r * Math.sin(endAngle);
-    const large = pct > 0.5 ? 1 : 0;
-
-    return (
-      <path
-        key={i}
-        d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`}
-        fill={seg.color}
-      />
-    );
-  });
-
+/* ─── Bar Row ────────────────────────────────────────────────────── */
+function BarRow({ ch, color, value, pct, fmtFn }) {
   return (
-    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
-      <svg width={size} height={size} style={{ borderRadius: '50%', overflow: 'hidden' }}>
-        {paths}
-        <circle cx={size / 2} cy={size / 2} r={innerSize / 2} fill="#fff" />
-      </svg>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        marginBottom: 14,
+      }}
+    >
+      <div
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          background: color,
+          flexShrink: 0,
+        }}
+      />
+      <div
+        style={{
+          fontSize: 12,
+          fontFamily: "'DM Sans', sans-serif",
+          color: '#6a8b7c',
+          width: 110,
+          flexShrink: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {ch}
+      </div>
+      <div
+        style={{
+          flex: 1,
+          height: 7,
+          background: '#f0f5f2',
+          borderRadius: 100,
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            width: `${pct}%`,
+            height: '100%',
+            background: color,
+            borderRadius: 100,
+            transition: 'width .45s cubic-bezier(.4,0,.2,1)',
+          }}
+        />
+      </div>
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          fontFamily: "'DM Sans', sans-serif",
+          color: '#0c1c14',
+          minWidth: 40,
+          textAlign: 'right',
+        }}
+      >
+        {fmtFn(value)}
+      </div>
+      <div
+        style={{
+          fontSize: 11,
+          fontFamily: "'DM Sans', sans-serif",
+          color: '#9ab8a9',
+          minWidth: 34,
+          textAlign: 'right',
+        }}
+      >
+        {pct}%
+      </div>
     </div>
   );
 }
 
-/**
- * Platform breakdown section — one donut per metric per channel.
- */
+/* ─── Stat Box ───────────────────────────────────────────────────── */
+function StatBox({ label, value, sub, isLast }) {
+  return (
+    <div
+      style={{
+        flex: 1,
+        padding: '14px 20px',
+        borderRight: isLast ? 'none' : '1px solid #f0f5f2',
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          fontFamily: "'DM Sans', sans-serif",
+          color: '#9ab8a9',
+          marginBottom: 4,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 14,
+          fontWeight: 800,
+          fontFamily: "'Sora', sans-serif",
+          color: '#0c1c14',
+          lineHeight: 1.2,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {value}
+      </div>
+      <div
+        style={{
+          fontSize: 11,
+          fontFamily: "'DM Sans', sans-serif",
+          color: '#9ab8a9',
+          marginTop: 2,
+        }}
+      >
+        {sub}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Main export ────────────────────────────────────────────────── */
 export default function PlatformBreakdown({ byChannel = {} }) {
+  const [activeKey, setActiveKey] = useState('revenue');
+
   const channels = Object.keys(byChannel);
 
+  /* ── Empty state ── */
   if (!channels.length) {
     return (
-      <div className="db-card">
-        <div className="chart-card-title" style={{ marginBottom: 12 }}>Platform Breakdown</div>
-        <div style={{ padding: '20px 0', textAlign: 'center', color: '#9ab8a9', fontSize: '.85rem' }}>
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 20,
+          border: '1px solid #e8f0eb',
+          boxShadow: '0 1px 6px rgba(0,0,0,.05)',
+          padding: '22px 24px',
+        }}
+      >
+        <div
+          style={{
+            fontFamily: "'Sora', sans-serif",
+            fontSize: '1rem',
+            fontWeight: 800,
+            color: '#0c1c14',
+            marginBottom: 12,
+          }}
+        >
+          Platform Breakdown
+        </div>
+        <div
+          style={{
+            padding: '20px 0',
+            textAlign: 'center',
+            color: '#9ab8a9',
+            fontSize: '.85rem',
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
           No channel data available.
         </div>
       </div>
     );
   }
 
-  const totalRevenue = channels.reduce((s, ch) => s + (byChannel[ch].revenue || 0), 0) || 1;
-  const totalBookings = channels.reduce((s, ch) => s + (byChannel[ch].bookings || 0), 0) || 1;
-  const totalNights = channels.reduce((s, ch) => s + (byChannel[ch].nights || 0), 0) || 1;
+  const m = META[activeKey] || META.revenue;
+  const sorted = [...channels].sort(
+    (a, b) => (byChannel[b][activeKey] || 0) - (byChannel[a][activeKey] || 0)
+  );
+  const total =
+    sorted.reduce((s, ch) => s + (byChannel[ch][activeKey] || 0), 0) || 1;
+  const topCh = sorted[0];
+  const topPct = Math.round(((byChannel[topCh][activeKey] || 0) / total) * 100);
 
-  const revSegments = channels.map((ch) => ({ color: PLATFORM_COLORS[ch] || getChannelColor(ch), value: byChannel[ch].revenue || 0 }));
-  const bookSegments = channels.map((ch) => ({ color: PLATFORM_COLORS[ch] || getChannelColor(ch), value: byChannel[ch].bookings || 0 }));
-  const nightSegments = channels.map((ch) => ({ color: PLATFORM_COLORS[ch] || getChannelColor(ch), value: byChannel[ch].nights || 0 }));
+  const tabKeys = ['revenue', 'bookings', 'nights'];
 
   return (
-    <div className="db-card" style={{ padding: 0 }}>
-      <div className="section-head">
+    <div
+      style={{
+        background: '#fff',
+        borderRadius: 20,
+        border: '1px solid #e8f0eb',
+        boxShadow: '0 1px 6px rgba(0,0,0,.05)',
+        overflow: 'hidden',
+      }}
+    >
+      {/* ── Header ── */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          padding: '18px 22px 14px',
+          borderBottom: '1px solid #f0f5f2',
+          flexWrap: 'wrap',
+          gap: 10,
+        }}
+      >
         <div>
-          <div className="chart-card-title">Platform Breakdown</div>
-          <div className="chart-card-sub">Revenue · Bookings · Nights</div>
+          <div
+            style={{
+              fontFamily: "'Sora', sans-serif",
+              fontSize: '1rem',
+              fontWeight: 800,
+              color: '#0c1c14',
+              marginBottom: 2,
+            }}
+          >
+            Platform Breakdown
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              fontFamily: "'DM Sans', sans-serif",
+              color: '#9ab8a9',
+            }}
+          >
+            Revenue · Bookings · Nights
+          </div>
+        </div>
+
+        {/* Tab switcher */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 2,
+            background: '#f0f5f2',
+            borderRadius: 8,
+            padding: 3,
+          }}
+        >
+          {tabKeys.map((k) => {
+            const on = activeKey === k;
+            return (
+              <button
+                key={k}
+                onClick={() => setActiveKey(k)}
+                style={{
+                  padding: '5px 14px',
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  fontFamily: "'DM Sans', sans-serif",
+                  color: on ? '#0c1c14' : '#6a8b7c',
+                  background: on ? '#fff' : 'transparent',
+                  border: on ? '1px solid #e8f0eb' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all .15s',
+                  boxShadow: on ? '0 1px 3px rgba(0,0,0,.06)' : 'none',
+                }}
+              >
+                {k.charAt(0).toUpperCase() + k.slice(1)}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="portal-wrap" style={{ padding: '12px 24px 20px' }}>
-        {/* Revenue donut */}
-        <div className="donut-col">
-          <div className="donut-title">Revenue</div>
-          <DonutChart segments={revSegments} />
-          <div className="donut-legend">
-            {channels.map((ch) => (
-              <div key={ch}>
-                <span className="donut-legend-dot" style={{ background: PLATFORM_COLORS[ch] || getChannelColor(ch) }} />
-                {ch}: {Math.round((byChannel[ch].revenue / totalRevenue) * 100)}%
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* ── Stat row ── */}
+      <div
+        style={{
+          display: 'flex',
+          borderBottom: '1px solid #f0f5f2',
+          overflow: 'hidden',
+        }}
+      >
+        <StatBox label={m.label} value={m.fmt(total)} sub={m.sub} />
+        <StatBox
+          label="Top channel"
+          value={topCh}
+          sub={`${topPct}% of ${activeKey}`}
+        />
+        <StatBox
+          label="Channels"
+          value={channels.length}
+          sub="active platforms"
+          isLast
+        />
+      </div>
 
-        {/* Bookings donut */}
-        <div className="donut-col">
-          <div className="donut-title">Bookings</div>
-          <DonutChart segments={bookSegments} />
-          <div className="donut-legend">
-            {channels.map((ch) => (
-              <div key={ch}>
-                <span className="donut-legend-dot" style={{ background: PLATFORM_COLORS[ch] || getChannelColor(ch) }} />
-                {ch}: {byChannel[ch].bookings || 0}
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* ── Bar chart ── */}
+      <div style={{ padding: '20px 22px 8px' }}>
+        {sorted.map((ch) => {
+          const val = byChannel[ch][activeKey] || 0;
+          const pct = Math.round((val / total) * 100);
+          const color = PLATFORM_COLORS[ch] || '#94a3b8';
+          return (
+            <BarRow
+              key={ch}
+              ch={ch}
+              color={color}
+              value={val}
+              pct={pct}
+              fmtFn={m.fmt}
+            />
+          );
+        })}
+      </div>
 
-        {/* Nights donut */}
-        <div className="donut-col">
-          <div className="donut-title">Nights</div>
-          <DonutChart segments={nightSegments} />
-          <div className="donut-legend">
-            {channels.map((ch) => (
-              <div key={ch}>
-                <span className="donut-legend-dot" style={{ background: PLATFORM_COLORS[ch] || getChannelColor(ch) }} />
-                {ch}: {byChannel[ch].nights || 0}
-              </div>
-            ))}
+      {/* ── Legend footer ── */}
+      <div
+        style={{
+          padding: '10px 22px 16px',
+          borderTop: '1px solid #f0f5f2',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+        }}
+      >
+        {channels.map((ch) => (
+          <div
+            key={ch}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              fontSize: 11,
+              fontFamily: "'DM Sans', sans-serif",
+              color: '#9ab8a9',
+            }}
+          >
+            <div
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: PLATFORM_COLORS[ch] || '#94a3b8',
+              }}
+            />
+            {ch}
           </div>
-        </div>
+        ))}
       </div>
     </div>
   );
