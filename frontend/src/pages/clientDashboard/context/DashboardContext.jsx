@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useState } from 'react';
 import { getPresetRange } from '../../utils/dateHelpers';
 
 const DashboardContext = createContext(null);
@@ -18,9 +18,12 @@ export function DashboardProvider({ children }) {
     calMonthsCount: 6,
   });
 
-  function updateDashState(partial) {
+  // useCallback ensures this function reference is stable across renders,
+  // preventing useDashboardData's useCallback from re-creating on every render
+  // (which was causing loadData to fire repeatedly).
+  const updateDashState = useCallback((partial) => {
     setDashState((prev) => ({ ...prev, ...partial }));
-  }
+  }, []);
 
   return (
     <DashboardContext.Provider value={{ dashState, setDashState, updateDashState }}>
