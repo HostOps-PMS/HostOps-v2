@@ -1,17 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import Navbar from './components/Navbar';
-import Banner from './components/Banner';
-import StatCards from './components/StatCards';
-import RevenueChart from './components/RevenueChart';
-import PlatformBreakdown from './components/PlatformBreakdown';
-import CalendarSection from './components/CalendarSection';
-import UnifiedInbox from './components/UnifiedInbox';
-import ActivityFeed from './components/ActivityFeed';
-import MessageModal from './components/MessageModal';
-import { useDashboard } from './context/DashboardContext';
-import { useDashboardData } from './hooks/useDashboardData';
-import './globals.css';
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Sora:wght@700;800&display=swap" rel="stylesheet" />
+import React, { useEffect, useState } from "react";
+import Navbar from "./components/Navbar";
+import Banner from "./components/Banner";
+import StatCards from "./components/StatCards";
+import RevenueChart from "./components/RevenueChart";
+import PlatformBreakdown from "./components/PlatformBreakdown";
+import CalendarSection from "./components/CalendarSection";
+import UnifiedInbox from "./components/UnifiedInbox";
+import ActivityFeed from "./components/ActivityFeed";
+import MessageModal from "./components/MessageModal";
+import { useDashboard } from "./context/DashboardContext";
+import { useDashboardData } from "./hooks/useDashboardData";
+import "./globals.css";
 
 export default function DashboardPage() {
   const { dashState } = useDashboard();
@@ -49,70 +48,86 @@ export default function DashboardPage() {
   const byChannel = data.byChannel || {};
   const period = data.period || {};
 
-  const ownerName = data.ownerName || 'Dashboard';
+  const ownerName = data.ownerName || "Dashboard";
 
-  return (
-    <div>
-      <Navbar onBackClick={() => window.history.back()} />
+return (
+    <div style={{ background: "#f4f6f5", minHeight: "100vh" }}>
+      <Navbar />
       <Banner type={banner.type} message={banner.message} />
 
-      <div style={{ background: '#f7faf8', minHeight: '100vh' }}>
-        <div className="db-demo-bar">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
-          Live Data Dashboard
-        </div>
+      <div className="db-container" style={{ paddingTop: 32, paddingBottom: 48 }}>
 
-        <div className="db-container">
-          {/* Page title */}
-          <div style={{ marginBottom: 28 }}>
-            <h1 style={{ fontFamily: "'Sora',sans-serif", fontSize: '1.75rem', fontWeight: 800, color: '#0c1c14', margin: '0 0 4px' }}>
+        {/* ── HEADER ROW ── */}
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 32 }}>
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#9ab8a9", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
+              Portfolio Overview
+            </p>
+            <h1 style={{ fontFamily: "'Sora',sans-serif", fontSize: "2rem", fontWeight: 800, color: "#0c1c14", margin: 0, lineHeight: 1.1 }}>
               {ownerName}
             </h1>
-            <p style={{ color: '#9ab8a9', fontSize: '.88rem', margin: 0 }}>Your portfolio at a glance</p>
           </div>
-
-          {/* KPI cards */}
-          <StatCards stats={stats} />
-
-          {/* Chart + Platform breakdown */}
-          <div className="db-grid-2-chart">
-            <RevenueChart data={data} period={period} />
-            <PlatformBreakdown byChannel={byChannel} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #e3ede8", borderRadius: 10, padding: "8px 14px", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", display: "inline-block", boxShadow: "0 0 0 2px #bbf7d0" }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#0f6e56" }}>Live Data</span>
           </div>
+        </div>
 
-          {/* Calendar */}
+        {/* ── KPI STRIP ── */}
+        <StatCards stats={stats} />
+
+        {/* ── MAIN 2-COL: Chart (wide) + Platform (narrow) ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 20, marginTop: 20 }}>
+          <RevenueChart data={data} period={period} />
+          <PlatformBreakdown byChannel={byChannel} />
+        </div>
+
+        {/* ── CALENDAR FULL WIDTH ── */}
+        <div style={{ marginTop: 20 }}>
           <CalendarSection />
+        </div>
 
-          {/* Inbox + Activity Feed */}
-          <div className="db-grid-2-bottom">
-            <UnifiedInbox
-              inbox={inbox}
-              totalUnread={totalUnread}
-              onThreadClick={handleThreadClick}
-            />
-            <ActivityFeed bookings={bookings} channels={dashState.channels} />
-          </div>
+        {/* ── BOTTOM 2-COL: Inbox + Activity ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginTop: 20 }}>
+          <UnifiedInbox
+            inbox={inbox}
+            totalUnread={totalUnread}
+            onThreadClick={handleThreadClick}
+          />
+          <ActivityFeed bookings={bookings} channels={dashState.channels} />
+        </div>
 
-          {/* CTA */}
-          <div className="cta-bottom">
-            <div className="cta-bottom-title">Ready to see this with your real data?</div>
-            <div className="cta-bottom-sub">Our team will set up your properties and start managing operations within days.</div>
-            <div className="cta-btns">
-              <button className="cta-btn-primary">Start Setup →</button>
-              <button className="cta-btn-secondary">Book a Quick Walkthrough</button>
+        {/* ── CTA ── */}
+        <div style={{
+          marginTop: 32,
+          background: "linear-gradient(135deg, #0f6e56 0%, #0a4f3d 100%)",
+          borderRadius: 20, padding: "40px 48px",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 24,
+        }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", marginBottom: 8, fontFamily: "'Sora',sans-serif" }}>
+              Ready to see this with your real data?
+            </div>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", maxWidth: 420 }}>
+              Our team will set up your properties and start managing operations within days.
             </div>
           </div>
-
-          <div style={{ textAlign: 'center', padding: '24px 0 0', color: '#c5d8cd', fontSize: '.75rem' }}>
-            © 2026 HostOps. All rights reserved.
+          <div style={{ display: "flex", gap: 12, flexShrink: 0 }}>
+            <button className="cta-btn-primary" style={{ background: "#fff", color: "#0f6e56", border: "none", borderRadius: 10, padding: "12px 22px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+              Start Setup →
+            </button>
+            <button className="cta-btn-secondary" style={{ background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 10, padding: "12px 22px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+              Book a Walkthrough
+            </button>
           </div>
+        </div>
+
+        <div style={{ textAlign: "center", padding: "24px 0 0", color: "#c5d8cd", fontSize: ".75rem" }}>
+          © 2026 HostOps. All rights reserved.
         </div>
       </div>
 
-      {/* Message reply modal */}
       <MessageModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
