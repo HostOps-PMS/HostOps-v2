@@ -21,7 +21,7 @@ export function useResetPassword({ email, token }) {
     try {
       await resetPassword({ email, token, newPassword });
       showMsg('Password reset! Redirecting to sign in…', 'success');
-      setTimeout(() => navigate('/login'), 1500);
+      setTimeout(() => navigate('/'), 1500);
     } catch (err) {
       showMsg(err.message || 'Reset failed. Please try again.', 'error');
     }
