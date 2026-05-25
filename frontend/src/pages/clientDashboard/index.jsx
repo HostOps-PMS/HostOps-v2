@@ -1,20 +1,59 @@
-import React, { useEffect, useState } from "react";
-import Navbar from "./components/Navbar";
-import Banner from "./components/Banner";
-import StatCards from "./components/StatCards";
-import RevenueChart from "./components/RevenueChart";
-import PlatformBreakdown from "./components/PlatformBreakdown";
-import CalendarSection from "./components/CalendarSection";
-import UnifiedInbox from "./components/UnifiedInbox";
-import ActivityFeed from "./components/ActivityFeed";
-import MessageModal from "./components/MessageModal";
-import { useDashboard } from "./context/DashboardContext";
-import { useDashboardData } from "./hooks/useDashboardData";
-import "./globals.css";
+import React, { useEffect, useState } from 'react';
+import Navbar from './components/Navbar';
+import Banner from './components/Banner';
+import StatCards from './components/StatCards';
+import RevenueChart from './components/RevenueChart';
+import PlatformBreakdown from './components/PlatformBreakdown';
+import CalendarSection from './components/CalendarSection';
+import UnifiedInbox from './components/UnifiedInbox';
+import ActivityFeed from './components/ActivityFeed';
+import MessageModal from './components/MessageModal';
+import PricingModal from './components/PricingModal';
+import { useDashboard } from './context/DashboardContext';
+import { useDashboardData } from './hooks/useDashboardData';
+import './globals.css';
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Sora:wght@700;800&display=swap" rel="stylesheet" />
 
 export default function DashboardPage() {
   const { dashState } = useDashboard();
   const { loadData, banner } = useDashboardData();
+
+  // ── Current logged-in user (for PricingModal pre-fill) ──────────────────────
+  // Tries multiple localStorage keys that your auth layer may use.
+  // The login response from the backend is: { accessToken, user: { firstName, lastName, email, ... } }
+  // So we check both a direct user object AND a wrapped { user: {...} } shape.
+  // If you have a useAuth() hook, replace this entire block with:
+  //   const { user: currentUser } = useAuth();
+  const [currentUser] = useState(() => {
+    try {
+      // Keys to check, in order of preference
+      const CANDIDATE_KEYS = ['hp_user', 'user', 'auth_user', 'currentUser', 'hostpilot_user'];
+
+      for (const key of CANDIDATE_KEYS) {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+
+        const parsed = JSON.parse(raw);
+
+        // Shape 1: stored directly as the user object — { firstName, lastName, email, ... }
+        if (parsed && (parsed.firstName || parsed.email)) {
+          return parsed;
+        }
+
+        // Shape 2: stored as { accessToken, user: { firstName, lastName, email, ... } }
+        if (parsed && parsed.user && (parsed.user.firstName || parsed.user.email)) {
+          return parsed.user;
+        }
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Pricing modal state
+  const [pricingOpen, setPricingOpen] = useState(false);
 
   // Message modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -190,7 +229,7 @@ return (
                 <div className="cta-bottom-title">Ready to see this with your real data?</div>
                 <div className="cta-bottom-sub">Our team will set up your properties and start managing operations within days.</div>
                 <div className="cta-btns">
-                  <button className="cta-btn-primary">Start Setup →</button>
+                  <button className="cta-btn-primary" onClick={() => setPricingOpen(true)}>Start Setup →</button>
                   <button className="cta-btn-secondary">Book a Quick Walkthrough</button>
                 </div>
               </div>
@@ -202,6 +241,13 @@ return (
           </>
         )}
       </div>
+
+      {/* Pricing modal */}
+      <PricingModal
+        isOpen={pricingOpen}
+        onClose={() => setPricingOpen(false)}
+        user={currentUser}
+      />
 
       <MessageModal
         isOpen={modalOpen}
