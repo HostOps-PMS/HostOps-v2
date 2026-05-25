@@ -1,0 +1,69 @@
+.otp-container {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 24px 0;
+  width: 100%;
+}
+
+.otp-input {
+  width: 100%;
+  aspect-ratio: 1 / 1.1;
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+  border: 2px solid #e3ede8;
+  border-radius: 12px;
+  background: #f8fbf9;
+  color: #0c1c14;
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.otp-input:focus {
+  border-color: #26a676;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(38, 166, 118, 0.1);
+  transform: translateY(-2px);
+}
+
+.otp-input:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Success State */
+.otp-success .otp-input {
+  border-color: #26a676;
+  background: #eaf8f1;
+}
+
+/* Error State */
+.otp-error .otp-input {
+  border-color: #c13515;
+  background: #fff0ee;
+  color: #c13515;
+}
+
+/* Shake Animation */
+.shake {
+  animation: otp-shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes otp-shake {
+  10%, 90% { transform: translate3d(-2px, 0, 0); }
+  20%, 80% { transform: translate3d(3px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-5px, 0, 0); }
+  40%, 60% { transform: translate3d(5px, 0, 0); }
+}
+
+@media (max-width: 400px) {
+  .otp-container {
+    gap: 6px;
+  }
+  .otp-input {
+    font-size: 1.2rem;
+    border-radius: 8px;
+  }
+}

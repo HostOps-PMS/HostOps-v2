@@ -39,8 +39,8 @@ router.post('/register', async (req, res, next) => {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
-    //const rawToken = randomToken();
-    //const hashed = hashToken(rawToken);
+    const rawToken = randomToken();
+    const hashed = hashToken(rawToken);
 
     const user = await User.create({
       email: data.email.toLowerCase(),
@@ -48,19 +48,35 @@ router.post('/register', async (req, res, next) => {
       firstName: data.firstName,
       lastName: data.lastName || '',
       propertyTagPrefix: data.propertyTagPrefix || '',
-      isVerified: true,
+      isVerified: false,
+      verifyToken: hashed,
+      verifyTokenExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
     });
 
-    /*const link = `${process.env.FRONTEND_URL}/verify?token=${rawToken}&email=${encodeURIComponent(user.email)}`;
+    // --- ADD CONTACT TO GHL ---
+    const contactWebhookUrl = process.env.GHL_CONTACT_WEBHOOK_URL;
+    if (contactWebhookUrl) {
+      try {
+        await fetch(contactWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: user.email,
+            first_name: user.firstName,
+            last_name: user.lastName
+          }),
+        });
+      } catch (err) {
+        console.error('Failed to trigger GHL Contact webhook:', err);
+      }
+    }
+    // --------------------------
+
     try {
-      await sendVerificationEmail(user.email, user.firstName, link);
+      await sendVerificationEmail(user.email, user.firstName, rawToken);
     } catch (e) {
       console.error('Email send failed:', e);
-      return res.status(500).json({
-        error: 'Account created but verification email failed to send. Check email service config.',
-        details: e.message
-      });
-    }*/
+    }
 
     res.status(201).json({
       message: 'Account created. Please check your email to verify.',
@@ -86,8 +102,8 @@ router.post('/verify', async (req, res, next) => {
     const hashed = hashToken(token);
     const user = await User.findOne({
       email: email.toLowerCase(),
-      //verifyToken: hashed,
-      //verifyTokenExpiry: { $gt: new Date() },
+      verifyToken: hashed,
+      verifyTokenExpiry: { $gt: new Date() },
     }).select('+verifyToken +verifyTokenExpiry');
 
     if (!user) {
@@ -234,9 +250,8 @@ router.post('/forgot-password', async (req, res, next) => {
       user.resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
       await user.save();
 
-      const link = `${process.env.FRONTEND_URL}/reset?token=${rawToken}&email=${encodeURIComponent(user.email)}`;
       try {
-        await sendResetEmail(user.email, user.firstName, link);
+        await sendResetEmail(user.email, user.firstName, rawToken);
       } catch (e) {
         console.error('Reset email send failed:', e);
       }
@@ -277,6 +292,80 @@ router.post('/reset-password', async (req, res, next) => {
     );
 
     res.json({ message: 'Password reset. Please log in with your new password.' });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/verify-reset-token
+// Used to silently verify the 6-digit OTP before asking for new password
+// ─────────────────────────────────────────────────────────────────
+router.post('/verify-reset-token', async (req, res, next) => {
+  try {
+    const { email, token } = req.body;
+    if (!email || !token) return res.status(400).json({ error: 'Email and token required' });
+
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+      resetToken: hashToken(token),
+      resetTokenExpiry: { $gt: new Date() },
+    }).select('+resetToken +resetTokenExpiry');
+
+    if (!user) return res.status(400).json({ error: 'Invalid or expired code' });
+
+    res.json({ valid: true });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/resend-verification
+// ─────────────────────────────────────────────────────────────────
+router.post('/resend-verification', async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) return res.json({ message: 'If registered, a new code has been sent.' });
+    if (user.isVerified) return res.status(400).json({ error: 'Already verified' });
+
+    const rawToken = randomToken();
+    user.verifyToken = hashToken(rawToken);
+    user.verifyTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await user.save();
+
+    try {
+      await sendVerificationEmail(user.email, user.firstName, rawToken);
+    } catch (e) {
+      console.error('Email send failed:', e);
+    }
+
+    res.json({ message: 'If registered, a new code has been sent.' });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/resend-reset
+// ─────────────────────────────────────────────────────────────────
+router.post('/resend-reset', async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (user) {
+      const rawToken = randomToken();
+      user.resetToken = hashToken(rawToken);
+      user.resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
+      await user.save();
+
+      try {
+        await sendResetEmail(user.email, user.firstName, rawToken);
+      } catch (e) {
+        console.error('Reset email send failed:', e);
+      }
+    }
+
+    res.json({ message: 'If registered, a new code has been sent.' });
   } catch (err) { next(err); }
 });
 

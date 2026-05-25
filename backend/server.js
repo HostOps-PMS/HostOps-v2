@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { connectDB, disconnectDB } from './config/db.js';
 import authRoutes from './routes/auth.js';
 import dashboardRoutes from './routes/dashboard.js';
+import { requireApiKey } from './middleware/apiKeyAuth.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -67,7 +68,7 @@ app.use(
     },
     credentials: true,
     methods:     ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'x-api-key'],
   })
 );
 
@@ -109,6 +110,9 @@ app.use('/auth/login',          authLimiter);
 app.use('/auth/register',       authLimiter);
 app.use('/auth/forgot-password', authLimiter);
 app.use('/auth/reset-password',  authLimiter);
+
+// ── Global API Key Protection ─────────────────────────────────────────────────
+app.use(requireApiKey);
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/auth', authRoutes);
