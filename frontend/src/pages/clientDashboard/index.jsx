@@ -1,18 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import Navbar from './components/Navbar';
-import Banner from './components/Banner';
-import StatCards from './components/StatCards';
-import RevenueChart from './components/RevenueChart';
-import PlatformBreakdown from './components/PlatformBreakdown';
-import CalendarSection from './components/CalendarSection';
-import UnifiedInbox from './components/UnifiedInbox';
-import ActivityFeed from './components/ActivityFeed';
-import MessageModal from './components/MessageModal';
-import PricingModal from './components/PricingModal';
-import { useDashboard } from './context/DashboardContext';
-import { useDashboardData } from './hooks/useDashboardData';
-import './globals.css';
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Sora:wght@700;800&display=swap" rel="stylesheet" />
+import React, { useEffect, useState } from "react";
+import Navbar from "./components/Navbar";
+import Banner from "./components/Banner";
+import StatCards from "./components/StatCards";
+import RevenueChart from "./components/RevenueChart";
+import PlatformBreakdown from "./components/PlatformBreakdown";
+import CalendarSection from "./components/CalendarSection";
+import UnifiedInbox from "./components/UnifiedInbox";
+import ActivityFeed from "./components/ActivityFeed";
+import MessageModal from "./components/MessageModal";
+import { useDashboard } from "./context/DashboardContext";
+import { useDashboardData } from "./hooks/useDashboardData";
+import "./globals.css";
 
 export default function DashboardPage() {
   const { dashState } = useDashboard();
@@ -241,13 +239,6 @@ return (
           </>
         )}
       </div>
-
-      {/* Pricing modal */}
-      <PricingModal
-        isOpen={pricingOpen}
-        onClose={() => setPricingOpen(false)}
-        user={currentUser}
-      />
 
       <MessageModal
         isOpen={modalOpen}
