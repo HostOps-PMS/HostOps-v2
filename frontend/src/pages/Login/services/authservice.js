@@ -12,11 +12,18 @@ export async function loginUser({ email, password }) {
   return data;
 }
 
-export async function registerUser({ firstName, lastName, email, password }) {
+export async function registerUser({
+  firstName,
+  lastName,
+  email,
+  password,
+  smoobuApiKey = '',
+  propertyTagPrefix = '',
+}) {
   const res = await fetch(`${API_BASE}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ firstName, lastName, email, password }),
+    body: JSON.stringify({ firstName, lastName, email, password, smoobuApiKey, propertyTagPrefix }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Registration failed');
