@@ -4,8 +4,8 @@ import LoginPage from './pages/Login';
 import DashboardPage from './pages/clientDashboard';
 import { DashboardProvider } from './pages/clientDashboard/context/DashboardContext';
 import { AuthProvider } from './pages/AuthContext';
-import VerifyPage from './pages/Verify';
-import ResetPasswordPage from './pages/ResetPassword';
+import VerifyPage from './pages/Login/verify';
+import ResetPage from './pages/Login/reset';
 
 function App() {
   return (
@@ -14,7 +14,7 @@ function App() {
         <Routes>
           <Route path="/" element={<LoginPage />} />
           <Route path="/verify-email" element={<VerifyPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPage />} />
           <Route
             path="/dashboard"
             element={
