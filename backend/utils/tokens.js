@@ -33,9 +33,36 @@ export function verifyRefreshToken(token) {
 }
 
 // ── Compute expiry Date object for refresh token ────────────────
+// Parses values like '7d', '30d', '24h', '60m', or plain numbers (treated as days).
 export function refreshTokenExpiry() {
-  const days = parseInt(process.env.JWT_REFRESH_EXPIRES || '7d');
-  return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  const raw = process.env.JWT_REFRESH_EXPIRES || '7d';
+  const ms = parseDuration(raw);
+  return new Date(Date.now() + ms);
+}
+
+/**
+ * Parses a duration string into milliseconds.
+ * Supports: '7d', '24h', '60m', '30s', or a plain number (treated as days).
+ */
+function parseDuration(str) {
+  const match = String(str).match(/^(\d+(\.\d+)?)\s*(d|h|m|s)?$/i);
+  if (!match) {
+    // Fallback: 7 days
+    console.warn(`[tokens] Could not parse JWT_REFRESH_EXPIRES="${str}", defaulting to 7d`);
+    return 7 * 24 * 60 * 60 * 1000;
+  }
+
+  const value = parseFloat(match[1]);
+  const unit  = (match[3] || 'd').toLowerCase();
+
+  const multipliers = {
+    d: 24 * 60 * 60 * 1000,
+    h: 60 * 60 * 1000,
+    m: 60 * 1000,
+    s: 1000,
+  };
+
+  return value * (multipliers[unit] ?? multipliers.d);
 }
 
 // ── Random tokens (verify, reset) ───────────────────────────────

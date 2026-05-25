@@ -4,7 +4,11 @@ import { useDashboard } from '../context/DashboardContext';
 import { fetchDashboard } from '../services/dashboardService';
 
 export function useDashboardData() {
+
+
   const auth = useAuth();
+
+
   const { dashState, updateDashState } = useDashboard();
   const [banner, setBanner] = useState({ message: '', type: '' });
 
