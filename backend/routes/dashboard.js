@@ -51,6 +51,9 @@ function filterPropsByPrefix(allProperties = [], prefix = '') {
 /**
  * Re-calculates stats and byChannel from a filtered booking set.
  * Called after MODE B filtering so stat cards stay consistent.
+ *
+ * FIX: now also computes `cancelledNights` so the Cancellations card
+ * shows the correct "X nights affected" subtitle (was always 0 before).
  */
 function recalcStats(filteredBookings = [], filteredProps = [], period = {}) {
   const active    = filteredBookings.filter((b) => b.type !== 'cancellation');
@@ -59,8 +62,10 @@ function recalcStats(filteredBookings = [], filteredProps = [], period = {}) {
   const nightCount = (b) =>
     Math.max(0, Math.round((new Date(b.departure) - new Date(b.arrival)) / 864e5));
 
-  const revenue = active.reduce((s, b) => s + (Number(b.price) || 0), 0);
-  const nights  = active.reduce((s, b) => s + nightCount(b), 0);
+  const revenue         = active.reduce((s, b) => s + (Number(b.price) || 0), 0);
+  const nights          = active.reduce((s, b) => s + nightCount(b), 0);
+  // FIX: compute nights for cancelled bookings
+  const cancelledNights = cancelled.reduce((s, b) => s + nightCount(b), 0);
 
   const byChannel = {};
   active.forEach((b) => {
@@ -79,7 +84,14 @@ function recalcStats(filteredBookings = [], filteredProps = [], period = {}) {
   }
 
   return {
-    stats: { revenue, bookings: active.length, cancellations: cancelled.length, nights, occupancy },
+    stats: {
+      revenue,
+      bookings:        active.length,
+      cancellations:   cancelled.length,
+      nights,
+      cancelledNights,   // FIX: included in returned stats
+      occupancy,
+    },
     byChannel,
   };
 }
@@ -132,7 +144,14 @@ router.get('/dashboard', async (req, res, next) => {
         smoobuNotConnected: true,
         message: err.message,
         period:      {},
-        stats:       { revenue: 0, bookings: 0, cancellations: 0, nights: 0, occupancy: 0 },
+        stats: {
+          revenue:         0,
+          bookings:        0,
+          cancellations:   0,
+          nights:          0,
+          cancelledNights: 0,
+          occupancy:       0,
+        },
         byChannel:   {},
         properties:  [],
         bookings:    [],

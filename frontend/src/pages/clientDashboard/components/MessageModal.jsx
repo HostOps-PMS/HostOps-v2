@@ -455,73 +455,7 @@ export default function MessageModal({
               ))}
             </div>
 
-            {/* ── Reply box ── */}
-            <div style={{
-              padding: '14px 20px 18px',
-              borderTop: T.border,
-              flexShrink: 0,
-              background: T.bg,
-            }}>
-              {/* Textarea */}
-              <div style={{
-                border: replyFocused ? `1.5px solid ${T.green}` : T.borderMid,
-                borderRadius: T.radiusSm,
-                overflow: 'hidden',
-                transition: 'border-color .15s',
-                background: T.bgSurface,
-              }}>
-                <textarea
-                  ref={textareaRef}
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  onFocus={() => setReplyFocused(true)}
-                  onBlur={() => setReplyFocused(false)}
-                  onKeyDown={(e) => {
-                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && replyText.trim()) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  placeholder={`Reply to ${guestName}…`}
-                  rows={3}
-                  style={{
-                    width: '100%', display: 'block',
-                    padding: '12px 14px',
-                    border: 'none', outline: 'none',
-                    background: 'transparent',
-                    fontFamily: T.fontBody, fontSize: 13.5, color: T.text,
-                    resize: 'none', lineHeight: 1.6,
-                  }}
-                />
-                {/* Toolbar row */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '8px 12px',
-                  borderTop: '1px solid #eaf0ec',
-                }}>
-                  <span style={{ fontFamily: T.fontBody, fontSize: 11, color: T.faint }}>
-                    ⌘ + Enter to send
-                  </span>
-                  <button
-                    disabled={!replyText.trim() || sending}
-                    onClick={handleSend}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 7,
-                      padding: '7px 18px',
-                      background: !replyText.trim() || sending ? T.faint : T.green,
-                      color: '#fff',
-                      border: 'none', borderRadius: T.radiusPill,
-                      fontFamily: T.fontBody, fontSize: 12.5, fontWeight: 700,
-                      cursor: !replyText.trim() || sending ? 'not-allowed' : 'pointer',
-                      transition: 'background .15s',
-                    }}
-                  >
-                    {sending ? <SpinnerIcon /> : <SendIcon />}
-                    {sending ? 'Sending…' : 'Send'}
-                  </button>
-                </div>
-              </div>
-            </div>
+
           </>
         )}
       </div>

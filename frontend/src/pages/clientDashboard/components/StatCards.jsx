@@ -210,8 +210,10 @@ export default function StatCards({ stats = {} }) {
   const revenue         = stats.revenue         ?? 0;
   const bookings        = stats.bookings        ?? 0;
   const cancellations   = stats.cancellations   ?? 0;
-  const occupancyRate   = stats.occupancyRate   ?? 0;
-  const totalNights     = stats.totalNights     ?? 0;
+  // FIX: API returns `occupancy` (not `occupancyRate`) and `nights` (not `totalNights`).
+  // `cancelledNights` is now also computed by the backend.
+  const occupancy       = stats.occupancy       ?? 0;
+  const nights          = stats.nights          ?? 0;
   const cancelledNights = stats.cancelledNights ?? 0;
 
   return (
@@ -227,7 +229,7 @@ export default function StatCards({ stats = {} }) {
       <SplitCard
         label="Bookings"
         value={bookings}
-        sub={`${totalNights} nights total`}
+        sub={`${nights} nights total`}
         color={T.blue}
         accentBg="#eef3ff"
         icon={
@@ -257,8 +259,8 @@ export default function StatCards({ stats = {} }) {
 
       <SplitCard
         label="Occupancy Rate"
-        value={`${occupancyRate}%`}
-        sub="This month"
+        value={`${occupancy}%`}
+        sub="Selected period"
         color={T.green}
         accentBg="#eaf8f1"
         icon={

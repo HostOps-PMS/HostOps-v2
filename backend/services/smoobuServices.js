@@ -52,6 +52,14 @@ async function smoobuFetch(path, apiKey) {
   return res.json();
 }
 
+// ── Shared night-count helper ─────────────────────────────────────────────────
+function nightCount(b) {
+  const arr = new Date(b.arrival);
+  const dep = new Date(b.departure);
+  if (isNaN(arr) || isNaN(dep)) return 0;
+  return Math.max(0, Math.round((dep - arr) / (1000 * 60 * 60 * 24)));
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 /**
  * @param {object} opts
@@ -105,16 +113,18 @@ export async function fetchSmoobuDashboard({
   );
   const cancellations = bookings.filter((b) => b.type === 'cancellation');
 
-  let totalRevenue = 0;
-  let totalNights  = 0;
+  let totalRevenue        = 0;
+  let totalNights         = 0;
+  // FIX: compute cancelledNights so StatCards can display "X nights affected"
+  let totalCancelledNights = 0;
 
   confirmedBookings.forEach((b) => {
     totalRevenue += Number(b.price || 0);
-    const arr = new Date(b.arrival);
-    const dep = new Date(b.departure);
-    if (!isNaN(arr) && !isNaN(dep)) {
-      totalNights += Math.max(0, Math.round((dep - arr) / (1000 * 60 * 60 * 24)));
-    }
+    totalNights  += nightCount(b);
+  });
+
+  cancellations.forEach((b) => {
+    totalCancelledNights += nightCount(b);
   });
 
   const rangeDays = Math.max(
@@ -131,11 +141,7 @@ export async function fetchSmoobuDashboard({
     if (!byChannel[ch]) byChannel[ch] = { revenue: 0, bookings: 0, nights: 0 };
     byChannel[ch].revenue  += Number(b.price || 0);
     byChannel[ch].bookings += 1;
-    const arr = new Date(b.arrival);
-    const dep = new Date(b.departure);
-    if (!isNaN(arr) && !isNaN(dep)) {
-      byChannel[ch].nights += Math.max(0, Math.round((dep - arr) / (1000 * 60 * 60 * 24)));
-    }
+    byChannel[ch].nights   += nightCount(b);
   });
 
   // ── Revenue chart (monthly) ────────────────────────────────────────────────
@@ -171,10 +177,12 @@ export async function fetchSmoobuDashboard({
     ownerEmail,
     period:     { from: dateFrom, to: dateTo },
     stats: {
-      revenue:       totalRevenue,
-      bookings:      confirmedBookings.length,
-      cancellations: cancellations.length,
-      nights:        totalNights,
+      revenue:          totalRevenue,
+      bookings:         confirmedBookings.length,
+      cancellations:    cancellations.length,
+      nights:           totalNights,
+      // FIX: added cancelledNights — was missing, causing StatCards to show 0
+      cancelledNights:  totalCancelledNights,
       occupancy,
     },
     byChannel,
