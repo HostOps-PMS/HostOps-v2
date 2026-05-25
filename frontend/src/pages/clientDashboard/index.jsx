@@ -1,18 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import Navbar from './components/Navbar';
-import Banner from './components/Banner';
-import StatCards from './components/StatCards';
-import RevenueChart from './components/RevenueChart';
-import PlatformBreakdown from './components/PlatformBreakdown';
-import CalendarSection from './components/CalendarSection';
-import UnifiedInbox from './components/UnifiedInbox';
-import ActivityFeed from './components/ActivityFeed';
-import MessageModal from './components/MessageModal';
-import PricingModal from './components/PricingModal';
-import { useDashboard } from './context/DashboardContext';
-import { useDashboardData } from './hooks/useDashboardData';
-import './globals.css';
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Sora:wght@700;800&display=swap" rel="stylesheet" />
+import React, { useEffect, useState } from "react";
+import Navbar from "./components/Navbar";
+import Banner from "./components/Banner";
+import StatCards from "./components/StatCards";
+import RevenueChart from "./components/RevenueChart";
+import PlatformBreakdown from "./components/PlatformBreakdown";
+import CalendarSection from "./components/CalendarSection";
+import UnifiedInbox from "./components/UnifiedInbox";
+import ActivityFeed from "./components/ActivityFeed";
+import MessageModal from "./components/MessageModal";
+import { useDashboard } from "./context/DashboardContext";
+import { useDashboardData } from "./hooks/useDashboardData";
+import "./globals.css";
 
 export default function DashboardPage() {
   const { dashState } = useDashboard();
@@ -93,9 +91,9 @@ export default function DashboardPage() {
   // This replaces the main dashboard body so they aren't staring at empty cards.
   const smoobuNotConnected = banner.type === 'connect';
 
-  return (
-    <div>
-      <Navbar onBackClick={() => window.history.back()} />
+return (
+    <div style={{ background: "#f4f6f5", minHeight: "100vh" }}>
+      <Navbar />
       <Banner type={banner.type} message={banner.message} />
 
       <div style={{ background: '#f7faf8', minHeight: '100vh' }}>
@@ -242,14 +240,6 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Pricing modal */}
-      <PricingModal
-        isOpen={pricingOpen}
-        onClose={() => setPricingOpen(false)}
-        user={currentUser}
-      />
-
-      {/* Message reply modal */}
       <MessageModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
