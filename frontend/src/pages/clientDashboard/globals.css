@@ -222,6 +222,50 @@ html, body {
 }
 .cal-nav-today:hover { background: #d4f0e4; }
 .cal-scroll-inner { display: flex; min-height: 500px; }
+.cal-end-scroll-btn {
+  position: relative;
+  width: 48px;
+  min-width: 48px;
+  cursor: pointer;
+  transition: all 0.3s ease-out;
+  outline: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  flex-shrink: 0;
+}
+.cal-end-scroll-btn .scroll-fade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to left, rgba(0,0,0,0.06), rgba(0,0,0,0.03), transparent);
+  transition: opacity 0.3s;
+}
+.cal-end-scroll-btn:hover .scroll-fade { opacity: 0; }
+.cal-end-scroll-btn .hover-highlight {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to left, rgba(16, 185, 129, 0.08), rgba(52, 211, 153, 0.04), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.cal-end-scroll-btn:hover .hover-highlight { opacity: 1; }
+.cal-end-scroll-btn .arrow-container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cal-end-scroll-btn svg {
+  width: 24px;
+  height: 24px;
+  color: rgba(100, 116, 139, 0.6);
+  transition: all 0.3s ease-out;
+}
+.cal-end-scroll-btn:hover svg {
+  color: #059669;
+  transform: translateX(4px);
+}
 
 /* ── HP cal toolbar ─────────────────────────────────────────────────── */
 .hp-cal-wrap { background: #fff; border-radius: 16px; border: 1px solid #e3ede8; overflow: hidden; }

@@ -23,12 +23,6 @@ const MONTHS = [
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/**
-
- * Builds the flat array of date objects for the calendar window.
-
- */
-
 function buildDateRange(baseDate, monthsCount) {
   const dates = [];
   const start = new Date(baseDate);
@@ -41,6 +35,7 @@ function buildDateRange(baseDate, monthsCount) {
   }
   return dates;
 }
+
 function ChannelBadge({ channel }) {
   const color = getChannelColor(channel);
   const initial = getChannelInitial(channel);
@@ -74,6 +69,7 @@ function PropertyRow({ prop, allBookings, dateRange, ymdRange, todayISO }) {
   ymdRange.forEach((ymd, i) => {
     ymdToIdx[ymd] = i;
   });
+
   const cellMap = {};
   propBookings.forEach((booking) => {
     const arrYMD = toYMD(booking.arrival);
@@ -106,9 +102,11 @@ function PropertyRow({ prop, allBookings, dateRange, ymdRange, todayISO }) {
     ]
       .filter(Boolean)
       .join(" ");
+
     if (idx <= skipUntil) {
       return <td key={dayStr} className={tdClass || undefined} />;
     }
+
     const entry = cellMap[idx];
     if (entry) {
       const { booking, renderSpan } = entry;
@@ -116,13 +114,6 @@ function PropertyRow({ prop, allBookings, dateRange, ymdRange, todayISO }) {
       const channel = (booking.channel && booking.channel.name) || "Direct";
       const guests = (booking.adults || 0) + (booking.children || 0);
       const pillClass = getChannelPillClass(channel);
-      const tooltipText = [
-        booking["guest-name"] || "Guest",
-        channel,
-        `${guests || 1} guest(s)`,
-        fmtMoney(booking.price),
-        `${toYMD(booking.arrival)} → ${toYMD(booking.departure)}`,
-      ].join(" · ");
 
       return (
         <td key={dayStr} className={tdClass || undefined}>
@@ -156,7 +147,7 @@ function PropertyRow({ prop, allBookings, dateRange, ymdRange, todayISO }) {
                     <div><div class="cal-tt-dl">Check-in</div><div class="cal-tt-dv">${fmt(booking.arrival)}</div></div>
                     <div><div class="cal-tt-dl">Check-out</div><div class="cal-tt-dv">${fmt(booking.departure)}</div></div>
                   </div>
-                  <div class="cal-tt-row"><span class="cal-tt-rl">Guests</span><span class="cal-tt-rv">${g} · ${nights} nights</span></div>
+                  <div class="cal-tt-row"><span class="cal-tt-rl">Guests</span><span class="cal-tt-rv">${g} - ${nights} nights</span></div>
                   <div class="cal-tt-row cal-tt-last"><span class="cal-tt-rl">Total</span><span class="cal-tt-rv cal-tt-price">${fmtMoney(booking.price)}</span></div>
                 `;
                 document.body.appendChild(tt);
@@ -203,13 +194,11 @@ function PropertyRow({ prop, allBookings, dateRange, ymdRange, todayISO }) {
             }}
           >
             <ChannelBadge channel={channel} />
-
             <span className="pill-text">
               {booking["guest-name"] || "Guest"}
             </span>
-
             <span className="pill-meta">
-              {guests || 1} · {fmtMoney(booking.price)}
+              {guests || 1} - {fmtMoney(booking.price)}
             </span>
           </div>
         </td>
@@ -239,8 +228,7 @@ export default function CalendarGrid({
   onLoadMore,
 }) {
   const scrollRef = useRef(null);
-  const today = new Date();
-  const todayISO = toYMD(today);
+  const todayISO = toYMD(new Date());
   const dateRange = buildDateRange(calBaseDate, calMonthsCount);
   const ymdRange = dateRange.map(toYMD);
 
@@ -254,6 +242,7 @@ export default function CalendarGrid({
 
   const displayedProps =
     view === "single" ? properties.slice(0, 1) : properties;
+
   const monthGroups = [];
   let currentMonth = null;
   let monthStart = 0;
@@ -274,15 +263,15 @@ export default function CalendarGrid({
     }
   });
 
-  if (monthGroups.length)
+  if (monthGroups.length) {
     monthGroups[monthGroups.length - 1].span =
       dateRange.length - monthGroups[monthGroups.length - 1].startIdx;
+  }
 
   useEffect(() => {
     if (!shouldScrollToToday || !scrollRef.current) return;
 
     const todayCell = scrollRef.current.querySelector("th.today");
-
     if (!todayCell) {
       scrollRef.current.scrollLeft = 0;
     } else {
@@ -296,6 +285,7 @@ export default function CalendarGrid({
 
     onScrollToTodayConsumed?.();
   }, [shouldScrollToToday, onScrollToTodayConsumed]);
+
   useEffect(() => {
     const style = document.createElement("style");
     style.id = "cal-tt-styles";
@@ -327,9 +317,9 @@ export default function CalendarGrid({
         .cal-tt-rv { font-weight: 500; color: #0c1c14; }
         .cal-tt-price { color: #0F6E56 !important; }
       `;
-
       document.head.appendChild(style);
     }
+
     return () => {
       const el = document.getElementById("cal-tt-styles");
       if (el) el.remove();
@@ -384,86 +374,84 @@ export default function CalendarGrid({
         .cal-tt-price { color: #0F6E56 !important; }
       `}</style>
 
-      <table className="cal-table">
-        <thead>
-          {/* Month label row */}
-
-          <tr className="cal-month-row">
-            <th className="cal-prop-col">Properties</th>
-
-            {monthGroups.map((mg) => (
-              <th key={mg.label} colSpan={mg.span} className="cal-month-label">
-                {mg.label}
-              </th>
-            ))}
-          </tr>
-
-          {/* Day header row */}
-
-          <tr className="cal-day-row">
-            <th className="cal-prop-col" />
-
-            {dateRange.map((d, i) => {
-              const ymd = ymdRange[i];
-              const isToday = ymd === todayISO;
-              const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-              const isMonthStart = d.getDate() === 1;
-              const cls = [
-                isToday ? "today" : "",
-                isWeekend ? "weekend" : "",
-                isMonthStart ? "month-start" : "",
-              ]
-                .filter(Boolean)
-                .join(" ");
-              return (
-                <th key={ymd} className={cls || undefined}>
-                  {DAYS[d.getDay()]}
-
-                  <span className="day-num">{d.getDate()}</span>
+      <div className="cal-scroll-inner">
+        <table className="cal-table">
+          <thead>
+            <tr className="cal-month-row">
+              <th className="cal-prop-col">Properties</th>
+              {monthGroups.map((mg) => (
+                <th key={mg.label} colSpan={mg.span} className="cal-month-label">
+                  {mg.label}
                 </th>
-              );
-            })}
-          </tr>
-        </thead>
+              ))}
+            </tr>
 
-        <tbody>
-          {displayedProps.map((prop) => (
-            <PropertyRow
-              key={prop.id}
-              prop={prop}
-              allBookings={filteredBookings}
-              dateRange={dateRange}
-              ymdRange={ymdRange}
-              todayISO={todayISO}
-            />
-          ))}
-        </tbody>
-      </table>
+            <tr className="cal-day-row">
+              <th className="cal-prop-col" />
+              {dateRange.map((d, i) => {
+                const ymd = ymdRange[i];
+                const isToday = ymd === todayISO;
+                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                const isMonthStart = d.getDate() === 1;
+                const cls = [
+                  isToday ? "today" : "",
+                  isWeekend ? "weekend" : "",
+                  isMonthStart ? "month-start" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ");
 
-      {/* Inline "load more" button */}
+                return (
+                  <th key={ymd} className={cls || undefined}>
+                    {DAYS[d.getDay()]}
+                    <span className="day-num">{d.getDate()}</span>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
 
-      {onLoadMore && (
-        <div style={{ padding: "16px", textAlign: "center" }}>
+          <tbody>
+            {displayedProps.map((prop) => (
+              <PropertyRow
+                key={prop.id}
+                prop={prop}
+                allBookings={filteredBookings}
+                dateRange={dateRange}
+                ymdRange={ymdRange}
+                todayISO={todayISO}
+              />
+            ))}
+          </tbody>
+        </table>
+
+        {onLoadMore && (
           <button
+            type="button"
+            className="cal-end-scroll-btn"
             onClick={onLoadMore}
-            style={{
-              padding: "8px 20px",
-              background: "#eaf8f1",
-              border: "1px solid #b7e4cf",
-
-              borderRadius: 100,
-              fontFamily: "DM Sans",
-              fontSize: ".78rem",
-
-              fontWeight: 700,
-              color: "#1e8760",
-              cursor: "pointer",
-            }}
+            title="Load 2 more months"
+            aria-label="Load 2 more months"
           >
-            Load more months →
+            <span className="scroll-fade" />
+            <span className="hover-highlight" />
+            <span className="arrow-container">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M5 12h12" />
+                <path d="m12 5 7 7-7 7" />
+              </svg>
+            </span>
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
