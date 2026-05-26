@@ -239,6 +239,36 @@ router.get('/me', requireAuth, (req, res) => {
   res.json({ user: req.user.toJSON() });
 });
 
+// PATCH /auth/profile
+// Updates editable profile fields: firstName, lastName, propertyTagPrefix.
+// Email is intentionally excluded — changing it would require re-verification.
+router.patch('/profile', requireAuth, async (req, res, next) => {
+  try {
+    const profileSchema = z.object({
+      firstName:         z.string().min(1).max(50).trim(),
+      lastName:          z.string().max(50).trim().optional().default(''),
+      propertyTagPrefix: z.string().max(100).trim().optional().default(''),
+    });
+
+    const data = profileSchema.parse(req.body);
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    user.firstName         = data.firstName;
+    user.lastName          = data.lastName ?? '';
+    user.propertyTagPrefix = data.propertyTagPrefix ?? '';
+    await user.save();
+
+    res.json({ message: 'Profile updated successfully.', user: user.toJSON() });
+  } catch (err) {
+    if (err.name === 'ZodError') {
+      return res.status(400).json({ error: 'Validation failed', details: err.errors });
+    }
+    next(err);
+  }
+});
+
 // PATCH /auth/smoobu-key
 router.patch('/smoobu-key', requireAuth, async (req, res, next) => {
   try {

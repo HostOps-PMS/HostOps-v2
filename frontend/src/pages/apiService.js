@@ -138,3 +138,14 @@ export async function sendReply({ reservationId, subject, messageBody }, auth) {
     body: JSON.stringify({ reservationId, subject, messageBody }),
   }, auth);
 }
+
+/**
+ * Updates the current user's profile (firstName, lastName, propertyTagPrefix).
+ * Returns the Response object; caller should check res.ok and parse res.json().
+ */
+export async function updateProfile({ firstName, lastName, propertyTagPrefix }, auth) {
+  return authFetch('/auth/profile', {
+    method: 'PATCH',
+    body: JSON.stringify({ firstName, lastName, propertyTagPrefix }),
+  }, auth);
+}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../AuthContext";
+import AccountSettingsModal from "./AccountSettingsModal";
 
 export default function Navbar() {
   const { getUser, clear } = useAuth();
@@ -8,6 +9,7 @@ export default function Navbar() {
   const [dropOpen, setDropOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const dropdownRef = useRef(null);
   const menuRef = useRef(null);
 
@@ -37,6 +39,12 @@ export default function Navbar() {
     clear();
     window.location.href = "/";
   };
+
+  function openAccountSettings() {
+    setDropOpen(false);
+    setMenuOpen(false);
+    setAccountSettingsOpen(true);
+  }
 
   const t = {
     navbar: {
@@ -220,16 +228,131 @@ export default function Navbar() {
   // Mobile layout
   if (isMobile) {
     return (
-      <nav style={{ ...t.navbar, position: "sticky" }}>
+      <>
+        <nav style={{ ...t.navbar, position: "sticky" }}>
+          <div style={t.inner}>
+            <a href="/" style={t.logoWrap}>
+              <div style={t.logoBox}>
+                <i className="ti ti-home" style={t.logoIcon} aria-hidden="true" />
+              </div>
+              <span style={t.logoText}>HostOps</span>
+            </a>
+
+            <div style={t.rightGroup}>
+              <button
+                style={t.iconBtn}
+                onClick={() => setDark((prev) => !prev)}
+                aria-label="Toggle dark mode"
+              >
+                <i
+                  className={dark ? "ti ti-sun" : "ti ti-moon"}
+                  style={t.iconBtnIcon}
+                  aria-hidden="true"
+                />
+              </button>
+
+              <div style={{ position: "relative" }} ref={dropdownRef}>
+                <div
+                  style={t.avatar}
+                  onClick={() => setDropOpen((prev) => !prev)}
+                >
+                  {user?.firstName?.charAt(0).toUpperCase() || "U"}
+                </div>
+                <div style={t.dropdown}>
+                  <div style={t.dropHeader}>
+                    <p style={t.dropName}>
+                      {user?.firstName} {user?.lastName || ""}
+                    </p>
+                    <p style={t.dropEmail}>{user?.email || ""}</p>
+                  </div>
+                  <div style={t.dropBody}>
+                    <button
+                      style={{
+                        ...t.dropBtn,
+                        color: dark ? "#eaf5f0" : "#0c1c14",
+                      }}
+                    >
+                      <i
+                        className="ti ti-bell"
+                        style={{ fontSize: "15px", color: "#1e8760" }}
+                        aria-hidden="true"
+                      />
+                      Notifications
+                    </button>
+                    <button
+                      style={{
+                        ...t.dropBtn,
+                        color: dark ? "#eaf5f0" : "#0c1c14",
+                      }}
+                    >
+                      <i
+                        className="ti ti-settings"
+                        style={{ fontSize: "15px", color: "#1e8760" }}
+                        aria-hidden="true"
+                      />
+                      Settings
+                    </button>
+                    <button
+                      style={{
+                        ...t.dropBtn,
+                        color: dark ? "#eaf5f0" : "#0c1c14",
+                      }}
+                      onClick={openAccountSettings}
+                    >
+                      <i
+                        className="ti ti-user"
+                        style={{ fontSize: "15px", color: "#1e8760" }}
+                        aria-hidden="true"
+                      />
+                      Account settings
+                    </button>
+                    <div style={t.mobileDivider} />
+                    <button
+                      style={{ ...t.dropBtn, color: "#c13515" }}
+                      onClick={handleLogout}
+                    >
+                      <i
+                        className="ti ti-logout"
+                        style={{ fontSize: "15px", color: "#c13515" }}
+                        aria-hidden="true"
+                      />
+                      Log out
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </nav>
+
+        <AccountSettingsModal
+          isOpen={accountSettingsOpen}
+          onClose={() => setAccountSettingsOpen(false)}
+        />
+      </>
+    );
+  }
+
+  // Desktop layout
+  return (
+    <>
+      <nav style={t.navbar}>
         <div style={t.inner}>
           <a href="/" style={t.logoWrap}>
             <div style={t.logoBox}>
               <i className="ti ti-home" style={t.logoIcon} aria-hidden="true" />
             </div>
-            <span style={t.logoText}>HostOps</span>
+            <span style={t.logoText}>HostPilot</span>
           </a>
 
           <div style={t.rightGroup}>
+            <button style={t.iconBtn} aria-label="Notifications">
+              <i
+                className="ti ti-bell"
+                style={t.iconBtnIcon}
+                aria-hidden="true"
+              />
+            </button>
             <button
               style={t.iconBtn}
               onClick={() => setDark((prev) => !prev)}
@@ -242,13 +365,24 @@ export default function Navbar() {
               />
             </button>
 
+            <div style={t.divider} />
+
             <div style={{ position: "relative" }} ref={dropdownRef}>
               <div
-                style={t.avatar}
+                style={t.userPill}
                 onClick={() => setDropOpen((prev) => !prev)}
               >
-                {user?.firstName?.charAt(0).toUpperCase() || "U"}
+                <div style={t.avatar}>
+                  {user?.firstName?.charAt(0).toUpperCase() || "U"}
+                </div>
+                <span style={t.userName}>{user?.firstName || "User"}</span>
+                <i
+                  className="ti ti-chevron-down"
+                  style={t.chevron}
+                  aria-hidden="true"
+                />
               </div>
+
               <div style={t.dropdown}>
                 <div style={t.dropHeader}>
                   <p style={t.dropName}>
@@ -258,36 +392,8 @@ export default function Navbar() {
                 </div>
                 <div style={t.dropBody}>
                   <button
-                    style={{
-                      ...t.dropBtn,
-                      color: dark ? "#eaf5f0" : "#0c1c14",
-                    }}
-                  >
-                    <i
-                      className="ti ti-bell"
-                      style={{ fontSize: "15px", color: "#1e8760" }}
-                      aria-hidden="true"
-                    />
-                    Notifications
-                  </button>
-                  <button
-                    style={{
-                      ...t.dropBtn,
-                      color: dark ? "#eaf5f0" : "#0c1c14",
-                    }}
-                  >
-                    <i
-                      className="ti ti-settings"
-                      style={{ fontSize: "15px", color: "#1e8760" }}
-                      aria-hidden="true"
-                    />
-                    Settings
-                  </button>
-                  <button
-                    style={{
-                      ...t.dropBtn,
-                      color: dark ? "#eaf5f0" : "#0c1c14",
-                    }}
+                    style={{ ...t.dropBtn, color: dark ? "#eaf5f0" : "#0c1c14" }}
+                    onClick={openAccountSettings}
                   >
                     <i
                       className="ti ti-user"
@@ -296,7 +402,6 @@ export default function Navbar() {
                     />
                     Account settings
                   </button>
-                  <div style={t.mobileDivider} />
                   <button
                     style={{ ...t.dropBtn, color: "#c13515" }}
                     onClick={handleLogout}
@@ -314,92 +419,11 @@ export default function Navbar() {
           </div>
         </div>
       </nav>
-    );
-  }
 
-  // Desktop layout
-  return (
-    <nav style={t.navbar}>
-      <div style={t.inner}>
-        <a href="/" style={t.logoWrap}>
-          <div style={t.logoBox}>
-            <i className="ti ti-home" style={t.logoIcon} aria-hidden="true" />
-          </div>
-          <span style={t.logoText}>HostPilot</span>
-        </a>
-
-        <div style={t.rightGroup}>
-          <button style={t.iconBtn} aria-label="Notifications">
-            <i
-              className="ti ti-bell"
-              style={t.iconBtnIcon}
-              aria-hidden="true"
-            />
-          </button>
-          <button
-            style={t.iconBtn}
-            onClick={() => setDark((prev) => !prev)}
-            aria-label="Toggle dark mode"
-          >
-            <i
-              className={dark ? "ti ti-sun" : "ti ti-moon"}
-              style={t.iconBtnIcon}
-              aria-hidden="true"
-            />
-          </button>
-
-          <div style={t.divider} />
-
-          <div style={{ position: "relative" }} ref={dropdownRef}>
-            <div
-              style={t.userPill}
-              onClick={() => setDropOpen((prev) => !prev)}
-            >
-              <div style={t.avatar}>
-                {user?.firstName?.charAt(0).toUpperCase() || "U"}
-              </div>
-              <span style={t.userName}>{user?.firstName || "User"}</span>
-              <i
-                className="ti ti-chevron-down"
-                style={t.chevron}
-                aria-hidden="true"
-              />
-            </div>
-
-            <div style={t.dropdown}>
-              <div style={t.dropHeader}>
-                <p style={t.dropName}>
-                  {user?.firstName} {user?.lastName || ""}
-                </p>
-                <p style={t.dropEmail}>{user?.email || ""}</p>
-              </div>
-              <div style={t.dropBody}>
-                <button
-                  style={{ ...t.dropBtn, color: dark ? "#eaf5f0" : "#0c1c14" }}
-                >
-                  <i
-                    className="ti ti-user"
-                    style={{ fontSize: "15px", color: "#1e8760" }}
-                    aria-hidden="true"
-                  />
-                  Account settings
-                </button>
-                <button
-                  style={{ ...t.dropBtn, color: "#c13515" }}
-                  onClick={handleLogout}
-                >
-                  <i
-                    className="ti ti-logout"
-                    style={{ fontSize: "15px", color: "#c13515" }}
-                    aria-hidden="true"
-                  />
-                  Log out
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </nav>
+      <AccountSettingsModal
+        isOpen={accountSettingsOpen}
+        onClose={() => setAccountSettingsOpen(false)}
+      />
+    </>
   );
 }
