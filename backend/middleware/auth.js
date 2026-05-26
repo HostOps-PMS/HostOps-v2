@@ -9,7 +9,13 @@ export async function requireAuth(req, res, next) {
     if (!token) return res.status(401).json({ error: 'Missing token' });
 
     const decoded = verifyAccessToken(token);
-    const user = await User.findById(decoded.sub);
+
+    // Select +smoobuApiKey so the smoobu service can use the
+    // user's own Smoobu API key on every authenticated request.
+    // Without this, smoobuApiKey is always null (select: false in schema)
+    // and every request falls back to the global env key — which belongs
+    // to only one account, causing other users to see wrong/no data.
+    const user = await User.findById(decoded.sub).select('+smoobuApiKey');
     if (!user) return res.status(401).json({ error: 'User not found' });
     if (!user.isVerified) {
       return res.status(403).json({ error: 'Email not verified' });

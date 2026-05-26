@@ -12,24 +12,26 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// ── Validation schemas ──────────────────────────────────────────
+// Validation schemas
 const registerSchema = z.object({
-  email: z.string().email().max(254),
-  password: z.string().min(8).max(128),
-  firstName: z.string().min(1).max(50),
-  lastName: z.string().max(50).optional().default(''),
+  email:             z.string().email().max(254),
+  password:          z.string().min(8).max(128),
+  firstName:         z.string().min(1).max(50),
+  lastName:          z.string().max(50).optional().default(''),
   propertyTagPrefix: z.string().optional().default(''),
+  // Each user connects their own Smoobu account via their API key.
+  // The login email must match the email on the Smoobu account.
+  // This key is stored with select:false and is loaded only on
+  // authenticated requests (see middleware/auth.js).
+  smoobuApiKey:      z.string().max(512).optional().default(''),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email:    z.string().email(),
   password: z.string().min(1),
 });
 
-// ─────────────────────────────────────────────────────────────────
 // POST /auth/register
-// Create user, send verification email
-// ─────────────────────────────────────────────────────────────────
 router.post('/register', async (req, res, next) => {
   try {
     const data = registerSchema.parse(req.body);
@@ -39,21 +41,28 @@ router.post('/register', async (req, res, next) => {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
+    // smoobuApiKey and propertyTagPrefix are both optional at registration.
+    // Users with neither will see an empty dashboard (smoobuNotConnected)
+    // until they connect their Smoobu account via PATCH /auth/smoobu-key.
+    // belongsToUser() in smoobu.js correctly returns false for accounts
+    // with no key and no prefix - no data leak risk.
     const rawToken = randomToken();
     const hashed = hashToken(rawToken);
 
     const user = await User.create({
-      email: data.email.toLowerCase(),
-      password: data.password,
-      firstName: data.firstName,
-      lastName: data.lastName || '',
+      email:             data.email.toLowerCase(),
+      password:          data.password,
+      firstName:         data.firstName,
+      lastName:          data.lastName || '',
       propertyTagPrefix: data.propertyTagPrefix || '',
-      isVerified: false,
-      verifyToken: hashed,
-      verifyTokenExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      // Store the user's personal Smoobu API key so the smoobu service
+      // can use it to fetch only their properties and bookings.
+      smoobuApiKey:      data.smoobuApiKey || null,
+      isVerified:        false,
+      verifyToken:       hashed,
+      verifyTokenExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
 
-    // --- ADD CONTACT TO GHL ---
     const contactWebhookUrl = process.env.GHL_CONTACT_WEBHOOK_URL;
     if (contactWebhookUrl) {
       try {
@@ -63,14 +72,13 @@ router.post('/register', async (req, res, next) => {
           body: JSON.stringify({
             email: user.email,
             first_name: user.firstName,
-            last_name: user.lastName
+            last_name: user.lastName,
           }),
         });
       } catch (err) {
         console.error('Failed to trigger GHL Contact webhook:', err);
       }
     }
-    // --------------------------
 
     try {
       await sendVerificationEmail(user.email, user.firstName, rawToken);
@@ -90,7 +98,6 @@ router.post('/register', async (req, res, next) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────
 // POST /auth/verify
 router.post('/verify', async (req, res, next) => {
   try {
@@ -119,7 +126,6 @@ router.post('/verify', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─────────────────────────────────────────────────────────────────
 // POST /auth/login
 router.post('/login', async (req, res, next) => {
   try {
@@ -167,7 +173,6 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────
 // POST /auth/refresh
 router.post('/refresh', async (req, res, next) => {
   try {
@@ -214,7 +219,6 @@ router.post('/refresh', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─────────────────────────────────────────────────────────────────
 // POST /auth/logout
 router.post('/logout', async (req, res, next) => {
   try {
@@ -230,13 +234,28 @@ router.post('/logout', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─────────────────────────────────────────────────────────────────
 // GET /auth/me
 router.get('/me', requireAuth, (req, res) => {
   res.json({ user: req.user.toJSON() });
 });
 
-// ─────────────────────────────────────────────────────────────────
+// PATCH /auth/smoobu-key
+router.patch('/smoobu-key', requireAuth, async (req, res, next) => {
+  try {
+    const { smoobuApiKey } = req.body;
+    if (!smoobuApiKey || typeof smoobuApiKey !== 'string' || !smoobuApiKey.trim()) {
+      return res.status(400).json({ error: 'smoobuApiKey is required' });
+    }
+
+    const user = await User.findById(req.user._id).select('+smoobuApiKey');
+    user.smoobuApiKey = smoobuApiKey.trim();
+    user.smoobuConnectedAt = new Date();
+    await user.save();
+
+    res.json({ message: 'Smoobu API key updated successfully.' });
+  } catch (err) { next(err); }
+});
+
 // POST /auth/forgot-password
 router.post('/forgot-password', async (req, res, next) => {
   try {
@@ -245,7 +264,7 @@ router.post('/forgot-password', async (req, res, next) => {
 
     const user = await User.findOne({ email: email.toLowerCase() });
     if (user) {
-    const rawToken = randomToken();
+      const rawToken = randomToken();
       user.resetToken = hashToken(rawToken);
       user.resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
       await user.save();
@@ -261,7 +280,6 @@ router.post('/forgot-password', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─────────────────────────────────────────────────────────────────
 // POST /auth/reset-password
 router.post('/reset-password', async (req, res, next) => {
   try {
@@ -295,10 +313,8 @@ router.post('/reset-password', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─────────────────────────────────────────────────────────────────
 // POST /auth/verify-reset-token
 // Used to silently verify the 6-digit OTP before asking for new password
-// ─────────────────────────────────────────────────────────────────
 router.post('/verify-reset-token', async (req, res, next) => {
   try {
     const { email, token } = req.body;
@@ -316,9 +332,7 @@ router.post('/verify-reset-token', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─────────────────────────────────────────────────────────────────
 // POST /auth/resend-verification
-// ─────────────────────────────────────────────────────────────────
 router.post('/resend-verification', async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -343,9 +357,7 @@ router.post('/resend-verification', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─────────────────────────────────────────────────────────────────
 // POST /auth/resend-reset
-// ─────────────────────────────────────────────────────────────────
 router.post('/resend-reset', async (req, res, next) => {
   try {
     const { email } = req.body;

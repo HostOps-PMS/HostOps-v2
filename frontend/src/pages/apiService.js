@@ -4,9 +4,9 @@ const HP_API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
  * Authenticated fetch wrapper. Automatically attaches Bearer token and
  * retries once after a silent token refresh on 401.
  *
- * @param {string} path   - API path, e.g. "/api/dashboard"
+ * @param {string} path    - API path, e.g. "/api/dashboard"
  * @param {object} options - Standard fetch options
- * @param {object} auth   - Auth helpers from AuthContext
+ * @param {object} auth    - Auth helpers from AuthContext
  * @returns {Response|null} null when the session cannot be recovered
  */
 export async function authFetch(path, options = {}, auth) {
@@ -42,6 +42,7 @@ export async function authFetch(path, options = {}, auth) {
 
 /**
  * Attempts a silent token refresh using the HttpOnly refresh cookie.
+ * Also updates the stored user if the refresh response includes it.
  */
 export async function tryRefresh(auth) {
   try {
@@ -51,8 +52,16 @@ export async function tryRefresh(auth) {
       headers: { 'x-api-key': import.meta.env.VITE_API_KEY },
     });
     if (!res.ok) return false;
+
     const data = await res.json();
     auth.setToken(data.accessToken);
+
+    // ✅ FIX: If the refresh endpoint also returns a user object, persist it.
+    // Prevents stale user data after token rotation.
+    if (data.user) {
+      auth.setUser(data.user);
+    }
+
     return true;
   } catch {
     return false;
@@ -72,8 +81,16 @@ export async function verifySession(auth) {
       headers: { Authorization: `Bearer ${token}`, 'x-api-key': import.meta.env.VITE_API_KEY },
     });
 
-    if (res.ok) return res.json();
+    if (res.ok) {
+      const user = await res.json();
+      // ✅ FIX: Persist the fresh user object so getUser() is never stale.
+      // Previously this returned the user but never stored it, so any
+      // component calling auth.getUser() would get null or an old snapshot.
+      auth.setUser(user);
+      return user;
+    }
 
+    // Access token expired — try a silent refresh then re-validate.
     const refreshed = await tryRefresh(auth);
     if (!refreshed) {
       auth.clear();
@@ -83,7 +100,15 @@ export async function verifySession(auth) {
     const res2 = await fetch(`${HP_API_BASE}/auth/me`, {
       headers: { Authorization: `Bearer ${auth.getToken()}`, 'x-api-key': import.meta.env.VITE_API_KEY },
     });
-    return res2.ok ? res2.json() : null;
+
+    if (res2.ok) {
+      const user = await res2.json();
+      // ✅ FIX: Also persist after the post-refresh /me call.
+      auth.setUser(user);
+      return user;
+    }
+
+    return null;
   } catch {
     return null;
   }
