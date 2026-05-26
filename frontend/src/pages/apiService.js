@@ -17,6 +17,7 @@ export async function authFetch(path, options = {}, auth) {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      'x-api-key': import.meta.env.VITE_API_KEY,
       ...(options.headers || {}),
       Authorization: `Bearer ${token}`,
     },
@@ -48,6 +49,7 @@ export async function tryRefresh(auth) {
     const res = await fetch(`${HP_API_BASE}/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
+      headers: { 'x-api-key': import.meta.env.VITE_API_KEY },
     });
     if (!res.ok) return false;
 
@@ -76,7 +78,7 @@ export async function verifySession(auth) {
 
   try {
     const res = await fetch(`${HP_API_BASE}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, 'x-api-key': import.meta.env.VITE_API_KEY },
     });
 
     if (res.ok) {
@@ -96,7 +98,7 @@ export async function verifySession(auth) {
     }
 
     const res2 = await fetch(`${HP_API_BASE}/auth/me`, {
-      headers: { Authorization: `Bearer ${auth.getToken()}` },
+      headers: { Authorization: `Bearer ${auth.getToken()}`, 'x-api-key': import.meta.env.VITE_API_KEY },
     });
 
     if (res2.ok) {

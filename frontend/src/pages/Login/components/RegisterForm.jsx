@@ -3,6 +3,7 @@ import { registerUser } from '../services/authService';
 import { useAuthSubmit } from '../hooks/useAuth';
 import { validateRegistration } from '../utils/validators';
 import PasswordStrengthIndicator from './PasswordStrengthIndicator';
+import { useNavigate } from 'react-router-dom';
 
 export default function RegisterForm({ showMsg, hideMsg, onSuccess }) {
   const [fields, setFields] = useState({
@@ -14,11 +15,11 @@ export default function RegisterForm({ showMsg, hideMsg, onSuccess }) {
     hideMsg(); // clear errors on typing
   };
 
+  const navigate = useNavigate();
+
   const { submit, loading } = useAuthSubmit(registerUser, {
     onSuccess: () => {
-      showMsg('Account created! Check your email for a verification link before signing in.', 'success');
-      setFields({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '' });
-      onSuccess();
+      navigate(`/verify-email?email=${encodeURIComponent(fields.email)}`);
     },
     onError: (msg) => showMsg(msg),
   });

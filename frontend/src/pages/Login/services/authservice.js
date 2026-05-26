@@ -4,7 +4,7 @@ export async function loginUser({ email, password }) {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
     body: JSON.stringify({ email, password }),
   });
   const data = await res.json();
@@ -22,7 +22,7 @@ export async function registerUser({
 }) {
   const res = await fetch(`${API_BASE}/auth/register`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
     body: JSON.stringify({ firstName, lastName, email, password, smoobuApiKey, propertyTagPrefix }),
   });
   const data = await res.json();
@@ -33,7 +33,7 @@ export async function registerUser({
 export async function forgotPassword({ email }) {
   const res = await fetch(`${API_BASE}/auth/forgot-password`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
     body: JSON.stringify({ email }),
   });
   const data = await res.json();
@@ -47,7 +47,7 @@ export async function checkSession() {
   // First try with existing access token
   if (token) {
     const res = await fetch(`${API_BASE}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, 'x-api-key': import.meta.env.VITE_API_KEY },
     });
     if (res.ok) return true;
   }
@@ -57,6 +57,7 @@ export async function checkSession() {
     const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
       method: 'POST',
       credentials: 'include', // Crucial to send the HttpOnly 'rt' cookie
+      headers: { 'x-api-key': import.meta.env.VITE_API_KEY },
     });
     
     if (refreshRes.ok) {

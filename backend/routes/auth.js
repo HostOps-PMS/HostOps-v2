@@ -12,7 +12,7 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// ── Validation schemas ──────────────────────────────────────────
+// Validation schemas
 const registerSchema = z.object({
   email:             z.string().email().max(254),
   password:          z.string().min(8).max(128),
@@ -31,9 +31,7 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-// ─────────────────────────────────────────────────────────────────
 // POST /auth/register
-// ─────────────────────────────────────────────────────────────────
 router.post('/register', async (req, res, next) => {
   try {
     const data = registerSchema.parse(req.body);
@@ -47,7 +45,10 @@ router.post('/register', async (req, res, next) => {
     // Users with neither will see an empty dashboard (smoobuNotConnected)
     // until they connect their Smoobu account via PATCH /auth/smoobu-key.
     // belongsToUser() in smoobu.js correctly returns false for accounts
-    // with no key and no prefix — no data leak risk.
+    // with no key and no prefix - no data leak risk.
+    const rawToken = randomToken();
+    const hashed = hashToken(rawToken);
+
     const user = await User.create({
       email:             data.email.toLowerCase(),
       password:          data.password,
@@ -57,12 +58,37 @@ router.post('/register', async (req, res, next) => {
       // Store the user's personal Smoobu API key so the smoobu service
       // can use it to fetch only their properties and bookings.
       smoobuApiKey:      data.smoobuApiKey || null,
-      isVerified:        true,
+      isVerified:        false,
+      verifyToken:       hashed,
+      verifyTokenExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
 
+    const contactWebhookUrl = process.env.GHL_CONTACT_WEBHOOK_URL;
+    if (contactWebhookUrl) {
+      try {
+        await fetch(contactWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: user.email,
+            first_name: user.firstName,
+            last_name: user.lastName,
+          }),
+        });
+      } catch (err) {
+        console.error('Failed to trigger GHL Contact webhook:', err);
+      }
+    }
+
+    try {
+      await sendVerificationEmail(user.email, user.firstName, rawToken);
+    } catch (e) {
+      console.error('Email send failed:', e);
+    }
+
     res.status(201).json({
-      message: 'Account created successfully.',
-      userId:  user._id,
+      message: 'Account created. Please check your email to verify.',
+      userId: user._id,
     });
   } catch (err) {
     if (err.name === 'ZodError') {
@@ -72,9 +98,7 @@ router.post('/register', async (req, res, next) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────
 // POST /auth/verify
-// ─────────────────────────────────────────────────────────────────
 router.post('/verify', async (req, res, next) => {
   try {
     const { email, token } = req.body;
@@ -85,14 +109,16 @@ router.post('/verify', async (req, res, next) => {
     const hashed = hashToken(token);
     const user = await User.findOne({
       email: email.toLowerCase(),
+      verifyToken: hashed,
+      verifyTokenExpiry: { $gt: new Date() },
     }).select('+verifyToken +verifyTokenExpiry');
 
     if (!user) {
       return res.status(400).json({ error: 'Invalid or expired token' });
     }
 
-    user.isVerified        = true;
-    user.verifyToken       = undefined;
+    user.isVerified = true;
+    user.verifyToken = undefined;
     user.verifyTokenExpiry = undefined;
     await user.save();
 
@@ -100,9 +126,7 @@ router.post('/verify', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─────────────────────────────────────────────────────────────────
 // POST /auth/login
-// ─────────────────────────────────────────────────────────────────
 router.post('/login', async (req, res, next) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
@@ -115,12 +139,12 @@ router.post('/login', async (req, res, next) => {
       return res.status(403).json({ error: 'Please verify your email first' });
     }
 
-    const accessToken  = signAccessToken(user);
+    const accessToken = signAccessToken(user);
     const refreshToken = signRefreshToken(user);
 
     await RefreshToken.create({
-      userId:    user._id,
-      token:     hashToken(refreshToken),
+      userId: user._id,
+      token: hashToken(refreshToken),
       expiresAt: refreshTokenExpiry(),
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
@@ -131,10 +155,10 @@ router.post('/login', async (req, res, next) => {
 
     res.cookie('rt', refreshToken, {
       httpOnly: true,
-      secure:   process.env.NODE_ENV === 'production',
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'none',
-      maxAge:   7 * 24 * 60 * 60 * 1000,
-      path:     '/auth',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/auth',
     });
 
     res.json({
@@ -149,9 +173,7 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────
 // POST /auth/refresh
-// ─────────────────────────────────────────────────────────────────
 router.post('/refresh', async (req, res, next) => {
   try {
     const rawToken = req.cookies?.rt;
@@ -173,13 +195,13 @@ router.post('/refresh', async (req, res, next) => {
     if (!user) return res.status(401).json({ error: 'User not found' });
 
     const newRefreshToken = signRefreshToken(user);
-    stored.revokedAt   = new Date();
-    stored.replacedBy  = hashToken(newRefreshToken);
+    stored.revokedAt = new Date();
+    stored.replacedBy = hashToken(newRefreshToken);
     await stored.save();
 
     await RefreshToken.create({
-      userId:    user._id,
-      token:     hashToken(newRefreshToken),
+      userId: user._id,
+      token: hashToken(newRefreshToken),
       expiresAt: refreshTokenExpiry(),
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
@@ -187,19 +209,17 @@ router.post('/refresh', async (req, res, next) => {
 
     res.cookie('rt', newRefreshToken, {
       httpOnly: true,
-      secure:   process.env.NODE_ENV === 'production',
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'none',
-      maxAge:   7 * 24 * 60 * 60 * 1000,
-      path:     '/auth',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/auth',
     });
 
     res.json({ accessToken: signAccessToken(user) });
   } catch (err) { next(err); }
 });
 
-// ─────────────────────────────────────────────────────────────────
 // POST /auth/logout
-// ─────────────────────────────────────────────────────────────────
 router.post('/logout', async (req, res, next) => {
   try {
     const rawToken = req.cookies?.rt;
@@ -214,18 +234,12 @@ router.post('/logout', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─────────────────────────────────────────────────────────────────
 // GET /auth/me
-// ─────────────────────────────────────────────────────────────────
 router.get('/me', requireAuth, (req, res) => {
   res.json({ user: req.user.toJSON() });
 });
 
-// ─────────────────────────────────────────────────────────────────
-// PATCH /auth/smoobu-key  — Update / connect Smoobu API key
-// Allows an already-registered user to add or rotate their key
-// without re-registering.
-// ─────────────────────────────────────────────────────────────────
+// PATCH /auth/smoobu-key
 router.patch('/smoobu-key', requireAuth, async (req, res, next) => {
   try {
     const { smoobuApiKey } = req.body;
@@ -233,9 +247,8 @@ router.patch('/smoobu-key', requireAuth, async (req, res, next) => {
       return res.status(400).json({ error: 'smoobuApiKey is required' });
     }
 
-    // Load the user with the key field explicitly (select: false in schema)
     const user = await User.findById(req.user._id).select('+smoobuApiKey');
-    user.smoobuApiKey      = smoobuApiKey.trim();
+    user.smoobuApiKey = smoobuApiKey.trim();
     user.smoobuConnectedAt = new Date();
     await user.save();
 
@@ -243,9 +256,7 @@ router.patch('/smoobu-key', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─────────────────────────────────────────────────────────────────
 // POST /auth/forgot-password
-// ─────────────────────────────────────────────────────────────────
 router.post('/forgot-password', async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -254,13 +265,12 @@ router.post('/forgot-password', async (req, res, next) => {
     const user = await User.findOne({ email: email.toLowerCase() });
     if (user) {
       const rawToken = randomToken();
-      user.resetToken       = hashToken(rawToken);
+      user.resetToken = hashToken(rawToken);
       user.resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
       await user.save();
 
-      const link = `${process.env.FRONTEND_URL}/reset?token=${rawToken}&email=${encodeURIComponent(user.email)}`;
       try {
-        await sendResetEmail(user.email, user.firstName, link);
+        await sendResetEmail(user.email, user.firstName, rawToken);
       } catch (e) {
         console.error('Reset email send failed:', e);
       }
@@ -270,9 +280,7 @@ router.post('/forgot-password', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─────────────────────────────────────────────────────────────────
 // POST /auth/reset-password
-// ─────────────────────────────────────────────────────────────────
 router.post('/reset-password', async (req, res, next) => {
   try {
     const { email, token, newPassword } = req.body;
@@ -284,15 +292,15 @@ router.post('/reset-password', async (req, res, next) => {
     }
 
     const user = await User.findOne({
-      email:            email.toLowerCase(),
-      resetToken:       hashToken(token),
+      email: email.toLowerCase(),
+      resetToken: hashToken(token),
       resetTokenExpiry: { $gt: new Date() },
     }).select('+resetToken +resetTokenExpiry');
 
     if (!user) return res.status(400).json({ error: 'Invalid or expired token' });
 
-    user.password         = newPassword;
-    user.resetToken       = undefined;
+    user.password = newPassword;
+    user.resetToken = undefined;
     user.resetTokenExpiry = undefined;
     await user.save();
 
@@ -302,6 +310,74 @@ router.post('/reset-password', async (req, res, next) => {
     );
 
     res.json({ message: 'Password reset. Please log in with your new password.' });
+  } catch (err) { next(err); }
+});
+
+// POST /auth/verify-reset-token
+// Used to silently verify the 6-digit OTP before asking for new password
+router.post('/verify-reset-token', async (req, res, next) => {
+  try {
+    const { email, token } = req.body;
+    if (!email || !token) return res.status(400).json({ error: 'Email and token required' });
+
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+      resetToken: hashToken(token),
+      resetTokenExpiry: { $gt: new Date() },
+    }).select('+resetToken +resetTokenExpiry');
+
+    if (!user) return res.status(400).json({ error: 'Invalid or expired code' });
+
+    res.json({ valid: true });
+  } catch (err) { next(err); }
+});
+
+// POST /auth/resend-verification
+router.post('/resend-verification', async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) return res.json({ message: 'If registered, a new code has been sent.' });
+    if (user.isVerified) return res.status(400).json({ error: 'Already verified' });
+
+    const rawToken = randomToken();
+    user.verifyToken = hashToken(rawToken);
+    user.verifyTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await user.save();
+
+    try {
+      await sendVerificationEmail(user.email, user.firstName, rawToken);
+    } catch (e) {
+      console.error('Email send failed:', e);
+    }
+
+    res.json({ message: 'If registered, a new code has been sent.' });
+  } catch (err) { next(err); }
+});
+
+// POST /auth/resend-reset
+router.post('/resend-reset', async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (user) {
+      const rawToken = randomToken();
+      user.resetToken = hashToken(rawToken);
+      user.resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
+      await user.save();
+
+      try {
+        await sendResetEmail(user.email, user.firstName, rawToken);
+      } catch (e) {
+        console.error('Reset email send failed:', e);
+      }
+    }
+
+    res.json({ message: 'If registered, a new code has been sent.' });
   } catch (err) { next(err); }
 });
 

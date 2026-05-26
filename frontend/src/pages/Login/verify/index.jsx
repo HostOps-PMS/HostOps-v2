@@ -1,91 +1,120 @@
-import React from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { useVerify } from './hooks/useVerify';
+import React, { useEffect, useRef, useState } from 'react';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
+import OTPInput from '../components/OTPInput';
+import { verifyEmail, resendVerification } from './services/verifyService';
 import './Verify.css';
 
 export default function VerifyPage() {
   const [searchParams] = useSearchParams();
-  
-  // Security protection: Ensure we properly sanitize and read params
+  const navigate = useNavigate();
   const email = searchParams.get('email');
-  const token = searchParams.get('token');
+  
+  const [status, setStatus] = useState('idle');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [otpVersion, setOtpVersion] = useState(0);
+  const [resendCooldown, setResendCooldown] = useState(60);
+  const errorTimerRef = useRef(null);
 
-  const { status, errorMessage } = useVerify(email, token);
+  useEffect(() => {
+    let timer;
+    if (resendCooldown > 0) {
+      timer = setInterval(() => setResendCooldown(c => c - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
-  const renderContent = () => {
-    switch (status) {
-      case 'success':
-        return (
-          <>
-            <div className="vf-icon success">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            </div>
-            <h1 className="vf-h1">Email verified!</h1>
-            <p className="vf-p">Your account is now active. You can sign in to access your dashboard.</p>
-            <Link to="/" className="vf-btn">
-              Sign in &rarr;
-            </Link>
-          </>
-        );
+  useEffect(() => {
+    return () => clearTimeout(errorTimerRef.current);
+  }, []);
 
-      case 'error':
-        return (
-          <>
-            <div className="vf-icon error">
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-            </div>
-            <h1 className="vf-h1">Verification failed</h1>
-            <p className="vf-p">{errorMessage}</p>
-            <Link to="/" className="vf-btn">
-              Go to login
-            </Link>
-          </>
-        );
+  const clearOtpErrorSoon = () => {
+    clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => {
+      setStatus('idle');
+      setErrorMsg('');
+      setOtpVersion((value) => value + 1);
+    }, 700);
+  };
 
-      case 'connection_error':
-        return (
-          <>
-            <div className="vf-icon error">
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-            </div>
-            <h1 className="vf-h1">Connection error</h1>
-            <p className="vf-p">Could not reach the server. Please try again in a moment.</p>
-            <button onClick={() => window.location.reload()} className="vf-btn">
-              Try again
-            </button>
-          </>
-        );
-
-      case 'loading':
-      default:
-        return (
-          <>
-            <div className="vf-icon loading">
-              <svg className="vf-spinner" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M21 12a9 9 0 11-6.219-8.56" />
-              </svg>
-            </div>
-            <h1 className="vf-h1">Verifying your email...</h1>
-            <p className="vf-p">Please wait a moment.</p>
-          </>
-        );
+  const handleComplete = async (otp) => {
+    setStatus('loading');
+    setErrorMsg('');
+    clearTimeout(errorTimerRef.current);
+    try {
+      await verifyEmail(email, otp);
+      clearTimeout(errorTimerRef.current);
+      setStatus('success');
+      setTimeout(() => navigate('/'), 2000);
+    } catch (err) {
+      setStatus('error');
+      setErrorMsg(err.message);
+      clearOtpErrorSoon();
     }
   };
+
+  const handleResend = async () => {
+    if (resendCooldown > 0) return;
+    try {
+      await resendVerification(email);
+      clearTimeout(errorTimerRef.current);
+      setStatus('idle');
+      setErrorMsg('');
+      setOtpVersion((value) => value + 1);
+      setResendCooldown(60);
+      alert('A new code has been sent to your email.');
+    } catch(err) {
+      alert(err.message);
+    }
+  };
+
+  if (!email) {
+    return <div className="vf-wrap"><div className="vf-card">Missing email parameter. Return to login.</div></div>;
+  }
 
   return (
     <div className="vf-wrap">
       <div className="vf-card">
-        {renderContent()}
+        <h1 className="vf-h1">Verify your email</h1>
+        <p className="vf-p">We've sent a 6-digit code to <b>{email}</b>. Enter it below to verify your account.</p>
+        
+        <OTPInput 
+          key={otpVersion}
+          length={6} 
+          onComplete={handleComplete} 
+          isError={status === 'error'} 
+          isLoading={status === 'loading'} 
+        />
+        
+        {status === 'error' && <p style={{color: '#c13515', fontSize: '0.85rem'}}>{errorMsg}</p>}
+        {status === 'success' && (
+          <div style={{marginTop: '1rem'}}>
+             <div className="vf-icon success" style={{width: 32, height: 32, margin: '0 auto 10px'}}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            <p style={{color: '#26a676', fontSize: '0.85rem'}}>Email verified! Redirecting...</p>
+          </div>
+        )}
+
+        <div style={{marginTop: '2rem', textAlign: 'center'}}>
+          <button 
+            onClick={handleResend} 
+            disabled={resendCooldown > 0}
+            style={{
+              background: resendCooldown > 0 ? '#f3f4f6' : '#eff6ff', 
+              border: 'none', 
+              color: resendCooldown > 0 ? '#9ca3af' : '#2563eb', 
+              cursor: resendCooldown > 0 ? 'not-allowed' : 'pointer', 
+              padding: '10px 20px',
+              borderRadius: '8px',
+              fontWeight: '600',
+              transition: 'all 0.2s'
+            }}
+          >
+            {resendCooldown > 0 ? `Resend Code in ${resendCooldown}s` : 'Resend Code'}
+          </button>
+        </div>
       </div>
     </div>
   );

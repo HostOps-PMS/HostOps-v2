@@ -66,8 +66,8 @@ function parseDuration(str) {
 }
 
 // ── Random tokens (verify, reset) ───────────────────────────────
-export function randomToken(bytes = 32) {
-  return crypto.randomBytes(bytes).toString('hex');
+export function randomToken() {
+  return crypto.randomInt(100000, 999999).toString();
 }
 
 // ── Hash token for DB storage (so DB compromise ≠ token leak) ──

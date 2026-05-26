@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { forgotPassword } from '../services/authService';
 import { useAuthSubmit } from '../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 export default function ForgotPasswordForm({ showMsg, onBack }) {
   const [email, setEmail] = useState('');
 
+  const navigate = useNavigate();
+
   const { submit, loading } = useAuthSubmit(forgotPassword, {
-    onSuccess: (data) => showMsg(data.message || 'Check your email', 'success'),
+    onSuccess: () => navigate(`/reset-password?email=${encodeURIComponent(email)}`),
     onError: () => showMsg('Something went wrong. Please try again.'),
   });
 
