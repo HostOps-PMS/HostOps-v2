@@ -207,14 +207,7 @@ export default function DashboardPage() {
               </div>
 
               {/* CTA */}
-              <div className="cta-bottom">
-                <div className="cta-bottom-title">Ready to see this with your real data?</div>
-                <div className="cta-bottom-sub">Our team will set up your properties and start managing operations within days.</div>
-                <div className="cta-btns">
-                  <button className="cta-btn-primary" onClick={() => setPricingOpen(true)}>Start Setup →</button>
-                  <button className="cta-btn-secondary">Book a Quick Walkthrough</button>
-                </div>
-              </div>
+              
 
               <div style={{ textAlign: 'center', padding: '24px 0 0', color: '#c5d8cd', fontSize: '.75rem' }}>
                 © 2026 HostOps. All rights reserved.

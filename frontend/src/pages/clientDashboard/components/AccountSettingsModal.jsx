@@ -470,7 +470,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                   name="propertyTagPrefix"
                   value={form.propertyTagPrefix}
                   onChange={handleChange}
-                  placeholder="e.g. charmaine_"
+                  placeholder="e.g. _charmaine"
                   maxLength={100}
                 />
               </div>
