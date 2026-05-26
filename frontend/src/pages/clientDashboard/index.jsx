@@ -8,6 +8,7 @@ import CalendarSection from "./components/CalendarSection";
 import UnifiedInbox from "./components/UnifiedInbox";
 import ActivityFeed from "./components/ActivityFeed";
 import MessageModal from "./components/MessageModal";
+import DateFilterBar from "./components/DateFilterBar";
 import { useDashboard } from "./context/DashboardContext";
 import { useDashboardData } from "./hooks/useDashboardData";
 import "./globals.css";
@@ -88,10 +89,9 @@ export default function DashboardPage() {
   const ownerName = data.ownerName || 'Dashboard';
 
   // Show a dedicated connect prompt when the user has no Smoobu key configured.
-  // This replaces the main dashboard body so they aren't staring at empty cards.
   const smoobuNotConnected = banner.type === 'connect';
 
-return (
+  return (
     <div style={{ background: "#f4f6f5", minHeight: "100vh" }}>
       <Navbar />
       <Banner type={banner.type} message={banner.message} />
@@ -136,8 +136,6 @@ return (
                 To see your live bookings, revenue, and calendar, add your Smoobu API key. You can find it in your Smoobu account under <strong>Settings → API</strong>.
               </p>
 
-              
-
               <p style={{ color: '#b0c9bc', fontSize: '.75rem', marginTop: 24 }}>
                 Your API key is stored securely and never shared.
               </p>
@@ -155,12 +153,35 @@ return (
             </div>
 
             <div className="db-container">
-              {/* Page title */}
-              <div style={{ marginBottom: 28 }}>
-                <h1 style={{ fontFamily: "'Sora',sans-serif", fontSize: '1.75rem', fontWeight: 800, color: '#0c1c14', margin: '0 0 4px' }}>
-                  {ownerName}
-                </h1>
-                <p style={{ color: '#9ab8a9', fontSize: '.88rem', margin: 0 }}>Your portfolio at a glance</p>
+              {/* ── Page header: title LEFT, date filter RIGHT ── */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 16,
+                marginBottom: 28,
+              }}>
+                {/* Title */}
+                <div>
+                  <h1 style={{
+                    fontFamily: "'Sora',sans-serif",
+                    fontSize: '1.75rem',
+                    fontWeight: 800,
+                    color: '#0c1c14',
+                    margin: '0 0 4px',
+                  }}>
+                    {ownerName}
+                  </h1>
+                  <p style={{ color: '#9ab8a9', fontSize: '.88rem', margin: 0 }}>
+                    Your portfolio at a glance
+                  </p>
+                </div>
+
+                {/* Date filter toggle — placed top-right as circled in screenshot */}
+                <div style={{ paddingTop: 4 }}>
+                  <DateFilterBar />
+                </div>
               </div>
 
               {/* KPI cards */}
