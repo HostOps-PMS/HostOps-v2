@@ -9,14 +9,19 @@ export function useDashboardData() {
   const [banner, setBanner] = useState({ message: '', type: '' });
   const loadingRef = useRef(false);
 
-  const loadData = useCallback(async () => {
+  // fromOverride / toOverride: pass explicit dates when calling right after
+  // updateDashState() so we don't read a stale closure value.
+  const loadData = useCallback(async (fromOverride, toOverride) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
+
+    const from = fromOverride ?? dashState.from;
+    const to   = toOverride   ?? dashState.to;
 
     setBanner({ message: '⏳ Loading data…', type: 'loading' });
 
     try {
-      const res = await fetchDashboard({ from: dashState.from, to: dashState.to }, auth);
+      const res = await fetchDashboard({ from, to }, auth);
 
       if (!res) {
         setBanner({ message: '⚠️ Session expired. Please sign in again.', type: 'error' });

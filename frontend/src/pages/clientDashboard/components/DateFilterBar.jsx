@@ -42,6 +42,11 @@ function getRangeForPreset(preset) {
       const first = new Date(today.getFullYear(), 0, 1);
       return { from: toYMD(first), to: toYMD(today) };
     }
+    case 'yearly': {
+      const first = new Date(today.getFullYear(), 0, 1);
+      const last  = new Date(today.getFullYear(), 11, 31);
+      return { from: toYMD(first), to: toYMD(last) };
+    }
     default:
       return null;
   }
@@ -60,10 +65,13 @@ const PRESETS = [
   { id: 'weekly',  label: 'Weekly' },
   { id: 'monthly', label: 'Monthly' },
   { id: '6months', label: '6 Months' },
+  { id: 'yearly',  label: 'Yearly' },
   { id: 'custom',  label: 'Custom' },
 ];
 
 /* ─── Main Component ─────────────────────────────────────────── */
+// loadData is called with explicit from/to params so the stale
+// useCallback closure is bypassed — safe to call from any instance.
 export default function DateFilterBar() {
   const { dashState, updateDashState } = useDashboard();
   const { loadData } = useDashboardData();
@@ -97,8 +105,8 @@ export default function DateFilterBar() {
     if (!range) return;
     setActivePreset(preset);
     updateDashState({ preset, from: range.from, to: range.to });
-    // small tick so state settles before fetch
-    setTimeout(() => loadData(), 0);
+    // Pass dates explicitly — avoids reading a stale useCallback closure
+    loadData(range.from, range.to);
   }
 
   function applyCustom() {
@@ -106,7 +114,8 @@ export default function DateFilterBar() {
     if (customFrom > customTo)    { alert('"From" must be before "To".'); return; }
     setShowCustomPop(false);
     updateDashState({ preset: 'custom', from: customFrom, to: customTo });
-    setTimeout(() => loadData(), 0);
+    // Pass dates explicitly — avoids reading a stale useCallback closure
+    loadData(customFrom, customTo);
   }
 
   /* active preset label for display */

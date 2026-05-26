@@ -51,7 +51,8 @@ export default function CalendarSection() {
     updateDashState({ preset, from: range.from, to: range.to });
     setSelectedPreset(preset);
     setShowDatePop(false);
-    loadData();
+    // Pass dates explicitly — avoids reading a stale useCallback closure
+    loadData(range.from, range.to);
   }
 
   function applyCustomRange() {
@@ -60,7 +61,8 @@ export default function CalendarSection() {
     updateDashState({ preset: 'custom', from: localFrom, to: localTo });
     setSelectedPreset('custom');
     setShowDatePop(false);
-    loadData();
+    // Pass dates explicitly — avoids reading a stale useCallback closure
+    loadData(localFrom, localTo);
   }
 
   function applyChannelFilter() {
