@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from "react";
-import { toYMD, dayDiff, fmtMoney } from "../../utils/dateHelpers";
+import { toYMD, dayDiff, fmtMoney } from '../../utils/dateHelpers';
+import React, { useEffect, useRef, useState } from "react";
 import {
   getChannelPillClass,
   getChannelColor,
   getChannelInitial,
 } from "../utils/channelHelpers";
+
 
 const MONTHS = [
   "Jan",
@@ -228,7 +229,33 @@ export default function CalendarGrid({
   onLoadMore,
 }) {
   const scrollRef = useRef(null);
+  const filterPopRef = useRef(null);
   const todayISO = toYMD(new Date());
+
+  const [selectedProps, setSelectedProps] = useState([]);
+  const [showPropFilter, setShowPropFilter] = useState(false);
+
+  useEffect(() => {
+    function handler(e) {
+      if (filterPopRef.current && !filterPopRef.current.contains(e.target)) {
+        setShowPropFilter(false);
+      }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  function toggleProp(propId) {
+    setSelectedProps((prev) =>
+      prev.includes(propId) ? prev.filter((id) => id !== propId) : [...prev, propId]
+    );
+  }
+
+  function clearProps() {
+    setSelectedProps([]);
+    setShowPropFilter(false);
+  }
+
   const dateRange = buildDateRange(calBaseDate, calMonthsCount);
   const ymdRange = dateRange.map(toYMD);
 
@@ -240,8 +267,11 @@ export default function CalendarGrid({
         })
       : bookings;
 
-  const displayedProps =
+  let displayedProps =
     view === "single" ? properties.slice(0, 1) : properties;
+  if (selectedProps.length > 0) {
+    displayedProps = displayedProps.filter(p => selectedProps.includes(p.id));
+  }
 
   const monthGroups = [];
   let currentMonth = null;
@@ -387,7 +417,40 @@ export default function CalendarGrid({
             </tr>
 
             <tr className="cal-day-row">
-              <th className="cal-prop-col" />
+              <th className="cal-prop-col" style={{ overflow: 'visible', zIndex: 30 }}>
+                <div style={{ position: 'relative' }} ref={filterPopRef}>
+                  <button
+                    className="cal-btn"
+                    onClick={() => setShowPropFilter((v) => !v)}
+                    style={{ width: '100%', justifyContent: 'space-between', padding: '6px 10px', fontSize: '.72rem', background: selectedProps.length > 0 ? '#eaf8f1' : '#fff', borderColor: selectedProps.length > 0 ? '#b7e4cf' : '#e3ede8' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" /><line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" />
+                      </svg>
+                      {selectedProps.length > 0 ? `${selectedProps.length} Selected` : 'All Properties'}
+                    </div>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
+                  </button>
+
+                  {showPropFilter && (
+                    <div className="hp-popover" style={{ top: '100%', left: 0, marginTop: 6, minWidth: 200, maxHeight: 300, overflowY: 'auto' }}>
+                      <div style={{ fontSize: '.7rem', fontWeight: 700, color: '#9ab8a9', letterSpacing: '.5px', textTransform: 'uppercase', marginBottom: 8, padding: '0 6px' }}>Filter Properties</div>
+                      {properties.map((p) => (
+                        <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', cursor: 'pointer', borderRadius: 8, fontSize: '.8rem', color: '#0c1c14', fontWeight: 600 }}>
+                          <input type="checkbox" checked={selectedProps.includes(p.id)} onChange={() => toggleProp(p.id)} style={{ width: 14, height: 14, cursor: 'pointer', accentColor: '#26a676' }} />
+                          {p.name}
+                        </label>
+                      ))}
+                      {selectedProps.length > 0 && (
+                        <div style={{ borderTop: '1px solid #f0f5f2', marginTop: 8, paddingTop: 8, display: 'flex' }}>
+                          <button onClick={clearProps} style={{ flex: 1, padding: 6, background: '#f0f5f2', color: '#2a4e3c', border: 'none', borderRadius: 6, fontFamily: 'inherit', fontSize: '.75rem', fontWeight: 600, cursor: 'pointer' }}>Clear All</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </th>
               {dateRange.map((d, i) => {
                 const ymd = ymdRange[i];
                 const isToday = ymd === todayISO;
