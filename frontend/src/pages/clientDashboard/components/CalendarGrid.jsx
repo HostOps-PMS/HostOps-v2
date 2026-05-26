@@ -436,12 +436,19 @@ export default function CalendarGrid({
                   {showPropFilter && (
                     <div className="hp-popover" style={{ top: '100%', left: 0, marginTop: 6, minWidth: 200, maxHeight: 300, overflowY: 'auto' }}>
                       <div style={{ fontSize: '.7rem', fontWeight: 700, color: '#9ab8a9', letterSpacing: '.5px', textTransform: 'uppercase', marginBottom: 8, padding: '0 6px' }}>Filter Properties</div>
-                      {properties.map((p) => (
-                        <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', cursor: 'pointer', borderRadius: 8, fontSize: '.8rem', color: '#0c1c14', fontWeight: 600 }}>
-                          <input type="checkbox" checked={selectedProps.includes(p.id)} onChange={() => toggleProp(p.id)} style={{ width: 14, height: 14, cursor: 'pointer', accentColor: '#26a676' }} />
-                          {p.name}
-                        </label>
-                      ))}
+                      {
+                        properties.length === 0 ? (
+                          <div style={{ padding: '10px', fontSize: '.8rem', color: '#9ab8a9', textAlign: 'center', fontStyle: 'italic' }}>
+                            No Properties Found
+                          </div>
+                        ) : (
+                          properties.map((p) => (
+                            <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', cursor: 'pointer', borderRadius: 8, fontSize: '.8rem', color: '#0c1c14', fontWeight: 600 }}>
+                              <input type="checkbox" checked={selectedProps.includes(p.id)} onChange={() => toggleProp(p.id)} style={{ width: 14, height: 14, cursor: 'pointer', accentColor: '#26a676' }} />
+                              {p.name}
+                            </label>
+                          )))
+                      }
                       {selectedProps.length > 0 && (
                         <div style={{ borderTop: '1px solid #f0f5f2', marginTop: 8, paddingTop: 8, display: 'flex' }}>
                           <button onClick={clearProps} style={{ flex: 1, padding: 6, background: '#f0f5f2', color: '#2a4e3c', border: 'none', borderRadius: 6, fontFamily: 'inherit', fontSize: '.75rem', fontWeight: 600, cursor: 'pointer' }}>Clear All</button>
