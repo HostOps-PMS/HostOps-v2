@@ -317,4 +317,133 @@ router.get('/messages/:reservationId', async (req, res, next) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────
+// GET /api/debug-bookings?from=2025-01-01&to=2025-12-31
+// TEMPORARY — remove this route once you've captured the debug output.
+// Call it, copy the JSON response, share it so we can fix the stats logic.
+// ─────────────────────────────────────────────────────────────────
+router.get('/debug-bookings', async (req, res, next) => {
+  try {
+    const from = req.query.from || new Date().getFullYear() + '-01-01';
+    const to   = req.query.to   || new Date().toISOString().slice(0, 10);
+
+    const fmt = d => new Date(d).toISOString().slice(0, 10);
+
+    // Build 4 different fetch windows to find where the missing records are
+    const windows = [
+      {
+        label:     'A_exact_period',
+        fetchFrom: from,
+        fetchTo:   to,
+      },
+      {
+        label:     'B_plus2yr_ahead',
+        fetchFrom: from,
+        fetchTo:   fmt(new Date(new Date(to).setFullYear(new Date(to).getFullYear() + 2))),
+      },
+      {
+        label:     'C_minus1yr_plus2yr',
+        fetchFrom: fmt(new Date(new Date(from).setFullYear(new Date(from).getFullYear() - 1))),
+        fetchTo:   fmt(new Date(new Date(to).setFullYear(new Date(to).getFullYear() + 2))),
+      },
+      {
+        label:     'D_no_dates_fetch_all',
+        fetchFrom: null,
+        fetchTo:   null,
+      },
+    ];
+
+    const results = { selectedPeriod: { from, to }, windows: {} };
+
+    for (const w of windows) {
+      const data     = await getBookings(req.user, { from: w.fetchFrom, to: w.fetchTo, showCancellation: true });
+      const bookings = data.bookings || [];
+
+      const cancellations = bookings.filter(b => b.type === 'cancellation');
+      const blocked       = bookings.filter(b => b['is-blocked-booking'] && b.type !== 'cancellation');
+      const regular       = bookings.filter(b => b.type !== 'cancellation' && !b['is-blocked-booking']);
+
+      // arrival-in-period check
+      const inPeriod = b => {
+        if (!b.arrival) return true;
+        const arr = b.arrival.slice(0, 10);
+        return arr >= from && arr <= to;
+      };
+      // departure-overlap check (old logic)
+      const inPeriodOverlap = b => {
+        if (!b.arrival || !b.departure) return true;
+        return b.arrival.slice(0, 10) <= to && b.departure.slice(0, 10) > from;
+      };
+
+      results.windows[w.label] = {
+        fetchWindow: { from: w.fetchFrom, to: w.fetchTo },
+        raw: {
+          total: bookings.length,
+          cancellations: cancellations.length,
+          blocked: blocked.length,
+          regular: regular.length,
+        },
+        filteredByArrivalDate: {
+          cancellations: cancellations.filter(inPeriod).length,
+          blocked:       blocked.filter(inPeriod).length,
+          regular:       regular.filter(inPeriod).length,
+        },
+        filteredByDepartureOverlap: {
+          cancellations: cancellations.filter(inPeriodOverlap).length,
+          blocked:       blocked.filter(inPeriodOverlap).length,
+          regular:       regular.filter(inPeriodOverlap).length,
+        },
+        cancellationArrivalDates: cancellations
+          .map(b => b.arrival ? b.arrival.slice(0, 10) : 'NO_DATE')
+          .sort(),
+        sampleCancellations: cancellations.slice(0, 5).map(b => ({
+          id:                  b.id,
+          type:                b.type,
+          arrival:             b.arrival   || null,
+          departure:           b.departure || null,
+          'created-at':        b['created-at'] || null,
+          'is-blocked-booking': b['is-blocked-booking'] || false,
+        })),
+        sampleRegular: regular.slice(0, 3).map(b => ({
+          id:       b.id,
+          arrival:  b.arrival,
+          departure: b.departure,
+          price:    b.price,
+          channel:  b.channel?.name,
+          type:     b.type,
+        })),
+        sampleBlocked: blocked.slice(0, 3).map(b => ({
+          id:       b.id,
+          arrival:  b.arrival,
+          departure: b.departure,
+          type:     b.type,
+          'is-blocked-booking': b['is-blocked-booking'],
+        })),
+      };
+    }
+
+    // Property + occupancy info
+    const aptsData  = await getApartments(req.user);
+    const propCount = (aptsData.apartments || []).length;
+    const daysExact = Math.round((new Date(to) - new Date(from)) / 864e5);
+    const daysPlus1 = daysExact + 1;
+
+    results.occupancyDebug = {
+      propertyCount:          propCount,
+      daysInRange_exclusive:  daysExact,
+      daysInRange_inclusive:  daysPlus1,
+      totalNightsAvailable_exclusive: propCount * daysExact,
+      totalNightsAvailable_inclusive: propCount * daysPlus1,
+      note: 'occupancy = bookedNights / totalNightsAvailable * 100. Smoobu shows 4.83% for yearly 2025-2026 with 10 props. Check which denominator matches.',
+    };
+
+    // Log to server console
+    console.log('\n=== DEBUG-BOOKINGS ===\n', JSON.stringify(results, null, 2), '\n=== END DEBUG ===\n');
+
+    res.json(results);
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

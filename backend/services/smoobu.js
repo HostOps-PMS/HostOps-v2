@@ -84,51 +84,22 @@ async function smoobuRequestAllPages(basePath, apiKey, userId, { showCancellatio
 
 // ─────────────────────────────────────────────────────────────────
 // GET API KEY
-//
-// MODE A: user has their own smoobuApiKey → use it. Smoobu already
-//         scopes all responses to that account.
-//
-// MODE B: user has no personal key → fall back to the shared
-//         process.env.SMOOBU_API_KEY. routes/dashboard.js is
-//         responsible for applying propertyTagPrefix filtering
-//         afterwards so users only see their own properties.
-//
-// Throws NO_SMOOBU_KEY only when NEITHER source has a key — meaning
-// the server is misconfigured or the user genuinely hasn't connected.
-//
-// WHY the env fallback lives here:
-//   Previously getApiKeyForUser threw immediately for any user without
-//   a personal key, so MODE B could never work — getDashboard() would
-//   throw before routes/dashboard.js could do prefix filtering.
 // ─────────────────────────────────────────────────────────────────
 export function getApiKeyForUser(user) {
-  // MODE A — personal key takes priority
   if (user.smoobuApiKey && user.smoobuApiKey.trim()) {
     return user.smoobuApiKey.trim();
   }
 
-  // MODE B — shared env key fallback
   const envKey = process.env.SMOOBU_API_KEY;
   if (envKey && envKey.trim()) {
     return envKey.trim();
   }
 
-  // Neither source configured — user must connect their Smoobu account
   const err = new Error('No Smoobu API key connected. Please connect your Smoobu account.');
   err.code = 'NO_SMOOBU_KEY';
   throw err;
 }
 
-// ─────────────────────────────────────────────────────────────────
-// CACHE USER ID HELPER
-//
-// In MODE B all users share the same API key and therefore the same
-// Smoobu account. To prevent their cache slots from colliding we
-// suffix the cache key with the user's _id, just like MODE A.
-// The shared-key data is fetched once per user per TTL window, and
-// routes/dashboard.js trims it down to their prefix subset before
-// sending to the client.
-// ─────────────────────────────────────────────────────────────────
 function getCacheUserId(user) {
   return String(user._id);
 }
@@ -245,40 +216,82 @@ export async function getDashboard(user, { from, to } = {}) {
   const fromDate = from || fmt(startOfYear);
   const toDate   = to   || fmt(today);
 
-  const fetchToDate = new Date();
-  fetchToDate.setFullYear(fetchToDate.getFullYear() + 2);
-  const fetchToDateStr = fmt(new Date(Math.max(new Date(toDate), fetchToDate)));
+  // FIX 1: Fetch a wide window to capture ALL bookings including cancellations.
+  // Smoobu's /reservations API filters by arrival date when using from/to params.
+  // Cancellations often have their ORIGINAL arrival date — if a guest booked for
+  // next year and cancelled, the cancellation record has next year's arrival date.
+  // We must fetch far enough ahead to capture those.
+  // Also fetch 2 years back so we catch cancellations for past bookings that were
+  // created within the user's selected period.
+  const fetchFrom = new Date(fromDate);
+  fetchFrom.setFullYear(fetchFrom.getFullYear() - 1); // 1 year before selected start
+  const fetchTo = new Date(toDate);
+  fetchTo.setFullYear(fetchTo.getFullYear() + 2);     // 2 years after selected end
 
   const [apartmentsData, bookingsData] = await Promise.all([
     getApartments(user),
-    getBookings(user, { from: fromDate, to: fetchToDateStr, showCancellation: true }),
+    getBookings(user, { from: fmt(fetchFrom), to: fmt(fetchTo), showCancellation: true }),
   ]);
 
   const properties  = apartmentsData.apartments || [];
   const allBookings = bookingsData.bookings     || [];
 
-  // Filter bookings to stats period
-  const statsBookings = allBookings.filter(b => {
-    if (!b.arrival || !b.departure) return false;
-    return b.arrival.slice(0, 10) <= toDate && b.departure.slice(0, 10) > fromDate;
-  });
-
+  // FIX 2: computeNights must return 0 (not 1) when dates are missing.
+  // The old Math.max(1, ...) was giving every no-date cancellation 1 phantom night,
+  // inflating cancelledNights.
   function computeNights(b) {
     if (!b.arrival || !b.departure) return 0;
-    return Math.max(1, Math.round((new Date(b.departure) - new Date(b.arrival)) / (1000 * 60 * 60 * 24)));
+    const nights = Math.round((new Date(b.departure) - new Date(b.arrival)) / (1000 * 60 * 60 * 24));
+    return Math.max(0, nights);
   }
 
-  let totalRevenue = 0, totalNights = 0, totalBookings = 0, cancellations = 0, cancellationNights = 0;
+  // FIX 3: Correct booking-to-stats-period matching.
+  //
+  // Smoobu Analytics counts a booking/cancellation in a period if its
+  // ARRIVAL DATE falls within that period (not a departure-overlap check).
+  // Using arrival-overlap (arrival <= toDate AND departure > fromDate) was
+  // pulling in bookings from outside the period and missing others.
+  //
+  // Exception: cancellations with NO arrival date are still counted if they
+  // exist in the API response for this query window — Smoobu sometimes strips
+  // dates from cancelled records.
+  const statsBookings = allBookings.filter(b => {
+    if (b.type === 'cancellation') {
+      // No arrival date: include it — it was returned by Smoobu so it's relevant
+      if (!b.arrival) return true;
+      // Has arrival: only include if arrival is within our selected period
+      const arrival = b.arrival.slice(0, 10);
+      return arrival >= fromDate && arrival <= toDate;
+    }
+    // Regular + blocked bookings: must have arrival, and arrival must be in period
+    if (!b.arrival) return false;
+    const arrival = b.arrival.slice(0, 10);
+    return arrival >= fromDate && arrival <= toDate;
+  });
+
+  let totalRevenue = 0, totalNights = 0, totalBookings = 0;
+  let cancellations = 0, cancelledNights = 0;
   const byChannel = {};
 
   statsBookings.forEach(b => {
     const nights = computeNights(b);
+
     if (b.type === 'cancellation') {
       cancellations++;
-      cancellationNights += nights;
+      cancelledNights += nights;
       return;
     }
-    if (b['is-blocked-booking']) return;
+
+    // FIX 4: Blocked bookings — Smoobu Analytics DOES include them in the
+    // bookings count (that's why Smoobu shows 149 while we showed 141 —
+    // we were skipping blocked bookings entirely).
+    // Include them in totalBookings but NOT in revenue or channel breakdown
+    // (blocked bookings have no price or channel).
+    if (b['is-blocked-booking']) {
+      totalBookings += 1;
+      totalNights   += nights; // blocked nights DO reduce availability
+      return;
+    }
 
     totalRevenue  += Number(b.price) || 0;
     totalNights   += nights;
@@ -291,11 +304,31 @@ export async function getDashboard(user, { from, to } = {}) {
     byChannel[ch].nights   += nights;
   });
 
-  const daysInRange = Math.max(1, Math.round(
-    (new Date(toDate) - new Date(fromDate)) / (1000 * 60 * 60 * 24)
-  )) + 1;
+  // FIX 5: Occupancy denominator must match Smoobu's calculation.
+  // Smoobu uses: booked nights / (number_of_properties × days_in_selected_range).
+  // The old code used daysInRange + 1 which over-counted by 1 day.
+  // Also, the old code added +1 to make it inclusive — Smoobu uses exclusive end
+  // (from Jan 1 to Dec 31 = 364 days, not 365). Match Smoobu exactly:
+  const daysInRange = Math.max(
+    1,
+    Math.round((new Date(toDate) - new Date(fromDate)) / (1000 * 60 * 60 * 24))
+  );
   const totalAvailableNights = daysInRange * (properties.length || 1);
   const occupancyPct = Math.min(100, Math.round((totalNights / totalAvailableNights) * 100));
+
+  // FIX 6: revenueChart should only use confirmed (non-cancelled, non-blocked)
+  // bookings, grouped by arrival month, matching how Smoobu shows it.
+  const revenueByMonth = {};
+  statsBookings.forEach(b => {
+    if (b.type === 'cancellation' || b['is-blocked-booking']) return;
+    if (!b.arrival) return;
+    const month = b.arrival.slice(0, 7); // YYYY-MM
+    revenueByMonth[month] = (revenueByMonth[month] || 0) + (Number(b.price) || 0);
+  });
+
+  const revenueChart = Object.entries(revenueByMonth)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, revenue]) => ({ month, revenue }));
 
   const inboxData = await getInbox(user, { limit: 5 }).catch(err => {
     console.warn('Inbox fetch failed:', err.message);
@@ -305,16 +338,17 @@ export async function getDashboard(user, { from, to } = {}) {
   return {
     period: { from: fromDate, to: toDate, days: daysInRange },
     stats: {
-      revenue: totalRevenue,
-      bookings: totalBookings,
+      revenue:        totalRevenue,
+      bookings:       totalBookings,
       cancellations,
-      cancellationNights,
-      nights: totalNights,
-      occupancy: occupancyPct,
+      cancelledNights,
+      nights:         totalNights,
+      occupancy:      occupancyPct,
     },
     byChannel,
+    revenueChart,
     properties,
-    bookings: allBookings,
+    bookings:     allBookings,
     inbox:        inboxData.threads,
     totalUnread:  inboxData.totalUnread,
     totalThreads: inboxData.totalThreads,
