@@ -94,10 +94,30 @@ export default function DashboardPage() {
 
   return (
     <div style={{ background: "#f4f6f5", minHeight: "100vh" }}>
-      <Navbar />
-      <Banner type={banner.type} message={banner.message} />
+      <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
+        <Navbar />
+        <Banner type={banner.type} message={banner.message} />
+        {!smoobuNotConnected && (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            padding: "8px 20px",
+            background: "linear-gradient(135deg, #eaf8f1 0%, #f0fdf8 100%)",
+            borderBottom: "1px solid #d1f0e3",
+            width: "100%",
+          }}>
+            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#1e8760", display: "inline-block", animation: "pulse 2s infinite", flexShrink: 0 }} />
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "#1e8760", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+              Live Data Dashboard
+            </span>
+            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#1e8760", display: "inline-block", animation: "pulse 2s infinite 1s", flexShrink: 0 }} />
+          </div>
+        )}
+      </div>
 
-      <div style={{ background: '#f7faf8', minHeight: '100vh' }}>
+      <div style={{ background: '#f7faf8' }}>
         {smoobuNotConnected ? (
           // ── Smoobu not connected — show a clean connect prompt ──────────────
           <div className="db-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '70vh' }}>
@@ -145,14 +165,6 @@ export default function DashboardPage() {
         ) : (
           // ── Normal dashboard ─────────────────────────────────────────────────
           <>
-            <div className="db-demo-bar">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-              Live Data Dashboard
-            </div>
-
             <div className="db-container">
               {/* ── Page header: title LEFT, date filter RIGHT ── */}
               <div style={{
