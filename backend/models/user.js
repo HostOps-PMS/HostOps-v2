@@ -45,6 +45,11 @@ const userSchema = new mongoose.Schema({
   smoobuApiKey:      { type: String, select: false, default: null },
   smoobuConnectedAt: { type: Date,   default: null },
 
+  // First-login password change flag.
+  // Set to true when an admin creates the account (with a default/temporary password).
+  // User must change password on first dashboard load; only then is isVerified set to true.
+  mustChangePassword: { type: Boolean, default: false },
+
   // Activity tracking
   lastLoginAt: { type: Date },
 }, {

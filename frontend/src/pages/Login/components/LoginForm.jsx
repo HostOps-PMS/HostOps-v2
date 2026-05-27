@@ -12,6 +12,15 @@ export default function LoginForm({ showMsg, hideMsg, onForgot }) {
     onSuccess: (data) => {
       sessionStorage.setItem('hp_access_token', data.accessToken);
       sessionStorage.setItem('hp_user', JSON.stringify(data.user));
+
+      // If the account was admin-created with a temporary password,
+      // flag it so the dashboard shows the first-login password-change modal.
+      if (data.user.mustChangePassword) {
+        sessionStorage.setItem('hp_must_change_password', 'true');
+      } else {
+        sessionStorage.removeItem('hp_must_change_password');
+      }
+
       showMsg(`Welcome back, ${data.user.firstName}! Redirecting...`, 'success');
       setTimeout(() => navigate('/dashboard', { replace: true }), 800);
     },

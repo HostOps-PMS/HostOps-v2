@@ -71,3 +71,22 @@ export async function checkSession() {
   
   return false;
 }
+
+// POST /auth/change-password
+// Called on first login when mustChangePassword is true.
+// On success the backend sets isVerified: true and mustChangePassword: false.
+export async function changePassword({ currentPassword, newPassword }) {
+  const token = sessionStorage.getItem('hp_access_token');
+  const res = await fetch(`${API_BASE}/auth/change-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': import.meta.env.VITE_API_KEY,
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Password change failed');
+  return data;
+}
