@@ -38,6 +38,14 @@ export default function Clients() {
     });
   }, [clients, search, roleFilter]);
 
+  /* ── Handle client updated from modal ── */
+  function handleClientUpdated(updatedClient) {
+    // Refresh the full list so the table reflects the changes
+    refetch();
+    // Update the selected client in-place so the modal shows fresh data
+    setSelectedClient(updatedClient);
+  }
+
   return (
     <div className="db-layout">
       <Sidebar />
@@ -141,9 +149,13 @@ export default function Clients() {
         </div>
       </div>
 
-      {/* View client modal */}
+      {/* View / edit client modal */}
       {selectedClient && (
-        <ClientModal client={selectedClient} onClose={closeModal} />
+        <ClientModal
+          client={selectedClient}
+          onClose={closeModal}
+          onUpdated={handleClientUpdated}
+        />
       )}
 
       {/* Create account modal */}
