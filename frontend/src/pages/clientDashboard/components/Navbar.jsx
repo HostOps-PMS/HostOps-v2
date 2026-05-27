@@ -6,9 +6,8 @@ import AccountSettingsModal from "./AccountSettingsModal";
 
 export default function Navbar() {
   const { getUser, clear } = useAuth();
-  const { dashState } = useDashboard();
+  const { dashState, dark, setDark } = useDashboard();
   const user = getUser();
-  const [dark, setDark] = useState(false);
   const [dropOpen, setDropOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -425,7 +424,7 @@ export default function Navbar() {
   // Desktop layout
   return (
     <>
-      <nav style={t.navbar}>
+      <nav style={{ ...t.navbar, position: "sticky", top: 0 }}>
         <div style={t.inner}>
           <a href="/" style={t.logoWrap}>
             <div style={t.logoBox}>

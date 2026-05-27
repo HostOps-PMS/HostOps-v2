@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useDashboard } from '../context/DashboardContext';
 import {
   ComposedChart, Area, Line,
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -99,7 +100,7 @@ function CustomTooltip({ active, payload, label }) {
 }
 
 /* ─── Stat Pill ─────────────────────────────────────────────────── */
-function StatPill({ label, value, color, bg }) {
+function StatPill({ label, value, color, bg, dark }) {
   return (
     <div style={{
       background: bg, borderRadius: 12, padding: '10px 16px',
@@ -111,7 +112,7 @@ function StatPill({ label, value, color, bg }) {
       }}>
         {label}
       </div>
-      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: T.text, fontFamily: T.fontSora }}>
+      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: dark ? '#eaf5f0' : T.text, fontFamily: T.fontSora }}>
         {value}
       </div>
     </div>
@@ -122,6 +123,7 @@ function StatPill({ label, value, color, bg }) {
 // period.from and period.to are YYYY-MM-DD strings from the global DateFilterBar.
 // No local date filter — all filtering is driven by the top-level DateFilterBar.
 export default function RevenueChart({ data = {}, period = {} }) {
+  const { dark } = useDashboard();
   const bookings   = data.bookings   || [];
   const properties = data.properties || [];
   const numProps   = properties.length || 1;
@@ -150,14 +152,17 @@ export default function RevenueChart({ data = {}, period = {} }) {
 
   return (
     <div style={{
-      background: '#fff', borderRadius: 20, border: T.border,
+      background: dark ? '#132a1e' : '#fff',
+      borderRadius: 20,
+      border: dark ? '1px solid #1e3a2a' : T.border,
       boxShadow: T.shadow, padding: '22px 24px', fontFamily: T.fontDM,
+      transition: 'background 0.2s',
     }}>
 
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
         <div>
-          <div style={{ fontFamily: T.fontSora, fontSize: '1rem', fontWeight: 800, color: T.text, marginBottom: 2 }}>
+          <div style={{ fontFamily: T.fontSora, fontSize: '1rem', fontWeight: 800, color: dark ? '#eaf5f0' : T.text, marginBottom: 2 }}>
             Revenue &amp; Occupancy
           </div>
           <div style={{ fontSize: '.75rem', color: T.muted }}>{rangeLabel}</div>
@@ -180,8 +185,8 @@ export default function RevenueChart({ data = {}, period = {} }) {
       {/* ── Stat Pills ── */}
       {chartData.length > 0 && (
         <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
-          <StatPill label="Total Revenue" value={fmtMoney(totalRevenue)} color={T.green} bg={T.greenBg} />
-          <StatPill label="Avg Occupancy" value={`${avgOccupancy}%`}     color={T.blue}  bg={T.blueBg}  />
+          <StatPill label="Total Revenue" value={fmtMoney(totalRevenue)} color={T.green} bg={dark ? '#1a3d28' : T.greenBg} dark={dark} />
+          <StatPill label="Avg Occupancy" value={`${avgOccupancy}%`}     color={T.blue}  bg={dark ? '#1a2a3d' : T.blueBg}  dark={dark} />
         </div>
       )}
 
@@ -199,7 +204,7 @@ export default function RevenueChart({ data = {}, period = {} }) {
                 <stop offset="95%" stopColor={T.green} stopOpacity={0}    />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f5f2" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke={dark ? "#1e3a2a" : "#f0f5f2"} vertical={false} />
             <XAxis
               dataKey="label"
               tick={{ fontSize: 11, fill: T.muted, fontFamily: T.fontDM }}

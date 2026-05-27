@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { fmtMoney } from '../../utils/dateHelpers';
+import { useDashboard } from '../context/DashboardContext';
 
 const T = {
   fontSora: "'Sora', sans-serif",
@@ -141,7 +142,7 @@ function RevenueCard({ revenue, bookings }) {
 }
 
 /* ─── Split Stat Card ───────────────────────────────────────────── */
-function SplitCard({ label, value, sub, color, accentBg, icon }) {
+function SplitCard({ label, value, sub, color, accentBg, icon, dark }) {
   const [hovered, setHovered] = useState(false);
   return (
     <div
@@ -149,8 +150,8 @@ function SplitCard({ label, value, sub, color, accentBg, icon }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         borderRadius: 20,
-        background: '#fff',
-        border: `1px solid ${hovered ? color + '33' : '#f0f4f2'}`,
+        background: dark ? '#132a1e' : '#fff',
+        border: `1px solid ${hovered ? color + '33' : dark ? '#1e3a2a' : '#f0f4f2'}`,
         boxShadow: hovered ? `0 10px 32px ${color}18` : '0 1px 6px rgba(0,0,0,.05)',
         transform: hovered ? 'translateY(-3px)' : 'translateY(0)',
         transition: 'all .2s ease',
@@ -168,7 +169,7 @@ function SplitCard({ label, value, sub, color, accentBg, icon }) {
         {/* label */}
         <div style={{
           fontSize: '.65rem', fontWeight: 700, letterSpacing: '1px',
-          textTransform: 'uppercase', color: T.labelColor, fontFamily: T.fontDM,
+          textTransform: 'uppercase', color: dark ? '#6aab8a' : T.labelColor, fontFamily: T.fontDM,
           marginBottom: 12,
         }}>
           {label}
@@ -185,7 +186,7 @@ function SplitCard({ label, value, sub, color, accentBg, icon }) {
               {value}
             </div>
             <div style={{
-              fontSize: '.68rem', color: T.muted,
+              fontSize: '.68rem', color: dark ? '#4d8a6a' : T.muted,
               fontFamily: T.fontDM, fontWeight: 500, marginTop: 6,
             }}>
               {sub}
@@ -207,6 +208,7 @@ function SplitCard({ label, value, sub, color, accentBg, icon }) {
 
 /* ─── Main export ───────────────────────────────────────────────── */
 export default function StatCards({ stats = {} }) {
+  const { dark } = useDashboard();
   const revenue         = stats.revenue         ?? 0;
   const bookings        = stats.bookings        ?? 0;
   const cancellations   = stats.cancellations   ?? 0;
@@ -227,6 +229,7 @@ export default function StatCards({ stats = {} }) {
       <RevenueCard revenue={revenue} bookings={bookings} />
 
       <SplitCard
+        dark={dark}
         label="Bookings"
         value={bookings}
         sub={`${nights} nights total`}
@@ -243,6 +246,7 @@ export default function StatCards({ stats = {} }) {
       />
 
       <SplitCard
+        dark={dark}
         label="Cancellations"
         value={cancellations}
         sub={`${cancelledNights} nights affected`}
@@ -258,6 +262,7 @@ export default function StatCards({ stats = {} }) {
       />
 
       <SplitCard
+        dark={dark}
         label="Occupancy Rate"
         value={`${occupancy}%`}
         sub="Selected period"

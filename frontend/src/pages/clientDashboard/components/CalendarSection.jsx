@@ -11,7 +11,7 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
  * Complete calendar section: filter bar + nav bar + CalendarGrid.
  */
 export default function CalendarSection() {
-  const { dashState, updateDashState } = useDashboard();
+  const { dashState, updateDashState, dark } = useDashboard();
   const { loadData } = useDashboardData();
   const {
     calBaseDate, calMonthsCount, shouldScrollToToday,
@@ -89,14 +89,14 @@ export default function CalendarSection() {
     : 'All channels';
 
   return (
-    <div className="db-card" style={{ padding: 0, marginBottom: 20, overflow: 'visible' }}>
+    <div className="db-card" style={{ padding: 0, marginBottom: 20, overflow: 'visible', background: dark ? '#132a1e' : '#fff', border: dark ? '1px solid #1e3a2a' : undefined, transition: 'background 0.2s' }}>
       {/* Toolbar */}
-      <div className="cal-header">
-        <div className="cal-title">Availability Calendar</div>
+      <div className="cal-header" style={{ borderBottom: dark ? '1px solid #1e3a2a' : '1px solid #f0f5f2' }}>
+        <div className="cal-title" style={{ color: dark ? '#eaf5f0' : '#0c1c14' }}>Availability Calendar</div>
         <div className="cal-controls" style={{ position: 'relative' }}>
           {/* Date range button */}
           <div style={{ position: 'relative' }} ref={datePopRef}>
-            <button className="cal-btn" onClick={() => { setShowDatePop((v) => !v); setShowFilterPop(false); }}>
+           <button className="cal-btn" style={{ background: dark ? '#1a3d28' : '#fff', borderColor: dark ? '#2a5c3c' : '#e3ede8', color: dark ? '#a8d4bc' : '#0c1c14' }} onClick={() => { setShowDatePop((v) => !v); setShowFilterPop(false); }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
               </svg>
@@ -127,7 +127,7 @@ export default function CalendarSection() {
 
           {/* Channel filter button */}
           <div style={{ position: 'relative' }} ref={filterPopRef}>
-            <button className="cal-btn" onClick={() => { setShowFilterPop((v) => !v); setShowDatePop(false); }}>
+            <button className="cal-btn" style={{ background: dark ? '#1a3d28' : '#fff', borderColor: dark ? '#2a5c3c' : '#e3ede8', color: dark ? '#a8d4bc' : '#0c1c14' }} onClick={() => { setShowFilterPop((v) => !v); setShowDatePop(false); }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
               </svg>
@@ -152,7 +152,7 @@ export default function CalendarSection() {
           </div>
 
           {/* Multi/Single toggle */}
-          <div className="cal-btn-group">
+          <div className="cal-btn-group" style={{ background: dark ? '#0a1f15' : '#f0f5f2' }}>
             {['multi', 'single'].map((v) => (
               <button
                 key={v}
@@ -167,14 +167,14 @@ export default function CalendarSection() {
       </div>
 
       {/* Calendar nav bar */}
-      <div className="cal-nav">
+      <div className="cal-nav" style={{ background: dark ? '#0f2d1f' : '#fff', borderBottom: dark ? '1px solid #1e3a2a' : '1px solid #f0f5f2' }}>
         <button className="cal-nav-btn" onClick={() => shiftCalendar(-30)} title="Previous month">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>
         <button className="cal-nav-btn" onClick={() => shiftCalendar(30)} title="Next month">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
         </button>
-        <span className="cal-nav-label">{navLabel}</span>
+        <span className="cal-nav-label" style={{ color: dark ? '#eaf5f0' : '#0c1c14' }}>{navLabel}</span>
         <button className="cal-nav-today" onClick={goToToday}>Today</button>
       </div>
 

@@ -16,7 +16,7 @@ import Footer from "./components/Footer";
 import "./globals.css";
 
 export default function DashboardPage() {
-  const { dashState } = useDashboard();
+  const { dashState, dark } = useDashboard();
   const { loadData, banner } = useDashboardData();
 
   // ── First-login password change ──────────────────────────────────────────────
@@ -139,7 +139,7 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div style={{ background: '#f7faf8' }}>
+      <div style={{ background: dark ? "#0c1c14" : "#f7faf8", transition: "background 0.2s" }}>
         {smoobuNotConnected ? (
           // ── Smoobu not connected — show a clean connect prompt ──────────────
           <div className="db-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '70vh' }}>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useDashboard } from '../context/DashboardContext';
 
 const PLATFORM_COLORS = {
   Airbnb: '#FF5A5F',
@@ -29,7 +30,7 @@ const META = {
 };
 
 /* ─── Bar Row ────────────────────────────────────────────────────── */
-function BarRow({ ch, color, value, pct, fmtFn }) {
+function BarRow({ ch, color, value, pct, fmtFn, dark }) {
   return (
     <div
       style={{
@@ -66,7 +67,7 @@ function BarRow({ ch, color, value, pct, fmtFn }) {
         style={{
           flex: 1,
           height: 7,
-          background: '#f0f5f2',
+          background: dark ? '#1e3a2a' : '#f0f5f2',
           borderRadius: 100,
           overflow: 'hidden',
         }}
@@ -86,7 +87,7 @@ function BarRow({ ch, color, value, pct, fmtFn }) {
           fontSize: 11,
           fontWeight: 700,
           fontFamily: "'DM Sans', sans-serif",
-          color: '#0c1c14',
+          color: dark ? '#eaf5f0' : '#0c1c14',
           minWidth: 40,
           textAlign: 'right',
         }}
@@ -109,13 +110,13 @@ function BarRow({ ch, color, value, pct, fmtFn }) {
 }
 
 /* ─── Stat Box ───────────────────────────────────────────────────── */
-function StatBox({ label, value, sub, isLast }) {
+function StatBox({ label, value, sub, isLast, dark }) {
   return (
     <div
       style={{
         flex: 1,
         padding: '14px 20px',
-        borderRight: isLast ? 'none' : '1px solid #f0f5f2',
+        borderRight: isLast ? 'none' : dark ? '1px solid #1e3a2a' : '1px solid #f0f5f2',
       }}
     >
       <div
@@ -133,7 +134,7 @@ function StatBox({ label, value, sub, isLast }) {
           fontSize: 14,
           fontWeight: 800,
           fontFamily: "'Sora', sans-serif",
-          color: '#0c1c14',
+          color: dark ? '#eaf5f0' : '#0c1c14',
           lineHeight: 1.2,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -158,6 +159,7 @@ function StatBox({ label, value, sub, isLast }) {
 
 /* ─── Main export ────────────────────────────────────────────────── */
 export default function PlatformBreakdown({ byChannel = {} }) {
+  const { dark } = useDashboard();
   const [activeKey, setActiveKey] = useState('revenue');
 
   const channels = Object.keys(byChannel);
@@ -167,9 +169,9 @@ export default function PlatformBreakdown({ byChannel = {} }) {
     return (
       <div
         style={{
-          background: '#fff',
+          background: dark ? '#132a1e' : '#fff',
           borderRadius: 20,
-          border: '1px solid #e8f0eb',
+          border: dark ? '1px solid #1e3a2a' : '1px solid #e8f0eb',
           boxShadow: '0 1px 6px rgba(0,0,0,.05)',
           padding: '22px 24px',
         }}
@@ -214,11 +216,12 @@ export default function PlatformBreakdown({ byChannel = {} }) {
   return (
     <div
       style={{
-        background: '#fff',
+        background: dark ? '#132a1e' : '#fff',
         borderRadius: 20,
-        border: '1px solid #e8f0eb',
+        border: dark ? '1px solid #1e3a2a' : '1px solid #e8f0eb',
         boxShadow: '0 1px 6px rgba(0,0,0,.05)',
         overflow: 'hidden',
+        transition: 'background 0.2s',
       }}
     >
       {/* ── Header ── */}
@@ -228,7 +231,7 @@ export default function PlatformBreakdown({ byChannel = {} }) {
           alignItems: 'flex-start',
           justifyContent: 'space-between',
           padding: '18px 22px 14px',
-          borderBottom: '1px solid #f0f5f2',
+          borderBottom: dark ? '1px solid #1e3a2a' : '1px solid #f0f5f2',
           flexWrap: 'wrap',
           gap: 10,
         }}
@@ -239,7 +242,7 @@ export default function PlatformBreakdown({ byChannel = {} }) {
               fontFamily: "'Sora', sans-serif",
               fontSize: '1rem',
               fontWeight: 800,
-              color: '#0c1c14',
+              color: dark ? '#eaf5f0' : '#0c1c14',
               marginBottom: 2,
             }}
           >
@@ -261,7 +264,7 @@ export default function PlatformBreakdown({ byChannel = {} }) {
           style={{
             display: 'flex',
             gap: 2,
-            background: '#f0f5f2',
+            background: dark ? '#0a1f15' : '#f0f5f2',
             borderRadius: 8,
             padding: 3,
           }}
@@ -278,9 +281,9 @@ export default function PlatformBreakdown({ byChannel = {} }) {
                   fontSize: 12,
                   fontWeight: 700,
                   fontFamily: "'DM Sans', sans-serif",
-                  color: on ? '#0c1c14' : '#6a8b7c',
-                  background: on ? '#fff' : 'transparent',
-                  border: on ? '1px solid #e8f0eb' : 'none',
+                  color: on ? (dark ? '#eaf5f0' : '#0c1c14') : '#6a8b7c',
+                  background: on ? (dark ? '#1e3a2a' : '#fff') : 'transparent',
+                  border: on ? (dark ? '1px solid #2a5c3c' : '1px solid #e8f0eb') : 'none',
                   cursor: 'pointer',
                   transition: 'all .15s',
                   boxShadow: on ? '0 1px 3px rgba(0,0,0,.06)' : 'none',
@@ -297,17 +300,19 @@ export default function PlatformBreakdown({ byChannel = {} }) {
       <div
         style={{
           display: 'flex',
-          borderBottom: '1px solid #f0f5f2',
+          borderBottom: dark ? '1px solid #1e3a2a' : '1px solid #f0f5f2',
           overflow: 'hidden',
         }}
       >
-        <StatBox label={m.label} value={m.fmt(total)} sub={m.sub} />
+        <StatBox dark={dark} label={m.label} value={m.fmt(total)} sub={m.sub} />
         <StatBox
+          dark={dark}
           label="Top channel"
           value={topCh}
           sub={`${topPct}% of ${activeKey}`}
         />
         <StatBox
+          dark={dark}
           label="Channels"
           value={channels.length}
           sub="active platforms"
@@ -329,6 +334,7 @@ export default function PlatformBreakdown({ byChannel = {} }) {
               value={val}
               pct={pct}
               fmtFn={m.fmt}
+              dark={dark}
             />
           );
         })}
@@ -338,7 +344,7 @@ export default function PlatformBreakdown({ byChannel = {} }) {
       <div
         style={{
           padding: '10px 22px 16px',
-          borderTop: '1px solid #f0f5f2',
+          borderTop: dark ? '1px solid #1e3a2a' : '1px solid #f0f5f2',
           display: 'flex',
           flexWrap: 'wrap',
           gap: 12,
