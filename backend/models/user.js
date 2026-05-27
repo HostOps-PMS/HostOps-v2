@@ -14,10 +14,13 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: true,
-    select: false, // hindi babalik sa default queries
+    select: false,
   },
   firstName: { type: String, required: true, trim: true },
   lastName:  { type: String, default: '', trim: true },
+
+  // Human-readable label for admin users (e.g. "Main Admin", "Support Admin")
+  tag: { type: String, default: '', trim: true },
 
   // Email verification
   isVerified:        { type: Boolean, default: false },
@@ -36,21 +39,16 @@ const userSchema = new mongoose.Schema({
   },
 
   // ── MULTI-TENANT READY ────────────────────────────────────────
-  // Single-Smoobu mode: lahat ng users may same SMOOBU_API_KEY
-  // pero may sariling propertyTagPrefix para sa data filtering.
-  //
-  // Halimbawa: si Charmaine, propertyTagPrefix = "charmaine_"
-  // Yung properties niya sa Smoobu, naka-prefix ng "charmaine_BGC Studio"
-  // Sa kanyang dashboard, makikita lang niya yung properties na
-  // nagsisimula sa "charmaine_".
-  //
-  // Future multi-Smoobu mode: gagamitin natin yung smoobuApiKey
-  // (encrypted) at ihahanda na yung schema.
   propertyTagPrefix: { type: String, default: '', trim: true },
 
   // For future multi-Smoobu — encrypted bago i-store
   smoobuApiKey:      { type: String, select: false, default: null },
   smoobuConnectedAt: { type: Date,   default: null },
+
+  // First-login password change flag.
+  // Set to true when an admin creates the account (with a default/temporary password).
+  // User must change password on first dashboard load; only then is isVerified set to true.
+  mustChangePassword: { type: Boolean, default: false },
 
   // Activity tracking
   lastLoginAt: { type: Date },

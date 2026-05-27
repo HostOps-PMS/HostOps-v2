@@ -9,6 +9,7 @@ import UnifiedInbox from "./components/UnifiedInbox";
 import ActivityFeed from "./components/ActivityFeed";
 import MessageModal from "./components/MessageModal";
 import DateFilterBar from "./components/DateFilterBar";
+import FirstLoginModal from "./components/FirstLoginModal";
 import { useDashboard } from "./context/DashboardContext";
 import { useDashboardData } from "./hooks/useDashboardData";
 import Footer from "./components/Footer";
@@ -17,6 +18,22 @@ import "./globals.css";
 export default function DashboardPage() {
   const { dashState, dark } = useDashboard();
   const { loadData, banner } = useDashboardData();
+
+  // ── First-login password change ──────────────────────────────────────────────
+  // Set by LoginForm when the backend returns mustChangePassword: true.
+  // The modal is shown until the user successfully changes their password,
+  // at which point the backend marks the account as verified.
+  const [showFirstLoginModal, setShowFirstLoginModal] = useState(() => {
+    return sessionStorage.getItem('hp_must_change_password') === 'true';
+  });
+
+  const handlePasswordChanged = (updatedUser) => {
+    // Store the refreshed user object (now with isVerified: true)
+    if (updatedUser) {
+      sessionStorage.setItem('hp_user', JSON.stringify(updatedUser));
+    }
+    setShowFirstLoginModal(false);
+  };
 
   // ── Current logged-in user (for PricingModal pre-fill) ──────────────────────
   // Tries multiple localStorage keys that your auth layer may use.
@@ -93,7 +110,12 @@ export default function DashboardPage() {
   const smoobuNotConnected = banner.type === 'connect';
 
   return (
-    <div style={{ background: dark ? "#0a1a10" : "#f4f6f5", minHeight: "100vh", transition: "background 0.2s" }}>
+    <div style={{ background: "#f4f6f5", minHeight: "100vh" }}>
+      {/* First-login modal: blocking overlay shown until password is set */}
+      {showFirstLoginModal && (
+        <FirstLoginModal onComplete={handlePasswordChanged} />
+      )}
+
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
         <Navbar />
         <Banner type={banner.type} message={banner.message} />

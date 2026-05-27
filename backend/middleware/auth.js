@@ -17,7 +17,11 @@ export async function requireAuth(req, res, next) {
     // to only one account, causing other users to see wrong/no data.
     const user = await User.findById(decoded.sub).select('+smoobuApiKey');
     if (!user) return res.status(401).json({ error: 'User not found' });
-    if (!user.isVerified) {
+
+    // Allow through if the user must change their password (admin-created account).
+    // They are not yet verified, but the /auth/change-password endpoint
+    // needs to be accessible so they can complete the first-login flow.
+    if (!user.isVerified && !user.mustChangePassword) {
       return res.status(403).json({ error: 'Email not verified' });
     }
 

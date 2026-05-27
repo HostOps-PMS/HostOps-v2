@@ -1,0 +1,45 @@
+/* ═══════════════════════════════════════════════════════
+   App.css — global resets and base styles only
+   Page/component-specific styles live in their own .css files
+   ═══════════════════════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --color-brand: #26a676;
+  --color-brand-dark: #1e8760;
+  --color-bg: #f4f9f6;
+  --color-text: #0c1c14;
+  --color-muted: #6a8b7c;
+  --radius-card: 24px;
+  --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Sora', sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}
