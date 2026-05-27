@@ -1,0 +1,3 @@
+/* Reuse all design tokens from the dashboard global file.
+   Add clients-specific token overrides below if needed. */
+@import '../dashboard/global.css';

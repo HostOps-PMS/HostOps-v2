@@ -10,16 +10,16 @@ import { v4 as uuidv4 } from 'uuid';
 import { connectDB, disconnectDB } from './config/db.js';
 import authRoutes from './routes/auth.js';
 import dashboardRoutes from './routes/dashboard.js';
+import clientsRoutes from './routes/clients.js';
 import { requireApiKey } from './middleware/apiKeyAuth.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ── Trust Proxy (required when behind Nginx / load balancer / cloud) ──────────
-// Without this, rate limiting sees the proxy IP instead of the real client IP.
 app.set('trust proxy', 1);
 
-// ── Request ID (correlation ID for traceable logs) ────────────────────────────
+// ── Request ID ────────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
   req.id = uuidv4();
   res.setHeader('X-Request-Id', req.id);
@@ -46,7 +46,7 @@ app.use(
     crossOriginResourcePolicy: { policy: 'same-origin' },
     referrerPolicy:            { policy: 'strict-origin-when-cross-origin' },
     hsts: {
-      maxAge:            31536000, // 1 year in seconds
+      maxAge:            31536000,
       includeSubDomains: true,
       preload:           true,
     },
@@ -54,16 +54,28 @@ app.use(
 );
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
-  .split(',')
-  .map((o) => o.trim());
+const isDev = process.env.NODE_ENV !== 'production';
+
+// In dev, allow all localhost ports (5173, 5174, 5175, etc.)
+// In production, require explicit ALLOWED_ORIGINS env var.
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  : [];
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. mobile apps, curl, Postman in dev)
+      // Allow requests with no origin (curl, Postman, mobile apps)
       if (!origin) return callback(null, true);
+
+      // Dev: allow any localhost origin regardless of port
+      if (isDev && /^http:\/\/localhost(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      // Production: check against explicit whitelist
       if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+
       callback(new Error(`CORS: origin '${origin}' not allowed`));
     },
     credentials: true,
@@ -81,42 +93,43 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(cookieParser());
 
 // ── MongoDB Injection Sanitization ────────────────────────────────────────────
-// Strips keys starting with '$' or containing '.' from req.body, req.params, req.query
 app.use(mongoSanitize());
 
 // ── Rate Limiting ─────────────────────────────────────────────────────────────
-
-// Global limiter — broad safety net
 const globalLimiter = rateLimit({
-  windowMs:         15 * 60 * 1000, // 15 minutes
+  windowMs:         15 * 60 * 1000,
   max:              100,
-  standardHeaders:  true,  // Return rate limit info in 'RateLimit-*' headers
+  standardHeaders:  true,
   legacyHeaders:    false,
   message: { error: 'Too many requests, please try again later.' },
 });
 
-// Auth limiter — strict, protects login / register / password-reset
 const authLimiter = rateLimit({
-  windowMs:        15 * 60 * 1000, // 15 minutes
-  max:             10,              // only 10 attempts per window
+  windowMs:        15 * 60 * 1000,
+  max:             10,
   standardHeaders: true,
   legacyHeaders:   false,
   message: { error: 'Too many authentication attempts, please try again later.' },
-  skipSuccessfulRequests: true,    // Don't count successful logins against the limit
+  skipSuccessfulRequests: true,
 });
 
 app.use(globalLimiter);
-app.use('/auth/login',          authLimiter);
-app.use('/auth/register',       authLimiter);
+app.use('/auth/login',           authLimiter);
+app.use('/auth/register',        authLimiter);
 app.use('/auth/forgot-password', authLimiter);
 app.use('/auth/reset-password',  authLimiter);
 
 // ── Global API Key Protection ─────────────────────────────────────────────────
-app.use(requireApiKey);
+// /auth routes are exempt — login should not require an API key
+app.use((req, res, next) => {
+  if (req.path.startsWith('/auth')) return next();
+  requireApiKey(req, res, next);
+});
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/auth', authRoutes);
 app.use('/api',  dashboardRoutes);
+app.use('/api',  clientsRoutes);
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
@@ -133,30 +146,25 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   const requestId = req.id || 'unknown';
 
-  // Log with correlation ID so you can trace errors across your logs
   console.error(`[${new Date().toISOString()}] [req:${requestId}] Error:`, {
     message: err.message,
-    stack:   process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    stack:   isDev ? err.stack : undefined,
     path:    req.path,
     method:  req.method,
   });
 
-  // CORS errors
   if (err.message?.startsWith('CORS:')) {
     return res.status(403).json({ error: 'Forbidden: CORS policy violation' });
   }
 
-  // Never leak internal error details in production
-  const isDev = process.env.NODE_ENV === 'development';
   res.status(err.status || 500).json({
     error:     isDev ? err.message : 'Internal server error',
-    requestId,                           // lets the client quote an ID in bug reports
-    ...(isDev && { stack: err.stack }), // stack trace only in dev
+    requestId,
+    ...(isDev && { stack: err.stack }),
   });
 });
 
 // ── Graceful Shutdown ─────────────────────────────────────────────────────────
-// Ensures in-flight requests finish before the process exits (Docker, k8s, PM2).
 let server;
 
 async function shutdown(signal) {
@@ -172,7 +180,6 @@ async function shutdown(signal) {
     }
   });
 
-  // Force-exit after 10 s if something hangs
   setTimeout(() => {
     console.error('Forced exit after timeout.');
     process.exit(1);
@@ -182,14 +189,13 @@ async function shutdown(signal) {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT',  () => shutdown('SIGINT'));
 
-// ── Unhandled Rejections / Exceptions ─────────────────────────────────────────
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Promise Rejection:', reason);
 });
 
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
-  process.exit(1); // Always exit on uncaught exceptions — state is unknown
+  process.exit(1);
 });
 
 // ── Start Server ──────────────────────────────────────────────────────────────
