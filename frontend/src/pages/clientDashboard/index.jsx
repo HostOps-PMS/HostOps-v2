@@ -11,6 +11,7 @@ import MessageModal from "./components/MessageModal";
 import DateFilterBar from "./components/DateFilterBar";
 import { useDashboard } from "./context/DashboardContext";
 import { useDashboardData } from "./hooks/useDashboardData";
+import Footer from "./components/Footer";
 import "./globals.css";
 
 export default function DashboardPage() {
@@ -206,12 +207,7 @@ export default function DashboardPage() {
                 <ActivityFeed bookings={bookings} channels={dashState.channels} />
               </div>
 
-              {/* CTA */}
-              
-
-              <div style={{ textAlign: 'center', padding: '24px 0 0', color: '#c5d8cd', fontSize: '.75rem' }}>
-                © 2026 HostOps. All rights reserved.
-              </div>
+              <Footer />
             </div>
           </>
         )}
