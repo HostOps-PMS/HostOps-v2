@@ -135,7 +135,13 @@ router.post('/login', async (req, res, next) => {
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
-    if (!user.isVerified) {
+
+    // Block only self-registered accounts that have not yet clicked their
+    // verification email. Admin-created accounts (mustChangePassword: true)
+    // are allowed through — the frontend shows the first-login password-change
+    // modal on the dashboard instead.
+    const isAdminCreated = user.mustChangePassword === true;
+    if (!user.isVerified && !isAdminCreated) {
       return res.status(403).json({ error: 'Please verify your email first' });
     }
 
@@ -237,6 +243,57 @@ router.post('/logout', async (req, res, next) => {
 // GET /auth/me
 router.get('/me', requireAuth, (req, res) => {
   res.json({ user: req.user.toJSON() });
+});
+
+// POST /auth/change-password
+// Used on first login when mustChangePassword is true.
+// Verifies the current (temporary) password, sets the new one,
+// and marks the account as verified — completing the onboarding flow.
+router.post('/change-password', requireAuth, async (req, res, next) => {
+  try {
+    const changeSchema = z.object({
+      currentPassword: z.string().min(1),
+      newPassword:     z.string().min(8).max(128),
+    });
+
+    const { currentPassword, newPassword } = changeSchema.parse(req.body);
+
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({ error: 'New password must be different from the current one' });
+    }
+
+    user.password = newPassword;
+
+    // Complete first-login verification: the user has proven ownership of the
+    // account by logging in with the temporary password and choosing a new one.
+    if (user.mustChangePassword) {
+      user.mustChangePassword = false;
+      user.isVerified = true;
+    }
+
+    await user.save();
+
+    // Revoke all existing refresh tokens so old sessions are invalidated.
+    await RefreshToken.updateMany(
+      { userId: user._id, revokedAt: null },
+      { revokedAt: new Date() }
+    );
+
+    res.json({ message: 'Password changed successfully.', user: user.toJSON() });
+  } catch (err) {
+    if (err.name === 'ZodError') {
+      return res.status(400).json({ error: 'Validation failed', details: err.errors });
+    }
+    next(err);
+  }
 });
 
 // PATCH /auth/profile

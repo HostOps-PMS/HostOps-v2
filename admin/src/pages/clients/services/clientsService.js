@@ -56,10 +56,11 @@ export async function getClient(id) {
 }
 
 /**
- * POST /auth/register
- * Creates a new user account (admin-initiated).
- * Uses the standard register endpoint so password hashing,
- * verification email, and GHL webhook all fire normally.
+ * POST /api/clients
+ * Admin creates a new user account with a temporary password.
+ * Uses the dedicated admin endpoint (not /auth/register) so that
+ * mustChangePassword is set to true — forcing the user to change
+ * their password on first login before gaining full access.
  *
  * @param {{
  *   firstName: string,
@@ -70,10 +71,10 @@ export async function getClient(id) {
  *   propertyTagPrefix?: string,
  *   smoobuApiKey?: string,
  * }} data
- * @returns {Promise<{ message: string, userId: string }>}
+ * @returns {Promise<{ message: string, userId: string, user: object }>}
  */
 export async function createClient(data) {
-  return request('/auth/register', {
+  return request('/api/clients', {
     method: 'POST',
     body: JSON.stringify(data),
   });
