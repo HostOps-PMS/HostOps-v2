@@ -7,6 +7,7 @@ import express from 'express';
 import { z } from 'zod';
 import User from '../models/user.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { getDashboard } from '../services/smoobu.js';
 
 const router = express.Router();
 
@@ -56,6 +57,54 @@ router.get('/clients/:id', async (req, res, next) => {
 });
 
 // ─────────────────────────────────────────────────────────────────
+// GET /api/clients/:id/smoobu
+// Admin views a client's Smoobu dashboard data.
+//
+// The client's smoobuApiKey is loaded server-side (+smoobuApiKey) and
+// is NEVER sent to the frontend — the server fetches Smoobu on the
+// client's behalf and returns only the dashboard payload.
+//
+// If the client has no key, returns { smoobuNotConnected: true }.
+// ─────────────────────────────────────────────────────────────────
+router.get('/clients/:id/smoobu', async (req, res, next) => {
+  try {
+    // Load user WITH their smoobuApiKey (select:false — must be explicit)
+    const user = await User.findById(req.params.id).select('+smoobuApiKey');
+
+    if (!user) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    // If no key at all, return a clean "not connected" response
+    if (!user.smoobuApiKey || !user.smoobuApiKey.trim()) {
+      return res.status(200).json({
+        smoobuNotConnected: true,
+        message: 'This client has no Smoobu API key configured.',
+      });
+    }
+
+    const data = await getDashboard(user, {
+      from: req.query.from,
+      to:   req.query.to,
+    });
+
+    res.json(data);
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid client ID' });
+    }
+    // getDashboard throws this when there's no key — belt-and-suspenders
+    if (err.code === 'NO_SMOOBU_KEY') {
+      return res.status(200).json({
+        smoobuNotConnected: true,
+        message: err.message,
+      });
+    }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
 // POST /api/clients
 // Admin creates a new user account with a temporary password.
 // Sets mustChangePassword: true so the user is forced to set
@@ -90,9 +139,6 @@ router.post('/clients', async (req, res, next) => {
       role:               data.role,
       propertyTagPrefix:  data.propertyTagPrefix || '',
       smoobuApiKey:       data.smoobuApiKey || null,
-      // Admin-created accounts skip email verification.
-      // Instead, the user must change their temporary password on first login,
-      // which sets isVerified: true and mustChangePassword: false.
       isVerified:         false,
       mustChangePassword: true,
     });
@@ -105,6 +151,57 @@ router.post('/clients', async (req, res, next) => {
   } catch (err) {
     if (err.name === 'ZodError') {
       return res.status(400).json({ error: 'Validation failed', details: err.errors });
+    }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// PATCH /api/clients/:id
+// Admin updates a client's editable fields:
+//   - role
+//   - propertyTagPrefix
+//   - smoobuApiKey (optional — only updated if provided)
+// All other fields (email, password, isVerified, etc.) are
+// intentionally excluded to prevent accidental overwrites.
+// ─────────────────────────────────────────────────────────────────
+const updateClientSchema = z.object({
+  role:              z.enum(['client', 'admin']).optional(),
+  propertyTagPrefix: z.string().max(100).trim().optional(),
+  smoobuApiKey:      z.string().max(512).optional(),
+});
+
+router.patch('/clients/:id', async (req, res, next) => {
+  try {
+    const data = updateClientSchema.parse(req.body);
+
+    const update = {};
+    if (data.role              !== undefined) update.role              = data.role;
+    if (data.propertyTagPrefix !== undefined) update.propertyTagPrefix = data.propertyTagPrefix;
+    if (data.smoobuApiKey      !== undefined) {
+      update.smoobuApiKey      = data.smoobuApiKey.trim() || null;
+      update.smoobuConnectedAt = data.smoobuApiKey.trim() ? new Date() : null;
+    }
+
+    const client = await User.findByIdAndUpdate(
+      req.params.id,
+      { $set: update },
+      { new: true, runValidators: true }
+    )
+      .select('-password -verifyToken -verifyTokenExpiry -resetToken -resetTokenExpiry -smoobuApiKey -__v')
+      .lean();
+
+    if (!client) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    res.json(client);
+  } catch (err) {
+    if (err.name === 'ZodError') {
+      return res.status(400).json({ error: 'Validation failed', details: err.errors });
+    }
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid client ID' });
     }
     next(err);
   }
