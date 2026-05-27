@@ -5,7 +5,8 @@
 html, body {
   height: auto !important;
   overflow-y: auto !important;
-  overflow-x: hidden;
+  overflow-x: clip !important;
+  overflow: visible !important;
 }
 
 /* ── Layout ────────────────────────────────────────────────────────── */
@@ -437,4 +438,13 @@ html, body {
 .hp-spinner {
   display: flex; align-items: center; justify-content: center;
   padding: 60px; color: #9ab8a9; font-size: .85rem; gap: 10px;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.75); }
+}
+
+body, #root {
+  overflow: visible !important;
 }
