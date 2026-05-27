@@ -1,0 +1,57 @@
+/* ═══════════════════════════════════════════════════════
+   global.css — scoped global resets for the dashboard page
+   Mirrors App.css tokens; override here without touching root.
+   ═══════════════════════════════════════════════════════ */
+
+/* Design tokens — override or extend App.css :root vars */
+:root {
+  /* Brand */
+  --color-brand:       #26a676;
+  --color-brand-dark:  #1e8760;
+  --color-brand-light: #e0f4ed;
+
+  /* Backgrounds */
+  --color-bg:          #f4f9f6;
+  --color-surface:     #ffffff;
+  --color-surface-2:   #f0f7f4;
+
+  /* Text */
+  --color-text:        #0c1c14;
+  --color-muted:       #6a8b7c;
+  --color-placeholder: #a8c4b8;
+
+  /* Feedback */
+  --color-success:     #26a676;
+  --color-warning:     #f59e0b;
+  --color-danger:      #ef4444;
+  --color-info:        #3b82f6;
+
+  /* Borders */
+  --color-border:      #d4e8de;
+
+  /* Sidebar */
+  --sidebar-width:     240px;
+  --sidebar-bg:        #0c1c14;
+  --sidebar-text:      #c8ddd4;
+  --sidebar-active:    #26a676;
+
+  /* Topbar */
+  --topbar-h:          64px;
+
+  /* Radius */
+  --radius-card:       16px;
+  --radius-sm:         8px;
+  --radius-pill:       999px;
+
+  /* Shadow */
+  --shadow-card:       0 2px 12px rgba(12,28,20,.07);
+  --shadow-modal:      0 20px 60px rgba(12,28,20,.18);
+
+  /* Fonts */
+  --font-body:         'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display:      'Sora', sans-serif;
+
+  /* Transitions */
+  --ease:              cubic-bezier(.4,0,.2,1);
+  --transition:        180ms var(--ease);
+}
