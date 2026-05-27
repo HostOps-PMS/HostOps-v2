@@ -15,7 +15,7 @@ import Footer from "./components/Footer";
 import "./globals.css";
 
 export default function DashboardPage() {
-  const { dashState } = useDashboard();
+  const { dashState, dark } = useDashboard();
   const { loadData, banner } = useDashboardData();
 
   // ── Current logged-in user (for PricingModal pre-fill) ──────────────────────
@@ -93,7 +93,7 @@ export default function DashboardPage() {
   const smoobuNotConnected = banner.type === 'connect';
 
   return (
-    <div style={{ background: "#f4f6f5", minHeight: "100vh" }}>
+    <div style={{ background: dark ? "#0a1a10" : "#f4f6f5", minHeight: "100vh", transition: "background 0.2s" }}>
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
         <Navbar />
         <Banner type={banner.type} message={banner.message} />
@@ -117,7 +117,7 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div style={{ background: '#f7faf8' }}>
+      <div style={{ background: dark ? "#0c1c14" : "#f7faf8", transition: "background 0.2s" }}>
         {smoobuNotConnected ? (
           // ── Smoobu not connected — show a clean connect prompt ──────────────
           <div className="db-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '70vh' }}>

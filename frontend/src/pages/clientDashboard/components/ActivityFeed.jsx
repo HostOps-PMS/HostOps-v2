@@ -1,4 +1,5 @@
 import React from 'react';
+import { useDashboard } from '../context/DashboardContext';
 import { fmtDate, fmtMoney } from '../../utils/dateHelpers';
 import { getChannelColor, getChannelInitial } from '../utils/channelHelpers';
 
@@ -6,6 +7,7 @@ import { getChannelColor, getChannelInitial } from '../utils/channelHelpers';
  * Live Activity Feed — shows the 3 most recent non-cancelled bookings.
  */
 export default function ActivityFeed({ bookings = [], channels = [] }) {
+  const { dark } = useDashboard();
   const recent = bookings
     .filter((b) => {
       if (b.type === 'cancellation' || b['is-blocked-booking']) return false;
@@ -19,11 +21,11 @@ export default function ActivityFeed({ bookings = [], channels = [] }) {
     .slice(0, 3);
 
   return (
-    <div className="db-card" style={{ padding: 0 }}>
-      <div className="section-head" style={{ marginBottom: 0 }}>
+    <div className="db-card" style={{ padding: 0, background: dark ? '#132a1e' : '#fff', border: dark ? '1px solid #1e3a2a' : undefined, transition: 'background 0.2s' }}>
+      <div className="section-head" style={{ marginBottom: 0, borderBottom: dark ? '1px solid #1e3a2a' : undefined }}>
         <div>
-          <div className="section-head-title">Live Activity Feed</div>
-          <div className="section-head-sub">Recent bookings &amp; events</div>
+          <div className="section-head-title" style={{ color: dark ? '#eaf5f0' : undefined }}>Live Activity Feed</div>
+          <div className="section-head-sub" style={{ color: dark ? '#4d8a6a' : undefined }}>Recent bookings &amp; events</div>
         </div>
       </div>
 

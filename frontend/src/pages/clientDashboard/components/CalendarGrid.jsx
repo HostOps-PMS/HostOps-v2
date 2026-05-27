@@ -1,5 +1,6 @@
 import { toYMD, dayDiff, fmtMoney } from "../../utils/dateHelpers";
 import React, { useEffect, useRef, useState } from "react";
+import { useDashboard } from "../context/DashboardContext";
 import {
   getChannelPillClass,
   getChannelColor,
@@ -226,6 +227,7 @@ export default function CalendarGrid({
   onScrollToTodayConsumed,
   onLoadMore,
 }) {
+const { dark } = useDashboard();
   const scrollRef = useRef(null);
   const filterPopRef = useRef(null);
   const todayISO = toYMD(new Date());
@@ -356,7 +358,7 @@ export default function CalendarGrid({
   }, []);
 
   return (
-  <div style={{ display: "flex", width: "100%", overflow: "visible", borderTop: "1px solid #e3ede8", borderRadius: "0 0 14px 14px" }}>
+  <div style={{ display: "flex", width: "100%", overflow: "visible", borderTop: dark ? "1px solid #1e3a2a" : "1px solid #e3ede8", borderRadius: "0 0 14px 14px", "--cal-td-bg": "#fff", "--cal-td-today": "#f0faf4", "--cal-td-weekend": "#fcfafa", "--cal-month-bg": "#f5f9f7", "--cal-month-color": "#1a3028", "--cal-dayrow-bg": "#f7faf8", "--cal-daynum-color": "#0c1c14", "--cal-border": "1px solid #e3ede8" }}>
       <style>{`
           /* ── Tooltip ── */
           .cal-tt {
@@ -408,19 +410,19 @@ export default function CalendarGrid({
           /* ── Table ── */
           .cal-table { width: max-content; min-width: 100%; border-collapse: collapse; }
           .cal-table th { padding: 10px 6px; border-right: 1px solid #f0f5f2; border-bottom: 1px solid #e3ede8; font-size: .72rem; font-weight: 600; color: #9ab8a9; text-align: center; }
-          .cal-table td { min-width: 56px; max-width: 56px; width: 56px; height: 48px; border-right: 1px solid #eef2f0; border-bottom: 1px solid #eef2f0; position: relative; padding: 0; background: #fff; }
-          .cal-table td.today-col { background: #f0faf4; }
-          .cal-table td.weekend-col { background: #fcfafa; }
+          .cal-table td { min-width: 56px; max-width: 56px; width: 56px; height: 48px; border-right: 1px solid #eef2f0; border-bottom: 1px solid #eef2f0; position: relative; padding: 0; background: var(--cal-td-bg, #fff); }
+          .cal-table td.today-col { background: var(--cal-td-today, #f0faf4); }
+          .cal-table td.weekend-col { background: var(--cal-td-weekend, #fcfafa); }
           .cal-table td.month-start { border-left: 2px solid #b7e4cf; }
           .cal-table tbody tr:hover td { background: #fafcfb; }
           .cal-table tbody tr:hover td.today-col { background: #e8f5ee; }
 
           /* ── Month label ── */
-          .cal-month-label { text-align: left !important; padding: 8px 14px !important; font-family: 'Sora', sans-serif; font-size: .8rem; font-weight: 800; color: #1a3028; background: #f5f9f7; border-bottom: 1px solid #e3ede8; border-right: 1px solid #dde8e3; white-space: nowrap; position: relative; }
+          .cal-month-label { text-align: left !important; padding: 8px 14px !important; font-family: 'Sora', sans-serif; font-size: .8rem; font-weight: 800; color: var(--cal-month-color, #1a3028); background: var(--cal-month-bg, #f5f9f7); border-bottom: var(--cal-border, 1px solid #e3ede8); border-right: var(--cal-border, 1px solid #dde8e3); white-space: nowrap; position: relative; }
 
           /* ── Day header row ── */
-          .cal-day-row th { min-width: 56px; max-width: 56px; width: 56px; text-align: center; padding: 6px 4px; background: #f7faf8; border-bottom: 1px solid #e3ede8; border-right: 1px solid #eef2f0; font-size: .6rem; font-weight: 700; color: #7aab95; text-transform: uppercase; letter-spacing: .4px; }
-          .cal-day-row th .day-num { display: block; margin-top: 1px; font-size: .85rem; font-weight: 800; color: #0c1c14; }
+          .cal-day-row th { min-width: 56px; max-width: 56px; width: 56px; text-align: center; padding: 6px 4px; background: var(--cal-dayrow-bg, #f7faf8); border-bottom: var(--cal-border, 1px solid #e3ede8); border-right: 1px solid #eef2f0; font-size: .6rem; font-weight: 700; color: #7aab95; text-transform: uppercase; letter-spacing: .4px; }
+          .cal-day-row th .day-num { display: block; margin-top: 1px; font-size: .85rem; font-weight: 800; color: var(--cal-daynum-color, #0c1c14); }
           .cal-day-row th.weekend { color: #ec4899; }
           .cal-day-row th.weekend .day-num { color: #ec4899; }
           .cal-day-row th.today { background: #e8f5ee; }
@@ -452,11 +454,11 @@ export default function CalendarGrid({
         `}</style>
 
       {/* FIXED SIDEBAR */}
-      <div style={{ width: 240, minWidth: 240, background: "#eaf5ee", flexShrink: 0, borderRight: "1px solid #c8e6d6", overflow: "visible", display: "flex", flexDirection: "column" }}>
-        <div style={{ background: "#d6ede0", height: 36, display: "flex", alignItems: "center", padding: "0 16px 0 20px", borderBottom: "1px solid #e3ede8", fontSize: ".62rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".8px", color: "#5a8a70", flexShrink: 0 }}>
+      <div style={{ width: 240, minWidth: 240, background: dark ? "#0f2d1f" : "#eaf5ee", flexShrink: 0, borderRight: dark ? "1px solid #1e3a2a" : "1px solid #c8e6d6", overflow: "visible", display: "flex", flexDirection: "column" }}>
+        <div style={{ background: dark ? "#0a1f15" : "#d6ede0", height: 36, display: "flex", alignItems: "center", padding: "0 16px 0 20px", borderBottom: dark ? "1px solid #1a3d28" : "1px solid #e3ede8", fontSize: ".62rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".8px", color: dark ? "#4d9e7a" : "#5a8a70", flexShrink: 0 }}>
           Properties
         </div>
-        <div style={{ background: "#eaf5ee", height: 44, display: "flex", alignItems: "center", padding: "0 8px", borderBottom: "1px solid #c8e6d6", flexShrink: 0, position: "relative", zIndex: 30, overflow: "visible" }} ref={filterPopRef}>
+        <div style={{ background: dark ? "#0d2619" : "#eaf5ee", height: 44, display: "flex", alignItems: "center", padding: "0 8px", borderBottom: dark ? "1px solid #1a3d28" : "1px solid #c8e6d6", flexShrink: 0, position: "relative", zIndex: 30, overflow: "visible" }} ref={filterPopRef}>
           <button
             className="cal-btn"
             onClick={() => setShowPropFilter((v) => !v)}
@@ -506,12 +508,12 @@ export default function CalendarGrid({
           )}
         </div>
         {displayedProps.map((prop) => (
-          <div key={prop.id} style={{ height: 48, display: "flex", alignItems: "center", padding: "0 16px 0 20px", gap: 8, borderBottom: "1px solid #d6ede0", background: "#eaf5ee" }}
-            onMouseEnter={e => e.currentTarget.style.background = "#d4ecde"}
-            onMouseLeave={e => e.currentTarget.style.background = "#eaf5ee"}
+          <div key={prop.id} style={{ height: 48, display: "flex", alignItems: "center", padding: "0 16px 0 20px", gap: 8, borderBottom: dark ? "1px solid #1a3d28" : "1px solid #d6ede0", background: dark ? "#0f2d1f" : "#eaf5ee" }}
+            onMouseEnter={e => e.currentTarget.style.background = dark ? "#163d28" : "#d4ecde"}
+            onMouseLeave={e => e.currentTarget.style.background = dark ? "#0f2d1f" : "#eaf5ee"}
           >
             <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#26a676", flexShrink: 0, opacity: 0.7 }} />
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, fontSize: ".78rem", fontWeight: 600, color: "#1a3d28", letterSpacing: "-0.01em" }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, fontSize: ".78rem", fontWeight: 600, color: dark ? "#c8e6d6" : "#1a3d28", letterSpacing: "-0.01em" }}>
               {prop.name}
             </span>
           </div>

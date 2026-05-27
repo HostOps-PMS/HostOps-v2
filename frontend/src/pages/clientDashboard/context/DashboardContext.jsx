@@ -18,15 +18,14 @@ export function DashboardProvider({ children }) {
     calMonthsCount: 6,
   });
 
-  // useCallback ensures this function reference is stable across renders,
-  // preventing useDashboardData's useCallback from re-creating on every render
-  // (which was causing loadData to fire repeatedly).
+  const [dark, setDark] = useState(false);
+
   const updateDashState = useCallback((partial) => {
     setDashState((prev) => ({ ...prev, ...partial }));
   }, []);
 
   return (
-    <DashboardContext.Provider value={{ dashState, setDashState, updateDashState }}>
+    <DashboardContext.Provider value={{ dashState, setDashState, updateDashState, dark, setDark }}>
       {children}
     </DashboardContext.Provider>
   );
