@@ -31,6 +31,10 @@ const userSchema = new mongoose.Schema({
   resetToken:       { type: String, select: false },
   resetTokenExpiry: { type: Date,   select: false },
 
+  // Login OTP (Device verification)
+  loginOtp:       { type: String, select: false },
+  loginOtpExpiry: { type: Date,   select: false },
+
   // Roles
   role: {
     type: String,

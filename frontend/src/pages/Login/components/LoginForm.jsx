@@ -4,14 +4,20 @@ import { loginUser } from '../services/authService';
 import { useAuthSubmit } from '../hooks/useAuth';
 import { useAuth } from '../../AuthContext';
 
-export default function LoginForm({ showMsg, hideMsg, onForgot }) {
+export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp }) {
   const navigate = useNavigate();
   const auth = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
 
   const { submit, loading } = useAuthSubmit(loginUser, {
     onSuccess: (data) => {
+      if (data.requiresOtp) {
+        onRequiresOtp(email, rememberMe);
+        return;
+      }
+
       auth.setToken(data.accessToken);
       auth.setUser(data.user);
 
@@ -26,16 +32,15 @@ export default function LoginForm({ showMsg, hideMsg, onForgot }) {
       showMsg(`Welcome back, ${data.user.firstName}! Redirecting...`, 'success');
 
       setTimeout(() => {
-        if (data.user.tag === 'Main Admin') {
-          // ✅ Main Admin: cross-origin redirect to the dashboard app (5173).
+        if (data.isAdmin || data.user.tag === 'Main Admin') {
+          // ✅ Admin: cross-origin redirect to the admin app.
           // Token is passed via URL params since sessionStorage is port-scoped.
-          // AuthContext on 5173 will consume + clean the params on mount.
           const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5173';
           const params = new URLSearchParams({
             _t: data.accessToken,
             _u: JSON.stringify(data.user),
           });
-          window.location.href = `${dashboardBase}/dashboard?${params.toString()}`;
+          window.location.href = `${dashboardBase}/admin?${params.toString()}`;
         } else {
           // ✅ All other users: stay on the same app (5174), no port switch needed.
           navigate('/dashboard', { replace: true });
@@ -48,7 +53,12 @@ export default function LoginForm({ showMsg, hideMsg, onForgot }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     hideMsg();
-    submit({ email, password });
+    let deviceId = localStorage.getItem('hp_device_id');
+    if (!deviceId) {
+      deviceId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+      localStorage.setItem('hp_device_id', deviceId);
+    }
+    submit({ email, password, deviceId });
   };
 
   return (
@@ -79,6 +89,22 @@ export default function LoginForm({ showMsg, hideMsg, onForgot }) {
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
+
+        {/* // ---Remember Me-------------- */}
+        <div className="lp-field" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+          <input 
+            type="checkbox" 
+            id="rememberMe" 
+            checked={rememberMe} 
+            onChange={(e) => setRememberMe(e.target.checked)} 
+            style={{ width: 'auto', marginBottom: '0' }}
+          />
+          <label htmlFor="rememberMe" className="lp-label" style={{ marginBottom: '0', cursor: 'pointer' }}>
+            Remember Me
+          </label>
+        </div>
+        {/* // ---Remember Me-------------- */}
+
         <button className="lp-btn" type="submit" disabled={loading}>
           {loading ? 'Signing in...' : 'Sign In'}
         </button>

@@ -3,52 +3,116 @@
  * ─────────────────────────────────────────────────────
  * API calls for OTP verification and resend.
  *
- * Reads base URL from:
- *   VITE_API_URL  (e.g. http://localhost:3001)
+ * Uses relative URLs so the Vite dev-server proxy forwards
+ * /auth/* → http://localhost:5000 (no port mismatch).
  *
- * Endpoints expected from the backend:
- *   POST /auth/verify-otp   { otp: string }  → 200 | 401
- *   POST /auth/resend-otp   {}               → 200 | 429
+ * Endpoints on the backend:
+ *   POST /auth/verify-login-otp  { email, otp, deviceId, rememberMe }
+ *   POST /auth/resend-login-otp  { email }
  */
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+const API_KEY = import.meta.env.VITE_API_KEY ?? '';
 
 /**
- * Verify a 6-digit OTP code.
+ * Get the admin email stored in sessionStorage after login.
+ * Returns an empty string if not found.
+ */
+function getAdminEmail() {
+  try {
+    const raw = sessionStorage.getItem('hp_user');
+    if (!raw) return '';
+    return JSON.parse(raw)?.email ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Get (or generate) a stable device ID from localStorage.
+ */
+function getDeviceId() {
+  let id = localStorage.getItem('hp_device_id');
+  if (!id) {
+    id = crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).substring(2);
+    localStorage.setItem('hp_device_id', id);
+  }
+  return id;
+}
+
+/**
+ * Verify a 6-digit OTP code for the admin's current session.
  * @param {string} otp
  * @returns {Promise<object>} server response body
  * @throws {Error} with server message on failure
  */
 export async function verifyOtp(otp) {
-  const res = await fetch(`${API_BASE}/auth/verify-otp`, {
+  const email    = getAdminEmail();
+  const deviceId = getDeviceId();
+
+  const res = await fetch('/auth/verify-login-otp', {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ otp }),
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+    credentials: 'include',
+    body: JSON.stringify({ email, otp, deviceId, rememberMe: false }),
   });
 
+  const body = await res.json().catch(() => ({}));
+
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.message ?? 'Invalid or expired code.');
+    throw new Error(body.error ?? body.message ?? 'Invalid or expired code.');
   }
 
-  return res.json();
+  return body;
 }
 
 /**
- * Request a new OTP to be sent to the registered email.
+ * Request a new OTP to be sent to the admin's registered email.
  * @returns {Promise<object>} server response body
  * @throws {Error} with server message on failure
  */
 export async function resendOtp() {
-  const res = await fetch(`${API_BASE}/auth/resend-otp`, {
+  const email = getAdminEmail();
+
+  const res = await fetch('/auth/resend-login-otp', {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+    credentials: 'include',
+    body: JSON.stringify({ email }),
   });
 
+  const body = await res.json().catch(() => ({}));
+
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.message ?? 'Unable to resend code. Try again later.');
+    throw new Error(body.error ?? body.message ?? 'Unable to resend code. Try again later.');
   }
 
-  return res.json();
+  return body;
+}
+
+/**
+ * Trigger the initial OTP email when the AuthModal first mounts.
+ * Uses the same GHL webhook as email verification.
+ * @returns {Promise<object>}
+ * @throws {Error}
+ */
+export async function sendLoginOtp() {
+  const email = getAdminEmail();
+  if (!email) return; // No email yet — user hasn't come from the login redirect
+
+  const res = await fetch('/auth/send-login-otp', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+    credentials: 'include',
+    body: JSON.stringify({ email }),
+  });
+
+  const body = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(body.error ?? body.message ?? 'Failed to send OTP.');
+  }
+
+  return body;
 }

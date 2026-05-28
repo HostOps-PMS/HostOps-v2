@@ -3,6 +3,7 @@ import express from 'express';
 import { z } from 'zod';
 import User from '../models/user.js';
 import RefreshToken from '../models/refreshToken.js';
+import TrustedDevice from '../models/trustedDevice.js';
 import {
   signAccessToken, signRefreshToken, verifyRefreshToken,
   refreshTokenExpiry, randomToken, hashToken
@@ -29,6 +30,7 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email:    z.string().email(),
   password: z.string().min(1),
+  deviceId: z.string().optional(),
 });
 
 // POST /auth/register
@@ -145,6 +147,31 @@ router.post('/login', async (req, res, next) => {
       return res.status(403).json({ error: 'Please verify your email first' });
     }
 
+    const isAdmin = user.tag === "Main Admin" || user.role === "admin" || user.email === process.env.ADMIN_ROLE;
+
+    if (!isAdmin) {
+      let isTrusted = false;
+      if (deviceId) {
+        const trusted = await TrustedDevice.findOne({ userId: user._id, deviceId, expiresAt: { $gt: new Date() } });
+        if (trusted) isTrusted = true;
+      }
+
+      if (!isTrusted) {
+        const rawOtp = randomToken();
+        user.loginOtp = hashToken(rawOtp);
+        user.loginOtpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+        await user.save();
+
+        try {
+          await sendVerificationEmail(user.email, user.firstName, rawOtp);
+        } catch (e) {
+          console.error('Login OTP email send failed:', e);
+        }
+
+        return res.json({ requiresOtp: true });
+      }
+    }
+
     const accessToken = signAccessToken(user);
     const refreshToken = signRefreshToken(user);
 
@@ -170,6 +197,7 @@ router.post('/login', async (req, res, next) => {
     res.json({
       accessToken,
       user: user.toJSON(),
+      isAdmin,
     });
   } catch (err) {
     if (err.name === 'ZodError') {
@@ -177,6 +205,133 @@ router.post('/login', async (req, res, next) => {
     }
     next(err);
   }
+});
+
+// POST /auth/verify-login-otp
+router.post('/verify-login-otp', async (req, res, next) => {
+  try {
+    const { email, otp, deviceId, rememberMe } = req.body;
+    if (!email || !otp || !deviceId) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+      loginOtp: hashToken(otp),
+      loginOtpExpiry: { $gt: new Date() },
+    }).select('+loginOtp +loginOtpExpiry');
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid or expired OTP' });
+    }
+
+    user.loginOtp = undefined;
+    user.loginOtpExpiry = undefined;
+    
+    if (rememberMe) {
+      // --- 14-day expiration (adjust here for debugging) ---
+      // 3 seconds.
+      // const expiresIn = 3000;
+      // 30 seconds.
+      const expiresIn = 30000;
+      // 1 minute.
+      // const expiresIn = 60000;
+      // 14 days.
+      // const expiresIn = 14 * 24 * 60 * 60 * 1000;
+      const expiresAt = new Date(Date.now() + expiresIn);
+
+      await TrustedDevice.findOneAndUpdate(
+        { userId: user._id, deviceId },
+        { expiresAt },
+        { upsert: true, new: true },
+      );
+    }
+
+    const accessToken = signAccessToken(user);
+    const refreshToken = signRefreshToken(user);
+
+    await RefreshToken.create({
+      userId: user._id,
+      token: hashToken(refreshToken),
+      expiresAt: refreshTokenExpiry(),
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    res.cookie('rt', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'none',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/auth',
+    });
+
+    const isAdmin = user.tag === "Main Admin" || user.role === "admin" || user.email === process.env.ADMIN_ROLE;
+
+    res.json({
+      accessToken,
+      user: user.toJSON(),
+      isAdmin,
+    });
+  } catch (err) { next(err); }
+});
+
+// POST /auth/send-login-otp
+// Called by the admin AuthModal on mount to trigger the initial OTP email.
+router.post('/send-login-otp', async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      // Respond with success even if user not found (avoid enumeration)
+      return res.json({ message: 'If that email is registered, an OTP has been sent.' });
+    }
+
+    const rawOtp = randomToken();
+    user.loginOtp = hashToken(rawOtp);
+    user.loginOtpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+    await user.save();
+
+    try {
+      await sendVerificationEmail(user.email, user.firstName, rawOtp);
+    } catch (e) {
+      console.error('Login OTP email send failed:', e);
+    }
+
+    res.json({ message: 'If that email is registered, an OTP has been sent.' });
+  } catch (err) { next(err); }
+});
+
+// POST /auth/resend-login-otp
+// Re-generates and re-sends the login OTP for a given email.
+router.post('/resend-login-otp', async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.json({ message: 'If that email is registered, a new code has been sent.' });
+    }
+
+    const rawOtp = randomToken();
+    user.loginOtp = hashToken(rawOtp);
+    user.loginOtpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+    await user.save();
+
+    try {
+      await sendVerificationEmail(user.email, user.firstName, rawOtp);
+    } catch (e) {
+      console.error('Login OTP resend email send failed:', e);
+    }
+
+    res.json({ message: 'If that email is registered, a new code has been sent.' });
+  } catch (err) { next(err); }
 });
 
 // POST /auth/refresh

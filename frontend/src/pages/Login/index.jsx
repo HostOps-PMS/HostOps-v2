@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import LoginForm from './components/LoginForm';
 import ForgotPasswordForm from './components/ForgotPasswordForm';
+import LoginOTPForm from './components/LoginOTPForm';
 import Message from './components/Message';
 import Logo from './components/Logo';
 import './Login.css';
 
-const VIEWS = { LOGIN: 'login', FORGOT: 'forgot' };
+const VIEWS = { LOGIN: 'login', FORGOT: 'forgot', LOGIN_OTP: 'login_otp' };
 
 export default function LoginPage() {
   const [view, setView] = useState(VIEWS.LOGIN);
   const [message, setMessage] = useState({ text: '', type: '' });
+  const [otpData, setOtpData] = useState({ email: '', rememberMe: false });
 
   const showMsg = (text, type = 'error') => setMessage({ text, type });
   const hideMsg = () => setMessage({ text: '', type: '' });
@@ -31,6 +33,21 @@ export default function LoginPage() {
             showMsg={showMsg}
             hideMsg={hideMsg}
             onForgot={() => handleViewChange(VIEWS.FORGOT)}
+            onRequiresOtp={(email, rememberMe) => {
+              setOtpData({ email, rememberMe });
+              handleViewChange(VIEWS.LOGIN_OTP);
+              showMsg('Please verify your device to continue.', 'success');
+            }}
+          />
+        )}
+
+        {view === VIEWS.LOGIN_OTP && (
+          <LoginOTPForm
+            email={otpData.email}
+            rememberMe={otpData.rememberMe}
+            showMsg={showMsg}
+            hideMsg={hideMsg}
+            onBack={() => handleViewChange(VIEWS.LOGIN)}
           />
         )}
 
