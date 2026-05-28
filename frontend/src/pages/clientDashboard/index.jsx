@@ -240,9 +240,9 @@ export default function DashboardPage() {
                 />
                 <ActivityFeed bookings={bookings} channels={dashState.channels} />
               </div>
-
-              <Footer />
             </div>
+ 
+            <Footer />
           </>
         )}
       </div>
