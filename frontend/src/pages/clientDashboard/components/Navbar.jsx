@@ -454,7 +454,7 @@ export default function Navbar() {
                 <button
                   style={{ ...t.iconBtn, position: 'relative' }}
                   aria-label="Notifications"
-                  onClick={() => { setNotifOpen((p) => !p); setUnreadCount(0); setNotifications((prev) => prev.map((n) => ({ ...n, read: true }))); }}
+                  onClick={() => setNotifOpen((p) => !p)}
                 >
                   <i className="ti ti-bell" style={t.iconBtnIcon} aria-hidden="true" />
                   {unreadCount > 0 && (
@@ -483,11 +483,11 @@ export default function Navbar() {
                         Notifications
                       </span>
                       {notifications.length > 0 && (
-                        <button onClick={() => setNotifications([])} style={{
+                        <button onClick={() => { setUnreadCount(0); setNotifications((prev) => prev.map((n) => ({ ...n, read: true }))); }} style={{
                           fontSize: '11px', color: '#26a676', background: 'none',
                           border: 'none', cursor: 'pointer', fontWeight: 500,
                         }}>
-                          Clear all
+                          Read All
                         </button>
                       )}
                     </div>
@@ -647,7 +647,7 @@ export default function Navbar() {
               <button
                 style={{ ...t.iconBtn, position: 'relative' }}
                 aria-label="Notifications"
-                onClick={() => { setNotifOpen((p) => !p); setUnreadCount(0); setNotifications((prev) => prev.map((n) => ({ ...n, read: true }))); }}
+                onClick={() => setNotifOpen((p) => !p)}
               >
                 <i className="ti ti-bell" style={t.iconBtnIcon} aria-hidden="true" />
                 {unreadCount > 0 && (
@@ -683,11 +683,11 @@ export default function Navbar() {
                       Notifications
                     </span>
                     {notifications.length > 0 && (
-                      <button onClick={() => setNotifications([])} style={{
+                      <button onClick={() => { setUnreadCount(0); setNotifications((prev) => prev.map((n) => ({ ...n, read: true }))); }} style={{
                         fontSize: '11px', color: '#26a676', background: 'none',
                         border: 'none', cursor: 'pointer', fontWeight: 500,
                       }}>
-                        Clear all
+                        Read all
                       </button>
                     )}
                   </div>
