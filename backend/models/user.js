@@ -38,8 +38,15 @@ const userSchema = new mongoose.Schema({
   // Roles
   role: {
     type: String,
-    enum: ['client', 'admin'],
+    enum: ['client', 'admin', 'team_leader'],
     default: 'client',
+  },
+
+  // Assigned Server for Team Leaders (points to a client User ID)
+  serverId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'user',
+    default: null,
   },
 
   // ── MULTI-TENANT READY ────────────────────────────────────────
