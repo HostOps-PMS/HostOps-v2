@@ -1,0 +1,280 @@
+/* ═══════════════════════════════════════════════════════
+   authorization/authorization.css
+   All styles scoped to the Authorization modal only.
+   All class names are prefixed with am- (auth-modal).
+   ═══════════════════════════════════════════════════════ */
+
+@import './global.css';
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Sora:wght@700;800&display=swap');
+
+/* ── Overlay ──────────────────────────────────────────── */
+
+.am-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #eaf8f1 0%, #d4f0e4 100%);
+  padding: 20px;
+  font-family: var(--font-body);
+  animation: am-fade-in 0.25s var(--ease) forwards;
+}
+
+@keyframes am-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Card ─────────────────────────────────────────────── */
+
+.am-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  padding: 40px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: var(--shadow-card);
+  animation: am-slide-up 0.28s var(--ease) forwards;
+}
+
+@keyframes am-slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Logo ─────────────────────────────────────────────── */
+
+.am-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.am-logo-mark {
+  width: 42px;
+  height: 42px;
+  background: var(--color-brand);
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-family: var(--font-display);
+  font-size: 20px;
+  box-shadow: 0 6px 16px var(--color-brand-glow);
+  flex-shrink: 0;
+}
+
+.am-logo-brand {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: var(--color-text);
+  letter-spacing: -0.5px;
+}
+
+/* ── Header ───────────────────────────────────────────── */
+
+.am-icon-wrap {
+  width: 52px;
+  height: 52px;
+  background: var(--color-brand-light);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  color: var(--color-brand);
+}
+
+.am-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.45rem;
+  color: var(--color-text);
+  text-align: center;
+  margin: 0 0 8px;
+  letter-spacing: -0.4px;
+}
+
+.am-sub {
+  font-size: 0.9rem;
+  color: var(--color-muted);
+  text-align: center;
+  line-height: 1.55;
+  margin: 0 0 28px;
+}
+
+.am-sub strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* ── Message ──────────────────────────────────────────── */
+
+.am-msg {
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.am-msg--error {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger-border);
+}
+
+.am-msg--success {
+  background: #d4f0e4;
+  color: var(--color-success);
+  border: 1px solid #b7e4cf;
+}
+
+/* ── OTP Input Row ────────────────────────────────────── */
+
+.am-otp-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.am-otp-box {
+  width: 52px;
+  height: 58px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-input);
+  background: #f8fbf9;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text);
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition),
+              background var(--transition);
+  caret-color: var(--color-brand);
+  /* remove native number spinners */
+  -moz-appearance: textfield;
+}
+
+.am-otp-box::-webkit-inner-spin-button,
+.am-otp-box::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.am-otp-box:focus {
+  border-color: var(--color-brand);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(38, 166, 118, 0.12);
+}
+
+.am-otp-box--filled {
+  border-color: var(--color-brand);
+  background: #fff;
+}
+
+.am-otp-box--error {
+  border-color: var(--color-danger) !important;
+  background: var(--color-danger-bg) !important;
+  box-shadow: 0 0 0 3px rgba(193, 53, 21, 0.08) !important;
+}
+
+/* Separator between groups of 3 */
+.am-otp-sep {
+  display: flex;
+  align-items: center;
+  color: var(--color-placeholder);
+  font-size: 1.2rem;
+  font-weight: 700;
+  user-select: none;
+  padding-bottom: 2px;
+}
+
+/* ── Verify Button ────────────────────────────────────── */
+
+.am-btn {
+  width: 100%;
+  padding: 14px;
+  background: var(--color-brand);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--transition), transform var(--transition),
+              box-shadow var(--transition), opacity var(--transition);
+  box-shadow: 0 6px 18px var(--color-brand-glow);
+  margin-bottom: 18px;
+}
+
+.am-btn:hover:not(:disabled) {
+  background: var(--color-brand-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(38, 166, 118, 0.40);
+}
+
+.am-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Resend Row ───────────────────────────────────────── */
+
+.am-resend-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 0.84rem;
+  color: var(--color-muted);
+}
+
+.am-resend-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--color-brand);
+  padding: 0;
+  transition: color var(--transition);
+}
+
+.am-resend-btn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.am-resend-btn:disabled {
+  color: var(--color-placeholder);
+  cursor: default;
+}
+
+.am-resend-timer {
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+/* ── Footer ───────────────────────────────────────────── */
+
+.am-footer {
+  margin-top: 28px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--color-placeholder);
+}

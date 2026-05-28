@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { loginUser } from '../services/authService';
 import { useAuthSubmit } from '../hooks/useAuth';
+import { useAuth } from '../../AuthContext';
 
 export default function LoginForm({ showMsg, hideMsg, onForgot }) {
-  const navigate = useNavigate();
+  const auth = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const { submit, loading } = useAuthSubmit(loginUser, {
     onSuccess: (data) => {
-      sessionStorage.setItem('hp_access_token', data.accessToken);
-      sessionStorage.setItem('hp_user', JSON.stringify(data.user));
+      // Store in the login app's own sessionStorage as well
+      // (used by AuthContext on this side if needed)
+      auth.setToken(data.accessToken);
+      auth.setUser(data.user);
 
       // If the account was admin-created with a temporary password,
       // flag it so the dashboard shows the first-login password-change modal.
@@ -22,7 +24,20 @@ export default function LoginForm({ showMsg, hideMsg, onForgot }) {
       }
 
       showMsg(`Welcome back, ${data.user.firstName}! Redirecting...`, 'success');
-      setTimeout(() => navigate('/dashboard', { replace: true }), 800);
+
+      // ✅ FIX: sessionStorage is scoped per origin+port.
+      // A token set on localhost:5174 is invisible to localhost:5173.
+      // Solution: pass token + user via URL query params so the dashboard
+      // app's AuthContext can consume and store them in its own sessionStorage.
+      // AuthContext will clean the URL immediately after consuming.
+      setTimeout(() => {
+        const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5173';
+        const params = new URLSearchParams({
+          _t: data.accessToken,
+          _u: JSON.stringify(data.user),
+        });
+        window.location.href = `${dashboardBase}/dashboard?${params.toString()}`;
+      }, 800);
     },
     onError: (msg) => showMsg(msg),
   });
@@ -36,7 +51,7 @@ export default function LoginForm({ showMsg, hideMsg, onForgot }) {
   return (
     <>
       <h1 className="lp-h1">Welcome back</h1>
-      <p className="lp-sub">Sign in to view your live property dashboard.</p>
+      <p className="lp-sub">Log in to view your live property dashboard.</p>
 
       <form onSubmit={handleSubmit} autoComplete="on">
         <div className="lp-field">
@@ -62,7 +77,7 @@ export default function LoginForm({ showMsg, hideMsg, onForgot }) {
           />
         </div>
         <button className="lp-btn" type="submit" disabled={loading}>
-          {loading ? 'Signing in...' : 'Sign In'}
+          {loading ? 'Signing in...' : 'Log In'}
         </button>
         <button type="button" className="lp-link" onClick={onForgot}>
           Forgot password?
