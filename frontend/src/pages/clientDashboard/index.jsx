@@ -174,15 +174,8 @@ export default function DashboardPage() {
             {/* KPI cards */}
             <StatCards stats={stats} />
 
-              {/* Inbox + Activity Feed */}
-              <div className="db-grid-2-bottom">
-                <UnifiedInbox
-                  inbox={inbox}
-                  totalUnread={totalUnread}
-                  onThreadClick={handleThreadClick}
-                />
-                {/* <ActivityFeed bookings={bookings} channels={dashState.channels} /> */}
-              </div>
+              {/* Availability Calendar */}
+              <CalendarSection />
             </div>
  
             <Footer />
