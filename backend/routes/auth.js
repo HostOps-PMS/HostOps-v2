@@ -131,7 +131,8 @@ router.post('/verify', async (req, res, next) => {
 // POST /auth/login
 router.post('/login', async (req, res, next) => {
   try {
-    const { email, password } = loginSchema.parse(req.body);
+    const data = loginSchema.parse(req.body);
+    const { email, password, deviceId } = data;
 
     const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
     if (!user || !(await user.comparePassword(password))) {
