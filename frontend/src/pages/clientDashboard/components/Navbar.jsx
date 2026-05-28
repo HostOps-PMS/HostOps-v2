@@ -735,9 +735,9 @@ export default function Navbar() {
               )}
             </div>
 
-            <button style={t.iconBtn} aria-label="Inbox">
+            <a href="/inbox" style={{ ...t.iconBtn, textDecoration: 'none' }} aria-label="Inbox">
               <i className="ti ti-inbox" style={t.iconBtnIcon} aria-hidden="true" />
-            </button>
+            </a>
 
             {/* Export PDF — sits right after the bell */}
             {ExportButton}
