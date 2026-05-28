@@ -6,6 +6,7 @@ import {
   getChannelColor,
   getChannelInitial,
 } from "../utils/channelHelpers";
+import DOMPurify from "dompurify";
 
 const MONTHS = [
   "Jan",
@@ -139,7 +140,7 @@ function PropertyRow({ prop, allBookings, dateRange, ymdRange, todayISO }) {
                     day: "numeric",
                   });
 
-                tt.innerHTML = `
+                tt.innerHTML = DOMPurify.sanitize(`
                   <div class="cal-tt-top">
                     <span class="cal-tt-name">${booking["guest-name"] || "Guest"}</span>
                     <span class="cal-tt-chip">${channel}</span>
@@ -150,7 +151,7 @@ function PropertyRow({ prop, allBookings, dateRange, ymdRange, todayISO }) {
                   </div>
                   <div class="cal-tt-row"><span class="cal-tt-rl">Guests</span><span class="cal-tt-rv">${g} - ${nights} nights</span></div>
                   <div class="cal-tt-row cal-tt-last"><span class="cal-tt-rl">Total</span><span class="cal-tt-rv cal-tt-price">${fmtMoney(booking.price)}</span></div>
-                `;
+                `);
                 document.body.appendChild(tt);
                 el._ttEl = tt;
               }
