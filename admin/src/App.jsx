@@ -5,6 +5,7 @@ import './App.css';
 import LoginPage  from './pages/Login';
 import Dashboard  from './pages/dashboard';
 import Clients    from './pages/clients';
+import Staffs     from './pages/Staffs/index';
 import AuthorizationModal from './pages/authorization';
 
 // ── Consume _t / _u URL params injected by the frontend login app ──────────
@@ -66,6 +67,15 @@ export default function App() {
           element={
             <PrivateRoute>
               <Clients />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/staffs"
+          element={
+            <PrivateRoute>
+              <Staffs />
             </PrivateRoute>
           }
         />

@@ -5,7 +5,7 @@ import { useAuthSubmit } from '../hooks/useAuth';
 import { useAuth } from '../../AuthContext';
 import OTPInput from './OTPInput';
 
-export default function LoginOTPForm({ email, rememberMe, showMsg, hideMsg, onBack }) {
+export default function LoginOTPForm({ email, rememberMe, showMsg, hideMsg, onBack, onOTPSuccess }) {
   const navigate = useNavigate();
   const auth = useAuth();
 
@@ -20,20 +20,21 @@ export default function LoginOTPForm({ email, rememberMe, showMsg, hideMsg, onBa
         sessionStorage.removeItem('hp_must_change_password');
       }
 
-      showMsg(`OTP Verified. Welcome back, ${data.user.firstName}! Redirecting...`, 'success');
-
-      setTimeout(() => {
-        if (data.isAdmin || data.user.tag === 'Main Admin') {
+      // Admin users bypass property selection — go straight to the admin dashboard
+      if (data.isAdmin || data.user.tag === 'Main Admin') {
+        showMsg(`OTP Verified. Welcome back, ${data.user.firstName}! Redirecting...`, 'success');
+        setTimeout(() => {
           const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5173';
           const params = new URLSearchParams({
             _t: data.accessToken,
             _u: JSON.stringify(data.user),
           });
           window.location.href = `${dashboardBase}/admin?${params.toString()}`;
-        } else {
-          navigate('/dashboard', { replace: true });
-        }
-      }, 800);
+        }, 800);
+      } else {
+        // Non-admin: hand off to parent so it can show the property selection screen
+        onOTPSuccess(data);
+      }
     },
     onError: (msg) => showMsg(msg),
   });

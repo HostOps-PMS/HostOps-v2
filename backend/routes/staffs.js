@@ -1,0 +1,203 @@
+// src/routes/staffs.js
+// ─────────────────────────────────────────────────────────────────
+// Admin-only routes for managing staff accounts per client.
+// Each staff member is linked to a clientId and a list of
+// Smoobu property IDs they are allowed to access.
+//
+// Mount in server.js: app.use('/api', staffsRoutes);
+// ─────────────────────────────────────────────────────────────────
+import express from 'express';
+import { z } from 'zod';
+import Staff from '../models/staff.js';
+import User  from '../models/user.js';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { getApartments } from '../services/smoobu.js';
+
+const router = express.Router();
+
+// All routes require authentication + admin role
+router.use(requireAuth);
+router.use(requireAdmin);
+
+// ─────────────────────────────────────────────────────────────────
+// GET /api/staffs
+// Returns all staff members.
+// Optional query: ?clientId=<mongoId> — filter by client.
+// ─────────────────────────────────────────────────────────────────
+router.get('/staffs', async (req, res, next) => {
+  try {
+    const filter = {};
+    if (req.query.clientId) filter.clientId = req.query.clientId;
+
+    const staffs = await Staff.find(filter)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json(staffs);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// GET /api/staffs/:id
+// Returns a single staff member by MongoDB ObjectId.
+// ─────────────────────────────────────────────────────────────────
+router.get('/staffs/:id', async (req, res, next) => {
+  try {
+    const staff = await Staff.findById(req.params.id).lean();
+    if (!staff) return res.status(404).json({ error: 'Staff not found' });
+    res.json(staff);
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid staff ID' });
+    }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// GET /api/clients/:clientId/properties
+// Returns the Smoobu properties for a specific client so the admin
+// can pick which properties to assign to a new staff member.
+// Reuses the same smoobu service used by the dashboard/properties routes.
+// ─────────────────────────────────────────────────────────────────
+router.get('/clients/:clientId/properties', async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.clientId).select('+smoobuApiKey');
+    if (!user) return res.status(404).json({ error: 'Client not found' });
+
+    const data = await getApartments(user);
+    res.json({ properties: data.apartments || [] });
+  } catch (err) {
+    if (err.code === 'NO_SMOOBU_KEY') {
+      return res.status(200).json({
+        properties: [],
+        smoobuNotConnected: true,
+        message: 'No Smoobu account connected for this client.',
+      });
+    }
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid client ID' });
+    }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /api/staffs
+// Admin creates a new staff account linked to a client.
+// Staff member must change password on first login.
+// ─────────────────────────────────────────────────────────────────
+const createStaffSchema = z.object({
+  clientId:    z.string().min(1),
+  firstName:   z.string().min(1).max(50).trim(),
+  lastName:    z.string().max(50).trim().optional().default(''),
+  email:       z.string().email().max(254),
+  password:    z.string().min(8).max(128),
+  propertyIds: z.array(z.string()).optional().default([]),
+  staffRole:   z.string().max(100).trim().optional().default(''),
+});
+
+router.post('/staffs', async (req, res, next) => {
+  try {
+    const data = createStaffSchema.parse(req.body);
+
+    // Verify the client exists
+    const client = await User.findById(data.clientId);
+    if (!client) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    const existing = await Staff.findOne({ email: data.email.toLowerCase() });
+    if (existing) {
+      return res.status(409).json({ error: 'Email already registered' });
+    }
+
+    const staff = await Staff.create({
+      clientId:           data.clientId,
+      firstName:          data.firstName,
+      lastName:           data.lastName || '',
+      email:              data.email.toLowerCase(),
+      password:           data.password,
+      propertyIds:        data.propertyIds,
+      staffRole:          data.staffRole || '',
+      isActive:           true,
+      mustChangePassword: true,
+    });
+
+    res.status(201).json({
+      message: 'Staff account created successfully.',
+      staffId: staff._id,
+      staff: staff.toJSON(),
+    });
+  } catch (err) {
+    if (err.name === 'ZodError') {
+      return res.status(400).json({ error: 'Validation failed', details: err.errors });
+    }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// PATCH /api/staffs/:id
+// Admin updates a staff member's editable fields.
+// ─────────────────────────────────────────────────────────────────
+const updateStaffSchema = z.object({
+  firstName:   z.string().min(1).max(50).trim().optional(),
+  lastName:    z.string().max(50).trim().optional(),
+  propertyIds: z.array(z.string()).optional(),
+  staffRole:   z.string().max(100).trim().optional(),
+  isActive:    z.boolean().optional(),
+  password:    z.string().min(8).max(128).optional(),
+});
+
+router.patch('/staffs/:id', async (req, res, next) => {
+  try {
+    const data = updateStaffSchema.parse(req.body);
+
+    const staff = await Staff.findById(req.params.id).select('+password');
+    if (!staff) return res.status(404).json({ error: 'Staff not found' });
+
+    if (data.firstName   !== undefined) staff.firstName   = data.firstName;
+    if (data.lastName    !== undefined) staff.lastName    = data.lastName;
+    if (data.propertyIds !== undefined) staff.propertyIds = data.propertyIds;
+    if (data.staffRole   !== undefined) staff.staffRole   = data.staffRole;
+    if (data.isActive    !== undefined) staff.isActive    = data.isActive;
+    if (data.password    !== undefined) {
+      staff.password           = data.password;
+      staff.mustChangePassword = true; // force re-login with new password
+    }
+
+    await staff.save();
+
+    res.json(staff.toJSON());
+  } catch (err) {
+    if (err.name === 'ZodError') {
+      return res.status(400).json({ error: 'Validation failed', details: err.errors });
+    }
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid staff ID' });
+    }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// DELETE /api/staffs/:id
+// Admin permanently deletes a staff account.
+// ─────────────────────────────────────────────────────────────────
+router.delete('/staffs/:id', async (req, res, next) => {
+  try {
+    const staff = await Staff.findByIdAndDelete(req.params.id);
+    if (!staff) return res.status(404).json({ error: 'Staff not found' });
+    res.json({ message: 'Staff account deleted successfully.' });
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid staff ID' });
+    }
+    next(err);
+  }
+});
+
+export default router;
