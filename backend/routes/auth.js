@@ -2,11 +2,13 @@
 import express from 'express';
 import { z } from 'zod';
 import User from '../models/user.js';
+import Staff from '../models/staff.js';
 import RefreshToken from '../models/refreshToken.js';
 import TrustedDevice from '../models/trustedDevice.js';
 import {
   signAccessToken, signRefreshToken, verifyRefreshToken,
-  refreshTokenExpiry, randomToken, hashToken
+  signStaffAccessToken, signStaffRefreshToken,
+  refreshTokenExpiry, randomToken, hashToken,
 } from '../utils/tokens.js';
 import { sendVerificationEmail, sendResetEmail } from '../services/email.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -129,13 +131,58 @@ router.post('/verify', async (req, res, next) => {
 });
 
 // POST /auth/login
+// Handles both regular users AND staff accounts so the frontend
+// only needs one login endpoint. Staff are detected by checking the
+// Staff model when no matching User is found (or password doesn't match).
 router.post('/login', async (req, res, next) => {
   try {
     const data = loginSchema.parse(req.body);
     const { email, password, deviceId } = data;
 
+    // ── Check if this is a staff login ────────────────────────────
+    // Try User first. If not found or password wrong, try Staff.
     const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
-    if (!user || !(await user.comparePassword(password))) {
+    const userPasswordMatch = user && (await user.comparePassword(password));
+
+    if (!userPasswordMatch) {
+      // Try staff login
+      const staff = await Staff.findOne({ email: email.toLowerCase() }).select('+password');
+      if (staff && (await staff.comparePassword(password))) {
+        if (!staff.isActive) {
+          return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
+        }
+
+        const accessToken  = signStaffAccessToken(staff);
+        const refreshToken = signStaffRefreshToken(staff);
+
+        await RefreshToken.create({
+          userId:    staff._id,
+          token:     hashToken(refreshToken),
+          expiresAt: refreshTokenExpiry(),
+          ipAddress: req.ip,
+          userAgent: req.get('user-agent'),
+        });
+
+        staff.lastLoginAt = new Date();
+        await staff.save();
+
+        res.cookie('rt', refreshToken, {
+          httpOnly: true,
+          secure:   process.env.NODE_ENV === 'production',
+          sameSite: 'none',
+          maxAge:   7 * 24 * 60 * 60 * 1000,
+          path:     '/auth',
+        });
+
+        return res.json({
+          accessToken,
+          staff:              staff.toJSON(),
+          mustChangePassword: staff.mustChangePassword,
+          isStaff:            true,
+        });
+      }
+
+      // Neither user nor staff matched
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -199,6 +246,66 @@ router.post('/login', async (req, res, next) => {
       accessToken,
       user: user.toJSON(),
       isAdmin,
+    });
+  } catch (err) {
+    if (err.name === 'ZodError') {
+      return res.status(400).json({ error: 'Validation failed' });
+    }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/staff-login
+// Staff members log in with email + password.
+// No OTP flow — staff accounts are admin-created and pre-trusted.
+// Returns a staff-scoped access token (role: 'staff', clientId claim)
+// so the middleware can load both the Staff record and the client's
+// Smoobu API key on every subsequent request.
+// ─────────────────────────────────────────────────────────────────
+router.post('/staff-login', async (req, res, next) => {
+  try {
+    const { email, password } = z.object({
+      email:    z.string().email(),
+      password: z.string().min(1),
+    }).parse(req.body);
+
+    const staff = await Staff.findOne({ email: email.toLowerCase() }).select('+password');
+
+    if (!staff || !(await staff.comparePassword(password))) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    if (!staff.isActive) {
+      return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
+    }
+
+    const accessToken  = signStaffAccessToken(staff);
+    const refreshToken = signStaffRefreshToken(staff);
+
+    await RefreshToken.create({
+      userId:    staff._id,   // reuse RefreshToken model — userId = staffId here
+      token:     hashToken(refreshToken),
+      expiresAt: refreshTokenExpiry(),
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+
+    staff.lastLoginAt = new Date();
+    await staff.save();
+
+    res.cookie('rt', refreshToken, {
+      httpOnly: true,
+      secure:   process.env.NODE_ENV === 'production',
+      sameSite: 'none',
+      maxAge:   7 * 24 * 60 * 60 * 1000,
+      path:     '/auth',
+    });
+
+    res.json({
+      accessToken,
+      staff: staff.toJSON(),
+      mustChangePassword: staff.mustChangePassword,
     });
   } catch (err) {
     if (err.name === 'ZodError') {
@@ -353,6 +460,41 @@ router.post('/refresh', async (req, res, next) => {
       return res.status(401).json({ error: 'Refresh token revoked' });
     }
 
+    // ── Staff refresh ──────────────────────────────────────────────
+    // Staff refresh tokens carry role: 'staff' and staffId/clientId.
+    // Re-sign using staff-specific signing function so the new access
+    // token still carries the staff claims.
+    if (decoded.role === 'staff') {
+      const staff = await Staff.findById(decoded.staffId || decoded.sub);
+      if (!staff || !staff.isActive) {
+        return res.status(401).json({ error: 'Staff account not found or inactive' });
+      }
+
+      const newRefreshToken = signStaffRefreshToken(staff);
+      stored.revokedAt  = new Date();
+      stored.replacedBy = hashToken(newRefreshToken);
+      await stored.save();
+
+      await RefreshToken.create({
+        userId:    staff._id,
+        token:     hashToken(newRefreshToken),
+        expiresAt: refreshTokenExpiry(),
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      res.cookie('rt', newRefreshToken, {
+        httpOnly: true,
+        secure:   process.env.NODE_ENV === 'production',
+        sameSite: 'none',
+        maxAge:   7 * 24 * 60 * 60 * 1000,
+        path:     '/auth',
+      });
+
+      return res.json({ accessToken: signStaffAccessToken(staff) });
+    }
+
+    // ── Regular user refresh ───────────────────────────────────────
     const user = await User.findById(decoded.sub);
     if (!user) return res.status(401).json({ error: 'User not found' });
 
@@ -414,6 +556,30 @@ router.post('/change-password', requireAuth, async (req, res, next) => {
 
     const { currentPassword, newPassword } = changeSchema.parse(req.body);
 
+    // ── Staff change-password ──────────────────────────────────────
+    if (req.isStaff) {
+      const staff = await Staff.findById(req.staff._id).select('+password');
+      if (!staff) return res.status(404).json({ error: 'Staff not found' });
+
+      const isMatch = await staff.comparePassword(currentPassword);
+      if (!isMatch) return res.status(401).json({ error: 'Current password is incorrect' });
+      if (currentPassword === newPassword) {
+        return res.status(400).json({ error: 'New password must be different from the current one' });
+      }
+
+      staff.password           = newPassword;
+      staff.mustChangePassword = false;
+      await staff.save();
+
+      await RefreshToken.updateMany(
+        { userId: staff._id, revokedAt: null },
+        { revokedAt: new Date() }
+      );
+
+      return res.json({ message: 'Password changed successfully.', staff: staff.toJSON() });
+    }
+
+    // ── Regular user change-password ───────────────────────────────
     const user = await User.findById(req.user._id).select('+password');
     if (!user) return res.status(404).json({ error: 'User not found' });
 

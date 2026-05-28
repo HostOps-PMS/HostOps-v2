@@ -11,17 +11,24 @@ export function useDashboardData() {
 
   // fromOverride / toOverride: pass explicit dates when calling right after
   // updateDashState() so we don't read a stale closure value.
-  const loadData = useCallback(async (fromOverride, toOverride) => {
+  //
+  // apartmentIdOverride: pass an explicit apartmentId right after selectProperty()
+  // so we don't read a stale closure. Omit to use dashState.selectedPropertyId.
+  const loadData = useCallback(async (fromOverride, toOverride, apartmentIdOverride) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
 
-    const from = fromOverride ?? dashState.from;
-    const to   = toOverride   ?? dashState.to;
+    const from        = fromOverride        ?? dashState.from;
+    const to          = toOverride          ?? dashState.to;
+    // undefined as override means "use context value"; null means "All Properties"
+    const apartmentId = apartmentIdOverride !== undefined
+      ? apartmentIdOverride
+      : dashState.selectedPropertyId;
 
     setBanner({ message: '⏳ Loading data…', type: 'loading' });
 
     try {
-      const res = await fetchDashboard({ from, to }, auth);
+      const res = await fetchDashboard({ from, to, apartmentId }, auth);
 
       if (!res) {
         setBanner({ message: '⚠️ Session expired. Please sign in again.', type: 'error' });
@@ -56,7 +63,7 @@ export function useDashboardData() {
     } finally {
       loadingRef.current = false;
     }
-  }, [auth, dashState.from, dashState.to, updateDashState]);
+  }, [auth, dashState.from, dashState.to, dashState.selectedPropertyId, updateDashState]);
 
   return { loadData, banner };
 }

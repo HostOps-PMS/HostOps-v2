@@ -115,10 +115,23 @@ export async function verifySession(auth) {
 }
 
 /**
- * Fetches dashboard data for a given date range.
+ * Fetches dashboard data for a given date range and optional property filter.
+ *
+ * @param {object} opts
+ * @param {string}      [opts.from]         - Date range start YYYY-MM-DD
+ * @param {string}      [opts.to]           - Date range end YYYY-MM-DD
+ * @param {string|null} [opts.apartmentId]  - When set, backend scopes response
+ *                                            to that single property (bookings,
+ *                                            inbox threads, stats, byChannel).
+ *                                            null / undefined = All Properties.
  */
-export async function fetchDashboard({ from, to }, auth) {
-  const query = from && to ? `?from=${from}&to=${to}` : '';
+export async function fetchDashboard({ from, to, apartmentId }, auth) {
+  const params = new URLSearchParams();
+  if (from)        params.set('from', from);
+  if (to)          params.set('to',   to);
+  if (apartmentId) params.set('apartmentId', String(apartmentId));
+
+  const query = params.toString() ? `?${params.toString()}` : '';
   return authFetch(`/api/dashboard${query}`, {}, auth);
 }
 

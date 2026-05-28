@@ -1,6 +1,7 @@
 // src/middleware/auth.js
 import { verifyAccessToken } from '../utils/tokens.js';
 import User from '../models/user.js';
+import Staff from '../models/staff.js';
 
 export async function requireAuth(req, res, next) {
   try {
@@ -10,6 +11,36 @@ export async function requireAuth(req, res, next) {
 
     const decoded = verifyAccessToken(token);
 
+    // ── STAFF LOGIN ────────────────────────────────────────────────
+    // Staff tokens carry role: 'staff' and clientId in the payload.
+    // We load the Staff record for auth checks, and the client's User
+    // record (with smoobuApiKey) so the Smoobu service can use the
+    // correct API key when fetching data on behalf of this staff member.
+    if (decoded.role === 'staff') {
+      const staff = await Staff.findById(decoded.staffId || decoded.sub);
+      if (!staff) return res.status(401).json({ error: 'Staff not found' });
+      if (!staff.isActive) return res.status(403).json({ error: 'Staff account is inactive' });
+
+      // Load the client user WITH smoobuApiKey so dashboard routes can
+      // call the Smoobu API using the client's own key.
+      const clientUser = await User.findById(staff.clientId).select('+smoobuApiKey');
+      if (!clientUser) return res.status(401).json({ error: 'Client account not found' });
+
+      // Attach both to req so downstream routes and services have access.
+      // req.user is set to clientUser so all existing Smoobu service calls
+      // (which use req.user for the API key) work without any changes.
+      // req.staff holds the staff record for property-level filtering.
+      req.user        = clientUser;
+      req.staff       = staff;
+      req.isStaff     = true;
+      // Normalise propertyIds to strings for comparison — Smoobu IDs are
+      // numbers but the Staff schema stores them as strings.
+      req.staffPropertyIds = (staff.propertyIds || []).map(String);
+
+      return next();
+    }
+
+    // ── REGULAR USER / ADMIN LOGIN ─────────────────────────────────
     // Select +smoobuApiKey so the smoobu service can use the
     // user's own Smoobu API key on every authenticated request.
     // Without this, smoobuApiKey is always null (select: false in schema)
@@ -25,7 +56,8 @@ export async function requireAuth(req, res, next) {
       return res.status(403).json({ error: 'Email not verified' });
     }
 
-    req.user = user;
+    req.user    = user;
+    req.isStaff = false;
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
@@ -39,6 +71,10 @@ export async function requireAuth(req, res, next) {
 }
 
 export function requireAdmin(req, res, next) {
+  // Staff members are never admins regardless of their client's role
+  if (req.isStaff) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
   if (req.user?.role !== 'admin') {
     return res.status(403).json({ error: 'Admin access required' });
   }

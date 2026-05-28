@@ -1,5 +1,6 @@
 // src/routes/dashboard.js
 import express from 'express';
+import User from '../models/user.js';
 import { requireAuth } from '../middleware/auth.js';
 import {
   getApartments, getBookings, getRates, getDashboard,
@@ -10,6 +11,24 @@ const router = express.Router();
 
 // All routes here require auth
 router.use(requireAuth);
+
+// ── Reload user with smoobuApiKey ─────────────────────────────────────────────
+// requireAuth loads the user WITHOUT smoobuApiKey (it has select:false in the
+// schema).  Every route in this file needs the key to call the Smoobu API, so
+// we reload it once here for all downstream handlers.
+//
+// For staff: requireAuth already sets req.user = clientUser WITH smoobuApiKey,
+// so the findById call below is a no-op (userWithKey will equal req.user).
+// We keep it here for safety — it's an indexed lookup, negligible overhead.
+router.use(async (req, res, next) => {
+  try {
+    const userWithKey = await User.findById(req.user._id).select('+smoobuApiKey');
+    if (userWithKey) req.user = userWithKey;
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ─────────────────────────────────────────────────────────────────
 // Filtering strategy
@@ -23,6 +42,12 @@ router.use(requireAuth);
 //   user.smoobuApiKey is null → smoobu service falls back to
 //   process.env.SMOOBU_API_KEY → all users hit the same Smoobu account
 //   → we filter by propertyTagPrefix so each user sees only their subset.
+//
+// MODE C — staff login (applied on top of A or B)
+//   req.isStaff === true → further narrow the already-scoped data down
+//   to only the properties listed in req.staffPropertyIds.
+//   This happens AFTER MODE A / B filtering so staff never see data
+//   that belongs to a different client even if propertyIds are guessed.
 //
 // The root cause of "baligtad" (inverted data) was:
 //   smoobuApiKey was never loaded (select:false, not overridden in
@@ -97,6 +122,95 @@ function recalcStats(filteredBookings = [], filteredProps = [], period = {}) {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Per-property filter (optional, applied on top of account-level
+// filtering). When apartmentId is provided via query param, the
+// response is scoped to only that single property's bookings, inbox
+// threads, and recalculated stats.
+//
+// This is the mechanism used by the frontend PropertySelectorModal:
+// after the user picks a property on the dashboard, every /api/dashboard
+// request includes ?apartmentId=<id> so the response is already
+// filtered before it reaches the client.
+// ─────────────────────────────────────────────────────────────────
+function applyPropertyFilter(data, apartmentId) {
+  if (!apartmentId) return;
+
+  const numId = Number(apartmentId);
+  const strId = String(apartmentId);
+
+  const selectedProp = (data.properties || []).find(
+    (p) => p.id === numId || String(p.id) === strId
+  );
+
+  // If the requested apartment isn't in the user's authorised set, do nothing
+  // (the data is already account-scoped upstream; this is just a narrowing filter).
+  if (!selectedProp) return;
+
+  // Narrow properties to just the selected one
+  data.properties = [selectedProp];
+
+  // Filter bookings (all bookings incl. cancelled / blocked) to this property
+  data.bookings = (data.bookings || []).filter(
+    (b) => b.apartment && (b.apartment.id === numId || String(b.apartment.id) === strId)
+  );
+
+  // Filter inbox threads — threads carry the property name (string), not the ID,
+  // because getInbox() maps t.apartment?.name. Match on name after verifying
+  // the property record exists.
+  data.inbox = (data.inbox || []).filter(
+    (t) => t.property === selectedProp.name
+  );
+
+  // Recalculate stats & channel breakdown from the filtered booking set
+  const { stats, byChannel } = recalcStats(data.bookings, data.properties, data.period);
+  data.stats       = stats;
+  data.byChannel   = byChannel;
+  data.totalUnread = (data.inbox || []).reduce((s, t) => s + (t.unread || 0), 0);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MODE C — Staff property filter
+// Applied after MODE A / B so it narrows an already-client-scoped
+// dataset down to only the properties the staff member is assigned to.
+//
+// staffPropertyIds: string[] — from req.staffPropertyIds (set by middleware).
+// Smoobu property IDs are numbers; we compare both string and number forms.
+// ─────────────────────────────────────────────────────────────────
+function applyStaffPropertyFilter(data, staffPropertyIds) {
+  if (!staffPropertyIds || staffPropertyIds.length === 0) return;
+
+  const allowedStrIds = new Set(staffPropertyIds.map(String));
+
+  // Filter properties to only those the staff member is assigned
+  data.properties = (data.properties || []).filter(
+    (p) => allowedStrIds.has(String(p.id))
+  );
+
+  const allowedNumIds = new Set([...allowedStrIds].map(Number));
+
+  // Filter ALL bookings (including cancelled/blocked) to assigned properties
+  data.bookings = (data.bookings || []).filter(
+    (b) => b.apartment && (
+      allowedStrIds.has(String(b.apartment.id)) ||
+      allowedNumIds.has(b.apartment.id)
+    )
+  );
+
+  // Filter inbox threads to assigned properties
+  // Threads use property name (string) — match against the filtered properties list
+  const allowedPropNames = new Set((data.properties || []).map((p) => p.name));
+  data.inbox = (data.inbox || []).filter(
+    (t) => allowedPropNames.has(t.property)
+  );
+
+  // Recalculate stats & channel breakdown from the narrowed booking set
+  const { stats, byChannel } = recalcStats(data.bookings, data.properties, data.period);
+  data.stats       = stats;
+  data.byChannel   = byChannel;
+  data.totalUnread = (data.inbox || []).reduce((s, t) => s + (t.unread || 0), 0);
+}
+
+// ─────────────────────────────────────────────────────────────────
 // GET /api/dashboard
 // ─────────────────────────────────────────────────────────────────
 router.get('/dashboard', async (req, res, next) => {
@@ -108,6 +222,9 @@ router.get('/dashboard', async (req, res, next) => {
 
     // MODE A: user has own API key → smoobu already scoped the data correctly
     if (hasOwnApiKey(req.user)) {
+      applyPropertyFilter(data, req.query.apartmentId);
+      // MODE C: further narrow to staff's assigned properties if applicable
+      if (req.isStaff) applyStaffPropertyFilter(data, req.staffPropertyIds);
       return res.json(data);
     }
 
@@ -133,6 +250,9 @@ router.get('/dashboard', async (req, res, next) => {
       data.totalUnread = filteredInbox.reduce((s, t) => s + (t.unread || 0), 0);
     }
 
+    applyPropertyFilter(data, req.query.apartmentId);
+    // MODE C: further narrow to staff's assigned properties if applicable
+    if (req.isStaff) applyStaffPropertyFilter(data, req.staffPropertyIds);
     res.json(data);
   } catch (err) {
     // User has no Smoobu API key configured yet — return a clean empty
@@ -177,6 +297,14 @@ router.get('/properties', async (req, res, next) => {
       }
     }
 
+    // MODE C: staff only sees their assigned properties
+    if (req.isStaff && req.staffPropertyIds?.length) {
+      const allowedStrIds = new Set(req.staffPropertyIds.map(String));
+      data.apartments = (data.apartments || []).filter(
+        (p) => allowedStrIds.has(String(p.id))
+      );
+    }
+
     res.json(data);
   } catch (err) {
     if (err.code === 'NO_SMOOBU_KEY') {
@@ -202,6 +330,18 @@ router.get('/bookings', async (req, res, next) => {
           (b) => b.apartment && propIds.has(b.apartment.id)
         );
       }
+    }
+
+    // MODE C: staff only sees bookings for their assigned properties
+    if (req.isStaff && req.staffPropertyIds?.length) {
+      const allowedStrIds = new Set(req.staffPropertyIds.map(String));
+      const allowedNumIds = new Set([...allowedStrIds].map(Number));
+      data.bookings = (data.bookings || []).filter(
+        (b) => b.apartment && (
+          allowedStrIds.has(String(b.apartment.id)) ||
+          allowedNumIds.has(b.apartment.id)
+        )
+      );
     }
 
     res.json(data);
@@ -240,6 +380,15 @@ router.get('/rates', async (req, res, next) => {
       }
     }
 
+    // MODE C: staff can only request rates for their assigned properties
+    if (req.isStaff && req.staffPropertyIds?.length) {
+      const allowedStrIds = new Set(req.staffPropertyIds.map(String));
+      requestedIds = requestedIds.filter((id) => allowedStrIds.has(String(id)));
+      if (!requestedIds.length) {
+        return res.status(403).json({ error: 'None of the requested apartments are assigned to you' });
+      }
+    }
+
     const data = await getRates(req.user, { apartmentIds: requestedIds, start, end });
     res.json(data);
   } catch (err) { next(err); }
@@ -250,10 +399,39 @@ router.get('/rates', async (req, res, next) => {
 // In MODE A: all reservations returned by the API already belong to
 //   the user's account — no extra check needed.
 // In MODE B: verify the reservation's apartment is in the user's prefix set.
+// In MODE C (staff): verify the reservation's apartment is in staffPropertyIds.
 // ─────────────────────────────────────────────────────────────────
-async function assertReservationOwnership(user, reservationId) {
-  if (hasOwnApiKey(user)) return; // API key already scopes access
+async function assertReservationOwnership(req, reservationId) {
+  const user = req.user;
 
+  // MODE C: staff ownership check — must be one of their assigned properties
+  if (req.isStaff) {
+    if (!req.staffPropertyIds?.length) {
+      const err = new Error('No properties assigned to this staff account'); err.status = 403; throw err;
+    }
+    const allowedStrIds = new Set(req.staffPropertyIds.map(String));
+    const allowedNumIds = new Set([...allowedStrIds].map(Number));
+
+    const { bookings = [] } = await getBookings(user, {});
+    const reservation = bookings.find((b) => String(b.id) === String(reservationId));
+
+    if (!reservation) {
+      const err = new Error('Reservation not found'); err.status = 404; throw err;
+    }
+    if (
+      !allowedStrIds.has(String(reservation.apartment?.id)) &&
+      !allowedNumIds.has(reservation.apartment?.id)
+    ) {
+      const err = new Error('Unauthorized: reservation does not belong to your assigned properties');
+      err.status = 403; throw err;
+    }
+    return;
+  }
+
+  // MODE A: API key already scopes access
+  if (hasOwnApiKey(user)) return;
+
+  // MODE B: verify the reservation's apartment is in the user's prefix set
   const prefix = (user.propertyTagPrefix || '').trim();
   if (!prefix) return; // admin / no prefix = no restriction
 
@@ -282,7 +460,7 @@ router.post('/messages/reply', async (req, res, next) => {
       return res.status(400).json({ error: 'reservationId and messageBody are required' });
     }
 
-    await assertReservationOwnership(req.user, reservationId);
+    await assertReservationOwnership(req, reservationId);
 
     const result = await sendReplyToGuest(req.user, reservationId, { subject, messageBody });
     res.json({ success: true, ...result });
@@ -302,7 +480,7 @@ router.post('/messages/reply', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.get('/messages/:reservationId', async (req, res, next) => {
   try {
-    await assertReservationOwnership(req.user, req.params.reservationId);
+    await assertReservationOwnership(req, req.params.reservationId);
 
     const data = await getReservationMessages(req.user, req.params.reservationId);
     res.json(data);
