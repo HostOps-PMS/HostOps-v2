@@ -1,0 +1,48 @@
+/* ═══════════════════════════════════════════════════════
+   authorization/global.css
+   CSS custom properties shared across the authorization
+   page. Mirrors the dashboard global.css pattern.
+   ═══════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Brand ── */
+  --color-brand:        #26a676;
+  --color-brand-dark:   #1e8760;
+  --color-brand-light:  rgba(38, 166, 118, 0.12);
+  --color-brand-glow:   rgba(38, 166, 118, 0.30);
+
+  /* ── Surfaces ── */
+  --color-bg:           #f4f9f6;
+  --color-surface:      #ffffff;
+  --color-surface-2:    #f0f5f2;
+  --color-border:       #e3ede8;
+
+  /* ── Text ── */
+  --color-text:         #0c1c14;
+  --color-muted:        #6a8b7c;
+  --color-placeholder:  #9ab8a9;
+
+  /* ── Feedback ── */
+  --color-success:      #1e8760;
+  --color-danger:       #c13515;
+  --color-danger-bg:    #fff0ee;
+  --color-danger-border:#ffd5ce;
+
+  /* ── Typography ── */
+  --font-body:    'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Sora', sans-serif;
+
+  /* ── Shape ── */
+  --radius-card:  24px;
+  --radius-input: 14px;
+  --radius-pill:  100px;
+  --radius-sm:    10px;
+
+  /* ── Motion ── */
+  --transition:   0.18s ease;
+  --ease:         cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── Shadow ── */
+  --shadow-card:  0 20px 60px rgba(4, 14, 9, 0.10);
+  --shadow-modal: 0 32px 80px rgba(4, 14, 9, 0.18);
+}
