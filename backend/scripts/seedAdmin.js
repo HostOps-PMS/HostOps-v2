@@ -4,10 +4,10 @@ import mongoose from 'mongoose';
 import User from '../models/user.js';
 
 const ADMIN = {
-  email:     'innovation@telexph.com',
-  password:  'password123',
-  firstName: 'Innovation',
-  lastName:  'Admin',
+  email:     process.env.ADMIN_EMAIL,
+  password:  process.env.ADMIN_PASSWORD,
+  firstName: process.env.ADMIN_FIRST_NAME || 'Innovation',
+  lastName:  process.env.ADMIN_LAST_NAME || 'Admin',
   tag:       'Main Admin',
   role:      'admin',
   isVerified: true,

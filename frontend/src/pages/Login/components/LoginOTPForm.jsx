@@ -23,7 +23,12 @@ export default function LoginOTPForm({ email, rememberMe, showMsg, hideMsg, onBa
       showMsg(`OTP Verified. Welcome back, ${data.user.firstName}! Redirecting...`, 'success');
 
       setTimeout(() => {
-        if (data.isAdmin || data.user.tag === 'Main Admin') {
+        const isAdminUser = 
+          data.user.tag === 'Main Admin' && 
+          data.user.role === 'admin' && 
+          data.user.email === import.meta.env.VITE_ADMIN_ROLE;
+
+        if (isAdminUser) {
           const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5173';
           const params = new URLSearchParams({
             _t: data.accessToken,
