@@ -324,6 +324,14 @@ export default function Navbar() {
             </a>
 
             <div style={t.rightGroup}>
+
+              <button style={t.iconBtn} aria-label="Inbox">
+                <i
+                  className="ti ti-inbox"
+                  style={t.iconBtnIcon}
+                  aria-hidden="true"
+                />
+              </button>
               {/* Export PDF */}
               {ExportButton}
 
@@ -440,6 +448,10 @@ export default function Navbar() {
                 style={t.iconBtnIcon}
                 aria-hidden="true"
               />
+            </button>
+
+            <button style={t.iconBtn} aria-label="Inbox">
+              <i className="ti ti-inbox" style={t.iconBtnIcon} aria-hidden="true" />
             </button>
 
             {/* Export PDF — sits right after the bell */}

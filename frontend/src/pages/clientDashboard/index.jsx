@@ -174,28 +174,20 @@ export default function DashboardPage() {
             {/* KPI cards */}
             <StatCards stats={stats} />
 
-            {/* Chart + Platform breakdown */}
-            <div className="db-grid-2-chart">
-              <RevenueChart data={data} period={period} />
-              <PlatformBreakdown byChannel={byChannel} />
+              {/* Inbox + Activity Feed */}
+              <div className="db-grid-2-bottom">
+                <UnifiedInbox
+                  inbox={inbox}
+                  totalUnread={totalUnread}
+                  onThreadClick={handleThreadClick}
+                />
+                <ActivityFeed bookings={bookings} channels={dashState.channels} />
+              </div>
             </div>
-
-            {/* Calendar */}
-            <CalendarSection />
-
-            {/* Inbox + Activity Feed */}
-            <div className="db-grid-2-bottom">
-              <UnifiedInbox
-                inbox={inbox}
-                totalUnread={totalUnread}
-                onThreadClick={handleThreadClick}
-              />
-              <ActivityFeed bookings={bookings} channels={dashState.channels} />
-            </div>
-
+ 
             <Footer />
-          </div>
-        </>
+          </>
+        )}
       </div>
 
       <MessageModal
