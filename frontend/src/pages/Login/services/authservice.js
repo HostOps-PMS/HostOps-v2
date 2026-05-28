@@ -1,14 +1,26 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-export async function loginUser({ email, password }) {
+export async function loginUser({ email, password, deviceId }) {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, deviceId }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Login failed');
+  return data;
+}
+
+export async function verifyLoginOtp({ email, otp, deviceId, rememberMe }) {
+  const res = await fetch(`${API_BASE}/auth/verify-login-otp`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
+    body: JSON.stringify({ email, otp, deviceId, rememberMe }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'OTP verification failed');
   return data;
 }
 

@@ -12,8 +12,8 @@
  *   resend          () => void
  */
 
-import { useState } from 'react';
-import { verifyOtp, resendOtp } from '../services/authService';
+import { useState, useEffect } from 'react';
+import { verifyOtp, resendOtp, sendLoginOtp } from '../services/authService';
 
 const RESEND_COOLDOWN_SEC = 60;
 
@@ -22,6 +22,14 @@ export function useAuthorization(onAuthorized) {
   const [resendLoading, setResendLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [message, setMessage]             = useState(null);
+
+  // Send OTP email as soon as the AuthModal mounts.
+  // The admin email is read from sessionStorage (set from URL params on redirect).
+  useEffect(() => {
+    sendLoginOtp().catch((err) => {
+      console.error('Failed to send initial login OTP:', err);
+    });
+  }, []);
 
   function showMessage(text, type = 'error') {
     setMessage({ text, type });

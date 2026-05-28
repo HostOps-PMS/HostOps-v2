@@ -20,14 +20,13 @@ export default function OtpInput({ digits, inputRefs, onChange, onKeyDown, onPas
   return (
     <div className="am-otp-row">
       {digits.map((digit, i) => (
-        <>
+        <div key={i} style={{ display: 'contents' }}>
           {/* visual dash separator between digit 3 and 4 */}
           {i === 3 && (
-            <span key="sep" className="am-otp-sep">–</span>
+            <span className="am-otp-sep">–</span>
           )}
 
           <input
-            key={i}
             ref={(el) => (inputRefs.current[i] = el)}
             className={[
               'am-otp-box',
@@ -44,7 +43,7 @@ export default function OtpInput({ digits, inputRefs, onChange, onKeyDown, onPas
             onKeyDown={(e) => onKeyDown(i, e)}
             onPaste={onPaste}
           />
-        </>
+        </div>
       ))}
     </div>
   );
