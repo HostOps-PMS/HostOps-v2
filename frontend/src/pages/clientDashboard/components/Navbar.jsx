@@ -13,6 +13,13 @@ export default function Navbar() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const notifRef = useRef(null);
+  const notifRefMobile = useRef(null);
+  const prevBookingIdsRef = useRef(null);
+  const audioCtxRef = useRef(null);
   const dropdownRef = useRef(null);
   const menuRef = useRef(null);
 
@@ -36,6 +43,124 @@ export default function Navbar() {
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function playNotifSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      audioCtxRef.current = ctx;
+
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(0.0001, ctx.currentTime);
+      master.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.01);
+      master.connect(ctx.destination);
+
+      // First tone — higher pitch ding
+      const o1 = ctx.createOscillator();
+      const g1 = ctx.createGain();
+      o1.type = 'sine';
+      o1.frequency.setValueAtTime(880, ctx.currentTime);
+      o1.frequency.exponentialRampToValueAtTime(1100, ctx.currentTime + 0.08);
+      g1.gain.setValueAtTime(0.5, ctx.currentTime);
+      g1.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+      o1.connect(g1);
+      g1.connect(master);
+      o1.start(ctx.currentTime);
+      o1.stop(ctx.currentTime + 0.5);
+
+      // Second tone — lower follow-up
+      const o2 = ctx.createOscillator();
+      const g2 = ctx.createGain();
+      o2.type = 'sine';
+      o2.frequency.setValueAtTime(660, ctx.currentTime + 0.12);
+      o2.frequency.exponentialRampToValueAtTime(820, ctx.currentTime + 0.22);
+      g2.gain.setValueAtTime(0.0001, ctx.currentTime + 0.12);
+      g2.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.14);
+      g2.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.65);
+      o2.connect(g2);
+      g2.connect(master);
+      o2.start(ctx.currentTime + 0.12);
+      o2.stop(ctx.currentTime + 0.65);
+
+      // Third tone — high finish
+      const o3 = ctx.createOscillator();
+      const g3 = ctx.createGain();
+      o3.type = 'sine';
+      o3.frequency.setValueAtTime(1320, ctx.currentTime + 0.28);
+      o3.frequency.exponentialRampToValueAtTime(1100, ctx.currentTime + 0.5);
+      g3.gain.setValueAtTime(0.0001, ctx.currentTime + 0.28);
+      g3.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + 0.30);
+      g3.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.75);
+      o3.connect(g3);
+      g3.connect(master);
+      o3.start(ctx.currentTime + 0.28);
+      o3.stop(ctx.currentTime + 0.75);
+
+      setTimeout(() => ctx.close(), 1200);
+    } catch (e) {
+      console.warn('Audio notification failed:', e);
+    }
+  }
+
+  useEffect(() => {
+    const bookings = dashState?.rawData?.bookings;
+    if (!bookings) return;
+
+    const activeBookings = bookings
+      .filter((b) => !b['is-blocked-booking'] && b.type !== 'cancellation')
+      .sort((a, b) => new Date(b['created-at'] || b.createdAt || 0) - new Date(a['created-at'] || a.createdAt || 0));
+
+    const currentIds = new Set(activeBookings.map((b) => b.id));
+
+    // First load — populate with 3 most recent bookings (same as ActivityFeed)
+    if (prevBookingIdsRef.current === null) {
+      prevBookingIdsRef.current = currentIds;
+      const initial = activeBookings.slice(0, 5).map((b) => ({
+        id:       b.id,
+        guest:    b['guest-name'] || b.firstname || 'Guest',
+        property: b.apartment?.name || b.apartmentName || 'Property',
+        price:    b.price || b.amount || 0,
+        arrival:  b.arrival || b.checkIn || '',
+        channel:  (b.channel && b.channel.name) || (typeof b.channel === 'string' ? b.channel : '') || 'Direct',
+        time:     new Date(b['created-at'] || b.createdAt || Date.now()),
+        read:     true,
+      }));
+      setNotifications(initial);
+      return;
+    }
+
+    // Subsequent updates — detect truly new bookings and play sound
+    const newBookings = activeBookings.filter(
+      (b) => !prevBookingIdsRef.current.has(b.id)
+    );
+
+    if (newBookings.length > 0) {
+      playNotifSound();
+      const newNotifs = newBookings.map((b) => ({
+        id:       b.id,
+        guest:    b['guest-name'] || b.firstname || 'Guest',
+        property: b.apartment?.name || b.apartmentName || 'Property',
+        price:    b.price || b.amount || 0,
+        arrival:  b.arrival || b.checkIn || '',
+        channel:  (b.channel && b.channel.name) || (typeof b.channel === 'string' ? b.channel : '') || 'Direct',
+        time:     new Date(b['created-at'] || b.createdAt || Date.now()),
+        read:     false,
+      }));
+      setNotifications((prev) => [...newNotifs, ...prev]);
+      setUnreadCount((prev) => prev + newBookings.length);
+    }
+
+    prevBookingIdsRef.current = currentIds;
+  }, [dashState?.rawData?.bookings]);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      const inDesktop = notifRef.current && notifRef.current.contains(e.target);
+      const inMobile  = notifRefMobile.current && notifRefMobile.current.contains(e.target);
+      if (!inDesktop && !inMobile) setNotifOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleLogout = () => {
@@ -325,13 +450,89 @@ export default function Navbar() {
 
             <div style={t.rightGroup}>
 
-              <button style={t.iconBtn} aria-label="Inbox">
-                <i
-                  className="ti ti-inbox"
-                  style={t.iconBtnIcon}
-                  aria-hidden="true"
-                />
-              </button>
+              <div style={{ position: 'relative' }} ref={notifRefMobile}>
+                <button
+                  style={{ ...t.iconBtn, position: 'relative' }}
+                  aria-label="Notifications"
+                  onClick={() => { setNotifOpen((p) => !p); setUnreadCount(0); setNotifications((prev) => prev.map((n) => ({ ...n, read: true }))); }}
+                >
+                  <i className="ti ti-bell" style={t.iconBtnIcon} aria-hidden="true" />
+                  {unreadCount > 0 && (
+                    <span style={{
+                      position: 'absolute', top: '4px', right: '4px',
+                      width: '8px', height: '8px', borderRadius: '50%',
+                      background: '#e74c3c', border: '1.5px solid',
+                      borderColor: dark ? '#0c1c14' : '#eaf5f0',
+                      animation: 'notif-pulse 1.2s ease-in-out infinite',
+                    }} />
+                  )}
+                </button>
+                {notifOpen && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                    width: '290px', background: dark ? '#1a2e20' : '#fff',
+                    border: `1px solid ${dark ? '#1e3a2a' : '#d4eddf'}`,
+                    borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.13)',
+                    zIndex: 999, overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      padding: '14px 16px', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#e8f5ee'}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    }}>
+                      <span style={{ fontWeight: 700, fontSize: '13px', color: dark ? '#eaf5f0' : '#0c1c14' }}>
+                        Notifications
+                      </span>
+                      {notifications.length > 0 && (
+                        <button onClick={() => setNotifications([])} style={{
+                          fontSize: '11px', color: '#26a676', background: 'none',
+                          border: 'none', cursor: 'pointer', fontWeight: 500,
+                        }}>
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: '28px 16px', textAlign: 'center', color: '#9ab8a9', fontSize: '13px' }}>
+                          No notifications yet
+                        </div>
+                      ) : (
+                        notifications.map((n, i) => (
+                          <div key={n.id || i} style={{
+                            padding: '12px 16px',
+                            borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f0f9f4'}`,
+                            background: n.read ? 'transparent' : (dark ? '#132a1e' : '#f5fdf8'),
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                              <span style={{
+                                width: '8px', height: '8px', borderRadius: '50%',
+                                background: '#26a676', flexShrink: 0, opacity: n.read ? 0 : 1,
+                              }} />
+                              <span style={{ fontSize: '12px', fontWeight: 700, color: dark ? '#eaf5f0' : '#0c1c14' }}>
+                                New Booking
+                              </span>
+                              <span style={{ fontSize: '11px', color: '#9ab8a9', marginLeft: 'auto' }}>
+                                {n.time.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '12px', color: dark ? '#b0cfc0' : '#3a5a48', paddingLeft: '16px' }}>
+                              <strong>{n.guest}</strong> · {n.property}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#26a676', paddingLeft: '16px', marginTop: '2px' }}>
+                              PHP {Number(n.price || 0).toLocaleString()} · {n.channel}
+                            </div>
+                            {n.arrival && (
+                              <div style={{ fontSize: '11px', color: '#9ab8a9', paddingLeft: '16px', marginTop: '1px' }}>
+                                Check-in: {new Date(n.arrival).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
               {/* Export PDF */}
               {ExportButton}
 
@@ -442,13 +643,97 @@ export default function Navbar() {
           </a>
 
           <div style={t.rightGroup}>
-            <button style={t.iconBtn} aria-label="Notifications">
-              <i
-                className="ti ti-bell"
-                style={t.iconBtnIcon}
-                aria-hidden="true"
-              />
-            </button>
+            <div style={{ position: 'relative' }} ref={notifRef}>
+              <button
+                style={{ ...t.iconBtn, position: 'relative' }}
+                aria-label="Notifications"
+                onClick={() => { setNotifOpen((p) => !p); setUnreadCount(0); setNotifications((prev) => prev.map((n) => ({ ...n, read: true }))); }}
+              >
+                <i className="ti ti-bell" style={t.iconBtnIcon} aria-hidden="true" />
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: '4px', right: '4px',
+                    width: '8px', height: '8px', borderRadius: '50%',
+                    background: '#e74c3c', border: '1.5px solid',
+                    borderColor: dark ? '#0c1c14' : '#eaf5f0',
+                    animation: 'notif-pulse 1.2s ease-in-out infinite',
+                  }} />
+                )}
+              </button>
+              <style>{`
+                @keyframes notif-pulse {
+                  0%, 100% { transform: scale(1); opacity: 1; }
+                  50% { transform: scale(1.4); opacity: 0.7; }
+                }
+              `}</style>
+
+              {notifOpen && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 8px)', left: 0,
+                  width: '320px', background: dark ? '#1a2e20' : '#fff',
+                  border: `1px solid ${dark ? '#1e3a2a' : '#d4eddf'}`,
+                  borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.13)',
+                  zIndex: 999, overflow: 'hidden',
+                }}>
+                  <div style={{
+                    padding: '14px 16px', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#e8f5ee'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}>
+                    <span style={{ fontWeight: 700, fontSize: '13px', color: dark ? '#eaf5f0' : '#0c1c14' }}>
+                      Notifications
+                    </span>
+                    {notifications.length > 0 && (
+                      <button onClick={() => setNotifications([])} style={{
+                        fontSize: '11px', color: '#26a676', background: 'none',
+                        border: 'none', cursor: 'pointer', fontWeight: 500,
+                      }}>
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: '32px 16px', textAlign: 'center', color: '#9ab8a9', fontSize: '13px' }}>
+                        No notifications yet
+                      </div>
+                    ) : (
+                      notifications.map((n, i) => (
+                        <div key={n.id || i} style={{
+                          padding: '12px 16px',
+                          borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f0f9f4'}`,
+                          background: n.read ? 'transparent' : (dark ? '#132a1e' : '#f5fdf8'),
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                            <span style={{
+                              width: '8px', height: '8px', borderRadius: '50%',
+                              background: '#26a676', flexShrink: 0,
+                              opacity: n.read ? 0 : 1,
+                            }} />
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: dark ? '#eaf5f0' : '#0c1c14' }}>
+                              New Booking
+                            </span>
+                            <span style={{ fontSize: '11px', color: '#9ab8a9', marginLeft: 'auto' }}>
+                              {n.time.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '12px', color: dark ? '#b0cfc0' : '#3a5a48', paddingLeft: '16px' }}>
+                            <strong>{n.guest}</strong> · {n.property}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#26a676', paddingLeft: '16px', marginTop: '2px' }}>
+                            PHP {Number(n.price || 0).toLocaleString()} · {n.channel}
+                          </div>
+                          {n.arrival && (
+                            <div style={{ fontSize: '11px', color: '#9ab8a9', paddingLeft: '16px', marginTop: '1px' }}>
+                              Check-in: {new Date(n.arrival).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <button style={t.iconBtn} aria-label="Inbox">
               <i className="ti ti-inbox" style={t.iconBtnIcon} aria-hidden="true" />

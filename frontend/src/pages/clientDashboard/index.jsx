@@ -238,7 +238,7 @@ export default function DashboardPage() {
                   totalUnread={totalUnread}
                   onThreadClick={handleThreadClick}
                 />
-                <ActivityFeed bookings={bookings} channels={dashState.channels} />
+                {/* <ActivityFeed bookings={bookings} channels={dashState.channels} /> */}
               </div>
             </div>
  
