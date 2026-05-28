@@ -32,7 +32,12 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp })
       showMsg(`Welcome back, ${data.user.firstName}! Redirecting...`, 'success');
 
       setTimeout(() => {
-        if (data.isAdmin || data.user.tag === 'Main Admin') {
+        const isAdminUser = 
+          data.user.tag === 'Main Admin' && 
+          data.user.role === 'admin' && 
+          data.user.email === import.meta.env.VITE_ADMIN_ROLE;
+
+        if (isAdminUser) {
           // ✅ Admin: cross-origin redirect to the admin app.
           // Token is passed via URL params since sessionStorage is port-scoped.
           const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5173';
