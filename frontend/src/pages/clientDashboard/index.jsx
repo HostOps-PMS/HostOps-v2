@@ -106,9 +106,6 @@ export default function DashboardPage() {
 
   const ownerName = data.ownerName || 'Dashboard';
 
-  // Show a dedicated connect prompt when the user has no Smoobu key configured.
-  const smoobuNotConnected = banner.type === 'connect';
-
   return (
     <div style={{ background: "#f4f6f5", minHeight: "100vh" }}>
       {/* First-login modal: blocking overlay shown until password is set */}
@@ -119,7 +116,7 @@ export default function DashboardPage() {
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
         <Navbar />
         <Banner type={banner.type} message={banner.message} />
-        {!smoobuNotConnected && (
+        {banner.type === 'live' && (
           <div style={{
             display: "flex",
             alignItems: "center",
@@ -140,111 +137,65 @@ export default function DashboardPage() {
       </div>
 
       <div style={{ background: dark ? "#0c1c14" : "#f7faf8", transition: "background 0.2s" }}>
-        {smoobuNotConnected ? (
-          // ── Smoobu not connected — show a clean connect prompt ──────────────
-          <div className="db-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '70vh' }}>
+        {/* ── Normal dashboard — always rendered regardless of Smoobu connection state ── */}
+        <>
+          <div className="db-container">
+            {/* ── Page header: title LEFT, date filter RIGHT ── */}
             <div style={{
-              background: '#fff',
-              borderRadius: 20,
-              padding: '48px 40px',
-              maxWidth: 480,
-              width: '100%',
-              boxShadow: '0 4px 32px rgba(38,166,118,.10)',
-              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 16,
+              marginBottom: 28,
             }}>
-              {/* Icon */}
-              <div style={{
-                width: 64, height: 64, borderRadius: '50%',
-                background: '#eaf8f1', display: 'flex',
-                alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 24px',
-              }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#26a676" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                </svg>
+              {/* Title */}
+              <div>
+                <h1 style={{
+                  fontFamily: "'Sora',sans-serif",
+                  fontSize: '1.75rem',
+                  fontWeight: 800,
+                  color: '#0c1c14',
+                  margin: '0 0 4px',
+                }}>
+                  {ownerName}
+                </h1>
+                <p style={{ color: '#9ab8a9', fontSize: '.88rem', margin: 0 }}>
+                  Your portfolio at a glance
+                </p>
               </div>
 
-              <h2 style={{
-                fontFamily: "'Sora', sans-serif",
-                fontSize: '1.35rem',
-                fontWeight: 800,
-                color: '#0c1c14',
-                margin: '0 0 10px',
-              }}>
-                Connect your Smoobu account
-              </h2>
-
-              <p style={{ color: '#6b8f7a', fontSize: '.9rem', lineHeight: 1.6, margin: '0 0 32px' }}>
-                To see your live bookings, revenue, and calendar, add your Smoobu API key. You can find it in your Smoobu account under <strong>Settings → API</strong>.
-              </p>
-
-              <p style={{ color: '#b0c9bc', fontSize: '.75rem', marginTop: 24 }}>
-                Your API key is stored securely and never shared.
-              </p>
+              {/* Date filter toggle — placed top-right as circled in screenshot */}
+              <div style={{ paddingTop: 4 }}>
+                <DateFilterBar />
+              </div>
             </div>
+
+            {/* KPI cards */}
+            <StatCards stats={stats} />
+
+            {/* Chart + Platform breakdown */}
+            <div className="db-grid-2-chart">
+              <RevenueChart data={data} period={period} />
+              <PlatformBreakdown byChannel={byChannel} />
+            </div>
+
+            {/* Calendar */}
+            <CalendarSection />
+
+            {/* Inbox + Activity Feed */}
+            <div className="db-grid-2-bottom">
+              <UnifiedInbox
+                inbox={inbox}
+                totalUnread={totalUnread}
+                onThreadClick={handleThreadClick}
+              />
+              <ActivityFeed bookings={bookings} channels={dashState.channels} />
+            </div>
+
+            <Footer />
           </div>
-        ) : (
-          // ── Normal dashboard ─────────────────────────────────────────────────
-          <>
-            <div className="db-container">
-              {/* ── Page header: title LEFT, date filter RIGHT ── */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: 16,
-                marginBottom: 28,
-              }}>
-                {/* Title */}
-                <div>
-                  <h1 style={{
-                    fontFamily: "'Sora',sans-serif",
-                    fontSize: '1.75rem',
-                    fontWeight: 800,
-                    color: '#0c1c14',
-                    margin: '0 0 4px',
-                  }}>
-                    {ownerName}
-                  </h1>
-                  <p style={{ color: '#9ab8a9', fontSize: '.88rem', margin: 0 }}>
-                    Your portfolio at a glance
-                  </p>
-                </div>
-
-                {/* Date filter toggle — placed top-right as circled in screenshot */}
-                <div style={{ paddingTop: 4 }}>
-                  <DateFilterBar />
-                </div>
-              </div>
-
-              {/* KPI cards */}
-              <StatCards stats={stats} />
-
-              {/* Chart + Platform breakdown */}
-              <div className="db-grid-2-chart">
-                <RevenueChart data={data} period={period} />
-                <PlatformBreakdown byChannel={byChannel} />
-              </div>
-
-              {/* Calendar */}
-              <CalendarSection />
-
-              {/* Inbox + Activity Feed */}
-              <div className="db-grid-2-bottom">
-                <UnifiedInbox
-                  inbox={inbox}
-                  totalUnread={totalUnread}
-                  onThreadClick={handleThreadClick}
-                />
-                <ActivityFeed bookings={bookings} channels={dashState.channels} />
-              </div>
-
-              <Footer />
-            </div>
-          </>
-        )}
+        </>
       </div>
 
       <MessageModal
