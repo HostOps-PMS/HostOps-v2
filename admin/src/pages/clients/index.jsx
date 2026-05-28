@@ -3,9 +3,10 @@ import './clients.css';
 
 import Sidebar           from '../Sidebar';
 import ClientsTable      from './components/ClientsTable';
-import ClientModal       from './components/ClientModal';
-import CreateAccountModal from './components/CreateAccountModal';
-import { useClients }    from './hooks/useClients';
+import ClientModal          from './components/ClientModal';
+import AddClientModal       from './components/AddClientModal';
+import AddTeamLeaderModal   from './components/AddTeamLeaderModal';
+import { useClients }       from './hooks/useClients';
 
 export default function Clients() {
   /* ── View-client modal ── */
@@ -13,8 +14,9 @@ export default function Clients() {
   const openModal  = (client) => setSelectedClient(client);
   const closeModal = ()       => setSelectedClient(null);
 
-  /* ── Create-account modal ── */
-  const [showCreate, setShowCreate] = useState(false);
+  /* ── Add Modals ── */
+  const [showAddClient, setShowAddClient] = useState(false);
+  const [showAddTeamLeader, setShowAddTeamLeader] = useState(false);
 
   /* ── Data ── */
   const { clients, loading, error, refetch } = useClients();
@@ -84,12 +86,22 @@ export default function Clients() {
             <div className="cl-header-actions">
               <button
                 className="db-btn db-btn--primary"
-                onClick={() => setShowCreate(true)}
+                onClick={() => setShowAddClient(true)}
               >
                 <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2">
                   <path d="M10 4v12M4 10h12" strokeLinecap="round" />
                 </svg>
-                Create Account
+                Add Client
+              </button>
+              <button
+                className="db-btn db-btn--primary"
+                onClick={() => setShowAddTeamLeader(true)}
+                style={{ marginLeft: 8 }}
+              >
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="M10 4v12M4 10h12" strokeLinecap="round" />
+                </svg>
+                Add Team Leader
               </button>
               <button className="db-btn db-btn--ghost" onClick={refetch} title="Refresh">
                 <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
@@ -137,6 +149,7 @@ export default function Clients() {
               <option value="all">All roles</option>
               <option value="client">Client</option>
               <option value="admin">Admin</option>
+              <option value="team_leader">Team Leader</option>
             </select>
           </div>
 
@@ -158,11 +171,20 @@ export default function Clients() {
         />
       )}
 
-      {/* Create account modal */}
-      {showCreate && (
-        <CreateAccountModal
-          onClose={() => setShowCreate(false)}
-          onSuccess={() => { setShowCreate(false); refetch(); }}
+      {/* Add Client modal */}
+      {showAddClient && (
+        <AddClientModal
+          onClose={() => setShowAddClient(false)}
+          onSuccess={() => { setShowAddClient(false); refetch(); }}
+        />
+      )}
+
+      {/* Add Team Leader modal */}
+      {showAddTeamLeader && (
+        <AddTeamLeaderModal
+          clients={clients.filter(c => c.role === 'client')}
+          onClose={() => setShowAddTeamLeader(false)}
+          onSuccess={() => { setShowAddTeamLeader(false); refetch(); }}
         />
       )}
     </div>

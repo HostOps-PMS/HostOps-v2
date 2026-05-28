@@ -16,9 +16,9 @@ function VerifiedBadge({ isVerified }) {
 }
 
 function RoleBadge({ role }) {
-  return role === 'admin'
-    ? <span className="db-badge db-badge--info">Admin</span>
-    : <span className="db-badge db-badge--neutral">Client</span>;
+  if (role === 'admin') return <span className="db-badge db-badge--info">Admin</span>;
+  if (role === 'team_leader') return <span className="db-badge" style={{background: '#e0e7ff', color: '#4338ca', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600}}>Team Leader</span>;
+  return <span className="db-badge db-badge--neutral">Client</span>;
 }
 
 function SmoobuBadge({ connected }) {

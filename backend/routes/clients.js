@@ -117,9 +117,10 @@ const createClientSchema = z.object({
   lastName:          z.string().max(50).trim().optional().default(''),
   email:             z.string().email().max(254),
   password:          z.string().min(8).max(128),
-  role:              z.enum(['client', 'admin']).optional().default('client'),
+  role:              z.enum(['client', 'admin', 'team_leader']).optional().default('client'),
   propertyTagPrefix: z.string().max(100).trim().optional().default(''),
   smoobuApiKey:      z.string().max(512).optional().default(''),
+  serverId:          z.string().optional(),
 });
 
 router.post('/clients', async (req, res, next) => {
@@ -131,6 +132,16 @@ router.post('/clients', async (req, res, next) => {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
+    if (data.role === 'team_leader') {
+      if (!data.serverId) {
+        return res.status(400).json({ error: 'Server assignment is required for Team Leaders.' });
+      }
+      const serverUser = await User.findOne({ _id: data.serverId, role: 'client' });
+      if (!serverUser) {
+        return res.status(400).json({ error: 'Invalid server selected. Must be an existing client.' });
+      }
+    }
+
     const user = await User.create({
       firstName:          data.firstName,
       lastName:           data.lastName || '',
@@ -139,6 +150,7 @@ router.post('/clients', async (req, res, next) => {
       role:               data.role,
       propertyTagPrefix:  data.propertyTagPrefix || '',
       smoobuApiKey:       data.smoobuApiKey || null,
+      serverId:           data.serverId || null,
       isVerified:         false,
       mustChangePassword: true,
     });
@@ -166,7 +178,7 @@ router.post('/clients', async (req, res, next) => {
 // intentionally excluded to prevent accidental overwrites.
 // ─────────────────────────────────────────────────────────────────
 const updateClientSchema = z.object({
-  role:              z.enum(['client', 'admin']).optional(),
+  role:              z.enum(['client', 'admin', 'team_leader']).optional(),
   propertyTagPrefix: z.string().max(100).trim().optional(),
   smoobuApiKey:      z.string().max(512).optional(),
 });
