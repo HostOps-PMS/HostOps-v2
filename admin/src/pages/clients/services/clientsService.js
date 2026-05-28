@@ -80,5 +80,43 @@ export async function createClient(data) {
   });
 }
 
-const clientsService = { getClients, getClient, createClient };
+/**
+ * PATCH /api/clients/:id
+ * Admin updates an existing client's editable fields.
+ * Only role, propertyTagPrefix, and smoobuApiKey are accepted by the server.
+ *
+ * @param {string} id - MongoDB ObjectId string
+ * @param {{
+ *   role?: 'client' | 'admin',
+ *   propertyTagPrefix?: string,
+ *   smoobuApiKey?: string,
+ * }} data
+ * @returns {Promise<User>}
+ */
+export async function updateClient(id, data) {
+  return request(`/api/clients/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * GET /api/clients/:id/smoobu
+ * Admin fetches the Smoobu dashboard data for a specific client.
+ * The server loads the client's smoobuApiKey server-side (never exposed
+ * to the frontend) and proxies the Smoobu response back.
+ *
+ * @param {string} id              - MongoDB ObjectId string
+ * @param {{ from?: string, to?: string }} [range] - Optional date range YYYY-MM-DD
+ * @returns {Promise<SmoobuDashboard>}
+ */
+export async function getClientSmoobuData(id, { from, to } = {}) {
+  const params = new URLSearchParams();
+  if (from) params.append('from', from);
+  if (to)   params.append('to',   to);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return request(`/api/clients/${id}/smoobu${qs}`);
+}
+
+const clientsService = { getClients, getClient, createClient, updateClient, getClientSmoobuData };
 export default clientsService;

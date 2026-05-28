@@ -27,6 +27,8 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  /* FIX: extra bottom padding so the table card is never clipped */
+  padding-bottom: 40px;
 }
 
 .db-content__header {
@@ -232,6 +234,8 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
+  /* FIX: prevent stats row from stretching to fill available space */
+  flex-shrink: 0;
 }
 
 .db-stat-card {
@@ -306,7 +310,12 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
-  overflow: hidden;
+  /* FIX: removed overflow: hidden — it was clipping the table body.
+     Clipping is now handled only by db-table-wrapper below. */
+  overflow: visible;
+  /* FIX: prevent the card from being squished to zero height
+     in the flex column when content is tall. */
+  flex-shrink: 0;
 }
 
 .db-table-card__head {
@@ -336,7 +345,12 @@
 
 .db-table-card__action:hover { text-decoration: underline; }
 
-.db-table-wrapper { overflow-x: auto; }
+/* FIX: the wrapper clips horizontal overflow only,
+   so the card corners stay rounded without hiding rows. */
+.db-table-wrapper {
+  overflow-x: auto;
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+}
 
 .db-table {
   width: 100%;
