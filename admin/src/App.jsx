@@ -87,9 +87,9 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      {!authorized && (
+      {/* {!authorized && (
         <AuthorizationModal onAuthorized={handleAuthorized} />
-      )}
+      )} */}
 
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -144,6 +144,15 @@ export default function App() {
           <Route path="staffs" element={<TeamLeaderStaffs />} />
           <Route index element={<Navigate to="staffs" replace />} />
         </Route>
+
+        <Route
+          path="/team-leaders"
+          element={
+            <PrivateRoute>
+              <TeamLeaders />
+            </PrivateRoute>
+          }
+        />
 
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
