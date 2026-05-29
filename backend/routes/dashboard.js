@@ -404,6 +404,15 @@ router.get('/rates', async (req, res, next) => {
 async function assertReservationOwnership(req, reservationId) {
   const user = req.user;
 
+  // Wide date window — getBookings() with no from/to defaults to Smoobu's
+  // narrow current-month window, missing past/future reservations → 404.
+  // Fetch ±2 years to reliably find any reservation (matches smoobu.js's
+  // verifyReservationOwnership which already uses the same approach).
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  const now = new Date();
+  const wideFrom = fmt(new Date(now.getFullYear() - 2, now.getMonth(), now.getDate()));
+  const wideTo   = fmt(new Date(now.getFullYear() + 2, now.getMonth(), now.getDate()));
+
   // MODE C: staff ownership check — must be one of their assigned properties
   if (req.isStaff) {
     if (!req.staffPropertyIds?.length) {
@@ -412,7 +421,7 @@ async function assertReservationOwnership(req, reservationId) {
     const allowedStrIds = new Set(req.staffPropertyIds.map(String));
     const allowedNumIds = new Set([...allowedStrIds].map(Number));
 
-    const { bookings = [] } = await getBookings(user, {});
+    const { bookings = [] } = await getBookings(user, { from: wideFrom, to: wideTo });
     const reservation = bookings.find((b) => String(b.id) === String(reservationId));
 
     if (!reservation) {
@@ -438,7 +447,7 @@ async function assertReservationOwnership(req, reservationId) {
   const allProps   = await getApartments(user);
   const { propIds } = filterPropsByPrefix(allProps.apartments || [], prefix);
 
-  const { bookings = [] } = await getBookings(user, {});
+  const { bookings = [] } = await getBookings(user, { from: wideFrom, to: wideTo });
   const reservation = bookings.find((b) => String(b.id) === String(reservationId));
 
   if (!reservation) {

@@ -4,7 +4,7 @@ import { loginUser } from '../services/authService';
 import { useAuthSubmit } from '../hooks/useAuth';
 import { useAuth } from '../../AuthContext';
 
-export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp }) {
+export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, onClientAccountLogin }) {
   const navigate = useNavigate();
   const auth = useAuth();
   const [email, setEmail] = useState('');
@@ -15,6 +15,24 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp })
     onSuccess: (data) => {
       if (data.requiresOtp) {
         onRequiresOtp(email, rememberMe);
+        return;
+      }
+
+      // ── Client Account login ───────────────────────────────────────
+      // Client accounts skip OTP and DomainLoginForm entirely.
+      // Token is stored here; PropertySelectForm will use it to fetch
+      // the parent client's properties from /api/properties.
+      if (data.isClientAccount) {
+        auth.setToken(data.accessToken);
+        auth.setUser({ ...data.clientAccount, role: 'clientAccount', isClientAccount: true });
+
+        if (data.mustChangePassword) {
+          sessionStorage.setItem('hp_must_change_password', 'true');
+        } else {
+          sessionStorage.removeItem('hp_must_change_password');
+        }
+
+        onClientAccountLogin(data);
         return;
       }
 
@@ -32,8 +50,8 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp })
       showMsg(`Welcome back, ${data.user.firstName}! Redirecting...`, 'success');
 
       setTimeout(() => {
-        if (data.isAdmin || data.user.role === 'admin') {
-          // ✅ Admin: cross-origin redirect to the admin app.
+        if (data.isAdmin || data.user.role === 'admin' || data.user.role === 'team_leader') {
+          // ✅ Admin & Team Leader: cross-origin redirect to the admin app.
           // Token is passed via URL params since sessionStorage is port-scoped.
           const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5173';
           const params = new URLSearchParams({

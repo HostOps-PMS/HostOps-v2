@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 
-import LoginPage  from './pages/Login';
-import Dashboard  from './pages/dashboard';
-import Clients    from './pages/clients';
-import Staffs     from './pages/Staffs/index';
+import LoginPage     from './pages/Login';
+import Dashboard     from './pages/dashboard';
+import Clients       from './pages/clients';
+import Staffs        from './pages/Staffs/index';
+import ClientAccount from './pages/clientAccount/index'; // ← NEW
 import TeamLeaders from './pages/team-leaders/index';
 import AuthorizationModal from './pages/authorization';
 import TeamLeaderLayout from './pages/TeamLeader/index';
@@ -15,8 +16,6 @@ import TeamLeaderDashboardPlaceholder from './pages/TeamLeader/dashboard/index';
 const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5174';
 
 // ── Consume _t / _u URL params injected by the frontend login app ──────────
-// This runs synchronously at module load, before any component mounts,
-// so sessionStorage is populated before AuthorizationModal fires sendLoginOtp.
 (function consumeLoginParams() {
   const params = new URLSearchParams(window.location.search);
   const token   = params.get('_t');
@@ -24,11 +23,9 @@ const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5174
   if (token)   sessionStorage.setItem('hp_access_token', token);
   if (userRaw) sessionStorage.setItem('hp_user', userRaw);
   if (token || userRaw) {
-    // Clean the URL immediately so tokens don't linger in browser history
     window.history.replaceState({}, '', window.location.pathname);
   }
 
-  // Redirect client-role users back to the frontend app — they don't belong here
   if (userRaw) {
     try {
       const parsed = JSON.parse(userRaw);
@@ -48,11 +45,9 @@ function PrivateRoute({ children }) {
   
   try {
     const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
-    // Block team_leaders from main admin routes
     if (user.role === 'team_leader') {
       return <Navigate to="/team-leader/staffs" replace />;
     }
-    // Block client users — they belong in the frontend app
     if (user.role === 'client') {
       window.location.href = `${FRONTEND_URL}/dashboard`;
       return null;
@@ -68,7 +63,6 @@ function TeamLeaderRoute({ children }) {
   const token = sessionStorage.getItem('hp_access_token');
   if (!token) return <Navigate to="/login" replace />;
   
-  // Only allow team_leaders
   try {
     const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
     if (user.role !== 'team_leader') {
@@ -82,8 +76,6 @@ function TeamLeaderRoute({ children }) {
 }
 
 export default function App() {
-  // Persist authorization per browser session.
-  // Clears automatically when the tab/browser is closed.
   const [authorized, setAuthorized] = useState(
     () => !!sessionStorage.getItem('hp_authorized')
   );
@@ -95,10 +87,9 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      {/* Authorization gate — blocks all routes until OTP is verified */}
-      {/* {!authorized && (
+      {!authorized && (
         <AuthorizationModal onAuthorized={handleAuthorized} />
-      )} */}
+      )}
 
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -130,11 +121,12 @@ export default function App() {
           }
         />
 
+        {/* ── NEW: Client Accounts ─────────────────────────────── */}
         <Route
-          path="/team-leaders"
+          path="/client-accounts"
           element={
             <PrivateRoute>
-              <TeamLeaders />
+              <ClientAccount />
             </PrivateRoute>
           }
         />
@@ -153,7 +145,6 @@ export default function App() {
           <Route index element={<Navigate to="staffs" replace />} />
         </Route>
 
-        {/* Default redirect */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>

@@ -2,6 +2,7 @@
 import { verifyAccessToken } from '../utils/tokens.js';
 import User from '../models/user.js';
 import Staff from '../models/staff.js';
+import ClientAccount from '../models/clientAccount.js';
 
 export async function requireAuth(req, res, next) {
   try {
@@ -33,9 +34,37 @@ export async function requireAuth(req, res, next) {
       req.user        = clientUser;
       req.staff       = staff;
       req.isStaff     = true;
+      req.isClientAccount = false;
       // Normalise propertyIds to strings for comparison — Smoobu IDs are
       // numbers but the Staff schema stores them as strings.
       req.staffPropertyIds = (staff.propertyIds || []).map(String);
+
+      return next();
+    }
+
+    // ── CLIENT ACCOUNT LOGIN ───────────────────────────────────────
+    // Sub-accounts linked to a parent client. Token carries role: 'clientAccount'
+    // and parentClientId. We load the parent client's User record (with
+    // smoobuApiKey) so all Smoobu service calls work identically to a
+    // regular client session. No property filtering — client accounts
+    // have access to all of the parent's properties.
+    if (decoded.role === 'clientAccount') {
+      const clientAccount = await ClientAccount.findById(decoded.clientAccountId || decoded.sub);
+      if (!clientAccount) return res.status(401).json({ error: 'Client account not found' });
+      if (!clientAccount.isActive) return res.status(403).json({ error: 'Client account is inactive' });
+
+      // Load the parent client WITH smoobuApiKey so Smoobu calls work.
+      const parentUser = await User.findById(clientAccount.parentClientId).select('+smoobuApiKey');
+      if (!parentUser) return res.status(401).json({ error: 'Parent client not found' });
+
+      // req.user = parent client (carries smoobuApiKey for Smoobu calls)
+      // req.clientAccount = the sub-account record itself
+      req.user            = parentUser;
+      req.clientAccount   = clientAccount;
+      req.isStaff         = false;
+      req.isClientAccount = true;
+      // Empty array signals "all properties" — properties.js checks this
+      req.staffPropertyIds = [];
 
       return next();
     }
@@ -49,6 +78,15 @@ export async function requireAuth(req, res, next) {
     const user = await User.findById(decoded.sub).select('+smoobuApiKey');
     if (!user) return res.status(401).json({ error: 'User not found' });
 
+    // For team leaders, dynamically inject their assigned client's (serverId) Smoobu API key in memory.
+    // This allows them to fetch properties and view dashboards without duplicating the key in the database.
+    if (user.role === 'team_leader' && user.serverId) {
+      const clientUser = await User.findById(user.serverId).select('+smoobuApiKey');
+      if (clientUser && clientUser.smoobuApiKey) {
+        user.smoobuApiKey = clientUser.smoobuApiKey;
+      }
+    }
+
     // Allow through if the user must change their password (admin-created account).
     // They are not yet verified, but the /auth/change-password endpoint
     // needs to be accessible so they can complete the first-login flow.
@@ -56,8 +94,9 @@ export async function requireAuth(req, res, next) {
       return res.status(403).json({ error: 'Email not verified' });
     }
 
-    req.user    = user;
-    req.isStaff = false;
+    req.user            = user;
+    req.isStaff         = false;
+    req.isClientAccount = false;
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
@@ -71,8 +110,8 @@ export async function requireAuth(req, res, next) {
 }
 
 export function requireAdmin(req, res, next) {
-  // Staff members are never admins regardless of their client's role
-  if (req.isStaff) {
+  // Staff members and client accounts are never admins
+  if (req.isStaff || req.isClientAccount) {
     return res.status(403).json({ error: 'Admin access required' });
   }
   if (req.user?.role !== 'admin') {
@@ -82,7 +121,7 @@ export function requireAdmin(req, res, next) {
 }
 
 export function requireAdminOrTeamLeader(req, res, next) {
-  if (req.isStaff) {
+  if (req.isStaff || req.isClientAccount) {
     return res.status(403).json({ error: 'Access denied' });
   }
   if (req.user?.role !== 'admin' && req.user?.role !== 'team_leader') {

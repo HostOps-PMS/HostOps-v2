@@ -3,11 +3,13 @@ import express from 'express';
 import { z } from 'zod';
 import User from '../models/user.js';
 import Staff from '../models/staff.js';
+import ClientAccount from '../models/clientAccount.js';
 import RefreshToken from '../models/refreshToken.js';
 import TrustedDevice from '../models/trustedDevice.js';
 import {
   signAccessToken, signRefreshToken, verifyRefreshToken,
   signStaffAccessToken, signStaffRefreshToken,
+  signClientAccountAccessToken, signClientAccountRefreshToken,
   refreshTokenExpiry, randomToken, hashToken,
 } from '../utils/tokens.js';
 import { sendVerificationEmail, sendResetEmail } from '../services/email.js';
@@ -139,6 +141,46 @@ router.post('/login', async (req, res, next) => {
     const data = loginSchema.parse(req.body);
     const { email, password, deviceId } = data;
 
+    // ── Check if this is a client account login FIRST ─────────────
+    // Client accounts must be checked before User because the same email
+    // could exist in both collections (e.g. the parent client's email was
+    // reused). Client accounts never go through the OTP flow.
+    const clientAccount = await ClientAccount.findOne({ email: email.toLowerCase() }).select('+password');
+    if (clientAccount && (await clientAccount.comparePassword(password))) {
+      if (!clientAccount.isActive) {
+        return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
+      }
+
+      const accessToken  = signClientAccountAccessToken(clientAccount);
+      const refreshToken = signClientAccountRefreshToken(clientAccount);
+
+      await RefreshToken.create({
+        userId:    clientAccount._id,
+        token:     hashToken(refreshToken),
+        expiresAt: refreshTokenExpiry(),
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      clientAccount.lastLoginAt = new Date();
+      await clientAccount.save();
+
+      res.cookie('rt', refreshToken, {
+        httpOnly: true,
+        secure:   process.env.NODE_ENV === 'production',
+        sameSite: 'none',
+        maxAge:   7 * 24 * 60 * 60 * 1000,
+        path:     '/auth',
+      });
+
+      return res.json({
+        accessToken,
+        clientAccount:      { ...clientAccount.toJSON(), role: 'clientAccount', isClientAccount: true },
+        mustChangePassword: clientAccount.mustChangePassword,
+        isClientAccount:    true,
+      });
+    }
+
     // ── Check if this is a staff login ────────────────────────────
     // Try User first. If not found or password wrong, try Staff.
     const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
@@ -176,7 +218,10 @@ router.post('/login', async (req, res, next) => {
 
         return res.json({
           accessToken,
-          staff:              staff.toJSON(),
+          // Inject role:'staff' and isStaff:true into the staff object so the
+          // frontend can detect staff sessions from the stored hp_user object.
+          // The Staff schema has no 'role' field — we add it here explicitly.
+          staff:              { ...staff.toJSON(), role: 'staff', isStaff: true },
           mustChangePassword: staff.mustChangePassword,
           isStaff:            true,
         });
@@ -195,8 +240,7 @@ router.post('/login', async (req, res, next) => {
       return res.status(403).json({ error: 'Please verify your email first' });
     }
 
-    const isAdmin = user.tag === "Main Admin" || user.role === "admin" || user.email === process.env.ADMIN_ROLE;
-    
+     const isAdmin = user.tag === "Main Admin" || user.role === "admin" || user.email === process.env.ADMIN_ROLE;
 
     if (!isAdmin) {
       let isTrusted = false;
@@ -305,7 +349,9 @@ router.post('/staff-login', async (req, res, next) => {
 
     res.json({
       accessToken,
-      staff: staff.toJSON(),
+      // Inject role:'staff' and isStaff:true so the frontend can always
+      // identify staff sessions from the stored hp_user object.
+      staff: { ...staff.toJSON(), role: 'staff', isStaff: true },
       mustChangePassword: staff.mustChangePassword,
     });
   } catch (err) {
@@ -342,7 +388,7 @@ router.post('/verify-login-otp', async (req, res, next) => {
       // 3 seconds.
       // const expiresIn = 3000;
       // 30 seconds.
-      const expiresIn = 30000;
+      const expiresIn = 14 * 24 * 60 * 60 * 1000;
       // 1 minute.
       // const expiresIn = 60000;
       // 14 days.
@@ -495,6 +541,37 @@ router.post('/refresh', async (req, res, next) => {
       return res.json({ accessToken: signStaffAccessToken(staff) });
     }
 
+    // ── Client Account refresh ─────────────────────────────────────
+    if (decoded.role === 'clientAccount') {
+      const clientAccount = await ClientAccount.findById(decoded.clientAccountId || decoded.sub);
+      if (!clientAccount || !clientAccount.isActive) {
+        return res.status(401).json({ error: 'Client account not found or inactive' });
+      }
+
+      const newRefreshToken = signClientAccountRefreshToken(clientAccount);
+      stored.revokedAt  = new Date();
+      stored.replacedBy = hashToken(newRefreshToken);
+      await stored.save();
+
+      await RefreshToken.create({
+        userId:    clientAccount._id,
+        token:     hashToken(newRefreshToken),
+        expiresAt: refreshTokenExpiry(),
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      res.cookie('rt', newRefreshToken, {
+        httpOnly: true,
+        secure:   process.env.NODE_ENV === 'production',
+        sameSite: 'none',
+        maxAge:   7 * 24 * 60 * 60 * 1000,
+        path:     '/auth',
+      });
+
+      return res.json({ accessToken: signClientAccountAccessToken(clientAccount) });
+    }
+
     // ── Regular user refresh ───────────────────────────────────────
     const user = await User.findById(decoded.sub);
     if (!user) return res.status(401).json({ error: 'User not found' });
@@ -578,6 +655,29 @@ router.post('/change-password', requireAuth, async (req, res, next) => {
       );
 
       return res.json({ message: 'Password changed successfully.', staff: staff.toJSON() });
+    }
+
+    // ── Client Account change-password ─────────────────────────────
+    if (req.isClientAccount) {
+      const clientAccount = await ClientAccount.findById(req.clientAccount._id).select('+password');
+      if (!clientAccount) return res.status(404).json({ error: 'Client account not found' });
+
+      const isMatch = await clientAccount.comparePassword(currentPassword);
+      if (!isMatch) return res.status(401).json({ error: 'Current password is incorrect' });
+      if (currentPassword === newPassword) {
+        return res.status(400).json({ error: 'New password must be different from the current one' });
+      }
+
+      clientAccount.password           = newPassword;
+      clientAccount.mustChangePassword = false;
+      await clientAccount.save();
+
+      await RefreshToken.updateMany(
+        { userId: clientAccount._id, revokedAt: null },
+        { revokedAt: new Date() }
+      );
+
+      return res.json({ message: 'Password changed successfully.', clientAccount: clientAccount.toJSON() });
     }
 
     // ── Regular user change-password ───────────────────────────────

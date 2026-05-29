@@ -78,7 +78,7 @@ export default function Clients() {
           {/* Page header */}
           <header className="cl-content__header">
             <div>
-              <h1 className="cl-content__title">Clients</h1>
+              <h1 className="cl-content__title">Businesses</h1>
               <p className="cl-content__sub">All registered users on the platform</p>
             </div>
             <div className="cl-header-actions">
@@ -89,7 +89,7 @@ export default function Clients() {
                 <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2">
                   <path d="M10 4v12M4 10h12" strokeLinecap="round" />
                 </svg>
-                Add Client
+                Add Business
               </button>
               <button className="db-btn db-btn--ghost" onClick={refetch} title="Refresh">
                 <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">

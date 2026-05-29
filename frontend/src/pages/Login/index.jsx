@@ -9,11 +9,12 @@ import bgImage from '../../assets/BG.png';
 import './Login.css';
 
 const VIEWS = {
-  LOGIN:           'login',
-  FORGOT:          'forgot',
-  LOGIN_OTP:       'login_otp',
-  PROPERTY_SELECT: 'property_select',
-  DOMAIN_LOGIN:    'domain_login',
+  LOGIN:                           'login',
+  FORGOT:                          'forgot',
+  LOGIN_OTP:                       'login_otp',
+  PROPERTY_SELECT:                 'property_select',
+  DOMAIN_LOGIN:                    'domain_login',
+  CLIENT_ACCOUNT_PROPERTY_SELECT:  'client_account_property_select',
 };
 
 const SLIDES = [
@@ -36,6 +37,8 @@ export default function LoginPage() {
 
   // Stores the single selected property ID after PropertySelectForm.
   // Passed to DomainLoginForm so it can validate the staff's propertyIds.
+  // '__all__' is a special value meaning "All Properties" — DomainLoginForm
+  // uses clientAccount credentials in this case and skips property access check.
   const [selectedPropertyId, setSelectedPropertyId] = useState(null);
 
   const showMsg = (text, type = 'error') => setMessage({ text, type });
@@ -112,6 +115,22 @@ export default function LoginPage() {
                 handleViewChange(VIEWS.LOGIN_OTP);
                 showMsg('Please verify your device to continue.', 'success');
               }}
+              onClientAccountLogin={(data) => {
+                // ── Client Account login ───────────────────────────────────────
+                // Client accounts skip OTP and DomainLoginForm on initial login.
+                // After login they go to CLIENT_ACCOUNT_PROPERTY_SELECT where they
+                // can pick "All Properties" or a specific property.
+                // Picking "All Properties" routes through DomainLoginForm for
+                // credential re-confirmation before dashboard access.
+                // The auth middleware sets req.staffPropertyIds = [] for these
+                // sessions so /api/properties returns all parent client properties.
+                setAuthData(data);
+                showMsg(
+                  `Welcome, ${data.clientAccount.firstName}! Please select a property to continue.`,
+                  'success',
+                );
+                setView(VIEWS.CLIENT_ACCOUNT_PROPERTY_SELECT);
+              }}
             />
           )}
 
@@ -123,14 +142,22 @@ export default function LoginPage() {
               hideMsg={hideMsg}
               onBack={() => handleViewChange(VIEWS.LOGIN)}
               onOTPSuccess={(data) => {
-                // Store full auth payload so PropertySelectForm and
-                // DomainLoginForm have access to the user object.
                 setAuthData(data);
-                showMsg(
-                  `Welcome, ${data.user.firstName}! Please select a property to continue.`,
-                  'success',
-                );
-                setView(VIEWS.PROPERTY_SELECT);
+                if (data.isAdmin || data.user?.role === 'admin' || data.user?.role === 'team_leader') {
+                  showMsg(`Welcome, ${data.user.firstName}! Redirecting...`, 'success');
+                  const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5173';
+                  const params = new URLSearchParams({
+                    _t: data.accessToken,
+                    _u: JSON.stringify(data.user),
+                  });
+                  window.location.href = `${dashboardBase}/admin?${params.toString()}`;
+                } else {
+                  showMsg(
+                    `Welcome, ${data.user.firstName}! Please select a property to continue.`,
+                    'success',
+                  );
+                  setView(VIEWS.PROPERTY_SELECT);
+                }
               }}
             />
           )}
@@ -141,7 +168,12 @@ export default function LoginPage() {
               showMsg={showMsg}
               hideMsg={hideMsg}
               onContinue={(propertyId) => {
-                // propertyId is the single selected apartment ID (number or string)
+                // '__all__' or a specific apartment ID.
+                // Both cases go to DomainLoginForm:
+                //   '__all__'     → DomainLoginForm uses clientAccount credentials,
+                //                   skips property access check, clears property scope.
+                //   specific id   → DomainLoginForm uses staff credentials,
+                //                   validates property access as normal.
                 setSelectedPropertyId(propertyId);
                 hideMsg();
                 setView(VIEWS.DOMAIN_LOGIN);
@@ -160,6 +192,30 @@ export default function LoginPage() {
                 hideMsg();
                 setView(VIEWS.PROPERTY_SELECT);
               }}
+            />
+          )}
+
+          {view === VIEWS.CLIENT_ACCOUNT_PROPERTY_SELECT && (
+            // ── Client Account Property Selection ───────────────────────────────
+            // isClientAccount=true is passed so we know the context.
+            // "All Properties" → onContinue('__all__') → DOMAIN_LOGIN view,
+            //   DomainLoginForm shows clientAccount credential form.
+            // Specific property → PropertySelectForm navigates to /dashboard
+            //   directly (already authenticated as clientAccount).
+            <PropertySelectForm
+              userData={authData?.clientAccount}
+              isClientAccount={true}
+              showMsg={showMsg}
+              hideMsg={hideMsg}
+              onContinue={(propertyId) => {
+                // Only called when '__all__' is selected (specific property
+                // navigates internally in PropertySelectForm for clientAccount).
+                // Route through DomainLoginForm for credential confirmation.
+                setSelectedPropertyId(propertyId);
+                hideMsg();
+                setView(VIEWS.DOMAIN_LOGIN);
+              }}
+              onBack={() => handleViewChange(VIEWS.LOGIN)}
             />
           )}
 
