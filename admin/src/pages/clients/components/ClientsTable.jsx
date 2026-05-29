@@ -43,10 +43,10 @@ export default function ClientsTable({ clients, loading, onRowClick }) {
   return (
     <div className="cl-table-card">
       <div className="cl-table-card__head">
-        <h2 className="cl-table-card__title">All Clients</h2>
+        <h2 className="cl-table-card__title">All Businesses</h2>
         {!loading && (
           <span className="cl-table-card__count">
-            {clients.length} {clients.length === 1 ? 'client' : 'clients'}
+            {clients.length} {clients.length === 1 ? 'Business' : 'Businesses'}
           </span>
         )}
       </div>
@@ -55,7 +55,7 @@ export default function ClientsTable({ clients, loading, onRowClick }) {
         <table className="cl-table">
           <thead>
             <tr>
-              <th>Client</th>
+              <th>Business</th>
               <th>Role</th>
               <th>Status</th>
               <th>Smoobu</th>
@@ -72,7 +72,7 @@ export default function ClientsTable({ clients, loading, onRowClick }) {
                     <td colSpan={6}>
                       <div className="cl-empty">
                         <div className="cl-empty__icon">👥</div>
-                        <div className="cl-empty__text">No clients found</div>
+                        <div className="cl-empty__text">No Businesses found</div>
                       </div>
                     </td>
                   </tr>

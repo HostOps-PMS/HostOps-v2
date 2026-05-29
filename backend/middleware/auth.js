@@ -78,6 +78,15 @@ export async function requireAuth(req, res, next) {
     const user = await User.findById(decoded.sub).select('+smoobuApiKey');
     if (!user) return res.status(401).json({ error: 'User not found' });
 
+    // For team leaders, dynamically inject their assigned client's (serverId) Smoobu API key in memory.
+    // This allows them to fetch properties and view dashboards without duplicating the key in the database.
+    if (user.role === 'team_leader' && user.serverId) {
+      const clientUser = await User.findById(user.serverId).select('+smoobuApiKey');
+      if (clientUser && clientUser.smoobuApiKey) {
+        user.smoobuApiKey = clientUser.smoobuApiKey;
+      }
+    }
+
     // Allow through if the user must change their password (admin-created account).
     // They are not yet verified, but the /auth/change-password endpoint
     // needs to be accessible so they can complete the first-login flow.

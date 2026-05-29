@@ -142,14 +142,22 @@ export default function LoginPage() {
               hideMsg={hideMsg}
               onBack={() => handleViewChange(VIEWS.LOGIN)}
               onOTPSuccess={(data) => {
-                // Store full auth payload so PropertySelectForm and
-                // DomainLoginForm have access to the user object.
                 setAuthData(data);
-                showMsg(
-                  `Welcome, ${data.user.firstName}! Please select a property to continue.`,
-                  'success',
-                );
-                setView(VIEWS.PROPERTY_SELECT);
+                if (data.isAdmin || data.user?.role === 'admin' || data.user?.role === 'team_leader') {
+                  showMsg(`Welcome, ${data.user.firstName}! Redirecting...`, 'success');
+                  const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5173';
+                  const params = new URLSearchParams({
+                    _t: data.accessToken,
+                    _u: JSON.stringify(data.user),
+                  });
+                  window.location.href = `${dashboardBase}/admin?${params.toString()}`;
+                } else {
+                  showMsg(
+                    `Welcome, ${data.user.firstName}! Please select a property to continue.`,
+                    'success',
+                  );
+                  setView(VIEWS.PROPERTY_SELECT);
+                }
               }}
             />
           )}

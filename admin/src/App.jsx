@@ -89,7 +89,7 @@ export default function App() {
     <BrowserRouter>
       {!authorized && (
         <AuthorizationModal onAuthorized={handleAuthorized} />
-      )} */}
+      )}
 
       <Routes>
         <Route path="/login" element={<LoginPage />} />

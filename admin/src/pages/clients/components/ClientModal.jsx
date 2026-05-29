@@ -85,7 +85,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
           {/* Header */}
           <div className="db-modal__head">
             <span className="db-modal__title">
-              {isEditing ? 'Edit Client' : 'Client Details'}
+              {isEditing ? 'Edit Business' : 'Business Details'}
             </span>
             <button className="db-modal__close" onClick={onClose}>✕</button>
           </div>
@@ -215,7 +215,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                 <button
                   className="db-btn db-btn--ghost"
                   onClick={() => setShowSmoobu(true)}
-                  title="View Smoobu data for this client"
+                  title="View Smoobu data for this business"
                 >
                   <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 4 }}>
                     <circle cx="10" cy="10" r="3" />
