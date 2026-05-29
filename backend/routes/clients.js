@@ -177,6 +177,9 @@ router.post('/clients', requireAdmin, async (req, res, next) => {
 // intentionally excluded to prevent accidental overwrites.
 // ─────────────────────────────────────────────────────────────────
 const updateClientSchema = z.object({
+  firstName:         z.string().min(1).max(50).trim().optional(),
+  lastName:          z.string().max(50).trim().optional(),
+  serverId:          z.string().optional(),
   role:              z.enum(['client', 'admin', 'team_leader']).optional(),
   propertyTagPrefix: z.string().max(100).trim().optional(),
   smoobuApiKey:      z.string().max(512).optional(),
@@ -187,6 +190,9 @@ router.patch('/clients/:id', requireAdmin, async (req, res, next) => {
     const data = updateClientSchema.parse(req.body);
 
     const update = {};
+    if (data.firstName         !== undefined) update.firstName         = data.firstName;
+    if (data.lastName          !== undefined) update.lastName          = data.lastName;
+    if (data.serverId          !== undefined) update.serverId          = data.serverId || null;
     if (data.role              !== undefined) update.role              = data.role;
     if (data.propertyTagPrefix !== undefined) update.propertyTagPrefix = data.propertyTagPrefix;
     if (data.smoobuApiKey      !== undefined) {
@@ -211,6 +217,25 @@ router.patch('/clients/:id', requireAdmin, async (req, res, next) => {
     if (err.name === 'ZodError') {
       return res.status(400).json({ error: 'Validation failed', details: err.errors });
     }
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid client ID' });
+    }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// DELETE /api/clients/:id
+// Admin deletes a client or team leader account.
+// ─────────────────────────────────────────────────────────────────
+router.delete('/clients/:id', requireAdmin, async (req, res, next) => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+    res.json({ message: 'User deleted successfully' });
+  } catch (err) {
     if (err.name === 'CastError') {
       return res.status(400).json({ error: 'Invalid client ID' });
     }

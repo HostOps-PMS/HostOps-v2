@@ -5,7 +5,6 @@ import Sidebar           from '../Sidebar';
 import ClientsTable      from './components/ClientsTable';
 import ClientModal          from './components/ClientModal';
 import AddClientModal       from './components/AddClientModal';
-import AddTeamLeaderModal   from './components/AddTeamLeaderModal';
 import { useClients }       from './hooks/useClients';
 
 export default function Clients() {
@@ -16,7 +15,6 @@ export default function Clients() {
 
   /* ── Add Modals ── */
   const [showAddClient, setShowAddClient] = useState(false);
-  const [showAddTeamLeader, setShowAddTeamLeader] = useState(false);
 
   /* ── Data ── */
   const { clients, loading, error, refetch } = useClients();
@@ -93,16 +91,6 @@ export default function Clients() {
                 </svg>
                 Add Client
               </button>
-              <button
-                className="db-btn db-btn--primary"
-                onClick={() => setShowAddTeamLeader(true)}
-                style={{ marginLeft: 8 }}
-              >
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2">
-                  <path d="M10 4v12M4 10h12" strokeLinecap="round" />
-                </svg>
-                Add Team Leader
-              </button>
               <button className="db-btn db-btn--ghost" onClick={refetch} title="Refresh">
                 <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M4 4a8 8 0 0112.97 3M16 16a8 8 0 01-12.97-3" strokeLinecap="round" />
@@ -176,15 +164,6 @@ export default function Clients() {
         <AddClientModal
           onClose={() => setShowAddClient(false)}
           onSuccess={() => { setShowAddClient(false); refetch(); }}
-        />
-      )}
-
-      {/* Add Team Leader modal */}
-      {showAddTeamLeader && (
-        <AddTeamLeaderModal
-          clients={clients.filter(c => c.role === 'client')}
-          onClose={() => setShowAddTeamLeader(false)}
-          onSuccess={() => { setShowAddTeamLeader(false); refetch(); }}
         />
       )}
     </div>

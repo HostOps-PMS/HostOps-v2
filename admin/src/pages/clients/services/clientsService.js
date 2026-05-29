@@ -118,5 +118,18 @@ export async function getClientSmoobuData(id, { from, to } = {}) {
   return request(`/api/clients/${id}/smoobu${qs}`);
 }
 
-const clientsService = { getClients, getClient, createClient, updateClient, getClientSmoobuData };
+/**
+ * DELETE /api/clients/:id
+ * Admin deletes an existing client or team leader account.
+ *
+ * @param {string} id - MongoDB ObjectId string
+ * @returns {Promise<{ message: string }>}
+ */
+export async function deleteClient(id) {
+  return request(`/api/clients/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+const clientsService = { getClients, getClient, createClient, updateClient, deleteClient, getClientSmoobuData };
 export default clientsService;

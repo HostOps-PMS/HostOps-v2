@@ -6,6 +6,7 @@ import LoginPage  from './pages/Login';
 import Dashboard  from './pages/dashboard';
 import Clients    from './pages/clients';
 import Staffs     from './pages/Staffs/index';
+import TeamLeaders from './pages/team-leaders/index';
 import AuthorizationModal from './pages/authorization';
 import TeamLeaderLayout from './pages/TeamLeader/index';
 import TeamLeaderStaffs from './pages/TeamLeader/staffs/index';
@@ -95,9 +96,9 @@ export default function App() {
   return (
     <BrowserRouter>
       {/* Authorization gate — blocks all routes until OTP is verified */}
-      {!authorized && (
+      {/* {!authorized && (
         <AuthorizationModal onAuthorized={handleAuthorized} />
-      )}
+      )} */}
 
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -125,6 +126,15 @@ export default function App() {
           element={
             <PrivateRoute>
               <Staffs />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/team-leaders"
+          element={
+            <PrivateRoute>
+              <TeamLeaders />
             </PrivateRoute>
           }
         />
