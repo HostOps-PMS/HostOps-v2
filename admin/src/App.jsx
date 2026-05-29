@@ -11,6 +11,8 @@ import TeamLeaderLayout from './pages/TeamLeader/index';
 import TeamLeaderStaffs from './pages/TeamLeader/staffs/index';
 import TeamLeaderDashboardPlaceholder from './pages/TeamLeader/dashboard/index';
 
+const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5174';
+
 // ── Consume _t / _u URL params injected by the frontend login app ──────────
 // This runs synchronously at module load, before any component mounts,
 // so sessionStorage is populated before AuthorizationModal fires sendLoginOtp.
@@ -24,17 +26,35 @@ import TeamLeaderDashboardPlaceholder from './pages/TeamLeader/dashboard/index';
     // Clean the URL immediately so tokens don't linger in browser history
     window.history.replaceState({}, '', window.location.pathname);
   }
+
+  // Redirect client-role users back to the frontend app — they don't belong here
+  if (userRaw) {
+    try {
+      const parsed = JSON.parse(userRaw);
+      if (parsed.role === 'client') {
+        window.location.href = `${FRONTEND_URL}/dashboard`;
+        return;
+      }
+    } catch (e) {
+      // ignore parse errors
+    }
+  }
 })();
 
 function PrivateRoute({ children }) {
   const token = sessionStorage.getItem('hp_access_token');
   if (!token) return <Navigate to="/login" replace />;
   
-  // Block team_leaders from main admin routes
   try {
     const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
+    // Block team_leaders from main admin routes
     if (user.role === 'team_leader') {
       return <Navigate to="/team-leader/staffs" replace />;
+    }
+    // Block client users — they belong in the frontend app
+    if (user.role === 'client') {
+      window.location.href = `${FRONTEND_URL}/dashboard`;
+      return null;
     }
   } catch (e) {
     // ignore
