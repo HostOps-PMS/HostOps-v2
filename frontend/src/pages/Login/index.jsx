@@ -34,6 +34,10 @@ export default function LoginPage() {
   // so they have access to the user object without re-fetching.
   const [authData, setAuthData] = useState(null);
 
+  // Stores the single selected property ID after PropertySelectForm.
+  // Passed to DomainLoginForm so it can validate the staff's propertyIds.
+  const [selectedPropertyId, setSelectedPropertyId] = useState(null);
+
   const showMsg = (text, type = 'error') => setMessage({ text, type });
   const hideMsg = () => setMessage({ text: '', type: '' });
 
@@ -97,6 +101,7 @@ export default function LoginPage() {
         {/* ── RIGHT: Form Panel ── */}
         <div className="lp-form-panel">
           <Message text={message.text} type={message.type} />
+
           {view === VIEWS.LOGIN && (
             <LoginForm
               showMsg={showMsg}
@@ -109,6 +114,7 @@ export default function LoginPage() {
               }}
             />
           )}
+
           {view === VIEWS.LOGIN_OTP && (
             <LoginOTPForm
               email={otpData.email}
@@ -116,14 +122,54 @@ export default function LoginPage() {
               showMsg={showMsg}
               hideMsg={hideMsg}
               onBack={() => handleViewChange(VIEWS.LOGIN)}
+              onOTPSuccess={(data) => {
+                // Store full auth payload so PropertySelectForm and
+                // DomainLoginForm have access to the user object.
+                setAuthData(data);
+                showMsg(
+                  `Welcome, ${data.user.firstName}! Please select a property to continue.`,
+                  'success',
+                );
+                setView(VIEWS.PROPERTY_SELECT);
+              }}
             />
           )}
+
+          {view === VIEWS.PROPERTY_SELECT && (
+            <PropertySelectForm
+              userData={authData?.user}
+              showMsg={showMsg}
+              hideMsg={hideMsg}
+              onContinue={(propertyId) => {
+                // propertyId is the single selected apartment ID (number or string)
+                setSelectedPropertyId(propertyId);
+                hideMsg();
+                setView(VIEWS.DOMAIN_LOGIN);
+              }}
+              onBack={() => handleViewChange(VIEWS.LOGIN)}
+            />
+          )}
+
+          {view === VIEWS.DOMAIN_LOGIN && (
+            <DomainLoginForm
+              userData={authData?.user}
+              selectedPropertyId={selectedPropertyId}
+              showMsg={showMsg}
+              hideMsg={hideMsg}
+              onBack={() => {
+                hideMsg();
+                setView(VIEWS.PROPERTY_SELECT);
+              }}
+            />
+          )}
+
           {view === VIEWS.FORGOT && (
             <ForgotPasswordForm
               showMsg={showMsg}
               onBack={() => handleViewChange(VIEWS.LOGIN)}
             />
           )}
+
           <a href="https://hostops.online/" className="lp-back-home">
             ← Back to homepage
           </a>

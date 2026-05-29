@@ -24,6 +24,27 @@ export async function verifyLoginOtp({ email, otp, deviceId, rememberMe }) {
   return data;
 }
 
+// ─────────────────────────────────────────────────────────────────
+// staffLogin
+//
+// Authenticates a staff member against POST /auth/staff-login.
+// Returns { accessToken, staff, mustChangePassword, isStaff: true }.
+// The caller (DomainLoginForm) is responsible for checking that
+// staff.propertyIds includes the property selected in PropertySelectForm
+// before proceeding to the dashboard.
+// ─────────────────────────────────────────────────────────────────
+export async function staffLogin({ email, password }) {
+  const res = await fetch(`${API_BASE}/auth/staff-login`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Staff login failed');
+  return data;
+}
+
 export async function registerUser({
   firstName,
   lastName,

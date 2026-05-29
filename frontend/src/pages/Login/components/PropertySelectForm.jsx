@@ -7,10 +7,13 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
 // PropertySelectForm
 //
 // Shown after OTP verification (non-admin users only).
-// Fetches the user's Smoobu properties and lets them choose which
-// ones to view on the dashboard.  The selection is persisted to
-// sessionStorage as `hp_selected_properties` (either 'all' or an
-// array of apartment IDs) before proceeding to Domain Login.
+// Fetches the client's Smoobu properties and lets them choose ONE
+// property to log into via staff domain login.
+//
+// The selected property's Smoobu apartment ID is stored as a STRING
+// (coerced with String()) and passed back to the parent via onContinue(id).
+// DomainLoginForm also coerces to String() before comparing with
+// staff.propertyIds so the types always match.
 // ─────────────────────────────────────────────────────────────────
 export default function PropertySelectForm({ userData, showMsg, hideMsg, onContinue, onBack }) {
   const auth = useAuth();
@@ -18,8 +21,9 @@ export default function PropertySelectForm({ userData, showMsg, hideMsg, onConti
   const [properties, setProperties]               = useState([]);
   const [loadingProps, setLoadingProps]           = useState(true);
   const [smoobuNotConnected, setSmoobuNotConnected] = useState(false);
-  const [allSelected, setAllSelected]             = useState(true);
-  const [selected, setSelected]                   = useState(new Set());
+
+  // Single selection — stores the Smoobu apartment ID coerced to STRING, or null
+  const [selectedId, setSelectedId] = useState(null);
 
   // ── Fetch properties on mount ────────────────────────────────────
   useEffect(() => {
@@ -50,9 +54,11 @@ export default function PropertySelectForm({ userData, showMsg, hideMsg, onConti
           return;
         }
 
-        // dashboard.js returns { apartments: [...] }
-        // (falls back to data.properties for any future shape changes)
-        setProperties(data.apartments || data.properties || []);
+        // /api/properties returns { properties: [...] }
+        // getApartments() inside the route returns { apartments: [...] }
+        // Accept both shapes to be safe.
+        const list = data.apartments || data.properties || [];
+        setProperties(list);
       } catch {
         if (!cancelled) setSmoobuNotConnected(true);
       } finally {
@@ -64,44 +70,22 @@ export default function PropertySelectForm({ userData, showMsg, hideMsg, onConti
     return () => { cancelled = true; };
   }, []);
 
-  // ── Selection helpers ────────────────────────────────────────────
-  const handleSelectAll = () => {
-    setAllSelected(true);
-    setSelected(new Set());
-  };
-
-  const handleToggleProperty = (id) => {
-    const next = new Set(selected);
-    if (next.has(id)) {
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
-    // If nothing individually selected, fall back to "all"
-    if (next.size === 0) {
-      setAllSelected(true);
-    } else {
-      setAllSelected(false);
-    }
-    setSelected(next);
-  };
-
-  // ── Continue ─────────────────────────────────────────────────────
+  // ── Continue — pass selected Smoobu apartment ID (as string) to parent ──
   const handleContinue = () => {
-    const value = allSelected ? 'all' : [...selected];
-    sessionStorage.setItem('hp_selected_properties', JSON.stringify(value));
-    onContinue();
+    if (!selectedId) return;
+    // Always pass as string so DomainLoginForm comparison is consistent
+    onContinue(String(selectedId));
   };
 
-  const canContinue = !loadingProps && (allSelected || selected.size > 0);
+  const canContinue = !loadingProps && selectedId !== null;
 
   // ── Render ───────────────────────────────────────────────────────
   return (
     <>
-      <h1 className="lp-h1">Select Properties</h1>
+      <h1 className="lp-h1">Select Property</h1>
       <p className="lp-sub">
         {userData?.firstName ? `Hi ${userData.firstName}! ` : ''}
-        Choose which properties to display on your dashboard.
+        Choose the property you want to log into.
       </p>
 
       {/* ── Property list ── */}
@@ -110,7 +94,7 @@ export default function PropertySelectForm({ userData, showMsg, hideMsg, onConti
           margin: '20px 0',
           maxHeight: '300px',
           overflowY: 'auto',
-          paddingRight: '2px', // prevent scrollbar overlap
+          paddingRight: '2px',
         }}
       >
         {loadingProps ? (
@@ -128,44 +112,28 @@ export default function PropertySelectForm({ userData, showMsg, hideMsg, onConti
               Loading properties…
             </p>
           </div>
+        ) : smoobuNotConnected ? (
+          <div style={{ textAlign: 'center', padding: '24px 0' }}>
+            <p style={{ color: '#9ab8a9', fontSize: '13px', margin: 0 }}>
+              No Smoobu account connected. Please contact your administrator.
+            </p>
+          </div>
+        ) : properties.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '24px 0' }}>
+            <p style={{ color: '#9ab8a9', fontSize: '13px', margin: 0 }}>
+              No properties found on your account.
+            </p>
+          </div>
         ) : (
-          <>
-            {/* All Properties card — always shown */}
+          properties.map((prop) => (
             <PropertyCard
-              label="All Properties"
-              sublabel={
-                smoobuNotConnected
-                  ? 'No Smoobu account connected'
-                  : `${properties.length} propert${properties.length !== 1 ? 'ies' : 'y'}`
-              }
-              isSelected={allSelected}
-              isAll
-              onClick={handleSelectAll}
+              key={prop.id}
+              label={prop.name}
+              // Compare as strings — Smoobu returns id as number, selectedId stored as string
+              isSelected={String(selectedId) === String(prop.id)}
+              onClick={() => setSelectedId(String(prop.id))}
             />
-
-            {/* Individual property cards */}
-            {!smoobuNotConnected &&
-              properties.map((prop) => (
-                <PropertyCard
-                  key={prop.id}
-                  label={prop.name}
-                  isSelected={!allSelected && selected.has(prop.id)}
-                  onClick={() => handleToggleProperty(prop.id)}
-                />
-              ))
-            }
-
-            {smoobuNotConnected && (
-              <p style={{
-                textAlign: 'center',
-                fontSize: '12px',
-                color: '#9ab8a9',
-                marginTop: '8px',
-              }}>
-                You can connect your Smoobu account later from Settings.
-              </p>
-            )}
-          </>
+          ))
         )}
       </div>
 
@@ -199,9 +167,9 @@ export default function PropertySelectForm({ userData, showMsg, hideMsg, onConti
 }
 
 // ─────────────────────────────────────────────────────────────────
-// PropertyCard — individual selectable row
+// PropertyCard — individual selectable row (radio-style, single select)
 // ─────────────────────────────────────────────────────────────────
-function PropertyCard({ label, sublabel, isSelected, isAll, onClick }) {
+function PropertyCard({ label, sublabel, isSelected, onClick }) {
   return (
     <div
       role="button"
@@ -223,13 +191,13 @@ function PropertyCard({ label, sublabel, isSelected, isAll, onClick }) {
         outline:       'none',
       }}
     >
-      {/* Checkbox / radio indicator */}
+      {/* Radio indicator */}
       <div
         style={{
           flexShrink:      0,
           width:           '20px',
           height:          '20px',
-          borderRadius:    isAll ? '50%' : '5px',
+          borderRadius:    '50%',
           border:          `2px solid ${isSelected ? '#26a676' : '#b8d4c4'}`,
           background:      isSelected ? '#26a676' : 'transparent',
           display:         'flex',
@@ -239,15 +207,12 @@ function PropertyCard({ label, sublabel, isSelected, isAll, onClick }) {
         }}
       >
         {isSelected && (
-          <svg width="11" height="8" viewBox="0 0 11 8" fill="none" aria-hidden="true">
-            <path
-              d="M1 4L4 7L10 1"
-              stroke="white"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <div style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: 'white',
+          }} />
         )}
       </div>
 
