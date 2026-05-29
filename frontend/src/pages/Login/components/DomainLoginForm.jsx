@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { staffLogin, loginUser } from '../services/authService';
+import { staffLogin, loginUser } from '../services/authservice.js';
 import { useAuth } from '../../AuthContext';
 
 // ─────────────────────────────────────────────────────────────────

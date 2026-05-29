@@ -50,7 +50,7 @@ export default function AddClientModal({ onClose, onSuccess }) {
       });
       onSuccess();
     } catch (err) {
-      setError(err.message ?? 'Failed to create client.');
+      setError(err.message ?? 'Failed to create business.');
       setSubmitting(false);
     }
   }
@@ -63,7 +63,7 @@ export default function AddClientModal({ onClose, onSuccess }) {
       <div className="db-modal" style={{ width: 560 }}>
         {/* Header */}
         <div className="db-modal__head">
-          <span className="db-modal__title">Add Client</span>
+          <span className="db-modal__title">Add Business</span>
           <button className="db-modal__close" onClick={onClose}>✕</button>
         </div>
 
@@ -162,7 +162,7 @@ export default function AddClientModal({ onClose, onSuccess }) {
             disabled={submitting}
             style={{ minWidth: 120 }}
           >
-            {submitting ? 'Creating…' : 'Add Client'}
+            {submitting ? 'Creating…' : 'Add Business'}
           </button>
         </div>
       </div>
