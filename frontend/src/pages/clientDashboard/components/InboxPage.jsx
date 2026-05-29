@@ -107,6 +107,21 @@ export default function InboxPage() {
   const { loadData } = useDashboardData();
   const auth = useAuth();
 
+  // Detect if the currently logged-in user is a staff member.
+  // We check multiple signals because the login form may store the session
+  // differently (data.staff vs data.user, isStaff flag, etc.):
+  //   1. hp_user has role:'staff' — set by backend on staff login responses
+  //   2. hp_user has isStaff:true — also injected by backend
+  //   3. hp_is_staff sessionStorage key — set by some login form implementations
+  // For staff: the reply box is always unlocked — they already authenticated
+  // via JWT and the backend enforces property-level access in assertReservationOwnership.
+  const currentUser = auth.getUser();
+  const isStaffUser = !!(
+    currentUser?.role === 'staff' ||
+    currentUser?.isStaff === true ||
+    sessionStorage.getItem('hp_is_staff') === 'true'
+  );
+
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [selected, setSelected] = useState(null);
@@ -115,13 +130,14 @@ export default function InboxPage() {
   const [msgError, setMsgError] = useState("");
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
-  const [staffUnlocked, setStaffUnlocked] = useState(false);
+  // Staff users start unlocked; regular users must enter the PIN first.
+  const [staffUnlocked, setStaffUnlocked] = useState(isStaffUser);
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState(false);
   const msgEndRef = useRef(null);
 
-  const STAFF_PIN = "1234"; // <-- palitan mo ng gusto mong PIN
+  const STAFF_PIN = "1234"; // <-- palitan mo ng gusto mong PIN (only used for non-staff client users)
 
   function handlePinSubmit() {
     if (pinInput === STAFF_PIN) {
@@ -129,7 +145,7 @@ export default function InboxPage() {
       setPinModalOpen(false);
       setPinInput("");
       setPinError(false);
-      // Auto-lock after 30 mins
+      // Auto-lock after 30 mins (only applies to PIN-unlocked client users)
       setTimeout(() => setStaffUnlocked(false), 30 * 60 * 1000);
     } else {
       setPinError(true);
@@ -450,12 +466,15 @@ export default function InboxPage() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <span style={{ fontSize: "11px", color: textSub }}>Ctrl+Enter to send</span>
-                        <button onClick={() => setStaffUnlocked(false)} style={{
-                          fontSize: "11px", color: "#e84545", background: "none",
-                          border: "none", cursor: "pointer", fontWeight: 600,
-                        }}>
-                          🔒 Lock
-                        </button>
+                        {/* Lock button only shown for non-staff client users who unlocked via PIN */}
+                        {!isStaffUser && (
+                          <button onClick={() => setStaffUnlocked(false)} style={{
+                            fontSize: "11px", color: "#e84545", background: "none",
+                            border: "none", cursor: "pointer", fontWeight: 600,
+                          }}>
+                            🔒 Lock
+                          </button>
+                        )}
                       </div>
                       <button
                         onClick={handleSend}

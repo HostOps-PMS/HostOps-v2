@@ -1,0 +1,463 @@
+/* src/pages/clientAccount/clientAccount.css */
+/* ─────────────────────────────────────────────────────────────────
+   ClientAccount page styles.
+   Re-uses the same .cl-* and .modal-* class conventions as the
+   Staffs/Clients pages so you get visual consistency for free.
+   ───────────────────────────────────────────────────────────────── */
+
+/* ── Page layout ─────────────────────────────────────────────── */
+.cl-content {
+  padding: 32px 36px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.db-content__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+.db-content__title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1a2e22;
+  margin: 0 0 4px;
+}
+
+.db-content__sub {
+  font-size: 0.85rem;
+  color: #6b8f71;
+  margin: 0;
+}
+
+/* ── Filters row ─────────────────────────────────────────────── */
+.cl-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.cl-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+  max-width: 340px;
+}
+
+.cl-search-icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ab8a9;
+  pointer-events: none;
+}
+
+.cl-search {
+  width: 100%;
+  padding: 8px 12px 8px 34px;
+  border: 1.5px solid #dde8df;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #1a2e22;
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.cl-search:focus {
+  border-color: #1555C0;
+}
+
+.cl-filter-select {
+  padding: 8px 12px;
+  border: 1.5px solid #dde8df;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #374f3c;
+  background: #fff;
+  outline: none;
+  cursor: pointer;
+  min-width: 200px;
+  transition: border-color 0.15s;
+}
+
+.cl-filter-select:focus {
+  border-color: #1555C0;
+}
+
+.cl-count {
+  font-size: 0.82rem;
+  color: #9ab8a9;
+  margin-left: auto;
+}
+
+/* ── Table ───────────────────────────────────────────────────── */
+.cl-table-wrap {
+  background: #fff;
+  border-radius: 12px;
+  border: 1.5px solid #e8f0ea;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(21, 85, 192, 0.04);
+}
+
+.cl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.cl-table thead tr {
+  background: #f6faf7;
+  border-bottom: 1.5px solid #e8f0ea;
+}
+
+.cl-table th {
+  padding: 11px 16px;
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #6b8f71;
+  white-space: nowrap;
+}
+
+.cl-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f0f5f1;
+  vertical-align: middle;
+}
+
+.cl-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.cl-table tbody tr:hover {
+  background: #f9fcfa;
+}
+
+/* ── Badges ──────────────────────────────────────────────────── */
+.cl-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.cl-badge--active {
+  background: #dcf5e8;
+  color: #1a7a44;
+}
+
+.cl-badge--inactive {
+  background: #f5e0e0;
+  color: #9b2c2c;
+}
+
+.cl-badge--warn {
+  background: #fff3cd;
+  color: #856404;
+}
+
+/* ── Action buttons ──────────────────────────────────────────── */
+.cl-action-btn {
+  padding: 5px 14px;
+  border-radius: 7px;
+  border: 1.5px solid #dde8df;
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #374f3c;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.cl-action-btn:hover {
+  background: #f0f7f2;
+  border-color: #b0c4b8;
+}
+
+.cl-action-btn--danger {
+  color: #c0392b;
+  border-color: #f5c6c0;
+}
+
+.cl-action-btn--danger:hover {
+  background: #fff0ee;
+  border-color: #e57373;
+}
+
+/* ── Modal overlay ───────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 46, 34, 0.38);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-box {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(21, 85, 192, 0.13), 0 4px 16px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-box--sm {
+  max-width: 420px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 26px 16px;
+  border-bottom: 1.5px solid #f0f5f1;
+}
+
+.modal-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a2e22;
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  color: #6b8f71;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: color 0.12s;
+}
+
+.modal-close:hover {
+  color: #1a2e22;
+}
+
+.modal-body {
+  padding: 22px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 26px 22px;
+  border-top: 1.5px solid #f0f5f1;
+}
+
+/* ── Modal form fields ───────────────────────────────────────── */
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+}
+
+.modal-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.modal-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  color: #6b8f71;
+}
+
+.modal-input {
+  padding: 9px 12px;
+  border: 1.5px solid #dde8df;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #1a2e22;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.modal-input:focus {
+  border-color: #1555C0;
+}
+
+.modal-input:disabled {
+  background: #f6faf7;
+  color: #9ab8a9;
+}
+
+.modal-hint {
+  font-size: 0.8rem;
+  color: #9ab8a9;
+  margin: 0;
+}
+
+.modal-hint--warn {
+  color: #e07b39;
+}
+
+.modal-error {
+  background: #fff0ee;
+  border: 1px solid #f5c6c0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.84rem;
+  color: #c0392b;
+}
+
+/* ── Properties checkbox list ───────────────────────────────── */
+.modal-props-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1.5px solid #e8f0ea;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #f9fcfa;
+}
+
+.modal-prop-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.85rem;
+  color: #374f3c;
+  cursor: pointer;
+  padding: 3px 0;
+}
+
+.modal-prop-item input[type='checkbox'] {
+  accent-color: #1555C0;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+/* ── Toggle ──────────────────────────────────────────────────── */
+.modal-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.modal-toggle input[type='checkbox'] {
+  display: none;
+}
+
+.modal-toggle__slider {
+  width: 36px;
+  height: 20px;
+  border-radius: 20px;
+  background: #dde8df;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.modal-toggle__slider::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+}
+
+.modal-toggle input:checked ~ .modal-toggle__slider {
+  background: #1555C0;
+}
+
+.modal-toggle input:checked ~ .modal-toggle__slider::after {
+  transform: translateX(16px);
+}
+
+.modal-toggle__label {
+  font-size: 0.85rem;
+  color: #374f3c;
+  font-weight: 500;
+}
+
+/* ── Modal buttons ───────────────────────────────────────────── */
+.modal-btn {
+  padding: 9px 20px;
+  border-radius: 9px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.12s, background 0.12s;
+}
+
+.modal-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.modal-btn--cancel {
+  background: #f0f5f1;
+  color: #374f3c;
+  border: 1.5px solid #dde8df;
+}
+
+.modal-btn--cancel:hover:not(:disabled) {
+  background: #e4ede6;
+}
+
+.modal-btn--primary {
+  background: #1555C0;
+  color: #fff;
+}
+
+.modal-btn--primary:hover:not(:disabled) {
+  background: #1245a0;
+}
+
+.modal-btn--danger {
+  background: #e53e3e;
+  color: #fff;
+}
+
+.modal-btn--danger:hover:not(:disabled) {
+  background: #c53030;
+}

@@ -63,6 +63,36 @@ export function signStaffRefreshToken(staff) {
   );
 }
 
+// ── Client Account access tokens ─────────────────────────────────
+// Sub-accounts linked to a parent client. Token carries role: 'clientAccount'
+// and parentClientId so the auth middleware can load the parent's smoobuApiKey.
+export function signClientAccountAccessToken(account) {
+  return jwt.sign(
+    {
+      sub:             account._id.toString(),
+      clientAccountId: account._id.toString(),
+      parentClientId:  account.parentClientId.toString(),
+      email:           account.email,
+      role:            'clientAccount',
+    },
+    process.env.JWT_ACCESS_SECRET,
+    { expiresIn: process.env.JWT_ACCESS_EXPIRES || '8h' }
+  );
+}
+
+export function signClientAccountRefreshToken(account) {
+  return jwt.sign(
+    {
+      sub:             account._id.toString(),
+      clientAccountId: account._id.toString(),
+      parentClientId:  account.parentClientId.toString(),
+      role:            'clientAccount',
+    },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: process.env.JWT_REFRESH_EXPIRES || '7d' }
+  );
+}
+
 export function verifyRefreshToken(token) {
   return jwt.verify(token, process.env.JWT_REFRESH_SECRET);
 }
