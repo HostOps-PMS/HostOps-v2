@@ -31,7 +31,7 @@ export default function AuthModal({ onAuthorized }) {
         {/* ── Logo ── */}
         <div className="am-logo">
           <div className="am-logo-mark">H</div>
-          <div className="am-logo-brand">HostPilot</div>
+          <div className="am-logo-brand">HostOps</div>
         </div>
 
         {/* ── Shield icon ── */}
