@@ -5,21 +5,148 @@
   align-items: center;
   justify-content: center;
   font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  background: linear-gradient(135deg, #eaf8f1 0%, #d4f0e4 100%);
-  padding: 20px;
   width: 100vw;
+  background: transparent;
+  padding: 40px 20px;
 }
 
+/* ─── SPLIT CARD CONTAINER ───────────────────────────────── */
 .lp-card {
+  display: flex;
+  align-items: stretch;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(12, 28, 20, 0.18);
+  width: 820px;
+  max-width: 95vw;
+  position: relative;
+  z-index: 1;
   background: #fff;
-  border-radius: 24px;
-  padding: 40px;
-  max-width: 440px;
-  width: 100%;
-  box-shadow: 0 20px 60px rgba(4, 14, 9, 0.08);
 }
 
-/* ─── LOGO ───────────────────────────────────────────────── */
+/* ─── LEFT PANEL (SLIDESHOW) ─────────────────────────────── */
+.lp-slideshow {
+  width: 45%;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  align-self: stretch;
+  min-height: 560px;
+}
+
+.lp-slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+
+.lp-slide.active {
+  opacity: 1;
+}
+
+.lp-slide-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, rgba(8,22,14,0.55) 0%, rgba(8,22,14,0.78) 100%);
+  z-index: 1;
+}
+
+.lp-slide-content {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 32px;
+}
+
+.lp-slide-logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.lp-slide-logo-mark {
+  width: 34px;
+  height: 34px;
+  background: #26a676;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.lp-slide-brand {
+  color: rgba(255,255,255,0.92);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.lp-slide-tagline {
+  font-size: 30px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+  margin-bottom: 10px;
+}
+
+.lp-slide-tagline em {
+  font-style: italic;
+  color: #26a676;
+  font-weight: 300;
+}
+
+.lp-slide-sub {
+  font-size: 12px;
+  color: rgba(255,255,255,0.35);
+  font-weight: 300;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.lp-slide-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.lp-slide-dot {
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.2);
+  cursor: pointer;
+  transition: all 0.3s;
+  border: none;
+  padding: 0;
+}
+
+.lp-slide-dot.active {
+  background: #26a676;
+  width: 32px;
+}
+
+/* ─── RIGHT PANEL (FORM) ─────────────────────────────────── */
+.lp-form-panel {
+  flex: 1;
+  padding: 44px 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* ─── LOGO (kept for non-login views like OTP/Forgot) ────── */
 .lp-logo {
   display: flex;
   align-items: center;
@@ -38,13 +165,11 @@
   justify-content: center;
   color: #fff;
   font-weight: 800;
-  font-family: 'Sora', sans-serif;
   font-size: 20px;
   box-shadow: 0 6px 16px rgba(38, 166, 118, 0.3);
 }
 
 .lp-brand {
-  font-family: 'Sora', sans-serif;
   font-weight: 800;
   font-size: 1.4rem;
   color: #0c1c14;
@@ -82,7 +207,6 @@
 
 /* ─── TYPOGRAPHY ─────────────────────────────────────────── */
 .lp-h1 {
-  font-family: 'Sora', sans-serif;
   font-weight: 800;
   font-size: 1.5rem;
   color: #0c1c14;
@@ -122,6 +246,7 @@
   background: #f8fbf9;
   outline: none;
   transition: all 0.2s;
+  box-sizing: border-box;
 }
 
 .lp-input:focus {
@@ -134,23 +259,22 @@
 .lp-btn {
   width: 100%;
   padding: 14px;
-  background: #26a676;
-  color: #fff;
-  border: none;
-  border-radius: 100px;
+  background: transparent;
+  color: #0c1c14;
+  border: 1.5px solid #0c1c14;
+  border-radius: 10px;
   font-family: inherit;
   font-size: 0.98rem;
   font-weight: 700;
   cursor: pointer;
   margin-top: 8px;
   transition: all 0.2s;
-  box-shadow: 0 6px 18px rgba(38, 166, 118, 0.3);
 }
 
 .lp-btn:hover:not(:disabled) {
-  background: #1e8760;
+  background: #0c1c14;
+  color: #fff;
   transform: translateY(-1px);
-  box-shadow: 0 8px 22px rgba(38, 166, 118, 0.4);
 }
 
 .lp-btn:disabled {
