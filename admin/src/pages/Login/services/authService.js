@@ -21,7 +21,7 @@ export async function login({ email, password }) {
   // data.accessToken is a real JWT — backend signs it with JWT_ACCESS_SECRET
   return {
     accessToken: data.accessToken,
-    user: data.user,
+    user: data.user || data.staff, // Handle both admin/client and staff login responses
   };
 }
 

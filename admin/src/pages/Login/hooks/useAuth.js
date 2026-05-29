@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login, DASHBOARD_URL } from '../services/authService';
 
+const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5174';
+
 /**
  * Redirects to dashboard if a valid JWT token exists in sessionStorage.
  * No backend call — the token presence is enough for redirect on login page.
@@ -20,6 +22,10 @@ export function useAutoRedirect() {
         const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
         if (user.role === 'team_leader') {
           navigate('/team-leader/staffs', { replace: true });
+          return;
+        }
+        if (user.role === 'client') {
+          window.location.href = `${FRONTEND_URL}/dashboard`;
           return;
         }
       } catch (e) {
@@ -49,6 +55,8 @@ export function useAuthSubmit(type, showMessage) {
         setTimeout(() => {
           if (data.user.role === 'team_leader') {
             navigate('/team-leader/staffs', { replace: true });
+          } else if (data.user.role === 'client') {
+            window.location.href = `${FRONTEND_URL}/dashboard`;
           } else {
             navigate(DASHBOARD_URL, { replace: true });
           }
