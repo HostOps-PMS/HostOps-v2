@@ -35,6 +35,17 @@ const NAV_ITEMS = [
     label: 'Staffs',
     to: '/staffs',
   },
+  {
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M10 3a4 4 0 100 8 4 4 0 000-8z" />
+        <path d="M2 18a8 8 0 0116 0" strokeLinecap="round" />
+        <path d="M10 2l1.5 3 3 .5-2 2 .5 3-3-1.5-3 1.5.5-3-2-2 3-.5L10 2z" strokeLinejoin="round" />
+      </svg>
+    ),
+    label: 'Team Leaders',
+    to: '/team-leaders',
+  },
 ];
 
 const BOTTOM_ITEMS = [
@@ -70,7 +81,7 @@ export default function Sidebar() {
             key={item.to}
             to={item.to}
             className={({ isActive }) =>
-              `db-nav-item${isActive ? ' db-nav-item--active' : ''}`
+              `db-nav-item${isActive ? " db-nav-item--active" : ""}`
             }
           >
             {item.icon}
@@ -86,7 +97,7 @@ export default function Sidebar() {
             key={item.to}
             to={item.to}
             className={({ isActive }) =>
-              `db-nav-item${isActive ? ' db-nav-item--active' : ''}`
+              `db-nav-item${isActive ? " db-nav-item--active" : ""}`
             }
           >
             {item.icon}
@@ -96,14 +107,31 @@ export default function Sidebar() {
         <button
           className="db-nav-item"
           onClick={() => {
-            sessionStorage.removeItem('hp_access_token');
-            window.location.href = '/login';
+            sessionStorage.removeItem("hp_access_token");
+            sessionStorage.removeItem("hp_user");
+            sessionStorage.removeItem("hp_authorized");
+            // Redirect to frontend login
+            window.location.href = "http://localhost:5173/login";
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M13 15l4-5-4-5" strokeLinecap="round" strokeLinejoin="round" />
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+          >
+            <path
+              d="M13 15l4-5-4-5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
             <path d="M17 10H7" strokeLinecap="round" />
-            <path d="M7 3H4a1 1 0 00-1 1v12a1 1 0 001 1h3" strokeLinecap="round" />
+            <path
+              d="M7 3H4a1 1 0 00-1 1v12a1 1 0 001 1h3"
+              strokeLinecap="round"
+            />
           </svg>
           Logout
         </button>
