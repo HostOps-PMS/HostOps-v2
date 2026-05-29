@@ -60,7 +60,7 @@ export default function Sidebar() {
             key={item.to}
             to={item.to}
             className={({ isActive }) =>
-              `db-nav-item${isActive ? ' db-nav-item--active' : ''}`
+              `db-nav-item${isActive ? " db-nav-item--active" : ""}`
             }
           >
             {item.icon}
@@ -76,7 +76,7 @@ export default function Sidebar() {
             key={item.to}
             to={item.to}
             className={({ isActive }) =>
-              `db-nav-item${isActive ? ' db-nav-item--active' : ''}`
+              `db-nav-item${isActive ? " db-nav-item--active" : ""}`
             }
           >
             {item.icon}
@@ -86,15 +86,31 @@ export default function Sidebar() {
         <button
           className="db-nav-item"
           onClick={() => {
-            sessionStorage.removeItem('hp_access_token');
-            sessionStorage.removeItem('hp_user');
-            window.location.href = '/login';
+            sessionStorage.removeItem("hp_access_token");
+            sessionStorage.removeItem("hp_user");
+            sessionStorage.removeItem("hp_authorized");
+            // Redirect to frontend login
+            window.location.href = "http://localhost:5173/login";
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M13 15l4-5-4-5" strokeLinecap="round" strokeLinejoin="round" />
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+          >
+            <path
+              d="M13 15l4-5-4-5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
             <path d="M17 10H7" strokeLinecap="round" />
-            <path d="M7 3H4a1 1 0 00-1 1v12a1 1 0 001 1h3" strokeLinecap="round" />
+            <path
+              d="M7 3H4a1 1 0 00-1 1v12a1 1 0 001 1h3"
+              strokeLinecap="round"
+            />
           </svg>
           Logout
         </button>

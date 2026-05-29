@@ -7,6 +7,7 @@ import Dashboard     from './pages/dashboard';
 import Clients       from './pages/clients';
 import Staffs        from './pages/Staffs/index';
 import ClientAccount from './pages/clientAccount/index'; // ← NEW
+import TeamLeaders from './pages/team-leaders/index';
 import AuthorizationModal from './pages/authorization';
 import TeamLeaderLayout from './pages/TeamLeader/index';
 import TeamLeaderStaffs from './pages/TeamLeader/staffs/index';
@@ -88,7 +89,7 @@ export default function App() {
     <BrowserRouter>
       {!authorized && (
         <AuthorizationModal onAuthorized={handleAuthorized} />
-      )}
+      )} */}
 
       <Routes>
         <Route path="/login" element={<LoginPage />} />
