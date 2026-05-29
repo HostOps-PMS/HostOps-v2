@@ -639,7 +639,7 @@ export default function Navbar() {
             <div style={t.logoBox}>
               <i className="ti ti-home" style={t.logoIcon} aria-hidden="true" />
             </div>
-            <span style={t.logoText}>HostPilot</span>
+            <span style={t.logoText}>HostOps</span>
           </a>
 
           <div style={t.rightGroup}>
