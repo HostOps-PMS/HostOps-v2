@@ -6,9 +6,7 @@ const INITIAL = {
   lastName:          '',
   email:             '',
   password:          '',
-  role:              'client',
-  propertyTagPrefix: '',
-  smoobuApiKey:      '',
+  serverId:          '',
 };
 
 function Field({ label, required, children }) {
@@ -23,7 +21,7 @@ function Field({ label, required, children }) {
   );
 }
 
-export default function CreateAccountModal({ onClose, onSuccess }) {
+export default function AddTeamLeaderModal({ clients, onClose, onSuccess }) {
   const [form,        setForm]        = useState(INITIAL);
   const [showPass,    setShowPass]    = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
@@ -32,8 +30,8 @@ export default function CreateAccountModal({ onClose, onSuccess }) {
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   async function handleSubmit() {
-    if (!form.firstName.trim() || !form.email.trim() || !form.password.trim()) {
-      setError('First name, email, and password are required.');
+    if (!form.firstName.trim() || !form.email.trim() || !form.password.trim() || !form.serverId) {
+      setError('First name, email, password, and server are required.');
       return;
     }
     if (form.password.length < 8) {
@@ -49,13 +47,12 @@ export default function CreateAccountModal({ onClose, onSuccess }) {
         lastName:          form.lastName.trim(),
         email:             form.email.trim(),
         password:          form.password,
-        role:              form.role,
-        propertyTagPrefix: form.propertyTagPrefix.trim(),
-        smoobuApiKey:      form.smoobuApiKey.trim() || undefined,
+        role:              'team_leader',
+        serverId:          form.serverId,
       });
       onSuccess();
     } catch (err) {
-      setError(err.message ?? 'Failed to create account.');
+      setError(err.message ?? 'Failed to create team leader.');
       setSubmitting(false);
     }
   }
@@ -68,7 +65,7 @@ export default function CreateAccountModal({ onClose, onSuccess }) {
       <div className="db-modal" style={{ width: 560 }}>
         {/* Header */}
         <div className="db-modal__head">
-          <span className="db-modal__title">Create Account</span>
+          <span className="db-modal__title">Add Team Leader</span>
           <button className="db-modal__close" onClick={onClose}>✕</button>
         </div>
 
@@ -155,35 +152,17 @@ export default function CreateAccountModal({ onClose, onSuccess }) {
             </div>
           </Field>
 
-          {/* Role */}
-          <Field label="Role" required>
-            <select value={form.role} onChange={set('role')}>
-              <option value="client">Client</option>
-              <option value="admin">Admin</option>
+          {/* Server Dropdown */}
+          <Field label="Assigned Server (Client)" required>
+            <select value={form.serverId} onChange={set('serverId')}>
+              <option value="" disabled>Select a server</option>
+              {clients.map(client => (
+                <option key={client._id} value={client._id}>
+                  {client.firstName} {client.lastName}
+                </option>
+              ))}
             </select>
           </Field>
-
-          {/* Property Tag & Smoobu row */}
-          <div className="db-modal__row">
-            <Field label="Property Tag Prefix">
-              <input
-                type="text"
-                placeholder="e.g. PROP-"
-                value={form.propertyTagPrefix}
-                onChange={set('propertyTagPrefix')}
-                maxLength={100}
-              />
-            </Field>
-            <Field label="Smoobu API Key">
-              <input
-                type="text"
-                placeholder="Optional"
-                value={form.smoobuApiKey}
-                onChange={set('smoobuApiKey')}
-                maxLength={512}
-              />
-            </Field>
-          </div>
         </div>
 
         {/* Footer */}
@@ -197,7 +176,7 @@ export default function CreateAccountModal({ onClose, onSuccess }) {
             disabled={submitting}
             style={{ minWidth: 120 }}
           >
-            {submitting ? 'Creating…' : 'Create Account'}
+            {submitting ? 'Creating…' : 'Add Team Leader'}
           </button>
         </div>
       </div>

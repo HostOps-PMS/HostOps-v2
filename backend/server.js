@@ -11,6 +11,8 @@ import { connectDB, disconnectDB } from './config/db.js';
 import authRoutes from './routes/auth.js';
 import dashboardRoutes from './routes/dashboard.js';
 import clientsRoutes from './routes/clients.js';
+import propertiesRoutes from './routes/properties.js';
+import staffsRoutes from './routes/staffs.js';
 import { requireApiKey } from './middleware/apiKeyAuth.js';
 
 const app = express();
@@ -130,6 +132,8 @@ app.use((req, res, next) => {
 app.use('/auth', authRoutes);
 app.use('/api',  dashboardRoutes);
 app.use('/api',  clientsRoutes);
+app.use('/api',  propertiesRoutes);
+app.use('/api',  staffsRoutes);
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {

@@ -2,11 +2,19 @@ import React, { useState, useEffect } from 'react';
 import LoginForm from './components/LoginForm';
 import ForgotPasswordForm from './components/ForgotPasswordForm';
 import LoginOTPForm from './components/LoginOTPForm';
+import PropertySelectForm from './components/PropertySelectForm';
+import DomainLoginForm from './components/DomainLoginForm';
 import Message from './components/Message';
 import bgImage from '../../assets/BG.png';
 import './Login.css';
 
-const VIEWS = { LOGIN: 'login', FORGOT: 'forgot', LOGIN_OTP: 'login_otp' };
+const VIEWS = {
+  LOGIN:           'login',
+  FORGOT:          'forgot',
+  LOGIN_OTP:       'login_otp',
+  PROPERTY_SELECT: 'property_select',
+  DOMAIN_LOGIN:    'domain_login',
+};
 
 const SLIDES = [
   'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80',
@@ -16,10 +24,15 @@ const SLIDES = [
 ];
 
 export default function LoginPage() {
-  const [view, setView] = useState(VIEWS.LOGIN);
+  const [view,    setView]    = useState(VIEWS.LOGIN);
   const [message, setMessage] = useState({ text: '', type: '' });
   const [otpData, setOtpData] = useState({ email: '', rememberMe: false });
   const [currentSlide, setCurrentSlide] = useState(0);
+
+  // Stores the full auth payload returned after successful OTP verification.
+  // Passed down to subsequent screens (PropertySelectForm, DomainLoginForm)
+  // so they have access to the user object without re-fetching.
+  const [authData, setAuthData] = useState(null);
 
   const showMsg = (text, type = 'error') => setMessage({ text, type });
   const hideMsg = () => setMessage({ text: '', type: '' });

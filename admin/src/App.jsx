@@ -5,7 +5,11 @@ import './App.css';
 import LoginPage  from './pages/Login';
 import Dashboard  from './pages/dashboard';
 import Clients    from './pages/clients';
+import Staffs     from './pages/Staffs/index';
 import AuthorizationModal from './pages/authorization';
+import TeamLeaderLayout from './pages/TeamLeader/index';
+import TeamLeaderStaffs from './pages/TeamLeader/staffs/index';
+import TeamLeaderDashboardPlaceholder from './pages/TeamLeader/dashboard/index';
 
 // ── Consume _t / _u URL params injected by the frontend login app ──────────
 // This runs synchronously at module load, before any component mounts,
@@ -24,10 +28,36 @@ import AuthorizationModal from './pages/authorization';
 
 function PrivateRoute({ children }) {
   const token = sessionStorage.getItem('hp_access_token');
-  // Valid session = any non-empty token (real JWT from backend)
-  return token
-    ? children
-    : <Navigate to="/login" replace />;
+  if (!token) return <Navigate to="/login" replace />;
+  
+  // Block team_leaders from main admin routes
+  try {
+    const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
+    if (user.role === 'team_leader') {
+      return <Navigate to="/team-leader/staffs" replace />;
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  return children;
+}
+
+function TeamLeaderRoute({ children }) {
+  const token = sessionStorage.getItem('hp_access_token');
+  if (!token) return <Navigate to="/login" replace />;
+  
+  // Only allow team_leaders
+  try {
+    const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
+    if (user.role !== 'team_leader') {
+      return <Navigate to="/dashboard" replace />;
+    }
+  } catch (e) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
 }
 
 export default function App() {
@@ -45,9 +75,9 @@ export default function App() {
   return (
     <BrowserRouter>
       {/* Authorization gate — blocks all routes until OTP is verified */}
-      {!authorized && (
+      {/* {!authorized && (
         <AuthorizationModal onAuthorized={handleAuthorized} />
-      )}
+      )} */}
 
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -69,6 +99,29 @@ export default function App() {
             </PrivateRoute>
           }
         />
+
+        <Route
+          path="/staffs"
+          element={
+            <PrivateRoute>
+              <Staffs />
+            </PrivateRoute>
+          }
+        />
+
+        {/* Team Leader Routes */}
+        <Route
+          path="/team-leader"
+          element={
+            <TeamLeaderRoute>
+              <TeamLeaderLayout />
+            </TeamLeaderRoute>
+          }
+        >
+          <Route path="dashboard" element={<TeamLeaderDashboardPlaceholder />} />
+          <Route path="staffs" element={<TeamLeaderStaffs />} />
+          <Route index element={<Navigate to="staffs" replace />} />
+        </Route>
 
         {/* Default redirect */}
         <Route path="*" element={<Navigate to="/login" replace />} />

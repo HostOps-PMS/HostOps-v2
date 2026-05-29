@@ -15,6 +15,25 @@ export function signAccessToken(user) {
   );
 }
 
+// ── Staff access tokens ──────────────────────────────────────────
+// Separate signing function so staff tokens are clearly distinguishable
+// from user tokens via role: 'staff' and the extra staffId / clientId claims.
+// The middleware (auth.js) reads role: 'staff' to know it must look up
+// the Staff model instead of the User model.
+export function signStaffAccessToken(staff) {
+  return jwt.sign(
+    {
+      sub:      staff._id.toString(),  // staffId
+      staffId:  staff._id.toString(),
+      clientId: staff.clientId.toString(),
+      email:    staff.email,
+      role:     'staff',
+    },
+    process.env.JWT_ACCESS_SECRET,
+    { expiresIn: process.env.JWT_ACCESS_EXPIRES || '8h' }
+  );
+}
+
 export function verifyAccessToken(token) {
   return jwt.verify(token, process.env.JWT_ACCESS_SECRET);
 }
@@ -23,6 +42,22 @@ export function verifyAccessToken(token) {
 export function signRefreshToken(user) {
   return jwt.sign(
     { sub: user._id.toString() },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: process.env.JWT_REFRESH_EXPIRES || '7d' }
+  );
+}
+
+// ── Staff refresh tokens ─────────────────────────────────────────
+// Must include role: 'staff' so /auth/refresh can route correctly
+// when it re-signs the access token after rotation.
+export function signStaffRefreshToken(staff) {
+  return jwt.sign(
+    {
+      sub:      staff._id.toString(),
+      staffId:  staff._id.toString(),
+      clientId: staff.clientId.toString(),
+      role:     'staff',
+    },
     process.env.JWT_REFRESH_SECRET,
     { expiresIn: process.env.JWT_REFRESH_EXPIRES || '7d' }
   );
