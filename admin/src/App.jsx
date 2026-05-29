@@ -95,9 +95,9 @@ export default function App() {
   return (
     <BrowserRouter>
       {/* Authorization gate — blocks all routes until OTP is verified */}
-      {/* {!authorized && (
+      {!authorized && (
         <AuthorizationModal onAuthorized={handleAuthorized} />
-      )} */}
+      )}
 
       <Routes>
         <Route path="/login" element={<LoginPage />} />
