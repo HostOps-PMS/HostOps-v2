@@ -32,7 +32,19 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
           sessionStorage.removeItem('hp_must_change_password');
         }
 
-        onClientAccountLogin(data);
+        // ✅ Client accounts now redirect to the admin dashboard (same as
+        // admin/team_leader). Token is passed via URL params since sessionStorage
+        // is port-scoped. The AuthorizationModal OTP gate on the admin app will
+        // intercept and require verification before granting access.
+        showMsg(`Welcome, ${data.clientAccount.firstName}! Redirecting...`, 'success');
+        setTimeout(() => {
+          const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5173';
+          const params = new URLSearchParams({
+            _t: data.accessToken,
+            _u: JSON.stringify({ ...data.clientAccount, role: 'clientAccount', isClientAccount: true }),
+          });
+          window.location.href = `${dashboardBase}/admin?${params.toString()}`;
+        }, 800);
         return;
       }
 

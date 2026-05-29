@@ -24,6 +24,9 @@ const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5174
   if (userRaw) sessionStorage.setItem('hp_user', userRaw);
   if (token || userRaw) {
     window.history.replaceState({}, '', window.location.pathname);
+    // ── Clear any previous authorization so the OTP gate always fires
+    // for a fresh login, even if the user had already passed it before.
+    sessionStorage.removeItem('hp_authorized');
   }
 
   if (userRaw) {
@@ -75,10 +78,55 @@ function TeamLeaderRoute({ children }) {
   return children;
 }
 
+// ── /admin entry-point redirect ───────────────────────────────────────────
+// consumeLoginParams() already stored token + user into sessionStorage before
+// React mounted. This component just resolves the correct landing page per role.
+// The AuthorizationModal OTP gate renders above all routes and blocks the UI
+// until the user passes it — so no content is shown before verification.
+function AdminEntryRedirect() {
+  const token = sessionStorage.getItem('hp_access_token');
+  if (!token) return <Navigate to="/login" replace />;
+  try {
+    const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
+    if (user.role === 'team_leader') return <Navigate to="/team-leader/staffs" replace />;
+    if (user.role === 'clientAccount') return <Navigate to="/dashboard" replace />;
+    // admin → main dashboard
+    return <Navigate to="/dashboard" replace />;
+  } catch {
+    return <Navigate to="/login" replace />;
+  }
+}
+
+// ── Roles that must pass the AuthorizationModal OTP gate ──────────────────
+// 'client' is intentionally excluded — they are redirected to the frontend
+// app above and never reach this point.
+const ROLES_REQUIRING_AUTH = new Set(['admin', 'team_leader', 'clientAccount']);
+
+function getRoleFromSession() {
+  try {
+    const raw = sessionStorage.getItem('hp_user');
+    if (!raw) return null;
+    return JSON.parse(raw)?.role ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
-  const [authorized, setAuthorized] = useState(
-    () => !!sessionStorage.getItem('hp_authorized')
-  );
+  const [authorized, setAuthorized] = useState(() => {
+    // Already passed the gate in this session
+    if (sessionStorage.getItem('hp_authorized')) return true;
+
+    const role = getRoleFromSession();
+
+    // No token / no user yet (e.g. /login route) — skip the gate
+    if (!sessionStorage.getItem('hp_access_token') || !role) return true;
+
+    // Roles that don't need the OTP gate pass straight through
+    if (!ROLES_REQUIRING_AUTH.has(role)) return true;
+
+    return false;
+  });
 
   function handleAuthorized() {
     sessionStorage.setItem('hp_authorized', '1');
@@ -93,6 +141,9 @@ export default function App() {
 
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+
+        {/* ── Entry point from the login app cross-origin redirect ── */}
+        <Route path="/admin" element={<AdminEntryRedirect />} />
 
         <Route
           path="/dashboard"
@@ -127,6 +178,16 @@ export default function App() {
           element={
             <PrivateRoute>
               <ClientAccount />
+            </PrivateRoute>
+          }
+        />
+
+        {/* ── Team Leaders (admin view) ─────────────────────────── */}
+        <Route
+          path="/team-leaders"
+          element={
+            <PrivateRoute>
+              <TeamLeaders />
             </PrivateRoute>
           }
         />

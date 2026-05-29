@@ -363,6 +363,10 @@ router.post('/staff-login', async (req, res, next) => {
 });
 
 // POST /auth/verify-login-otp
+// Verifies the 6-digit OTP for both regular Users and ClientAccounts.
+// ClientAccounts go through the admin AuthModal OTP gate, so their OTP
+// is stored on the ClientAccount document — not on User.
+// Each account type gets its own correctly-scoped access/refresh tokens.
 router.post('/verify-login-otp', async (req, res, next) => {
   try {
     const { email, otp, deviceId, rememberMe } = req.body;
@@ -370,90 +374,146 @@ router.post('/verify-login-otp', async (req, res, next) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    const normalizedEmail = email.toLowerCase();
+    const hashedOtp       = hashToken(otp);
+    const now             = new Date();
+
+    // ── Try User first ─────────────────────────────────────────────
     const user = await User.findOne({
-      email: email.toLowerCase(),
-      loginOtp: hashToken(otp),
-      loginOtpExpiry: { $gt: new Date() },
+      email:          normalizedEmail,
+      loginOtp:       hashedOtp,
+      loginOtpExpiry: { $gt: now },
     }).select('+loginOtp +loginOtpExpiry');
 
-    if (!user) {
+    if (user) {
+      user.loginOtp       = undefined;
+      user.loginOtpExpiry = undefined;
+
+      if (rememberMe) {
+        // --- 14-day expiration (adjust here for debugging) ---
+        // 3 seconds.
+        // const expiresIn = 3000;
+        // 30 seconds.
+        const expiresIn = 14 * 24 * 60 * 60 * 1000;
+        // 1 minute.
+        // const expiresIn = 60000;
+        // 14 days.
+        // const expiresIn = 14 * 24 * 60 * 60 * 1000;
+        const expiresAt = new Date(Date.now() + expiresIn);
+
+        await TrustedDevice.findOneAndUpdate(
+          { userId: user._id, deviceId },
+          { expiresAt },
+          { upsert: true, new: true },
+        );
+      }
+
+      const accessToken  = signAccessToken(user);
+      const refreshToken = signRefreshToken(user);
+
+      await RefreshToken.create({
+        userId:    user._id,
+        token:     hashToken(refreshToken),
+        expiresAt: refreshTokenExpiry(),
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      user.lastLoginAt = new Date();
+      await user.save();
+
+      res.cookie('rt', refreshToken, {
+        httpOnly: true,
+        secure:   process.env.NODE_ENV === 'production',
+        sameSite: 'none',
+        maxAge:   7 * 24 * 60 * 60 * 1000,
+        path:     '/auth',
+      });
+
+      const isAdmin = user.tag === 'Main Admin' || user.role === 'admin' || user.email === process.env.ADMIN_ROLE;
+
+      return res.json({
+        accessToken,
+        user: user.toJSON(),
+        isAdmin,
+      });
+    }
+
+    // ── Fall back to ClientAccount ─────────────────────────────────
+    const clientAccount = await ClientAccount.findOne({
+      email:          normalizedEmail,
+      loginOtp:       hashedOtp,
+      loginOtpExpiry: { $gt: now },
+    }).select('+loginOtp +loginOtpExpiry');
+
+    if (!clientAccount) {
       return res.status(401).json({ error: 'Invalid or expired OTP' });
     }
 
-    user.loginOtp = undefined;
-    user.loginOtpExpiry = undefined;
-    
-    if (rememberMe) {
-      // --- 14-day expiration (adjust here for debugging) ---
-      // 3 seconds.
-      // const expiresIn = 3000;
-      // 30 seconds.
-      const expiresIn = 14 * 24 * 60 * 60 * 1000;
-      // 1 minute.
-      // const expiresIn = 60000;
-      // 14 days.
-      // const expiresIn = 14 * 24 * 60 * 60 * 1000;
-      const expiresAt = new Date(Date.now() + expiresIn);
+    clientAccount.loginOtp       = undefined;
+    clientAccount.loginOtpExpiry = undefined;
 
-      await TrustedDevice.findOneAndUpdate(
-        { userId: user._id, deviceId },
-        { expiresAt },
-        { upsert: true, new: true },
-      );
-    }
-
-    const accessToken = signAccessToken(user);
-    const refreshToken = signRefreshToken(user);
+    const accessToken  = signClientAccountAccessToken(clientAccount);
+    const refreshToken = signClientAccountRefreshToken(clientAccount);
 
     await RefreshToken.create({
-      userId: user._id,
-      token: hashToken(refreshToken),
+      userId:    clientAccount._id,
+      token:     hashToken(refreshToken),
       expiresAt: refreshTokenExpiry(),
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
     });
 
-    user.lastLoginAt = new Date();
-    await user.save();
+    clientAccount.lastLoginAt = new Date();
+    await clientAccount.save();
 
     res.cookie('rt', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure:   process.env.NODE_ENV === 'production',
       sameSite: 'none',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/auth',
+      maxAge:   7 * 24 * 60 * 60 * 1000,
+      path:     '/auth',
     });
 
-    const isAdmin = user.tag === "Main Admin" || user.role === "admin" || user.email === process.env.ADMIN_ROLE;
-
-    res.json({
+    return res.json({
       accessToken,
-      user: user.toJSON(),
-      isAdmin,
+      clientAccount: { ...clientAccount.toJSON(), role: 'clientAccount', isClientAccount: true },
+      isClientAccount: true,
     });
   } catch (err) { next(err); }
 });
 
 // POST /auth/send-login-otp
 // Called by the admin AuthModal on mount to trigger the initial OTP email.
+// Checks both User and ClientAccount collections so admins, team leaders,
+// and client accounts all receive the OTP correctly.
 router.post('/send-login-otp', async (req, res, next) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
 
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) {
-      // Respond with success even if user not found (avoid enumeration)
+    const normalizedEmail = email.toLowerCase();
+
+    // Try User first, then fall back to ClientAccount.
+    const user          = await User.findOne({ email: normalizedEmail });
+    const clientAccount = !user
+      ? await ClientAccount.findOne({ email: normalizedEmail })
+      : null;
+
+    const account = user || clientAccount;
+
+    // Respond with success even if not found (avoid enumeration).
+    if (!account) {
       return res.json({ message: 'If that email is registered, an OTP has been sent.' });
     }
 
     const rawOtp = randomToken();
-    user.loginOtp = hashToken(rawOtp);
-    user.loginOtpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
-    await user.save();
+    account.loginOtp       = hashToken(rawOtp);
+    account.loginOtpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+    await account.save();
 
     try {
-      await sendVerificationEmail(user.email, user.firstName, rawOtp);
+      await sendVerificationEmail(account.email, account.firstName, rawOtp);
     } catch (e) {
       console.error('Login OTP email send failed:', e);
     }
@@ -464,23 +524,34 @@ router.post('/send-login-otp', async (req, res, next) => {
 
 // POST /auth/resend-login-otp
 // Re-generates and re-sends the login OTP for a given email.
+// Checks both User and ClientAccount collections so all account types
+// can resend their OTP from the admin AuthModal.
 router.post('/resend-login-otp', async (req, res, next) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
 
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) {
+    const normalizedEmail = email.toLowerCase();
+
+    // Try User first, then fall back to ClientAccount.
+    const user          = await User.findOne({ email: normalizedEmail });
+    const clientAccount = !user
+      ? await ClientAccount.findOne({ email: normalizedEmail })
+      : null;
+
+    const account = user || clientAccount;
+
+    if (!account) {
       return res.json({ message: 'If that email is registered, a new code has been sent.' });
     }
 
     const rawOtp = randomToken();
-    user.loginOtp = hashToken(rawOtp);
-    user.loginOtpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
-    await user.save();
+    account.loginOtp       = hashToken(rawOtp);
+    account.loginOtpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+    await account.save();
 
     try {
-      await sendVerificationEmail(user.email, user.firstName, rawOtp);
+      await sendVerificationEmail(account.email, account.firstName, rawOtp);
     } catch (e) {
       console.error('Login OTP resend email send failed:', e);
     }
