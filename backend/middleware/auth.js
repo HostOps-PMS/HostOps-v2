@@ -80,3 +80,13 @@ export function requireAdmin(req, res, next) {
   }
   next();
 }
+
+export function requireAdminOrTeamLeader(req, res, next) {
+  if (req.isStaff) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  if (req.user?.role !== 'admin' && req.user?.role !== 'team_leader') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  next();
+}

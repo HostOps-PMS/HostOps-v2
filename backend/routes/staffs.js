@@ -10,24 +10,27 @@ import express from 'express';
 import { z } from 'zod';
 import Staff from '../models/staff.js';
 import User  from '../models/user.js';
-import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { requireAuth, requireAdminOrTeamLeader } from '../middleware/auth.js';
 import { getApartments } from '../services/smoobu.js';
 
 const router = express.Router();
 
-// All routes require authentication + admin role
+// All routes require authentication
 router.use(requireAuth);
-router.use(requireAdmin);
 
 // ─────────────────────────────────────────────────────────────────
 // GET /api/staffs
 // Returns all staff members.
 // Optional query: ?clientId=<mongoId> — filter by client.
 // ─────────────────────────────────────────────────────────────────
-router.get('/staffs', async (req, res, next) => {
+router.get('/staffs', requireAdminOrTeamLeader, async (req, res, next) => {
   try {
     const filter = {};
-    if (req.query.clientId) filter.clientId = req.query.clientId;
+    if (req.user.role === 'team_leader') {
+      filter.clientId = req.user.serverId;
+    } else if (req.query.clientId) {
+      filter.clientId = req.query.clientId;
+    }
 
     const staffs = await Staff.find(filter)
       .sort({ createdAt: -1 })
@@ -43,10 +46,15 @@ router.get('/staffs', async (req, res, next) => {
 // GET /api/staffs/:id
 // Returns a single staff member by MongoDB ObjectId.
 // ─────────────────────────────────────────────────────────────────
-router.get('/staffs/:id', async (req, res, next) => {
+router.get('/staffs/:id', requireAdminOrTeamLeader, async (req, res, next) => {
   try {
     const staff = await Staff.findById(req.params.id).lean();
     if (!staff) return res.status(404).json({ error: 'Staff not found' });
+    
+    if (req.user.role === 'team_leader' && String(staff.clientId) !== String(req.user.serverId)) {
+      return res.status(403).json({ error: 'Unauthorized to view this staff member' });
+    }
+    
     res.json(staff);
   } catch (err) {
     if (err.name === 'CastError') {
@@ -62,8 +70,12 @@ router.get('/staffs/:id', async (req, res, next) => {
 // can pick which properties to assign to a new staff member.
 // Reuses the same smoobu service used by the dashboard/properties routes.
 // ─────────────────────────────────────────────────────────────────
-router.get('/clients/:clientId/properties', async (req, res, next) => {
+router.get('/clients/:clientId/properties', requireAdminOrTeamLeader, async (req, res, next) => {
   try {
+    if (req.user.role === 'team_leader' && String(req.params.clientId) !== String(req.user.serverId)) {
+      return res.status(403).json({ error: 'Unauthorized to access these properties' });
+    }
+
     const user = await User.findById(req.params.clientId).select('+smoobuApiKey');
     if (!user) return res.status(404).json({ error: 'Client not found' });
 
@@ -99,9 +111,13 @@ const createStaffSchema = z.object({
   staffRole:   z.string().max(100).trim().optional().default(''),
 });
 
-router.post('/staffs', async (req, res, next) => {
+router.post('/staffs', requireAdminOrTeamLeader, async (req, res, next) => {
   try {
     const data = createStaffSchema.parse(req.body);
+
+    if (req.user.role === 'team_leader' && String(data.clientId) !== String(req.user.serverId)) {
+      return res.status(403).json({ error: 'Unauthorized to create staff for this client' });
+    }
 
     // Verify the client exists
     const client = await User.findById(data.clientId);
@@ -152,12 +168,16 @@ const updateStaffSchema = z.object({
   password:    z.string().min(8).max(128).optional(),
 });
 
-router.patch('/staffs/:id', async (req, res, next) => {
+router.patch('/staffs/:id', requireAdminOrTeamLeader, async (req, res, next) => {
   try {
     const data = updateStaffSchema.parse(req.body);
 
     const staff = await Staff.findById(req.params.id).select('+password');
     if (!staff) return res.status(404).json({ error: 'Staff not found' });
+
+    if (req.user.role === 'team_leader' && String(staff.clientId) !== String(req.user.serverId)) {
+      return res.status(403).json({ error: 'Unauthorized to update this staff member' });
+    }
 
     if (data.firstName   !== undefined) staff.firstName   = data.firstName;
     if (data.lastName    !== undefined) staff.lastName    = data.lastName;
@@ -187,10 +207,16 @@ router.patch('/staffs/:id', async (req, res, next) => {
 // DELETE /api/staffs/:id
 // Admin permanently deletes a staff account.
 // ─────────────────────────────────────────────────────────────────
-router.delete('/staffs/:id', async (req, res, next) => {
+router.delete('/staffs/:id', requireAdminOrTeamLeader, async (req, res, next) => {
   try {
-    const staff = await Staff.findByIdAndDelete(req.params.id);
+    const staff = await Staff.findById(req.params.id);
     if (!staff) return res.status(404).json({ error: 'Staff not found' });
+
+    if (req.user.role === 'team_leader' && String(staff.clientId) !== String(req.user.serverId)) {
+      return res.status(403).json({ error: 'Unauthorized to delete this staff member' });
+    }
+
+    await Staff.findByIdAndDelete(req.params.id);
     res.json({ message: 'Staff account deleted successfully.' });
   } catch (err) {
     if (err.name === 'CastError') {

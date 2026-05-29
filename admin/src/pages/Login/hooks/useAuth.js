@@ -15,8 +15,19 @@ export function useAutoRedirect() {
     didCheck.current = true;
 
     const token = sessionStorage.getItem('hp_access_token');
-    if (token) navigate(DASHBOARD_URL, { replace: true });
-  }, []);
+    if (token) {
+      try {
+        const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
+        if (user.role === 'team_leader') {
+          navigate('/team-leader/staffs', { replace: true });
+          return;
+        }
+      } catch (e) {
+        // ignore
+      }
+      navigate(DASHBOARD_URL, { replace: true });
+    }
+  }, [navigate]);
 }
 
 /**
@@ -36,7 +47,11 @@ export function useAuthSubmit(type, showMessage) {
         sessionStorage.setItem('hp_user', JSON.stringify(data.user));
         showMessage(`Welcome back, ${data.user.firstName}! Redirecting...`, 'success');
         setTimeout(() => {
-          navigate(DASHBOARD_URL, { replace: true });
+          if (data.user.role === 'team_leader') {
+            navigate('/team-leader/staffs', { replace: true });
+          } else {
+            navigate(DASHBOARD_URL, { replace: true });
+          }
         }, 800);
       }
     } catch (err) {
