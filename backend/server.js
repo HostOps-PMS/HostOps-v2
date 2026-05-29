@@ -8,11 +8,12 @@ import compression from 'compression';
 import mongoSanitize from 'express-mongo-sanitize';
 import { v4 as uuidv4 } from 'uuid';
 import { connectDB, disconnectDB } from './config/db.js';
-import authRoutes from './routes/auth.js';
-import dashboardRoutes from './routes/dashboard.js';
-import clientsRoutes from './routes/clients.js';
-import propertiesRoutes from './routes/properties.js';
-import staffsRoutes from './routes/staffs.js';
+import authRoutes           from './routes/auth.js';
+import dashboardRoutes      from './routes/dashboard.js';
+import clientsRoutes        from './routes/clients.js';
+import propertiesRoutes     from './routes/properties.js';
+import staffsRoutes         from './routes/staffs.js';
+import clientAccountsRoutes from './routes/clientAccounts.js'; // ← NEW
 import { requireApiKey } from './middleware/apiKeyAuth.js';
 
 const app = express();
@@ -58,8 +59,6 @@ app.use(
 // ── CORS ──────────────────────────────────────────────────────────────────────
 const isDev = process.env.NODE_ENV !== 'production';
 
-// In dev, allow all localhost ports (5173, 5174, 5175, etc.)
-// In production, require explicit ALLOWED_ORIGINS env var.
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
   : [];
@@ -67,17 +66,11 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (curl, Postman, mobile apps)
       if (!origin) return callback(null, true);
-
-      // Dev: allow any localhost origin regardless of port
       if (isDev && /^http:\/\/localhost(:\d+)?$/.test(origin)) {
         return callback(null, true);
       }
-
-      // Production: check against explicit whitelist
       if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-
       callback(new Error(`CORS: origin '${origin}' not allowed`));
     },
     credentials: true,
@@ -122,7 +115,6 @@ app.use('/auth/forgot-password', authLimiter);
 app.use('/auth/reset-password',  authLimiter);
 
 // ── Global API Key Protection ─────────────────────────────────────────────────
-// /auth routes are exempt — login should not require an API key
 app.use((req, res, next) => {
   if (req.path.startsWith('/auth')) return next();
   requireApiKey(req, res, next);
@@ -134,6 +126,7 @@ app.use('/api',  dashboardRoutes);
 app.use('/api',  clientsRoutes);
 app.use('/api',  propertiesRoutes);
 app.use('/api',  staffsRoutes);
+app.use('/api',  clientAccountsRoutes); // ← NEW
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {

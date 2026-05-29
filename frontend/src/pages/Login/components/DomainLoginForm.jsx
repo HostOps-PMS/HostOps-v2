@@ -1,26 +1,32 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { staffLogin } from '../services/authservice';
+import { staffLogin, loginUser } from '../services/authService';
 import { useAuth } from '../../AuthContext';
 
 // ─────────────────────────────────────────────────────────────────
 // DomainLoginForm
 //
-// Staff login step — shown after property selection.
-// Accepts staff email + password, calls POST /auth/staff-login,
-// then verifies that the returned staff account has access to the
-// property the user selected in PropertySelectForm.
+// Handles two distinct login flows depending on selectedPropertyId:
 //
-// Property ID matching is done with String() coercion on BOTH sides:
+// ── SPECIFIC PROPERTY (selectedPropertyId is a Smoobu apartment ID) ──
+//   Staff login step — shown after property selection.
+//   Accepts staff email + password, calls POST /auth/staff-login,
+//   then verifies that the returned staff account has access to the
+//   property the user selected in PropertySelectForm.
+//
+// ── ALL PROPERTIES (selectedPropertyId === '__all__') ──
+//   Client Account login step — shown when "All Properties" is selected.
+//   Accepts clientAccount email + password, calls POST /auth/login,
+//   which detects the clientAccount in the DB and returns isClientAccount: true.
+//   No property access check is performed — the clientAccount has access to
+//   all parent client properties by design (req.staffPropertyIds = [] in middleware).
+//   On success: clears hp_selected_property_id/name so dashboard shows everything.
+//
+// Property ID matching (specific property flow):
 //   - selectedPropertyId comes from PropertySelectForm as a string
 //     (Smoobu apartment id coerced to String before passing via onContinue)
 //   - staff.propertyIds from the backend is an array of strings (["3261782"])
-// Both sides are String() coerced again here as a safety net, since
-// Smoobu returns apartment IDs as numbers but the Staff schema stores
-// them as strings — consistent coercion prevents type mismatch rejections.
-//
-// If credentials are valid BUT the staff member does not have access
-// to the selected property, login is rejected with a clear error.
+//   Both sides are String() coerced here as a safety net against type mismatch.
 // ─────────────────────────────────────────────────────────────────
 export default function DomainLoginForm({ userData, selectedPropertyId, showMsg, hideMsg, onBack }) {
   const navigate = useNavigate();
@@ -31,18 +37,20 @@ export default function DomainLoginForm({ userData, selectedPropertyId, showMsg,
   const [showPass, setShowPass] = useState(false);
   const [loading,  setLoading]  = useState(false);
 
+  // Is the user logging in with "All Properties" selected?
+  const isAllProperties = selectedPropertyId === '__all__';
+
   const handleSubmit = async () => {
     hideMsg();
 
     if (!email.trim()) {
-      showMsg('Please enter your staff email.');
+      showMsg('Please enter your email.');
       return;
     }
     if (!password) {
       showMsg('Please enter your password.');
       return;
     }
-    // Guard: selectedPropertyId must be present (passed from PropertySelectForm)
     if (!selectedPropertyId) {
       showMsg('No property selected. Please go back and select a property.');
       return;
@@ -51,13 +59,48 @@ export default function DomainLoginForm({ userData, selectedPropertyId, showMsg,
     setLoading(true);
 
     try {
+      // ── ALL PROPERTIES FLOW ────────────────────────────────────────
+      // Use POST /auth/login (loginUser) which detects clientAccount first.
+      // No property access check needed — clientAccount has access to all
+      // parent client properties by design.
+      if (isAllProperties) {
+        const data = await loginUser({ email: email.trim(), password });
+
+        // Must be a clientAccount login — reject staff/user logins here
+        if (!data.isClientAccount) {
+          showMsg('Please use your client account credentials to access all properties.');
+          setLoading(false);
+          return;
+        }
+
+        // Store the clientAccount token and record
+        auth.setToken(data.accessToken);
+        auth.setUser({ ...data.clientAccount, role: 'clientAccount', isClientAccount: true });
+
+        // Clear property scope — dashboard will show all properties
+        sessionStorage.removeItem('hp_selected_property_id');
+        sessionStorage.removeItem('hp_selected_property_name');
+
+        // If first-login, flag for dashboard's password-change modal
+        if (data.mustChangePassword) {
+          sessionStorage.setItem('hp_must_change_password', 'true');
+        } else {
+          sessionStorage.removeItem('hp_must_change_password');
+        }
+
+        showMsg(`Welcome, ${data.clientAccount.firstName}! Redirecting…`, 'success');
+        setTimeout(() => navigate('/dashboard', { replace: true }), 800);
+        return;
+      }
+
+      // ── SPECIFIC PROPERTY FLOW ─────────────────────────────────────
+      // Use POST /auth/staff-login (staffLogin).
+      // Verify the staff account has access to the selected property.
       const data = await staffLogin({ email: email.trim(), password });
 
-      // ── Property access check ──────────────────────────────────────
       // staff.propertyIds = ["3261782"] (strings, from Staff model)
       // selectedPropertyId = "3261782" (string, coerced in PropertySelectForm)
-      // Coerce both sides to String again as a safety net against any
-      // upstream type inconsistency.
+      // Coerce both sides to String again as a safety net.
       const staffPropertyIds = (data.staff?.propertyIds || []).map(String);
       const chosenId = String(selectedPropertyId);
 
@@ -70,7 +113,6 @@ export default function DomainLoginForm({ userData, selectedPropertyId, showMsg,
       }
 
       // ── Auth success ───────────────────────────────────────────────
-      // Store the staff access token and staff record.
       auth.setToken(data.accessToken);
       auth.setUser(data.staff);
 
@@ -86,10 +128,7 @@ export default function DomainLoginForm({ userData, selectedPropertyId, showMsg,
       }
 
       showMsg(`Welcome, ${data.staff.firstName}! Redirecting…`, 'success');
-
-      setTimeout(() => {
-        navigate('/dashboard', { replace: true });
-      }, 800);
+      setTimeout(() => navigate('/dashboard', { replace: true }), 800);
 
     } catch (err) {
       showMsg(err.message || 'Login failed. Please check your credentials.');
@@ -103,23 +142,27 @@ export default function DomainLoginForm({ userData, selectedPropertyId, showMsg,
 
   return (
     <>
-      <h1 className="lp-h1">Staff Sign In</h1>
+      <h1 className="lp-h1">
+        {isAllProperties ? 'Client Account Sign In' : 'Staff Sign In'}
+      </h1>
       <p className="lp-sub">
-        Enter your staff credentials to access the selected property.
+        {isAllProperties
+          ? 'Enter your client account credentials to access all properties.'
+          : 'Enter your staff credentials to access the selected property.'}
       </p>
 
       <div style={{ marginTop: '24px' }}>
-        {/* Staff email field */}
+        {/* Email field */}
         <div style={{ marginBottom: '16px' }}>
           <label className="lp-label" htmlFor="dl-email">
-            Staff Email
+            {isAllProperties ? 'Client Account Email' : 'Staff Email'}
           </label>
           <div style={{ position: 'relative' }}>
             <input
               id="dl-email"
               className="lp-input"
               type="email"
-              placeholder="staff@example.com"
+              placeholder={isAllProperties ? 'clientaccount@example.com' : 'staff@example.com'}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onKeyDown={handleKeyDown}

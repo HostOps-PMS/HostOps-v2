@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
@@ -10,19 +11,42 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
 // Fetches the client's Smoobu properties and lets them choose ONE
 // property to log into via staff domain login.
 //
+// When isClientAccount=true, an "All Properties" option is shown at
+// the top. Selecting it sets selectedId to '__all__' which maps to
+// selectedPropertyId: null in DashboardContext (= show everything).
+// Selecting a specific property stores its ID and name so the
+// dashboard scopes to that single property.
+//
 // The selected property's Smoobu apartment ID is stored as a STRING
 // (coerced with String()) and passed back to the parent via onContinue(id).
 // DomainLoginForm also coerces to String() before comparing with
 // staff.propertyIds so the types always match.
+//
+// ALL PROPERTIES FLOW:
+//   - "All Properties" is always shown at the top for all user types.
+//   - Selecting it calls onContinue('__all__') which sends the user to
+//     DomainLoginForm regardless of user type.
+//   - DomainLoginForm handles '__all__' by using clientAccount credentials
+//     (POST /auth/login) and skipping the property access check, then
+//     redirects to dashboard with no property scope (all properties shown).
+//
+// CLIENT ACCOUNT FLOW (specific property):
+//   - isClientAccount=true + specific property selected → PropertySelectForm
+//     handles navigation to /dashboard directly (no DomainLoginForm needed).
+//
+// REGULAR CLIENT FLOW (specific property):
+//   - onContinue(propertyId) → parent shows DomainLoginForm with staff login.
 // ─────────────────────────────────────────────────────────────────
-export default function PropertySelectForm({ userData, showMsg, hideMsg, onContinue, onBack }) {
+export default function PropertySelectForm({ userData, isClientAccount, showMsg, hideMsg, onContinue, onBack }) {
   const auth = useAuth();
+  const navigate = useNavigate();
 
   const [properties, setProperties]               = useState([]);
   const [loadingProps, setLoadingProps]           = useState(true);
   const [smoobuNotConnected, setSmoobuNotConnected] = useState(false);
 
-  // Single selection — stores the Smoobu apartment ID coerced to STRING, or null
+  // Single selection — '__all__' means All Properties,
+  // otherwise stores the Smoobu apartment ID coerced to STRING, or null
   const [selectedId, setSelectedId] = useState(null);
 
   // ── Fetch properties on mount ────────────────────────────────────
@@ -54,8 +78,7 @@ export default function PropertySelectForm({ userData, showMsg, hideMsg, onConti
           return;
         }
 
-        // /api/properties returns { properties: [...] }
-        // getApartments() inside the route returns { apartments: [...] }
+        // /api/properties returns { apartments: [...] }
         // Accept both shapes to be safe.
         const list = data.apartments || data.properties || [];
         setProperties(list);
@@ -70,10 +93,38 @@ export default function PropertySelectForm({ userData, showMsg, hideMsg, onConti
     return () => { cancelled = true; };
   }, []);
 
-  // ── Continue — pass selected Smoobu apartment ID (as string) to parent ──
+  // ── Continue ──────────────────────────────────────────────────────
+  // '__all__' selected (any user type):
+  //   → always passes '__all__' to parent via onContinue so DomainLoginForm
+  //     is shown next. DomainLoginForm will use clientAccount credentials
+  //     and skip the property access check.
+  //
+  // Specific property + isClientAccount=true:
+  //   → handles navigation to /dashboard internally (already authenticated).
+  //
+  // Specific property + regular user:
+  //   → passes propertyId to parent (index.jsx) which shows DomainLoginForm
+  //     for staff login with property access check.
   const handleContinue = () => {
     if (!selectedId) return;
-    // Always pass as string so DomainLoginForm comparison is consistent
+
+    // ── "All Properties" — always go through DomainLoginForm ─────────
+    if (selectedId === '__all__') {
+      onContinue('__all__');
+      return;
+    }
+
+    // ── Specific property + clientAccount — direct to dashboard ──────
+    if (isClientAccount) {
+      const prop = properties.find((p) => String(p.id) === selectedId);
+      sessionStorage.setItem('hp_selected_property_id',   selectedId);
+      sessionStorage.setItem('hp_selected_property_name', prop?.name || '');
+      showMsg('Redirecting…', 'success');
+      setTimeout(() => navigate('/dashboard', { replace: true }), 800);
+      return;
+    }
+
+    // ── Specific property + regular user — go to DomainLoginForm ─────
     onContinue(String(selectedId));
   };
 
@@ -125,15 +176,30 @@ export default function PropertySelectForm({ userData, showMsg, hideMsg, onConti
             </p>
           </div>
         ) : (
-          properties.map((prop) => (
+          <>
+            {/* ── All Properties option (always shown) ─────────────────────────
+                Always rendered at the top for all user types.
+                Selecting this sends the user to DomainLoginForm regardless
+                of user type — credentials required before dashboard access.
+            ── */}
             <PropertyCard
-              key={prop.id}
-              label={prop.name}
-              // Compare as strings — Smoobu returns id as number, selectedId stored as string
-              isSelected={String(selectedId) === String(prop.id)}
-              onClick={() => setSelectedId(String(prop.id))}
+              key="__all__"
+              label="All Properties"
+              sublabel="View data across all your properties"
+              isSelected={selectedId === '__all__'}
+              onClick={() => setSelectedId('__all__')}
+              isAllOption
             />
-          ))
+            {properties.map((prop) => (
+              <PropertyCard
+                key={prop.id}
+                label={prop.name}
+                // Compare as strings — Smoobu returns id as number, selectedId stored as string
+                isSelected={String(selectedId) === String(prop.id)}
+                onClick={() => setSelectedId(String(prop.id))}
+              />
+            ))}
+          </>
         )}
       </div>
 
@@ -168,8 +234,9 @@ export default function PropertySelectForm({ userData, showMsg, hideMsg, onConti
 
 // ─────────────────────────────────────────────────────────────────
 // PropertyCard — individual selectable row (radio-style, single select)
+// isAllOption: renders a slightly distinct style for the "All Properties" entry
 // ─────────────────────────────────────────────────────────────────
-function PropertyCard({ label, sublabel, isSelected, onClick }) {
+function PropertyCard({ label, sublabel, isSelected, onClick, isAllOption }) {
   return (
     <div
       role="button"
@@ -181,10 +248,10 @@ function PropertyCard({ label, sublabel, isSelected, onClick }) {
         alignItems:    'center',
         gap:           '12px',
         padding:       '11px 14px',
-        marginBottom:  '8px',
+        marginBottom:  isAllOption ? '12px' : '8px',
         borderRadius:  '12px',
-        border:        `2px solid ${isSelected ? '#26a676' : '#e3ede8'}`,
-        background:    isSelected ? '#eaf8f1' : '#f8fbf9',
+        border:        `2px solid ${isSelected ? '#26a676' : isAllOption ? '#b8d4c4' : '#e3ede8'}`,
+        background:    isSelected ? '#eaf8f1' : isAllOption ? '#f2faf6' : '#f8fbf9',
         cursor:        'pointer',
         transition:    'border-color 0.15s ease, background 0.15s ease',
         userSelect:    'none',
