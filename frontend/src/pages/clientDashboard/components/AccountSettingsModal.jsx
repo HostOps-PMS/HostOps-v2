@@ -2,11 +2,28 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../AuthContext";
 import { updateProfile } from "../../apiService";
 
+// ─────────────────────────────────────────────────────────────────
+// changePassword — calls POST /auth/change-password
+// Works for both regular users and staff (backend detects via token).
+// ─────────────────────────────────────────────────────────────────
+async function changePassword({ currentPassword, newPassword }, auth) {
+  const token = auth.getToken();
+  return fetch(`${import.meta.env.VITE_API_URL || ""}/auth/change-password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
 export default function AccountSettingsModal({ isOpen, onClose }) {
   const { getUser, setUser } = useAuth();
   const auth = useAuth();
   const user = getUser();
 
+  // ── Profile form ─────────────────────────────────────────────────
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -15,7 +32,25 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // 'success' | 'error' | null
   const [errorMsg, setErrorMsg] = useState("");
+
+  // ── Password form ────────────────────────────────────────────────
+  const [pwForm, setPwForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwStatus, setPwStatus] = useState(null); // 'success' | 'error' | null
+  const [pwErrorMsg, setPwErrorMsg] = useState("");
+  const [showPw, setShowPw] = useState({
+    current: false,
+    next: false,
+    confirm: false,
+  });
+
   const overlayRef = useRef(null);
+
+  const isStaff = user?.role === "staff";
 
   // Sync form with current user data whenever modal opens
   useEffect(() => {
@@ -27,6 +62,11 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
       });
       setSaveStatus(null);
       setErrorMsg("");
+      // Reset password form on open
+      setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setPwStatus(null);
+      setPwErrorMsg("");
+      setShowPw({ current: false, next: false, confirm: false });
     }
   }, [isOpen, user]);
 
@@ -60,6 +100,13 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
     if (saveStatus) setSaveStatus(null);
   }
 
+  function handlePwChange(e) {
+    const { name, value } = e.target;
+    setPwForm((prev) => ({ ...prev, [name]: value }));
+    if (pwStatus) setPwStatus(null);
+  }
+
+  // ── Save profile ─────────────────────────────────────────────────
   async function handleSave() {
     if (!form.firstName.trim()) {
       setErrorMsg("First name is required.");
@@ -96,6 +143,61 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
     }
   }
 
+  // ── Save password ────────────────────────────────────────────────
+  async function handlePasswordSave() {
+    const { currentPassword, newPassword, confirmPassword } = pwForm;
+
+    if (!currentPassword) {
+      setPwErrorMsg("Current password is required.");
+      setPwStatus("error");
+      return;
+    }
+    if (!newPassword || newPassword.length < 8) {
+      setPwErrorMsg("New password must be at least 8 characters.");
+      setPwStatus("error");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwErrorMsg("Passwords do not match.");
+      setPwStatus("error");
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setPwErrorMsg("New password must be different from your current password.");
+      setPwStatus("error");
+      return;
+    }
+
+    setPwSaving(true);
+    setPwStatus(null);
+    setPwErrorMsg("");
+
+    try {
+      const res = await changePassword({ currentPassword, newPassword }, auth);
+      const body = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setPwErrorMsg(body.error || "Failed to change password. Please try again.");
+        setPwStatus("error");
+        return;
+      }
+
+      // If backend returns updated user, persist it
+      if (body.user) {
+        setUser(body.user);
+      }
+
+      setPwStatus("success");
+      setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setShowPw({ current: false, next: false, confirm: false });
+    } catch {
+      setPwErrorMsg("An unexpected error occurred. Please try again.");
+      setPwStatus("error");
+    } finally {
+      setPwSaving(false);
+    }
+  }
+
   if (!isOpen) return null;
 
   const styles = {
@@ -116,8 +218,9 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
       borderRadius: "20px",
       width: "100%",
       maxWidth: "480px",
+      maxHeight: "90vh",
+      overflowY: "auto",
       boxShadow: "0 24px 64px rgba(12,28,20,0.18), 0 4px 16px rgba(12,28,20,0.08)",
-      overflow: "hidden",
       position: "relative",
       animation: "modalSlideIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)",
     },
@@ -271,6 +374,43 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
       gridTemplateColumns: "1fr 1fr",
       gap: 12,
     },
+    // Password input wrapper — relative so the eye icon can be absolute
+    pwInputWrap: {
+      position: "relative",
+      display: "flex",
+      alignItems: "center",
+    },
+    pwInput: {
+      width: "100%",
+      padding: "10px 40px 10px 14px",
+      borderRadius: 10,
+      border: "1.5px solid #d4e8dd",
+      fontSize: "13px",
+      color: "#0c1c14",
+      background: "#fff",
+      outline: "none",
+      transition: "border-color 0.15s, box-shadow 0.15s",
+      boxSizing: "border-box",
+      fontFamily: "inherit",
+    },
+    eyeBtn: {
+      position: "absolute",
+      right: 12,
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      color: "#9ab8a9",
+      fontSize: 15,
+      padding: 0,
+      display: "flex",
+      alignItems: "center",
+      lineHeight: 1,
+    },
+    divider: {
+      height: 1,
+      background: "#eaf3ee",
+      margin: "4px 0 20px",
+    },
     footer: {
       padding: "16px 28px 24px",
       display: "flex",
@@ -302,19 +442,35 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
       cursor: "pointer",
       transition: "background 0.15s",
     },
-    saveBtn: {
+    saveBtn: (isSaving) => ({
       padding: "9px 22px",
       borderRadius: 10,
       border: "none",
-      background: saving ? "#9ab8a9" : "#0c1c14",
+      background: isSaving ? "#9ab8a9" : "#0c1c14",
       fontSize: "13px",
       fontWeight: 700,
       color: "#eaf5f0",
-      cursor: saving ? "not-allowed" : "pointer",
+      cursor: isSaving ? "not-allowed" : "pointer",
       display: "flex",
       alignItems: "center",
       gap: 7,
       transition: "background 0.15s",
+    }),
+    // Inline footer for the password section (sits inside body, not in the sticky footer)
+    pwFooter: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+      marginTop: 4,
+    },
+    pwStatusMsg: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      fontSize: "12px",
+      fontWeight: 500,
+      flex: 1,
     },
   };
 
@@ -337,18 +493,28 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
           from { opacity: 0; transform: scale(0.94) translateY(8px); }
           to   { opacity: 1; transform: scale(1) translateY(0); }
         }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
         .acc-input:focus {
+          border-color: #1e8760!important;
+          box-shadow: 0 0 0 3px rgba(30,135,96,0.10)!important;
+        }
+        .acc-pw-input:focus {
           border-color: #1e8760!important;
           box-shadow: 0 0 0 3px rgba(30,135,96,0.10)!important;
         }
         .acc-close-btn:hover { background: #f0f8f4!important; color: #0c1c14!important; }
         .acc-cancel-btn:hover { background: #f0f8f4!important; }
         .acc-save-btn:hover:not(:disabled) { background: #1a3325!important; }
+        .acc-eye-btn:hover { color: #0c1c14!important; }
       `}</style>
 
       <div style={styles.overlay} ref={overlayRef} onClick={handleOverlayClick}>
         <div style={styles.modal} role="dialog" aria-modal="true" aria-label="Account Settings">
-          {/* Header */}
+
+          {/* ── Header ── */}
           <div style={styles.header}>
             <div style={styles.headerLeft}>
               <div style={styles.avatarLarge}>{initials}</div>
@@ -367,8 +533,9 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
             </button>
           </div>
 
-          {/* Body */}
+          {/* ── Body ── */}
           <div style={styles.body}>
+
             {/* Read-only info */}
             <div style={styles.section}>
               <p style={styles.sectionLabel}>Account Info</p>
@@ -382,29 +549,14 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                 </div>
               </div>
 
-              {/* Role & Verified */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                <div style={styles.readOnlyRow}>
-                  <i className="ti ti-shield-check" style={styles.readOnlyIcon} aria-hidden="true" />
-                  <div style={styles.readOnlyContent}>
-                    <p style={styles.readOnlyKey}>Role</p>
-                    <p style={styles.readOnlyVal} className="capitalize">
-                      {user?.role || "client"}
-                    </p>
-                  </div>
-                </div>
-                <div style={styles.readOnlyRow}>
-                  <i className="ti ti-badge-check" style={styles.readOnlyIcon} aria-hidden="true" />
-                  <div style={styles.readOnlyContent}>
-                    <p style={styles.readOnlyKey}>Status</p>
-                    <span style={{
-                      ...styles.badge,
-                      background: user?.isVerified ? "#eaf8f1" : "#fff3e0",
-                      color: user?.isVerified ? "#1e8760" : "#e07000",
-                    }}>
-                      {user?.isVerified ? "Verified" : "Unverified"}
-                    </span>
-                  </div>
+              {/* Role */}
+              <div style={styles.readOnlyRow}>
+                <i className="ti ti-shield-check" style={styles.readOnlyIcon} aria-hidden="true" />
+                <div style={styles.readOnlyContent}>
+                  <p style={styles.readOnlyKey}>Role</p>
+                  <p style={styles.readOnlyVal} className="capitalize">
+                    {user?.role || "client"}
+                  </p>
                 </div>
               </div>
 
@@ -418,7 +570,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
               </div>
             </div>
 
-            {/* Editable fields */}
+            {/* ── Editable profile fields ── */}
             <div style={styles.section}>
               <p style={styles.sectionLabel}>Edit Profile</p>
 
@@ -455,31 +607,162 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                 </div>
               </div>
 
+              {/* Property tag prefix — hidden for staff, they don't own properties */}
+              {!isStaff && (
+                <div style={styles.fieldGroup}>
+                  <label style={styles.label} htmlFor="acc-prefix">
+                    Property Tag Prefix
+                    <span style={{ fontWeight: 400, color: "#9ab8a9", marginLeft: 6 }}>
+                      (used to filter your Smoobu properties)
+                    </span>
+                  </label>
+                  <input
+                    id="acc-prefix"
+                    className="acc-input"
+                    style={styles.input}
+                    type="text"
+                    name="propertyTagPrefix"
+                    value={form.propertyTagPrefix}
+                    onChange={handleChange}
+                    placeholder="e.g. _charmaine"
+                    maxLength={100}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* ── Divider ── */}
+            <div style={styles.divider} />
+
+            {/* ── Change Password section ── */}
+            <div style={{ ...styles.section, marginBottom: 8 }}>
+              <p style={styles.sectionLabel}>Change Password</p>
+
+              {/* Current password */}
               <div style={styles.fieldGroup}>
-                <label style={styles.label} htmlFor="acc-prefix">
-                  Property Tag Prefix
-                  <span style={{ fontWeight: 400, color: "#9ab8a9", marginLeft: 6 }}>
-                    (used to filter your Smoobu properties)
-                  </span>
-                </label>
-                <input
-                  id="acc-prefix"
-                  className="acc-input"
-                  style={styles.input}
-                  type="text"
-                  name="propertyTagPrefix"
-                  value={form.propertyTagPrefix}
-                  onChange={handleChange}
-                  placeholder="e.g. _charmaine"
-                  maxLength={100}
-                />
+                <label style={styles.label} htmlFor="acc-currentPw">Current Password</label>
+                <div style={styles.pwInputWrap}>
+                  <input
+                    id="acc-currentPw"
+                    className="acc-pw-input"
+                    style={styles.pwInput}
+                    type={showPw.current ? "text" : "password"}
+                    name="currentPassword"
+                    value={pwForm.currentPassword}
+                    onChange={handlePwChange}
+                    placeholder="Enter current password"
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    className="acc-eye-btn"
+                    style={styles.eyeBtn}
+                    onClick={() => setShowPw((p) => ({ ...p, current: !p.current }))}
+                    tabIndex={-1}
+                    aria-label={showPw.current ? "Hide password" : "Show password"}
+                  >
+                    <i className={showPw.current ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+
+              {/* New password */}
+              <div style={styles.fieldGroup}>
+                <label style={styles.label} htmlFor="acc-newPw">New Password</label>
+                <div style={styles.pwInputWrap}>
+                  <input
+                    id="acc-newPw"
+                    className="acc-pw-input"
+                    style={styles.pwInput}
+                    type={showPw.next ? "text" : "password"}
+                    name="newPassword"
+                    value={pwForm.newPassword}
+                    onChange={handlePwChange}
+                    placeholder="At least 8 characters"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    className="acc-eye-btn"
+                    style={styles.eyeBtn}
+                    onClick={() => setShowPw((p) => ({ ...p, next: !p.next }))}
+                    tabIndex={-1}
+                    aria-label={showPw.next ? "Hide password" : "Show password"}
+                  >
+                    <i className={showPw.next ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm new password */}
+              <div style={{ ...styles.fieldGroup, marginBottom: 12 }}>
+                <label style={styles.label} htmlFor="acc-confirmPw">Confirm New Password</label>
+                <div style={styles.pwInputWrap}>
+                  <input
+                    id="acc-confirmPw"
+                    className="acc-pw-input"
+                    style={styles.pwInput}
+                    type={showPw.confirm ? "text" : "password"}
+                    name="confirmPassword"
+                    value={pwForm.confirmPassword}
+                    onChange={handlePwChange}
+                    placeholder="Re-enter new password"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    className="acc-eye-btn"
+                    style={styles.eyeBtn}
+                    onClick={() => setShowPw((p) => ({ ...p, confirm: !p.confirm }))}
+                    tabIndex={-1}
+                    aria-label={showPw.confirm ? "Hide password" : "Show password"}
+                  >
+                    <i className={showPw.confirm ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Password section footer (status + button) */}
+              <div style={styles.pwFooter}>
+                <div style={styles.pwStatusMsg}>
+                  {pwStatus === "success" && (
+                    <>
+                      <i className="ti ti-circle-check" style={{ color: "#1e8760", fontSize: 15 }} aria-hidden="true" />
+                      <span style={{ color: "#1e8760" }}>Password updated successfully.</span>
+                    </>
+                  )}
+                  {pwStatus === "error" && (
+                    <>
+                      <i className="ti ti-alert-circle" style={{ color: "#c13515", fontSize: 15 }} aria-hidden="true" />
+                      <span style={{ color: "#c13515" }}>{pwErrorMsg}</span>
+                    </>
+                  )}
+                </div>
+                <button
+                  style={styles.saveBtn(pwSaving)}
+                  className="acc-save-btn"
+                  onClick={handlePasswordSave}
+                  disabled={pwSaving}
+                >
+                  {pwSaving ? (
+                    <>
+                      <i className="ti ti-loader-2" style={{ fontSize: 14, animation: "spin 0.8s linear infinite" }} aria-hidden="true" />
+                      Updating…
+                    </>
+                  ) : (
+                    <>
+                      <i className="ti ti-lock-check" style={{ fontSize: 14 }} aria-hidden="true" />
+                      Update Password
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Footer */}
+          {/* ── Footer (profile save) ── */}
           <div style={styles.footer}>
-            {/* Status message */}
+            {/* Profile save status message */}
             <div style={styles.statusMsg}>
               {saveStatus === "success" && (
                 <>
@@ -505,7 +788,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                 Cancel
               </button>
               <button
-                style={styles.saveBtn}
+                style={styles.saveBtn(saving)}
                 className="acc-save-btn"
                 onClick={handleSave}
                 disabled={saving}
@@ -524,15 +807,9 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
               </button>
             </div>
           </div>
+
         </div>
       </div>
-
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </>
   );
 }

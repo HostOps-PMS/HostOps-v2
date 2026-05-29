@@ -61,6 +61,12 @@ const clientAccountSchema = new mongoose.Schema({
   },
 
   lastLoginAt: { type: Date },
+
+  // ── Admin AuthModal OTP gate ──────────────────────────────────────
+  // Mirrors the loginOtp fields on the User model.
+  // Stored hashed; cleared after successful verification.
+  loginOtp:       { type: String, select: false },
+  loginOtpExpiry: { type: Date,   select: false },
 }, {
   timestamps: true,
   collection: 'clientaccounts', // explicit MongoDB collection name
