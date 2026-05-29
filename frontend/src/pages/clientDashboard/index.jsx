@@ -109,7 +109,7 @@ export default function DashboardPage() {
   const ownerName = dashState.selectedPropertyName || data.ownerName || 'Dashboard';
 
   return (
-    <div style={{ background: "#f4f6f5", minHeight: "100%" }}>
+    <div style={{ background: "#f4f6f5", minHeight: "100vh" }}>
       {/* First-login modal: blocking overlay shown until password is set */}
       {showFirstLoginModal && (
         <FirstLoginModal onComplete={handlePasswordChanged} />
