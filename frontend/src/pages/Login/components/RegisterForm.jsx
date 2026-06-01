@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { registerUser } from '../services/authService';
+import { registerUser } from '../services/authservice';
 import { useAuthSubmit } from '../hooks/useAuth';
 import { validateRegistration } from '../utils/validators';
 import PasswordStrengthIndicator from './PasswordStrengthIndicator';

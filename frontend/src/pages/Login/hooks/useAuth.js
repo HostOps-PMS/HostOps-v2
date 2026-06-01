@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { checkSession } from '../services/authService';
+import { checkSession } from '../services/authservice';
 
 export function useAutoRedirect() {
   const navigate = useNavigate();
