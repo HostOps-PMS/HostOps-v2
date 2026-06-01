@@ -5,7 +5,7 @@ import LoginOTPForm from './components/LoginOTPForm';
 import PropertySelectForm from './components/PropertySelectForm';
 import DomainLoginForm from './components/DomainLoginForm';
 import Message from './components/Message';
-import bgImage from '../../assets/BG.png';
+import bgImage from '../../assets/bg.png';
 import './Login.css';
 
 const VIEWS = {
