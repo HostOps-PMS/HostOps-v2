@@ -144,29 +144,41 @@ router.post('/login', async (req, res, next) => {
     // ── Check if this is a client account login FIRST ─────────────
     // Client accounts must be checked before User because the same email
     // could exist in both collections (e.g. the parent client's email was
-    // reused). Client accounts now go through OTP verification before
-    // being granted a token — same as client and team_leader roles.
+    // reused). Client accounts never go through the OTP flow.
     const clientAccount = await ClientAccount.findOne({ email: email.toLowerCase() }).select('+password');
     if (clientAccount && (await clientAccount.comparePassword(password))) {
       if (!clientAccount.isActive) {
         return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
       }
 
-      // Generate and send OTP — token is NOT issued yet.
-      // The token will be issued after successful OTP verification
-      // in POST /auth/verify-login-otp (ClientAccount branch).
-      const rawOtp = randomToken();
-      clientAccount.loginOtp       = hashToken(rawOtp);
-      clientAccount.loginOtpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+      const accessToken  = signClientAccountAccessToken(clientAccount);
+      const refreshToken = signClientAccountRefreshToken(clientAccount);
+
+      await RefreshToken.create({
+        userId:    clientAccount._id,
+        token:     hashToken(refreshToken),
+        expiresAt: refreshTokenExpiry(),
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      clientAccount.lastLoginAt = new Date();
       await clientAccount.save();
 
-      try {
-        await sendVerificationEmail(clientAccount.email, clientAccount.firstName, rawOtp);
-      } catch (e) {
-        console.error('ClientAccount login OTP email send failed:', e);
-      }
+      res.cookie('rt', refreshToken, {
+        httpOnly: true,
+        secure:   process.env.NODE_ENV === 'production',
+        sameSite: 'none',
+        maxAge:   7 * 24 * 60 * 60 * 1000,
+        path:     '/auth',
+      });
 
-      return res.json({ requiresOtp: true });
+      return res.json({
+        accessToken,
+        clientAccount:      { ...clientAccount.toJSON(), role: 'clientAccount', isClientAccount: true },
+        mustChangePassword: clientAccount.mustChangePassword,
+        isClientAccount:    true,
+      });
     }
 
     // ── Check if this is a staff login ────────────────────────────
@@ -228,36 +240,9 @@ router.post('/login', async (req, res, next) => {
       return res.status(403).json({ error: 'Please verify your email first' });
     }
 
-    // ── Only true admins skip the OTP flow ────────────────────────
-    // team_leader and client roles must always go through OTP verification
-    // before being granted access to the dashboard. Admins (role: 'admin'
-    // or tagged 'Main Admin') bypass OTP since they are platform operators.
     const isAdmin = user.tag === "Main Admin" || user.role === "admin" || user.email === process.env.ADMIN_ROLE;
-
-    // ── client and team_leader always require OTP ──────────────────
-    // These roles are always sent an OTP regardless of trusted device status.
-    // The trusted device mechanism only applies to regular OTP-bypass flow
-    // (non-admin, non-client/team_leader users with a remembered device).
-    const requiresOtpAlways = user.role === 'client' || user.role === 'team_leader';
-
     let isTrusted = false;
-    if (!isAdmin) {
-      if (requiresOtpAlways) {
-        // Always generate and send OTP for client and team_leader
-        const rawOtp = randomToken();
-        user.loginOtp = hashToken(rawOtp);
-        user.loginOtpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
-        await user.save();
-
-        try {
-          await sendVerificationEmail(user.email, user.firstName, rawOtp);
-        } catch (e) {
-          console.error('Login OTP email send failed:', e);
-        }
-
-        return res.json({ requiresOtp: true });
-      }
-
+    if (!isAdmin) { 
       if (deviceId) {
         const trusted = await TrustedDevice.findOne({ userId: user._id, deviceId, expiresAt: { $gt: new Date() } });
         if (trusted) isTrusted = true;
