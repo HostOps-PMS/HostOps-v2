@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
 
 export async function verifyEmail(email, token) {
   const res = await fetch(`${API_BASE}/auth/verify`, {
