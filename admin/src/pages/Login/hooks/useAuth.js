@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login, DASHBOARD_URL } from '../services/authervice';
+import { login, DASHBOARD_URL } from '../services/authService';
 
 const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5174';
 
