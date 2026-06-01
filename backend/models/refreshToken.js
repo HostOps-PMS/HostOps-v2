@@ -24,6 +24,7 @@ const refreshTokenSchema = new mongoose.Schema({
   replacedBy: { type: String, default: null }, // for rotation tracking
   ipAddress:  { type: String },
   userAgent:  { type: String },
+  deviceId:   { type: String },
 }, {
   timestamps: true,
 });

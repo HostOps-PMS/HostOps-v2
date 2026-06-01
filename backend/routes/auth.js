@@ -240,10 +240,9 @@ router.post('/login', async (req, res, next) => {
       return res.status(403).json({ error: 'Please verify your email first' });
     }
 
-     const isAdmin = user.tag === "Main Admin" || user.role === "admin" || user.email === process.env.ADMIN_ROLE;
-
-    if (!isAdmin) {
-      let isTrusted = false;
+    const isAdmin = user.tag === "Main Admin" || user.role === "admin" || user.email === process.env.ADMIN_ROLE;
+    let isTrusted = false;
+    if (!isAdmin) { 
       if (deviceId) {
         const trusted = await TrustedDevice.findOne({ userId: user._id, deviceId, expiresAt: { $gt: new Date() } });
         if (trusted) isTrusted = true;
@@ -265,21 +264,49 @@ router.post('/login', async (req, res, next) => {
       }
     }
 
-    const accessToken = signAccessToken(user);
-    const refreshToken = signRefreshToken(user);
+    let refreshTokenToUse = null;
 
-    await RefreshToken.create({
-      userId: user._id,
-      token: hashToken(refreshToken),
-      expiresAt: refreshTokenExpiry(),
-      ipAddress: req.ip,
-      userAgent: req.get('user-agent'),
-    });
+    if (!isAdmin && isTrusted && req.cookies?.rt) {
+      try {
+        const decoded = verifyRefreshToken(req.cookies.rt);
+        if (decoded.sub === user._id.toString()) {
+          const stored = await RefreshToken.findOne({ token: hashToken(req.cookies.rt) });
+          if (stored && stored.isActive()) {
+            refreshTokenToUse = req.cookies.rt;
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    if (!refreshTokenToUse) {
+      // Revoke previous active refresh tokens for the same device
+      if (deviceId) {
+        await RefreshToken.updateMany(
+          { userId: user._id, deviceId, revokedAt: null },
+          { revokedAt: new Date() }
+        );
+      }
+
+      refreshTokenToUse = signRefreshToken(user);
+
+      await RefreshToken.create({
+        userId: user._id,
+        token: hashToken(refreshTokenToUse),
+        expiresAt: refreshTokenExpiry(),
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+        deviceId: deviceId || undefined,
+      });
+    }
+
+    const accessToken = signAccessToken(user);
 
     user.lastLoginAt = new Date();
     await user.save();
 
-    res.cookie('rt', refreshToken, {
+    res.cookie('rt', refreshTokenToUse, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'none',
@@ -390,15 +417,9 @@ router.post('/verify-login-otp', async (req, res, next) => {
       user.loginOtpExpiry = undefined;
 
       if (rememberMe) {
-        // --- 14-day expiration (adjust here for debugging) ---
-        // 3 seconds.
-        // const expiresIn = 3000;
-        // 30 seconds.
-        const expiresIn = 14 * 24 * 60 * 60 * 1000;
-        // 1 minute.
-        // const expiresIn = 60000;
-        // 14 days.
-        // const expiresIn = 14 * 24 * 60 * 60 * 1000;
+        // const expiresIn = 14 * 24 * 60 * 60 * 1000; // 14 days
+        // const expiresIn = 60000; // 1 min.
+        const expiresIn = 60 * 60 * 1000; // 1 hour
         const expiresAt = new Date(Date.now() + expiresIn);
 
         await TrustedDevice.findOneAndUpdate(
@@ -411,12 +432,21 @@ router.post('/verify-login-otp', async (req, res, next) => {
       const accessToken  = signAccessToken(user);
       const refreshToken = signRefreshToken(user);
 
+      // Revoke previous active refresh tokens for the same device
+      if (deviceId) {
+        await RefreshToken.updateMany(
+          { userId: user._id, deviceId, revokedAt: null },
+          { revokedAt: new Date() }
+        );
+      }
+
       await RefreshToken.create({
         userId:    user._id,
         token:     hashToken(refreshToken),
         expiresAt: refreshTokenExpiry(),
         ipAddress: req.ip,
         userAgent: req.get('user-agent'),
+        deviceId:  deviceId || undefined,
       });
 
       user.lastLoginAt = new Date();
