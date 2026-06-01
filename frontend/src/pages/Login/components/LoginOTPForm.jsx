@@ -11,6 +11,59 @@ export default function LoginOTPForm({ email, rememberMe, showMsg, hideMsg, onBa
 
   const { submit, loading } = useAuthSubmit(verifyLoginOtp, {
     onSuccess: (data) => {
+      // ── Client Account post-OTP redirect ───────────────────────────
+      // verify-login-otp returns { accessToken, clientAccount, isClientAccount: true }
+      // for clientAccount logins. Store token/user and redirect to dashboard.
+      if (data.isClientAccount) {
+        const user = { ...data.clientAccount, role: 'clientAccount', isClientAccount: true };
+        auth.setToken(data.accessToken);
+        auth.setUser(user);
+
+        if (data.clientAccount.mustChangePassword) {
+          sessionStorage.setItem('hp_must_change_password', 'true');
+        } else {
+          sessionStorage.removeItem('hp_must_change_password');
+        }
+
+        showMsg(`Welcome, ${data.clientAccount.firstName}! Redirecting...`, 'success');
+        setTimeout(() => {
+          const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5174';
+          const params = new URLSearchParams({
+            _t: data.accessToken,
+            _u: JSON.stringify(user),
+          });
+          window.location.href = `${dashboardBase}/admin?${params.toString()}`;
+        }, 800);
+        return;
+      }
+
+      // ── Client / Team Leader post-OTP redirect ─────────────────────
+      // After OTP verification, client and team_leader go directly to
+      // the dashboard. Token passed via URL params (sessionStorage is port-scoped).
+      if (data.user?.role === 'client' || data.user?.role === 'team_leader') {
+        auth.setToken(data.accessToken);
+        auth.setUser(data.user);
+
+        if (data.user.mustChangePassword) {
+          sessionStorage.setItem('hp_must_change_password', 'true');
+        } else {
+          sessionStorage.removeItem('hp_must_change_password');
+        }
+
+        showMsg(`Welcome, ${data.user.firstName}! Redirecting...`, 'success');
+        setTimeout(() => {
+          const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5174';
+          const params = new URLSearchParams({
+            _t: data.accessToken,
+            _u: JSON.stringify(data.user),
+          });
+          window.location.href = `${dashboardBase}/admin?${params.toString()}`;
+        }, 800);
+        return;
+      }
+
+      // ── Admin / all other roles ────────────────────────────────────
+      // Fall through to the parent's onAuthSuccess handler.
       auth.setToken(data.accessToken);
       auth.setUser(data.user);
 
