@@ -1,227 +1,924 @@
-import { useState, useEffect, useRef } from 'react';
-import { updateAdminProfile } from '../services/profileService';
+import React, { useState, useEffect, useRef } from "react";
+import { sendLoginOtp, verifyOtp } from "../../authorization/services/authService";
 
-export default function AccountSettingsModal({ isOpen, onClose, onSaved }) {
+const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "http://localhost:5000";
+
+// ─────────────────────────────────────────────────────────────────
+// changeAdminPassword 
+// ─────────────────────────────────────────────────────────────────
+async function changeAdminPassword({ currentPassword, newPassword }) {
+  const token = sessionStorage.getItem("hp_access_token");
+  const res = await fetch(`${API_BASE}/auth/change-password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": import.meta.env.VITE_API_KEY,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Failed to change password. Please try again.");
+  return data;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// OTPInput — 6-box OTP input, same pattern as the reset page
+// ─────────────────────────────────────────────────────────────────
+function OTPInput({ length = 6, onComplete, isError, isLoading, version }) {
+  const [values, setValues] = useState(Array(length).fill(""));
+  const inputRefs = useRef([]);
+
+  useEffect(() => {
+    setValues(Array(length).fill(""));
+    inputRefs.current[0]?.focus();
+  }, [version, length]);
+
+  function handleChange(idx, val) {
+    const digit = val.replace(/\D/g, "").slice(-1);
+    const next = [...values];
+    next[idx] = digit;
+    setValues(next);
+    if (digit && idx < length - 1) inputRefs.current[idx + 1]?.focus();
+    const filled = next.join("");
+    if (filled.length === length && !next.includes("")) onComplete(filled);
+  }
+
+  function handleKeyDown(idx, e) {
+    if (e.key === "Backspace") {
+      if (values[idx]) {
+        const next = [...values];
+        next[idx] = "";
+        setValues(next);
+      } else if (idx > 0) {
+        inputRefs.current[idx - 1]?.focus();
+      }
+    }
+  }
+
+  function handlePaste(e) {
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, length);
+    if (!pasted) return;
+    e.preventDefault();
+    const next = Array(length).fill("");
+    pasted.split("").forEach((d, i) => { next[i] = d; });
+    setValues(next);
+    const focus = Math.min(pasted.length, length - 1);
+    inputRefs.current[focus]?.focus();
+    if (pasted.length === length) onComplete(pasted);
+  }
+
+  return (
+    <div style={{ display: "flex", gap: 8, justifyContent: "center", margin: "18px 0 6px" }}>
+      {values.map((v, i) => (
+        <input
+          key={i}
+          ref={(el) => (inputRefs.current[i] = el)}
+          type="text"
+          inputMode="numeric"
+          maxLength={1}
+          value={v}
+          disabled={isLoading}
+          onChange={(e) => handleChange(i, e.target.value)}
+          onKeyDown={(e) => handleKeyDown(i, e)}
+          onPaste={handlePaste}
+          style={{
+            width: 42,
+            height: 48,
+            textAlign: "center",
+            fontSize: 20,
+            fontWeight: 700,
+            fontFamily: "'Sora', sans-serif",
+            borderRadius: 10,
+            border: `2px solid ${isError ? "#c13515" : v ? "#1e8760" : "#d4e8dd"}`,
+            background: isError ? "#fff5f3" : "#fff",
+            color: isError ? "#c13515" : "#0c1c14",
+            outline: "none",
+            transition: "border-color 0.15s, background 0.15s",
+            boxSizing: "border-box",
+            animation: isError ? "otpShake 0.35s ease" : "none",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// OTPModal — overlay modal for OTP verification step
+// ─────────────────────────────────────────────────────────────────
+function OTPModal({ email, onVerified, onCancel }) {
+  const [otpVersion, setOtpVersion] = useState(0);
+  const [otpStatus, setOtpStatus] = useState("idle");
+  const [otpError, setOtpError] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(60);
+  const errorTimerRef = useRef(null);
+
+  useEffect(() => {
+    let timer;
+    if (resendCooldown > 0) {
+      timer = setInterval(() => setResendCooldown((c) => c - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  useEffect(() => () => clearTimeout(errorTimerRef.current), []);
+
+  function clearOtpErrorSoon() {
+    clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => {
+      setOtpStatus("idle");
+      setOtpError("");
+      setOtpVersion((v) => v + 1);
+    }, 700);
+  }
+
+  async function handleOtpComplete(otp) {
+    setOtpStatus("loading");
+    setOtpError("");
+    clearTimeout(errorTimerRef.current);
+    try {
+      await verifyOtp(otp);
+      clearTimeout(errorTimerRef.current);
+      onVerified(otp);
+    } catch (err) {
+      setOtpStatus("error");
+      setOtpError(err.message);
+      clearOtpErrorSoon();
+    }
+  }
+
+  async function handleResend() {
+    if (resendCooldown > 0) return;
+    try {
+      await sendLoginOtp();
+      setOtpStatus("idle");
+      setOtpError("");
+      setOtpVersion((v) => v + 1);
+      setResendCooldown(60);
+    } catch (err) {
+      setOtpError(err.message);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(12,28,20,0.6)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        zIndex: 10100,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 20,
+          width: "100%",
+          maxWidth: 380,
+          boxShadow: "0 24px 64px rgba(12,28,20,0.22)",
+          animation: "modalSlideIn 0.22s cubic-bezier(0.34,1.56,0.64,1)",
+          padding: "28px 28px 24px",
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Verify Identity"
+      >
+        <div style={{ textAlign: "center", marginBottom: 14 }}>
+          <div
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: "50%",
+              background: "#eaf8f1",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 12,
+            }}
+          >
+            <i className="ti ti-shield-lock" style={{ fontSize: 24, color: "#1e8760" }} aria-hidden="true" />
+          </div>
+          <h3
+            style={{
+              fontFamily: "'Sora', sans-serif",
+              fontSize: "1.05rem",
+              fontWeight: 800,
+              color: "#0c1c14",
+              margin: "0 0 6px",
+            }}
+          >
+            Verify your identity
+          </h3>
+          <p style={{ fontSize: 13, color: "#6a8b7c", margin: 0, lineHeight: 1.5 }}>
+            A 6-digit code was sent to{" "}
+            <strong style={{ color: "#0c1c14" }}>{email}</strong>.
+            <br />Enter it below to continue.
+          </p>
+        </div>
+
+        <OTPInput
+          key={otpVersion}
+          length={6}
+          onComplete={handleOtpComplete}
+          isError={otpStatus === "error"}
+          isLoading={otpStatus === "loading"}
+          version={otpVersion}
+        />
+
+        {otpStatus === "error" && (
+          <p style={{ color: "#c13515", fontSize: "0.82rem", textAlign: "center", margin: "6px 0 0" }}>
+            {otpError}
+          </p>
+        )}
+
+        {otpStatus === "loading" && (
+          <p style={{ color: "#9ab8a9", fontSize: "0.82rem", textAlign: "center", margin: "6px 0 0" }}>
+            Verifying…
+          </p>
+        )}
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 20, gap: 10 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              background: "transparent",
+              border: "1.5px solid #d4e8dd",
+              borderRadius: 10,
+              padding: "9px 18px",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#4a6b5a",
+              cursor: "pointer",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleResend}
+            disabled={resendCooldown > 0}
+            style={{
+              background: resendCooldown > 0 ? "#e3ede8" : "#eaf8f1",
+              border: "none",
+              borderRadius: 10,
+              padding: "9px 18px",
+              fontSize: 13,
+              fontWeight: 700,
+              color: resendCooldown > 0 ? "#6a8b7c" : "#1e8760",
+              cursor: resendCooldown > 0 ? "not-allowed" : "pointer",
+              transition: "all 0.2s",
+            }}
+          >
+            {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Code"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SuccessModal — shown after password is changed successfully
+// ─────────────────────────────────────────────────────────────────
+function SuccessModal({ onClose }) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(12,28,20,0.6)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        zIndex: 10200,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 20,
+          width: "100%",
+          maxWidth: 360,
+          boxShadow: "0 24px 64px rgba(12,28,20,0.22)",
+          animation: "modalSlideIn 0.25s cubic-bezier(0.34,1.56,0.64,1)",
+          padding: "36px 28px 28px",
+          textAlign: "center",
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Password Changed Successfully"
+      >
+        <div
+          style={{
+            width: 68,
+            height: 68,
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #eaf8f1 0%, #d1f0e3 100%)",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 18,
+            boxShadow: "0 8px 24px rgba(30,135,96,0.18)",
+            animation: "successPop 0.4s cubic-bezier(0.34,1.56,0.64,1) 0.1s both",
+          }}
+        >
+          <i className="ti ti-lock-check" style={{ fontSize: 30, color: "#1e8760" }} aria-hidden="true" />
+        </div>
+
+        <h3
+          style={{
+            fontFamily: "'Sora', sans-serif",
+            fontSize: "1.15rem",
+            fontWeight: 800,
+            color: "#0c1c14",
+            margin: "0 0 8px",
+          }}
+        >
+          Password Updated!
+        </h3>
+        <p style={{ fontSize: 13, color: "#6a8b7c", margin: "0 0 24px", lineHeight: 1.6 }}>
+          Your password has been changed successfully.
+          <br />Keep it safe and don't share it with anyone.
+        </p>
+
+        <button
+          onClick={onClose}
+          style={{
+            width: "100%",
+            padding: "11px 0",
+            borderRadius: 12,
+            border: "none",
+            background: "#0c1c14",
+            color: "#eaf5f0",
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            fontFamily: "inherit",
+            transition: "background 0.15s",
+          }}
+          className="acc-save-btn"
+        >
+          <i className="ti ti-check" style={{ fontSize: 15 }} aria-hidden="true" />
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// AccountSettingsModal — main component
+// ─────────────────────────────────────────────────────────────────
+export default function AccountSettingsModal({ isOpen, onClose }) {
   const getUser = () => {
-    try { return JSON.parse(sessionStorage.getItem('hp_user') || '{}'); } catch { return {}; }
+    try { return JSON.parse(sessionStorage.getItem("hp_user") || "{}"); } catch { return {}; }
   };
+  const user = getUser();
 
-  const [form, setForm] = useState({ firstName: '', lastName: '' });
-  const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState(null); // 'success' | 'error' | null
-  const [errorMsg, setErrorMsg] = useState('');
+  const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwStatus, setPwStatus] = useState(null);
+  const [pwErrorMsg, setPwErrorMsg] = useState("");
+  const [showPw, setShowPw] = useState({ current: false, next: false, confirm: false });
+
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const verifiedTokenRef = useRef(null);
+
   const overlayRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
-      const user = getUser();
-      setForm({ firstName: user.firstName || '', lastName: user.lastName || '' });
-      setStatus(null);
-      setErrorMsg('');
+      setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setPwStatus(null);
+      setPwErrorMsg("");
+      setShowPw({ current: false, next: false, confirm: false });
+      setShowOtpModal(false);
+      setShowSuccessModal(false);
+      verifiedTokenRef.current = null;
     }
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleKey = (e) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [isOpen, onClose]);
+    function handleKey(e) {
+      if (e.key === "Escape" && !showOtpModal && !showSuccessModal) onClose();
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [isOpen, onClose, showOtpModal, showSuccessModal]);
 
   useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  function handleOverlayClick(e) {
+    if (e.target === overlayRef.current && !showOtpModal && !showSuccessModal) onClose();
+  }
 
-  const user = getUser();
-  const initials = [user.firstName, user.lastName].filter(Boolean).map(n => n[0].toUpperCase()).join('') || 'U';
-  const formattedLastLogin = user.lastLoginAt
-    ? new Date(user.lastLoginAt).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
-    : '—';
-
-  function handleChange(e) {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    if (status) setStatus(null);
+  function handlePwChange(e) {
+    const { name, value } = e.target;
+    setPwForm((prev) => ({ ...prev, [name]: value }));
+    if (pwStatus) setPwStatus(null);
   }
 
   async function handleSave() {
-    if (!form.firstName.trim()) {
-      setErrorMsg('First name is required.');
-      setStatus('error');
+    const { currentPassword, newPassword, confirmPassword } = pwForm;
+
+    if (!currentPassword) {
+      setPwErrorMsg("Current password is required.");
+      setPwStatus("error");
       return;
     }
-    setSaving(true);
-    setStatus(null);
+    if (!newPassword || newPassword.length < 8) {
+      setPwErrorMsg("New password must be at least 8 characters.");
+      setPwStatus("error");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwErrorMsg("Passwords do not match.");
+      setPwStatus("error");
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setPwErrorMsg("New password must be different from your current password.");
+      setPwStatus("error");
+      return;
+    }
+
+    setPwSaving(true);
+    setPwStatus(null);
+    setPwErrorMsg("");
     try {
-      const data = await updateAdminProfile(form);
-      const updated = { ...user, ...data.user, ...form };
-      sessionStorage.setItem('hp_user', JSON.stringify(updated));
-      setStatus('success');
-      onSaved?.(updated);
+      await sendLoginOtp();
+      setShowOtpModal(true);
     } catch (err) {
-      setErrorMsg(err.message || 'Something went wrong.');
-      setStatus('error');
+      setPwErrorMsg(err.message);
+      setPwStatus("error");
     } finally {
-      setSaving(false);
+      setPwSaving(false);
     }
   }
+
+  async function handleOtpVerified(otp) {
+    verifiedTokenRef.current = otp;
+    setShowOtpModal(false);
+
+    const { currentPassword, newPassword } = pwForm;
+
+    try {
+      const body = await changeAdminPassword({ currentPassword, newPassword });
+      if (body.user) {
+        sessionStorage.setItem("hp_user", JSON.stringify(body.user));
+      }
+
+      setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setShowPw({ current: false, next: false, confirm: false });
+      verifiedTokenRef.current = null;
+
+      setShowSuccessModal(true);
+    } catch (err) {
+      setPwErrorMsg(err.message);
+      setPwStatus("error");
+    }
+  }
+
+  function handleSuccessClose() {
+    setShowSuccessModal(false);
+  }
+
+  if (!isOpen) return null;
+
+  const styles = {
+    overlay: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(12, 28, 20, 0.45)",
+      backdropFilter: "blur(4px)",
+      WebkitBackdropFilter: "blur(4px)",
+      zIndex: 10000,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "20px",
+    },
+    modal: {
+      background: "#fff",
+      borderRadius: "20px",
+      width: "100%",
+      maxWidth: "480px",
+      maxHeight: "90vh",
+      overflowY: "auto",
+      scrollbarWidth: "none",        
+      msOverflowStyle: "none", 
+      boxShadow: "0 24px 64px rgba(12,28,20,0.18), 0 4px 16px rgba(12,28,20,0.08)",
+      position: "relative",
+      animation: "modalSlideIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)",
+    },
+    header: {
+      padding: "24px 28px 20px",
+      borderBottom: "1px solid #eaf3ee",
+      display: "flex",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    headerLeft: {
+      display: "flex",
+      alignItems: "center",
+      gap: 14,
+    },
+    avatarLarge: {
+      width: 48,
+      height: 48,
+      borderRadius: "50%",
+      background: "#0c1c14",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 18,
+      fontWeight: 600,
+      color: "#eaf5f0",
+      flexShrink: 0,
+      letterSpacing: "-0.5px",
+    },
+    headerText: {
+      flex: 1,
+    },
+    title: {
+      fontFamily: "'Sora', sans-serif",
+      fontSize: "1.1rem",
+      fontWeight: 800,
+      color: "#0c1c14",
+      margin: 0,
+      lineHeight: 1.2,
+    },
+    subtitle: {
+      fontSize: "12px",
+      color: "#9ab8a9",
+      margin: "4px 0 0",
+    },
+    closeBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      border: "1px solid #e0ede6",
+      background: "transparent",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
+      color: "#6a8b7c",
+      fontSize: 14,
+      flexShrink: 0,
+      transition: "background 0.15s, color 0.15s",
+    },
+    body: {
+      padding: "24px 28px",
+    },
+    section: {
+      marginBottom: 20,
+    },
+    sectionLabel: {
+      fontSize: "10px",
+      fontWeight: 700,
+      letterSpacing: "0.08em",
+      color: "#9ab8a9",
+      textTransform: "uppercase",
+      marginBottom: 12,
+    },
+    readOnlyRow: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "10px 14px",
+      background: "#f7faf8",
+      borderRadius: 10,
+      border: "1px solid #eaf3ee",
+      marginBottom: 8,
+    },
+    readOnlyIcon: {
+      fontSize: 14,
+      color: "#9ab8a9",
+      width: 18,
+      textAlign: "center",
+      flexShrink: 0,
+    },
+    readOnlyContent: {
+      flex: 1,
+      minWidth: 0,
+    },
+    readOnlyKey: {
+      fontSize: "10px",
+      color: "#9ab8a9",
+      fontWeight: 600,
+      letterSpacing: "0.05em",
+      textTransform: "uppercase",
+      marginBottom: 1,
+    },
+    readOnlyVal: {
+      fontSize: "13px",
+      color: "#0c1c14",
+      fontWeight: 500,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+    },
+    fieldGroup: {
+      marginBottom: 14,
+    },
+    label: {
+      display: "block",
+      fontSize: "12px",
+      fontWeight: 600,
+      color: "#4a6b5a",
+      marginBottom: 6,
+    },
+    input: {
+      width: "100%",
+      padding: "10px 14px",
+      borderRadius: 10,
+      border: "1.5px solid #d4e8dd",
+      fontSize: "13px",
+      color: "#0c1c14",
+      background: "#fff",
+      outline: "none",
+      transition: "border-color 0.15s, box-shadow 0.15s",
+      boxSizing: "border-box",
+      fontFamily: "inherit",
+    },
+    row2: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 12,
+    },
+    pwInputWrap: {
+      position: "relative",
+      display: "flex",
+      alignItems: "center",
+    },
+    pwInput: {
+      width: "100%",
+      padding: "10px 40px 10px 14px",
+      borderRadius: 10,
+      border: "1.5px solid #d4e8dd",
+      fontSize: "13px",
+      color: "#0c1c14",
+      background: "#fff",
+      outline: "none",
+      transition: "border-color 0.15s, box-shadow 0.15s",
+      boxSizing: "border-box",
+      fontFamily: "inherit",
+    },
+    eyeBtn: {
+      position: "absolute",
+      right: 12,
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      color: "#9ab8a9",
+      fontSize: 15,
+      padding: 0,
+      display: "flex",
+      alignItems: "center",
+      lineHeight: 1,
+    },
+    divider: {
+      height: 1,
+      background: "#eaf3ee",
+      margin: "4px 0 20px",
+    },
+    footer: {
+      padding: "16px 28px 24px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "flex-end",
+      gap: 10,
+      borderTop: "1px solid #eaf3ee",
+    },
+    btnGroup: {
+      display: "flex",
+      gap: 8,
+    },
+    cancelBtn: {
+      padding: "9px 18px",
+      borderRadius: 10,
+      border: "1.5px solid #d4e8dd",
+      background: "transparent",
+      fontSize: "13px",
+      fontWeight: 600,
+      color: "#4a6b5a",
+      cursor: "pointer",
+      transition: "background 0.15s",
+    },
+    saveBtn: (isSaving) => ({
+      padding: "9px 22px",
+      borderRadius: 10,
+      border: "none",
+      background: isSaving ? "#9ab8a9" : "#0c1c14",
+      fontSize: "13px",
+      fontWeight: 700,
+      color: "#eaf5f0",
+      cursor: isSaving ? "not-allowed" : "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: 7,
+      transition: "background 0.15s",
+      fontFamily: "inherit",
+    }),
+  };
+
+  const initials = [user?.firstName, user?.lastName].filter(Boolean).map((n) => n.charAt(0).toUpperCase()).join("") || "U";
+
+  const formattedLastLogin = user?.lastLoginAt
+    ? new Date(user.lastLoginAt).toLocaleString("en-PH", {
+        month: "short", day: "numeric", year: "numeric",
+        hour: "numeric", minute: "2-digit", hour12: true,
+      })
+    : "—";
 
   return (
     <>
       <style>{`
-        @keyframes modalSlideIn {
-          from { opacity: 0; transform: scale(0.94) translateY(8px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); }
-        }
+        @keyframes modalSlideIn { from { opacity: 0; transform: scale(0.94) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .adm-acc-input:focus { border-color: #1a9e6e !important; box-shadow: 0 0 0 3px rgba(26,158,110,0.10) !important; }
-        .adm-acc-close:hover { background: #f5f5f5 !important; }
-        .adm-acc-cancel:hover { background: #f5f5f5 !important; }
-        .adm-acc-save:hover:not(:disabled) { background: #333 !important; }
+        @keyframes otpShake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-5px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
+        @keyframes successPop { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
+        .acc-input:focus { border-color: #1e8760!important; box-shadow: 0 0 0 3px rgba(30,135,96,0.10)!important; }
+        .acc-pw-input:focus { border-color: #1e8760!important; box-shadow: 0 0 0 3px rgba(30,135,96,0.10)!important; }
+        .acc-close-btn:hover { background: #f0f8f4!important; color: #0c1c14!important; }
+        .acc-cancel-btn:hover { background: #f0f8f4!important; }
+        .acc-save-btn:hover:not(:disabled) { background: #1a3325!important; }
+        .acc-eye-btn:hover { color: #0c1c14!important; }
+        [role="dialog"]::-webkit-scrollbar { display: none; }
       `}</style>
 
-      <div
-        ref={overlayRef}
-        onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
-        style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.4)',
-          backdropFilter: 'blur(4px)',
-          zIndex: 10000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 20,
-        }}
-      >
-        <div
-          role="dialog" aria-modal="true" aria-label="Account Settings"
-          style={{
-            background: '#fff', borderRadius: 20, width: '100%', maxWidth: 460,
-            overflow: 'hidden', animation: 'modalSlideIn 0.22s cubic-bezier(0.34,1.56,0.64,1)',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.15)',
-          }}
-        >
-          {/* Header */}
-          <div style={{ padding: '22px 24px 18px', borderBottom: '0.5px solid rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: '50%',
-                background: 'linear-gradient(135deg, #1a9e6e, #0d7a55)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 16, fontWeight: 700, color: '#fff', flexShrink: 0,
-              }}>{initials}</div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#111', letterSpacing: '-0.01em' }}>Account Settings</div>
-                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Update your profile information</div>
+      {showOtpModal && (
+        <OTPModal email={user?.email} onVerified={handleOtpVerified} onCancel={() => setShowOtpModal(false)} />
+      )}
+
+      {showSuccessModal && <SuccessModal onClose={handleSuccessClose} />}
+
+      <div style={styles.overlay} ref={overlayRef} onClick={handleOverlayClick}>
+        <div style={styles.modal} role="dialog" aria-modal="true" aria-label="Account Settings">
+          <div style={styles.header}>
+            <div style={styles.headerLeft}>
+              <div style={styles.avatarLarge}>{initials}</div>
+              <div style={styles.headerText}>
+                <h2 style={styles.title}>Account Settings</h2>
+                <p style={styles.subtitle}>Update your profile information</p>
               </div>
             </div>
-            <button
-              className="adm-acc-close"
-              onClick={onClose}
-              aria-label="Close"
-              style={{
-                width: 30, height: 30, borderRadius: 8,
-                border: '0.5px solid rgba(0,0,0,0.12)',
-                background: 'transparent', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#888', fontSize: 14, transition: 'background 0.15s',
-              }}
-            >✕</button>
+            <button style={styles.closeBtn} className="acc-close-btn" onClick={onClose} aria-label="Close">
+              <i className="ti ti-x" aria-hidden="true" />
+            </button>
           </div>
 
-          {/* Body */}
-          <div style={{ padding: '20px 24px' }}>
-            {/* Read-only info */}
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: '#bbb', textTransform: 'uppercase', marginBottom: 10 }}>Account Info</div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
-              {[
-                { label: 'EMAIL', value: user.email || '—' },
-                { label: 'ROLE', value: user.role || 'admin' },
-                { label: 'LAST LOGIN', value: formattedLastLogin },
-              ].map(({ label, value }) => (
-                <div key={label} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '9px 12px', background: '#f9f9f9',
-                  borderRadius: 9, border: '0.5px solid rgba(0,0,0,0.06)',
-                }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: '#bbb', letterSpacing: '0.06em' }}>{label}</span>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: '#333' }}>{value}</span>
+          <div style={styles.body}>
+            <div style={styles.section}>
+              <p style={styles.sectionLabel}>Account Info</p>
+              <div style={styles.readOnlyRow}>
+                <i className="ti ti-mail" style={styles.readOnlyIcon} aria-hidden="true" />
+                <div style={styles.readOnlyContent}>
+                  <p style={styles.readOnlyKey}>Email</p>
+                  <p style={styles.readOnlyVal}>{user?.email || "—"}</p>
                 </div>
-              ))}
+              </div>
+              <div style={styles.readOnlyRow}>
+                <i className="ti ti-shield-check" style={styles.readOnlyIcon} aria-hidden="true" />
+                <div style={styles.readOnlyContent}>
+                  <p style={styles.readOnlyKey}>Role</p>
+                  <p style={styles.readOnlyVal} className="capitalize">{user?.role || "admin"}</p>
+                </div>
+              </div>
+              <div style={{ ...styles.readOnlyRow, marginTop: 8 }}>
+                <i className="ti ti-clock" style={styles.readOnlyIcon} aria-hidden="true" />
+                <div style={styles.readOnlyContent}>
+                  <p style={styles.readOnlyKey}>Last Login</p>
+                  <p style={styles.readOnlyVal}>{formattedLastLogin}</p>
+                </div>
+              </div>
             </div>
 
-            {/* Editable fields */}
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: '#bbb', textTransform: 'uppercase', marginBottom: 10 }}>Edit Profile</div>
+            <div style={styles.section}>
+              <div style={styles.row2}>
+                <div style={styles.readOnlyRow}>
+                  <div style={styles.readOnlyContent}>
+                    <p style={styles.readOnlyKey}>First Name</p>
+                    <p style={styles.readOnlyVal}>{user?.firstName || "—"}</p>
+                  </div>
+                </div>
+                <div style={styles.readOnlyRow}>
+                  <div style={styles.readOnlyContent}>
+                    <p style={styles.readOnlyKey}>Last Name</p>
+                    <p style={styles.readOnlyVal}>{user?.lastName || "—"}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {[
-                { name: 'firstName', label: 'First Name', placeholder: 'First name' },
-                { name: 'lastName',  label: 'Last Name',  placeholder: 'Last name' },
-              ].map(({ name, label, placeholder }) => (
-                <div key={name}>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#666', marginBottom: 5 }}>{label}</label>
+            <div style={styles.divider} />
+
+            <div style={{ ...styles.section, marginBottom: 8 }}>
+              <p style={styles.sectionLabel}>Change Password</p>
+              <div style={styles.fieldGroup}>
+                <label style={styles.label} htmlFor="acc-currentPw">Current Password</label>
+                <div style={styles.pwInputWrap}>
                   <input
-                    className="adm-acc-input"
-                    type="text"
-                    name={name}
-                    value={form[name]}
-                    onChange={handleChange}
-                    placeholder={placeholder}
-                    maxLength={50}
-                    style={{
-                      width: '100%', padding: '9px 12px', borderRadius: 9,
-                      border: '1.5px solid #e0e0e0', fontSize: 13, color: '#111',
-                      background: '#fff', outline: 'none', boxSizing: 'border-box',
-                      transition: 'border-color 0.15s, box-shadow 0.15s',
-                      fontFamily: 'inherit',
-                    }}
+                    id="acc-currentPw"
+                    className="acc-pw-input"
+                    style={styles.pwInput}
+                    type={showPw.current ? "text" : "password"}
+                    name="currentPassword"
+                    value={pwForm.currentPassword}
+                    onChange={handlePwChange}
+                    placeholder="Enter current password"
+                    autoComplete="current-password"
                   />
+                  <button type="button" className="acc-eye-btn" style={styles.eyeBtn} onClick={() => setShowPw((p) => ({ ...p, current: !p.current }))} tabIndex={-1}>
+                    <i className={showPw.current ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
+                  </button>
                 </div>
-              ))}
+              </div>
+
+              <div style={styles.fieldGroup}>
+                <label style={styles.label} htmlFor="acc-newPw">New Password</label>
+                <div style={styles.pwInputWrap}>
+                  <input
+                    id="acc-newPw"
+                    className="acc-pw-input"
+                    style={styles.pwInput}
+                    type={showPw.next ? "text" : "password"}
+                    name="newPassword"
+                    value={pwForm.newPassword}
+                    onChange={handlePwChange}
+                    placeholder="At least 8 characters"
+                    autoComplete="new-password"
+                  />
+                  <button type="button" className="acc-eye-btn" style={styles.eyeBtn} onClick={() => setShowPw((p) => ({ ...p, next: !p.next }))} tabIndex={-1}>
+                    <i className={showPw.next ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ ...styles.fieldGroup, marginBottom: 12 }}>
+                <label style={styles.label} htmlFor="acc-confirmPw">Confirm New Password</label>
+                <div style={styles.pwInputWrap}>
+                  <input
+                    id="acc-confirmPw"
+                    className="acc-pw-input"
+                    style={styles.pwInput}
+                    type={showPw.confirm ? "text" : "password"}
+                    name="confirmPassword"
+                    value={pwForm.confirmPassword}
+                    onChange={handlePwChange}
+                    placeholder="Re-enter new password"
+                    autoComplete="new-password"
+                  />
+                  <button type="button" className="acc-eye-btn" style={styles.eyeBtn} onClick={() => setShowPw((p) => ({ ...p, confirm: !p.confirm }))} tabIndex={-1}>
+                    <i className={showPw.confirm ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+
+              {pwStatus === "error" && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "12px", fontWeight: 500, marginTop: 4 }}>
+                  <i className="ti ti-alert-circle" style={{ color: "#c13515", fontSize: 15 }} aria-hidden="true" />
+                  <span style={{ color: "#c13515" }}>{pwErrorMsg}</span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Footer */}
-          <div style={{
-            padding: '14px 24px 20px',
-            borderTop: '0.5px solid rgba(0,0,0,0.07)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-          }}>
-            <div style={{ fontSize: 12, fontWeight: 500, flex: 1 }}>
-              {status === 'success' && <span style={{ color: '#1a9e6e' }}>✓ Changes saved successfully.</span>}
-              {status === 'error'   && <span style={{ color: '#e05555' }}>✕ {errorMsg}</span>}
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                className="adm-acc-cancel"
-                onClick={onClose}
-                disabled={saving}
-                style={{
-                  padding: '8px 16px', borderRadius: 9,
-                  border: '0.5px solid rgba(0,0,0,0.12)',
-                  background: 'transparent', fontSize: 13, fontWeight: 600,
-                  color: '#555', cursor: 'pointer', transition: 'background 0.15s',
-                }}
-              >Cancel</button>
-              <button
-                className="adm-acc-save"
-                onClick={handleSave}
-                disabled={saving}
-                style={{
-                  padding: '8px 20px', borderRadius: 9, border: 'none',
-                  background: saving ? '#aaa' : '#1a1a1a',
-                  fontSize: 13, fontWeight: 700, color: '#fff',
-                  cursor: saving ? 'not-allowed' : 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  transition: 'background 0.15s',
-                }}
-              >
-                {saving
-                  ? <><span style={{ fontSize: 13, animation: 'spin 0.8s linear infinite', display: 'inline-block' }}>⟳</span> Saving…</>
-                  : '✓ Save changes'
-                }
+          <div style={styles.footer}>
+            <div style={styles.btnGroup}>
+              <button style={styles.cancelBtn} className="acc-cancel-btn" onClick={onClose} disabled={pwSaving}>
+                Cancel
+              </button>
+              <button style={styles.saveBtn(pwSaving)} className="acc-save-btn" onClick={handleSave} disabled={pwSaving}>
+                {pwSaving ? (
+                  <><i className="ti ti-loader-2" style={{ fontSize: 14, animation: "spin 0.8s linear infinite" }} aria-hidden="true" /> Sending code…</>
+                ) : (
+                  <><i className="ti ti-check" style={{ fontSize: 14 }} aria-hidden="true" /> Save changes</>
+                )}
               </button>
             </div>
           </div>
