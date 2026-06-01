@@ -13,21 +13,46 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
 
   const { submit, loading } = useAuthSubmit(loginUser, {
     onSuccess: (data) => {
-      // ── All roles that require OTP go through here ─────────────────
-      // Backend returns requiresOtp: true for: client, team_leader,
-      // clientAccount, and any unrecognised device (regular users).
-      // LoginOTPForm handles post-OTP routing for each role type.
       if (data.requiresOtp) {
         onRequiresOtp(email, rememberMe);
-        showMsg('A verification code has been sent to your email.', 'success');
         return;
       }
 
-      // ── Admin login ────────────────────────────────────────────────
-      // Only admins bypass OTP entirely.
+      // ── Client Account login ───────────────────────────────────────
+      // Client accounts skip OTP and DomainLoginForm entirely.
+      // Token is stored here; PropertySelectForm will use it to fetch
+      // the parent client's properties from /api/properties.
+      if (data.isClientAccount) {
+        auth.setToken(data.accessToken);
+        auth.setUser({ ...data.clientAccount, role: 'clientAccount', isClientAccount: true });
+
+        if (data.mustChangePassword) {
+          sessionStorage.setItem('hp_must_change_password', 'true');
+        } else {
+          sessionStorage.removeItem('hp_must_change_password');
+        }
+
+        // ✅ Client accounts now redirect to the admin dashboard (same as
+        // admin/team_leader). Token is passed via URL params since sessionStorage
+        // is port-scoped. The AuthorizationModal OTP gate on the admin app will
+        // intercept and require verification before granting access.
+        showMsg(`Welcome, ${data.clientAccount.firstName}! Redirecting...`, 'success');
+        setTimeout(() => {
+          const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5173';
+          const params = new URLSearchParams({
+            _t: data.accessToken,
+            _u: JSON.stringify({ ...data.clientAccount, role: 'clientAccount', isClientAccount: true }),
+          });
+          window.location.href = `${dashboardBase}/admin?${params.toString()}`;
+        }, 800);
+        return;
+      }
+
       auth.setToken(data.accessToken);
       auth.setUser(data.user);
 
+      // If the account was admin-created with a temporary password,
+      // flag it so the dashboard shows the first-login password-change modal.
       if (data.user.mustChangePassword) {
         sessionStorage.setItem('hp_must_change_password', 'true');
       } else {
