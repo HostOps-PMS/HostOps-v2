@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { verifyOtp, resendOtp, sendLoginOtp } from '../services/authService';
+import { verifyOtp, resendOtp, sendLoginOtp } from '../services/authservice';
 
 const RESEND_COOLDOWN_SEC = 60;
 
