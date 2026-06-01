@@ -843,9 +843,12 @@ router.post('/forgot-password', async (req, res, next) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const normalizedEmail = email.toLowerCase();
+    const rawToken = randomToken();
+
+    // ── Regular User ───────────────────────────────────────────────
+    const user = await User.findOne({ email: normalizedEmail });
     if (user) {
-      const rawToken = randomToken();
       user.resetToken = hashToken(rawToken);
       user.resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
       await user.save();
@@ -854,6 +857,25 @@ router.post('/forgot-password', async (req, res, next) => {
         await sendResetEmail(user.email, user.firstName, rawToken);
       } catch (e) {
         console.error('Reset email send failed:', e);
+      }
+
+      return res.json({ message: 'If that email is registered, a reset link has been sent.' });
+    }
+
+    // ── Staff fallback — Staff has no resetToken fields, reuse loginOtp ──
+    // Staff accounts are admin-managed and always have a valid email.
+    // We store the OTP in loginOtp/loginOtpExpiry (already on the Staff schema)
+    // and send via sendVerificationEmail (same GHL webhook staff use for login OTP).
+    const staff = await Staff.findOne({ email: normalizedEmail });
+    if (staff) {
+      staff.loginOtp       = hashToken(rawToken);
+      staff.loginOtpExpiry = new Date(Date.now() + 60 * 60 * 1000);
+      await staff.save();
+
+      try {
+        await sendVerificationEmail(staff.email, staff.firstName, rawToken);
+      } catch (e) {
+        console.error('Staff reset OTP email send failed:', e);
       }
     }
 
@@ -895,19 +917,68 @@ router.post('/reset-password', async (req, res, next) => {
 });
 
 // POST /auth/verify-reset-token
-// Used to silently verify the 6-digit OTP before asking for new password
+// Used to silently verify the 6-digit OTP before asking for new password.
+// Checks User (resetToken) first, then Staff (loginOtp) as fallback.
 router.post('/verify-reset-token', async (req, res, next) => {
   try {
     const { email, token } = req.body;
     if (!email || !token) return res.status(400).json({ error: 'Email and token required' });
 
-    const user = await User.findOne({
-      email: email.toLowerCase(),
-      resetToken: hashToken(token),
-      resetTokenExpiry: { $gt: new Date() },
-    }).select('+resetToken +resetTokenExpiry');
+    const normalizedEmail = email.toLowerCase();
+    const hashed          = hashToken(token);
+    const now             = new Date();
 
-    if (!user) return res.status(400).json({ error: 'Invalid or expired code' });
+    // ── Regular User ───────────────────────────────────────────────
+    // resetToken is select:false — cannot filter by it in findOne() directly.
+    // Fetch by email with +resetToken, then compare manually.
+    const user = await User.findOne({ email: normalizedEmail })
+      .select('+resetToken +resetTokenExpiry');
+
+    console.log('[verify-reset-token] user found:', !!user);
+    if (user) {
+      console.log('[verify-reset-token] user.resetToken:', user.resetToken);
+      console.log('[verify-reset-token] hashed submitted:', hashed);
+      console.log('[verify-reset-token] expiry:', user.resetTokenExpiry, '> now:', user.resetTokenExpiry > now);
+    }
+
+    if (
+      user &&
+      user.resetToken === hashed &&
+      user.resetTokenExpiry &&
+      user.resetTokenExpiry > now
+    ) {
+      return res.json({ valid: true });
+    }
+
+    // ── ClientAccount fallback ────────────────────────────────────
+    // ClientAccount uses loginOtp/loginOtpExpiry (same as Staff).
+    const clientAccount = await ClientAccount.findOne({ email: normalizedEmail })
+      .select('+loginOtp +loginOtpExpiry');
+
+    if (
+      clientAccount &&
+      clientAccount.loginOtp === hashed &&
+      clientAccount.loginOtpExpiry &&
+      clientAccount.loginOtpExpiry > now
+    ) {
+      return res.json({ valid: true });
+    }
+
+    // ── Staff fallback ─────────────────────────────────────────────
+    // loginOtp is select:false on the Staff schema, so we cannot filter
+    // by it directly in findOne() — MongoDB excludes select:false fields
+    // from query matching. Fetch by email first, then compare manually.
+    const staff = await Staff.findOne({ email: normalizedEmail })
+      .select('+loginOtp +loginOtpExpiry');
+
+    if (
+      !staff ||
+      staff.loginOtp !== hashed ||
+      !staff.loginOtpExpiry ||
+      staff.loginOtpExpiry < now
+    ) {
+      return res.status(400).json({ error: 'Invalid or expired code' });
+    }
 
     res.json({ valid: true });
   } catch (err) { next(err); }
@@ -944,9 +1015,12 @@ router.post('/resend-reset', async (req, res, next) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const normalizedEmail = email.toLowerCase();
+    const rawToken = randomToken();
+
+    // ── Regular User ───────────────────────────────────────────────
+    const user = await User.findOne({ email: normalizedEmail });
     if (user) {
-      const rawToken = randomToken();
       user.resetToken = hashToken(rawToken);
       user.resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
       await user.save();
@@ -956,9 +1030,95 @@ router.post('/resend-reset', async (req, res, next) => {
       } catch (e) {
         console.error('Reset email send failed:', e);
       }
+
+      return res.json({ message: 'If registered, a new code has been sent.' });
+    }
+
+    // ── Staff fallback ─────────────────────────────────────────────
+    const staff = await Staff.findOne({ email: normalizedEmail });
+    if (staff) {
+      staff.loginOtp       = hashToken(rawToken);
+      staff.loginOtpExpiry = new Date(Date.now() + 60 * 60 * 1000);
+      await staff.save();
+
+      try {
+        await sendVerificationEmail(staff.email, staff.firstName, rawToken);
+      } catch (e) {
+        console.error('Staff reset OTP resend failed:', e);
+      }
     }
 
     res.json({ message: 'If registered, a new code has been sent.' });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/send-change-password-otp
+// Sends a dedicated OTP for the account-settings password change flow.
+// Requires the user to be authenticated (Bearer token via requireAuth).
+// Stores the OTP in:
+//   - User          → resetToken + resetTokenExpiry
+//   - Staff/ClientAccount → loginOtp  + loginOtpExpiry
+// The OTP is then verified via POST /auth/verify-reset-token before
+// the frontend calls POST /auth/change-password.
+// ─────────────────────────────────────────────────────────────────
+router.post('/send-change-password-otp', requireAuth, async (req, res, next) => {
+  try {
+    const rawToken = randomToken();
+    const hashed   = hashToken(rawToken);
+    const expiry   = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // ── Staff ──────────────────────────────────────────────────────
+    if (req.isStaff) {
+      const staff = await Staff.findById(req.staff._id);
+      if (!staff) return res.status(404).json({ error: 'Staff account not found.' });
+
+      staff.loginOtp       = hashed;
+      staff.loginOtpExpiry = expiry;
+      await staff.save();
+
+      try {
+        await sendVerificationEmail(staff.email, staff.firstName, rawToken);
+      } catch (e) {
+        console.error('Staff change-password OTP send failed:', e);
+      }
+
+      return res.json({ message: 'A verification code has been sent to your email.' });
+    }
+
+    // ── Client Account ─────────────────────────────────────────────
+    if (req.isClientAccount) {
+      const clientAccount = await ClientAccount.findById(req.clientAccount._id);
+      if (!clientAccount) return res.status(404).json({ error: 'Client account not found.' });
+
+      clientAccount.loginOtp       = hashed;
+      clientAccount.loginOtpExpiry = expiry;
+      await clientAccount.save();
+
+      try {
+        await sendResetEmail(clientAccount.email, clientAccount.firstName, rawToken);
+      } catch (e) {
+        console.error('Client account change-password OTP send failed:', e);
+      }
+
+      return res.json({ message: 'A verification code has been sent to your email.' });
+    }
+
+    // ── Regular User ───────────────────────────────────────────────
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    user.resetToken       = hashed;
+    user.resetTokenExpiry = expiry;
+    await user.save();
+
+    try {
+      await sendResetEmail(user.email, user.firstName, rawToken);
+    } catch (e) {
+      console.error('User change-password OTP send failed:', e);
+    }
+
+    res.json({ message: 'A verification code has been sent to your email.' });
   } catch (err) { next(err); }
 });
 

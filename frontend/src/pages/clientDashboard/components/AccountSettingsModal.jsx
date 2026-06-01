@@ -1,37 +1,465 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../AuthContext";
-import { updateProfile } from "../../apiService";
+
+const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 
 // ─────────────────────────────────────────────────────────────────
-// changePassword — calls POST /auth/change-password
+// sendOtpForPasswordChange — POST /auth/send-change-password-otp
+// Authenticated endpoint — sends an OTP scoped specifically to the
+// account-settings password change flow. Works for User, Staff, and
+// ClientAccount. Requires a valid Bearer token.
+// ─────────────────────────────────────────────────────────────────
+async function sendOtpForPasswordChange(auth) {
+  const token = auth.getToken();
+  const res = await fetch(`${API_BASE}/auth/send-change-password-otp`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": import.meta.env.VITE_API_KEY,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Unable to send OTP.");
+  return data;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// verifyOtp — POST /auth/verify-reset-token
+// Verifies the OTP the user entered before changing the password.
+// Works for User/ClientAccount (resetToken) and Staff (loginOtp).
+// ─────────────────────────────────────────────────────────────────
+async function verifyOtp(email, token) {
+  const res = await fetch(`${API_BASE}/auth/verify-reset-token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": import.meta.env.VITE_API_KEY,
+    },
+    body: JSON.stringify({ email, token }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Invalid or expired code.");
+  return data;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// changePassword — POST /auth/change-password
 // Works for both regular users and staff (backend detects via token).
 // ─────────────────────────────────────────────────────────────────
 async function changePassword({ currentPassword, newPassword }, auth) {
   const token = auth.getToken();
-  return fetch(`${import.meta.env.VITE_API_URL || ""}/auth/change-password`, {
+  const res = await fetch(`${API_BASE}/auth/change-password`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "x-api-key": import.meta.env.VITE_API_KEY,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ currentPassword, newPassword }),
   });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Failed to change password. Please try again.");
+  return data;
 }
 
+// ─────────────────────────────────────────────────────────────────
+// OTPInput — 6-box OTP input, same pattern as the reset page
+// ─────────────────────────────────────────────────────────────────
+function OTPInput({ length = 6, onComplete, isError, isLoading, version }) {
+  const [values, setValues] = useState(Array(length).fill(""));
+  const inputRefs = useRef([]);
+
+  // Reset when version changes (resend or re-open)
+  useEffect(() => {
+    setValues(Array(length).fill(""));
+    inputRefs.current[0]?.focus();
+  }, [version, length]);
+
+  function handleChange(idx, val) {
+    const digit = val.replace(/\D/g, "").slice(-1);
+    const next = [...values];
+    next[idx] = digit;
+    setValues(next);
+    if (digit && idx < length - 1) inputRefs.current[idx + 1]?.focus();
+    const filled = next.join("");
+    if (filled.length === length && !next.includes("")) onComplete(filled);
+  }
+
+  function handleKeyDown(idx, e) {
+    if (e.key === "Backspace") {
+      if (values[idx]) {
+        const next = [...values];
+        next[idx] = "";
+        setValues(next);
+      } else if (idx > 0) {
+        inputRefs.current[idx - 1]?.focus();
+      }
+    }
+  }
+
+  function handlePaste(e) {
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, length);
+    if (!pasted) return;
+    e.preventDefault();
+    const next = Array(length).fill("");
+    pasted.split("").forEach((d, i) => { next[i] = d; });
+    setValues(next);
+    const focus = Math.min(pasted.length, length - 1);
+    inputRefs.current[focus]?.focus();
+    if (pasted.length === length) onComplete(pasted);
+  }
+
+  return (
+    <div style={{ display: "flex", gap: 8, justifyContent: "center", margin: "18px 0 6px" }}>
+      {values.map((v, i) => (
+        <input
+          key={i}
+          ref={(el) => (inputRefs.current[i] = el)}
+          type="text"
+          inputMode="numeric"
+          maxLength={1}
+          value={v}
+          disabled={isLoading}
+          onChange={(e) => handleChange(i, e.target.value)}
+          onKeyDown={(e) => handleKeyDown(i, e)}
+          onPaste={handlePaste}
+          style={{
+            width: 42,
+            height: 48,
+            textAlign: "center",
+            fontSize: 20,
+            fontWeight: 700,
+            fontFamily: "'Sora', sans-serif",
+            borderRadius: 10,
+            border: `2px solid ${isError ? "#c13515" : v ? "#1e8760" : "#d4e8dd"}`,
+            background: isError ? "#fff5f3" : "#fff",
+            color: isError ? "#c13515" : "#0c1c14",
+            outline: "none",
+            transition: "border-color 0.15s, background 0.15s",
+            boxSizing: "border-box",
+            animation: isError ? "otpShake 0.35s ease" : "none",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// OTPModal — overlay modal for OTP verification step
+// ─────────────────────────────────────────────────────────────────
+function OTPModal({ email, auth, onVerified, onCancel }) {
+  const [otpVersion, setOtpVersion] = useState(0);
+  const [otpStatus, setOtpStatus] = useState("idle"); // idle | loading | error
+  const [otpError, setOtpError] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(60);
+  const errorTimerRef = useRef(null);
+
+  useEffect(() => {
+    let timer;
+    if (resendCooldown > 0) {
+      timer = setInterval(() => setResendCooldown((c) => c - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  useEffect(() => () => clearTimeout(errorTimerRef.current), []);
+
+  function clearOtpErrorSoon() {
+    clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => {
+      setOtpStatus("idle");
+      setOtpError("");
+      setOtpVersion((v) => v + 1);
+    }, 700);
+  }
+
+  async function handleOtpComplete(otp) {
+    setOtpStatus("loading");
+    setOtpError("");
+    clearTimeout(errorTimerRef.current);
+    try {
+      await verifyOtp(email, otp);
+      clearTimeout(errorTimerRef.current);
+      onVerified(otp);
+    } catch (err) {
+      setOtpStatus("error");
+      setOtpError(err.message);
+      clearOtpErrorSoon();
+    }
+  }
+
+  async function handleResend() {
+    if (resendCooldown > 0) return;
+    try {
+      await sendOtpForPasswordChange(auth);
+      setOtpStatus("idle");
+      setOtpError("");
+      setOtpVersion((v) => v + 1);
+      setResendCooldown(60);
+    } catch (err) {
+      setOtpError(err.message);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(12,28,20,0.6)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        zIndex: 10100,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 20,
+          width: "100%",
+          maxWidth: 380,
+          boxShadow: "0 24px 64px rgba(12,28,20,0.22)",
+          animation: "modalSlideIn 0.22s cubic-bezier(0.34,1.56,0.64,1)",
+          padding: "28px 28px 24px",
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Verify Identity"
+      >
+        {/* Icon */}
+        <div style={{ textAlign: "center", marginBottom: 14 }}>
+          <div
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: "50%",
+              background: "#eaf8f1",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 12,
+            }}
+          >
+            <i className="ti ti-shield-lock" style={{ fontSize: 24, color: "#1e8760" }} aria-hidden="true" />
+          </div>
+          <h3
+            style={{
+              fontFamily: "'Sora', sans-serif",
+              fontSize: "1.05rem",
+              fontWeight: 800,
+              color: "#0c1c14",
+              margin: "0 0 6px",
+            }}
+          >
+            Verify your identity
+          </h3>
+          <p style={{ fontSize: 13, color: "#6a8b7c", margin: 0, lineHeight: 1.5 }}>
+            A 6-digit code was sent to{" "}
+            <strong style={{ color: "#0c1c14" }}>{email}</strong>.
+            <br />Enter it below to continue.
+          </p>
+        </div>
+
+        {/* OTP boxes */}
+        <OTPInput
+          key={otpVersion}
+          length={6}
+          onComplete={handleOtpComplete}
+          isError={otpStatus === "error"}
+          isLoading={otpStatus === "loading"}
+          version={otpVersion}
+        />
+
+        {/* Error message */}
+        {otpStatus === "error" && (
+          <p
+            style={{
+              color: "#c13515",
+              fontSize: "0.82rem",
+              textAlign: "center",
+              margin: "6px 0 0",
+            }}
+          >
+            {otpError}
+          </p>
+        )}
+
+        {/* Loading indicator */}
+        {otpStatus === "loading" && (
+          <p style={{ color: "#9ab8a9", fontSize: "0.82rem", textAlign: "center", margin: "6px 0 0" }}>
+            Verifying…
+          </p>
+        )}
+
+        {/* Resend + Cancel */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginTop: 20,
+            gap: 10,
+          }}
+        >
+          <button
+            onClick={onCancel}
+            style={{
+              background: "transparent",
+              border: "1.5px solid #d4e8dd",
+              borderRadius: 10,
+              padding: "9px 18px",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#4a6b5a",
+              cursor: "pointer",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleResend}
+            disabled={resendCooldown > 0}
+            style={{
+              background: resendCooldown > 0 ? "#e3ede8" : "#eaf8f1",
+              border: "none",
+              borderRadius: 10,
+              padding: "9px 18px",
+              fontSize: 13,
+              fontWeight: 700,
+              color: resendCooldown > 0 ? "#6a8b7c" : "#1e8760",
+              cursor: resendCooldown > 0 ? "not-allowed" : "pointer",
+              transition: "all 0.2s",
+            }}
+          >
+            {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Code"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SuccessModal — shown after password is changed successfully
+// ─────────────────────────────────────────────────────────────────
+function SuccessModal({ onClose }) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(12,28,20,0.6)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        zIndex: 10200,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 20,
+          width: "100%",
+          maxWidth: 360,
+          boxShadow: "0 24px 64px rgba(12,28,20,0.22)",
+          animation: "modalSlideIn 0.25s cubic-bezier(0.34,1.56,0.64,1)",
+          padding: "36px 28px 28px",
+          textAlign: "center",
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Password Changed Successfully"
+      >
+        {/* Animated checkmark */}
+        <div
+          style={{
+            width: 68,
+            height: 68,
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #eaf8f1 0%, #d1f0e3 100%)",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 18,
+            boxShadow: "0 8px 24px rgba(30,135,96,0.18)",
+            animation: "successPop 0.4s cubic-bezier(0.34,1.56,0.64,1) 0.1s both",
+          }}
+        >
+          <i
+            className="ti ti-lock-check"
+            style={{ fontSize: 30, color: "#1e8760" }}
+            aria-hidden="true"
+          />
+        </div>
+
+        <h3
+          style={{
+            fontFamily: "'Sora', sans-serif",
+            fontSize: "1.15rem",
+            fontWeight: 800,
+            color: "#0c1c14",
+            margin: "0 0 8px",
+          }}
+        >
+          Password Updated!
+        </h3>
+        <p
+          style={{
+            fontSize: 13,
+            color: "#6a8b7c",
+            margin: "0 0 24px",
+            lineHeight: 1.6,
+          }}
+        >
+          Your password has been changed successfully.
+          <br />Keep it safe and don't share it with anyone.
+        </p>
+
+        <button
+          onClick={onClose}
+          style={{
+            width: "100%",
+            padding: "11px 0",
+            borderRadius: 12,
+            border: "none",
+            background: "#0c1c14",
+            color: "#eaf5f0",
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            fontFamily: "inherit",
+            transition: "background 0.15s",
+          }}
+          className="acc-save-btn"
+        >
+          <i className="ti ti-check" style={{ fontSize: 15 }} aria-hidden="true" />
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// AccountSettingsModal — main component
+// ─────────────────────────────────────────────────────────────────
 export default function AccountSettingsModal({ isOpen, onClose }) {
   const { getUser, setUser } = useAuth();
   const auth = useAuth();
   const user = getUser();
-
-  // ── Profile form ─────────────────────────────────────────────────
-  const [form, setForm] = useState({
-    firstName: "",
-    lastName: "",
-    propertyTagPrefix: "",
-  });
-  const [saving, setSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState(null); // 'success' | 'error' | null
-  const [errorMsg, setErrorMsg] = useState("");
 
   // ── Password form ────────────────────────────────────────────────
   const [pwForm, setPwForm] = useState({
@@ -40,7 +468,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
     confirmPassword: "",
   });
   const [pwSaving, setPwSaving] = useState(false);
-  const [pwStatus, setPwStatus] = useState(null); // 'success' | 'error' | null
+  const [pwStatus, setPwStatus] = useState(null); // 'error' | null
   const [pwErrorMsg, setPwErrorMsg] = useState("");
   const [showPw, setShowPw] = useState({
     current: false,
@@ -48,37 +476,36 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
     confirm: false,
   });
 
+  // ── OTP & success modal state ────────────────────────────────────
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  // Stores the verified OTP token temporarily so we can use it after OTP step
+  const verifiedTokenRef = useRef(null);
+
   const overlayRef = useRef(null);
 
-  const isStaff = user?.role === "staff";
-
-  // Sync form with current user data whenever modal opens
+  // Reset password form whenever modal opens
   useEffect(() => {
-    if (isOpen && user) {
-      setForm({
-        firstName: user.firstName || "",
-        lastName: user.lastName || "",
-        propertyTagPrefix: user.propertyTagPrefix || "",
-      });
-      setSaveStatus(null);
-      setErrorMsg("");
-      // Reset password form on open
+    if (isOpen) {
       setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
       setPwStatus(null);
       setPwErrorMsg("");
       setShowPw({ current: false, next: false, confirm: false });
+      setShowOtpModal(false);
+      setShowSuccessModal(false);
+      verifiedTokenRef.current = null;
     }
-  }, [isOpen, user]);
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close on Escape key
   useEffect(() => {
     if (!isOpen) return;
     function handleKey(e) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !showOtpModal && !showSuccessModal) onClose();
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, showOtpModal, showSuccessModal]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -91,13 +518,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
   }, [isOpen]);
 
   function handleOverlayClick(e) {
-    if (e.target === overlayRef.current) onClose();
-  }
-
-  function handleChange(e) {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-    if (saveStatus) setSaveStatus(null);
+    if (e.target === overlayRef.current && !showOtpModal && !showSuccessModal) onClose();
   }
 
   function handlePwChange(e) {
@@ -106,45 +527,8 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
     if (pwStatus) setPwStatus(null);
   }
 
-  // ── Save profile ─────────────────────────────────────────────────
+  // ── Save Changes: validates pw fields then sends OTP ───────────────
   async function handleSave() {
-    if (!form.firstName.trim()) {
-      setErrorMsg("First name is required.");
-      setSaveStatus("error");
-      return;
-    }
-
-    setSaving(true);
-    setSaveStatus(null);
-    setErrorMsg("");
-
-    try {
-      const res = await updateProfile(form, auth);
-      if (!res || !res.ok) {
-        const body = res ? await res.json().catch(() => ({})) : {};
-        setErrorMsg(body.error || "Failed to update profile. Please try again.");
-        setSaveStatus("error");
-        return;
-      }
-      const data = await res.json();
-      // Persist updated user to session storage
-      if (data.user) {
-        setUser(data.user);
-      } else {
-        // Merge local changes into stored user
-        setUser({ ...user, ...form });
-      }
-      setSaveStatus("success");
-    } catch {
-      setErrorMsg("An unexpected error occurred. Please try again.");
-      setSaveStatus("error");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  // ── Save password ────────────────────────────────────────────────
-  async function handlePasswordSave() {
     const { currentPassword, newPassword, confirmPassword } = pwForm;
 
     if (!currentPassword) {
@@ -168,34 +552,47 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
       return;
     }
 
+    // Send OTP to user's email and open OTP modal
     setPwSaving(true);
     setPwStatus(null);
     setPwErrorMsg("");
-
     try {
-      const res = await changePassword({ currentPassword, newPassword }, auth);
-      const body = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setPwErrorMsg(body.error || "Failed to change password. Please try again.");
-        setPwStatus("error");
-        return;
-      }
-
-      // If backend returns updated user, persist it
-      if (body.user) {
-        setUser(body.user);
-      }
-
-      setPwStatus("success");
-      setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      setShowPw({ current: false, next: false, confirm: false });
-    } catch {
-      setPwErrorMsg("An unexpected error occurred. Please try again.");
+      await sendOtpForPasswordChange(auth);
+      setShowOtpModal(true);
+    } catch (err) {
+      setPwErrorMsg(err.message);
       setPwStatus("error");
     } finally {
       setPwSaving(false);
     }
+  }
+
+  // ── Step 2: OTP verified — now actually change the password ──────
+  async function handleOtpVerified(otp) {
+    verifiedTokenRef.current = otp;
+    setShowOtpModal(false);
+
+    const { currentPassword, newPassword } = pwForm;
+
+    try {
+      const body = await changePassword({ currentPassword, newPassword }, auth);
+      if (body.user) setUser(body.user);
+
+      // Reset password form
+      setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setShowPw({ current: false, next: false, confirm: false });
+      verifiedTokenRef.current = null;
+
+      // Show success modal
+      setShowSuccessModal(true);
+    } catch (err) {
+      setPwErrorMsg(err.message);
+      setPwStatus("error");
+    }
+  }
+
+  function handleSuccessClose() {
+    setShowSuccessModal(false);
   }
 
   if (!isOpen) return null;
@@ -365,16 +762,11 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
       boxSizing: "border-box",
       fontFamily: "inherit",
     },
-    inputFocus: {
-      borderColor: "#1e8760",
-      boxShadow: "0 0 0 3px rgba(30,135,96,0.1)",
-    },
     row2: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
       gap: 12,
     },
-    // Password input wrapper — relative so the eye icon can be absolute
     pwInputWrap: {
       position: "relative",
       display: "flex",
@@ -455,8 +847,8 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
       alignItems: "center",
       gap: 7,
       transition: "background 0.15s",
+      fontFamily: "inherit",
     }),
-    // Inline footer for the password section (sits inside body, not in the sticky footer)
     pwFooter: {
       display: "flex",
       alignItems: "center",
@@ -474,15 +866,20 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
     },
   };
 
-  const initials = [user?.firstName, user?.lastName]
-    .filter(Boolean)
-    .map((n) => n.charAt(0).toUpperCase())
-    .join("") || "U";
+  const initials =
+    [user?.firstName, user?.lastName]
+      .filter(Boolean)
+      .map((n) => n.charAt(0).toUpperCase())
+      .join("") || "U";
 
   const formattedLastLogin = user?.lastLoginAt
     ? new Date(user.lastLoginAt).toLocaleString("en-PH", {
-        month: "short", day: "numeric", year: "numeric",
-        hour: "numeric", minute: "2-digit", hour12: true,
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
       })
     : "—";
 
@@ -497,6 +894,17 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
+        @keyframes otpShake {
+          0%, 100% { transform: translateX(0); }
+          20%      { transform: translateX(-5px); }
+          40%      { transform: translateX(5px); }
+          60%      { transform: translateX(-4px); }
+          80%      { transform: translateX(4px); }
+        }
+        @keyframes successPop {
+          from { opacity: 0; transform: scale(0.6); }
+          to   { opacity: 1; transform: scale(1); }
+        }
         .acc-input:focus {
           border-color: #1e8760!important;
           box-shadow: 0 0 0 3px rgba(30,135,96,0.10)!important;
@@ -510,6 +918,21 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
         .acc-save-btn:hover:not(:disabled) { background: #1a3325!important; }
         .acc-eye-btn:hover { color: #0c1c14!important; }
       `}</style>
+
+      {/* OTP modal layer */}
+      {showOtpModal && (
+        <OTPModal
+          email={user?.email}
+          auth={auth}
+        onVerified={handleOtpVerified}
+          onCancel={() => setShowOtpModal(false)}
+        />
+      )}
+
+      {/* Success modal layer */}
+      {showSuccessModal && (
+        <SuccessModal onClose={handleSuccessClose} />
+      )}
 
       <div style={styles.overlay} ref={overlayRef} onClick={handleOverlayClick}>
         <div style={styles.modal} role="dialog" aria-modal="true" aria-label="Account Settings">
@@ -570,65 +993,22 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
               </div>
             </div>
 
-            {/* ── Editable profile fields ── */}
+            {/* ── Name (read-only) ── */}
             <div style={styles.section}>
-              <p style={styles.sectionLabel}>Edit Profile</p>
-
               <div style={styles.row2}>
-                <div style={styles.fieldGroup}>
-                  <label style={styles.label} htmlFor="acc-firstName">First Name</label>
-                  <input
-                    id="acc-firstName"
-                    className="acc-input"
-                    style={styles.input}
-                    type="text"
-                    name="firstName"
-                    value={form.firstName}
-                    onChange={handleChange}
-                    placeholder="First name"
-                    maxLength={50}
-                    autoComplete="given-name"
-                  />
+                <div style={styles.readOnlyRow}>
+                  <div style={styles.readOnlyContent}>
+                    <p style={styles.readOnlyKey}>First Name</p>
+                    <p style={styles.readOnlyVal}>{user?.firstName || "—"}</p>
+                  </div>
                 </div>
-                <div style={styles.fieldGroup}>
-                  <label style={styles.label} htmlFor="acc-lastName">Last Name</label>
-                  <input
-                    id="acc-lastName"
-                    className="acc-input"
-                    style={styles.input}
-                    type="text"
-                    name="lastName"
-                    value={form.lastName}
-                    onChange={handleChange}
-                    placeholder="Last name"
-                    maxLength={50}
-                    autoComplete="family-name"
-                  />
+                <div style={styles.readOnlyRow}>
+                  <div style={styles.readOnlyContent}>
+                    <p style={styles.readOnlyKey}>Last Name</p>
+                    <p style={styles.readOnlyVal}>{user?.lastName || "—"}</p>
+                  </div>
                 </div>
               </div>
-
-              {/* Property tag prefix — hidden for staff, they don't own properties */}
-              {!isStaff && (
-                <div style={styles.fieldGroup}>
-                  <label style={styles.label} htmlFor="acc-prefix">
-                    Property Tag Prefix
-                    <span style={{ fontWeight: 400, color: "#9ab8a9", marginLeft: 6 }}>
-                      (used to filter your Smoobu properties)
-                    </span>
-                  </label>
-                  <input
-                    id="acc-prefix"
-                    className="acc-input"
-                    style={styles.input}
-                    type="text"
-                    name="propertyTagPrefix"
-                    value={form.propertyTagPrefix}
-                    onChange={handleChange}
-                    placeholder="e.g. _charmaine"
-                    maxLength={100}
-                  />
-                </div>
-              )}
             </div>
 
             {/* ── Divider ── */}
@@ -722,81 +1102,37 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                 </div>
               </div>
 
-              {/* Password section footer (status + button) */}
-              <div style={styles.pwFooter}>
-                <div style={styles.pwStatusMsg}>
-                  {pwStatus === "success" && (
-                    <>
-                      <i className="ti ti-circle-check" style={{ color: "#1e8760", fontSize: 15 }} aria-hidden="true" />
-                      <span style={{ color: "#1e8760" }}>Password updated successfully.</span>
-                    </>
-                  )}
-                  {pwStatus === "error" && (
-                    <>
-                      <i className="ti ti-alert-circle" style={{ color: "#c13515", fontSize: 15 }} aria-hidden="true" />
-                      <span style={{ color: "#c13515" }}>{pwErrorMsg}</span>
-                    </>
-                  )}
+              {/* Password error message */}
+              {pwStatus === "error" && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "12px", fontWeight: 500, marginTop: 4 }}>
+                  <i className="ti ti-alert-circle" style={{ color: "#c13515", fontSize: 15 }} aria-hidden="true" />
+                  <span style={{ color: "#c13515" }}>{pwErrorMsg}</span>
                 </div>
-                <button
-                  style={styles.saveBtn(pwSaving)}
-                  className="acc-save-btn"
-                  onClick={handlePasswordSave}
-                  disabled={pwSaving}
-                >
-                  {pwSaving ? (
-                    <>
-                      <i className="ti ti-loader-2" style={{ fontSize: 14, animation: "spin 0.8s linear infinite" }} aria-hidden="true" />
-                      Updating…
-                    </>
-                  ) : (
-                    <>
-                      <i className="ti ti-lock-check" style={{ fontSize: 14 }} aria-hidden="true" />
-                      Update Password
-                    </>
-                  )}
-                </button>
-              </div>
+              )}
             </div>
           </div>
 
-          {/* ── Footer (profile save) ── */}
-          <div style={styles.footer}>
-            {/* Profile save status message */}
-            <div style={styles.statusMsg}>
-              {saveStatus === "success" && (
-                <>
-                  <i className="ti ti-circle-check" style={{ color: "#1e8760", fontSize: 15 }} aria-hidden="true" />
-                  <span style={{ color: "#1e8760" }}>Changes saved successfully.</span>
-                </>
-              )}
-              {saveStatus === "error" && (
-                <>
-                  <i className="ti ti-alert-circle" style={{ color: "#c13515", fontSize: 15 }} aria-hidden="true" />
-                  <span style={{ color: "#c13515" }}>{errorMsg}</span>
-                </>
-              )}
-            </div>
-
+          {/* ── Footer ── */}
+          <div style={{ ...styles.footer, justifyContent: "flex-end" }}>
             <div style={styles.btnGroup}>
               <button
                 style={styles.cancelBtn}
                 className="acc-cancel-btn"
                 onClick={onClose}
-                disabled={saving}
+                disabled={pwSaving}
               >
                 Cancel
               </button>
               <button
-                style={styles.saveBtn(saving)}
+                style={styles.saveBtn(pwSaving)}
                 className="acc-save-btn"
                 onClick={handleSave}
-                disabled={saving}
+                disabled={pwSaving}
               >
-                {saving ? (
+                {pwSaving ? (
                   <>
                     <i className="ti ti-loader-2" style={{ fontSize: 14, animation: "spin 0.8s linear infinite" }} aria-hidden="true" />
-                    Saving…
+                    Sending code…
                   </>
                 ) : (
                   <>

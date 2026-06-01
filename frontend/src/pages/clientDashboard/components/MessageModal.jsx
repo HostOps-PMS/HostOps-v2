@@ -455,6 +455,38 @@ export default function MessageModal({
               ))}
             </div>
 
+            {/* ── Staff-only reply notice (non-interactive) ── */}
+            <div style={{
+              padding: '14px 20px',
+              borderTop: T.border,
+              background: T.bgSurface,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              flexShrink: 0,
+            }}>
+              <div style={{
+                width: 34, height: 34, borderRadius: '50%',
+                background: '#fff4e0', color: '#c07d00',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, fontSize: 16,
+              }}>
+                🔒
+              </div>
+              <div>
+                <div style={{
+                  fontFamily: T.fontBody, fontWeight: 700,
+                  fontSize: 13, color: T.text,
+                }}>
+                  Replying is restricted to staff accounts
+                </div>
+                <div style={{
+                  fontFamily: T.fontBody, fontSize: 11.5, color: T.muted, marginTop: 2,
+                }}>
+                  Only staff members can send messages to guests.
+                </div>
+              </div>
+            </div>
 
           </>
         )}
