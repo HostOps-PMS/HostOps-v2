@@ -49,6 +49,27 @@ export default function LoginPage() {
     setView(nextView);
   };
 
+  const handleAuthSuccess = (data) => {
+    setAuthData(data);
+    if (data.isAdmin || data.user?.role === 'admin' || data.user?.role === 'team_leader') {
+      showMsg(`Welcome, ${data.user.firstName}! Redirecting...`, 'success');
+      setTimeout(() => {
+        const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5173';
+        const params = new URLSearchParams({
+          _t: data.accessToken,
+          _u: JSON.stringify(data.user),
+        });
+        window.location.href = `${dashboardBase}/admin?${params.toString()}`;
+      }, 800);
+    } else {
+      showMsg(
+        `Welcome, ${data.user.firstName}! Please select a property to continue.`,
+        'success',
+      );
+      setView(VIEWS.PROPERTY_SELECT);
+    }
+  };
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlide(prev => (prev + 1) % SLIDES.length);
@@ -131,6 +152,7 @@ export default function LoginPage() {
                 );
                 setView(VIEWS.CLIENT_ACCOUNT_PROPERTY_SELECT);
               }}
+              onAuthSuccess={handleAuthSuccess}
             />
           )}
 
@@ -141,24 +163,7 @@ export default function LoginPage() {
               showMsg={showMsg}
               hideMsg={hideMsg}
               onBack={() => handleViewChange(VIEWS.LOGIN)}
-              onOTPSuccess={(data) => {
-                setAuthData(data);
-                if (data.isAdmin || data.user?.role === 'admin' || data.user?.role === 'team_leader') {
-                  showMsg(`Welcome, ${data.user.firstName}! Redirecting...`, 'success');
-                  const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5173';
-                  const params = new URLSearchParams({
-                    _t: data.accessToken,
-                    _u: JSON.stringify(data.user),
-                  });
-                  window.location.href = `${dashboardBase}/admin?${params.toString()}`;
-                } else {
-                  showMsg(
-                    `Welcome, ${data.user.firstName}! Please select a property to continue.`,
-                    'success',
-                  );
-                  setView(VIEWS.PROPERTY_SELECT);
-                }
-              }}
+              onAuthSuccess={handleAuthSuccess}
             />
           )}
 

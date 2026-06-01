@@ -4,7 +4,7 @@ import { loginUser } from '../services/authService';
 import { useAuthSubmit } from '../hooks/useAuth';
 import { useAuth } from '../../AuthContext';
 
-export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, onClientAccountLogin }) {
+export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, onClientAccountLogin, onAuthSuccess }) {
   const navigate = useNavigate();
   const auth = useAuth();
   const [email, setEmail] = useState('');
@@ -59,23 +59,7 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
         sessionStorage.removeItem('hp_must_change_password');
       }
 
-      showMsg(`Welcome back, ${data.user.firstName}! Redirecting...`, 'success');
-
-      setTimeout(() => {
-        if (data.isAdmin || data.user.role === 'admin' || data.user.role === 'team_leader') {
-          // ✅ Admin & Team Leader: cross-origin redirect to the admin app.
-          // Token is passed via URL params since sessionStorage is port-scoped.
-          const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5173';
-          const params = new URLSearchParams({
-            _t: data.accessToken,
-            _u: JSON.stringify(data.user),
-          });
-          window.location.href = `${dashboardBase}/admin?${params.toString()}`;
-        } else {
-          // ✅ All other users: stay on the same app (5174), no port switch needed.
-          navigate('/dashboard', { replace: true });
-        }
-      }, 800);
+      onAuthSuccess(data);
     },
     onError: (msg) => showMsg(msg),
   });
