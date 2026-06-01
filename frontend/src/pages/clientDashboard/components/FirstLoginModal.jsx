@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { changePassword } from '../../Login/services/authService';
+import { changePassword } from '../../Login/services/authservice';
 
 // Inline password validation — mirrors the rules in src/utils/validators.js
 function validateNewPassword(password) {

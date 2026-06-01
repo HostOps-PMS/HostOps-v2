@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { verifyLoginOtp } from '../services/authService';
+import { verifyLoginOtp } from '../services/authservice';
 import { useAuthSubmit } from '../hooks/useAuth';
 import { useAuth } from '../../AuthContext';
 import OTPInput from './OTPInput';
