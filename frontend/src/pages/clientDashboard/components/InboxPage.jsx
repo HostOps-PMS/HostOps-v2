@@ -501,22 +501,20 @@ export default function InboxPage() {
                   </>
                 ) : (
                   <div
-                    onClick={() => setPinModalOpen(true)}
                     style={{
                       padding: "14px 16px", borderRadius: "10px",
                       border: `1px dashed ${border}`,
-                      background: inputBg, cursor: "pointer",
+                      background: inputBg,
                       display: "flex", alignItems: "center", gap: 10,
-                      transition: "all .15s",
                     }}
                   >
                     <span style={{ fontSize: "18px" }}>🔒</span>
                     <div>
                       <div style={{ fontSize: "13px", fontWeight: 600, color: textSub }}>
-                        Staff only — click to unlock reply
+                        Replying is restricted to staff accounts
                       </div>
                       <div style={{ fontSize: "11px", color: dark ? "#2e5c3e" : "#b8d0c4" }}>
-                        Enter your staff PIN to send messages
+                        Only staff members can send messages to guests
                       </div>
                     </div>
                   </div>

@@ -240,7 +240,7 @@ router.post('/login', async (req, res, next) => {
       return res.status(403).json({ error: 'Please verify your email first' });
     }
 
-    const isAdmin = user.tag === "Main Admin" || user.role === "admin" || user.email === process.env.ADMIN_ROLE;
+    const isAdmin = user.tag === "Main Admin" || user.role === "admin" || user.role === "team_leader" || user.email === process.env.ADMIN_ROLE;
     let isTrusted = false;
     if (!isAdmin) { 
       if (deviceId) {
