@@ -15,11 +15,12 @@ import { useAuth } from '../../AuthContext';
 //   property the user selected in PropertySelectForm.
 //
 // ── ALL PROPERTIES (selectedPropertyId === '__all__') ──
-//   Client Account login step — shown when "All Properties" is selected.
-//   Accepts clientAccount email + password, calls POST /auth/login,
-//   which detects the clientAccount in the DB and returns isClientAccount: true.
-//   No property access check is performed — the clientAccount has access to
-//   all parent client properties by design (req.staffPropertyIds = [] in middleware).
+//   Client Account or Team Leader login step — shown when "All Properties" is selected.
+//   Accepts clientAccount OR team_leader email + password, calls POST /auth/login.
+//   - If isClientAccount: true → stores clientAccount record, clears property scope.
+//   - If user.role === 'team_leader' → stores user record, clears property scope.
+//   No property access check is performed for either — they have access to all
+//   parent client properties by design (req.staffPropertyIds = [] in middleware).
 //   On success: clears hp_selected_property_id/name so dashboard shows everything.
 //
 // Property ID matching (specific property flow):
@@ -60,36 +61,58 @@ export default function DomainLoginForm({ userData, selectedPropertyId, showMsg,
 
     try {
       // ── ALL PROPERTIES FLOW ────────────────────────────────────────
-      // Use POST /auth/login (loginUser) which detects clientAccount first.
-      // No property access check needed — clientAccount has access to all
-      // parent client properties by design.
+      // Use POST /auth/login (loginUser) which detects clientAccount first,
+      // then falls through to regular user login (team_leader, etc.).
+      // No property access check needed — clientAccount and team_leader
+      // have access to all parent client properties by design.
       if (isAllProperties) {
         const data = await loginUser({ email: email.trim(), password });
 
-        // Must be a clientAccount login — reject staff/user logins here
-        if (!data.isClientAccount) {
-          showMsg('Please use your client account credentials to access all properties.');
-          setLoading(false);
+        // ── Client Account ─────────────────────────────────────────
+        if (data.isClientAccount) {
+          auth.setToken(data.accessToken);
+          auth.setUser({ ...data.clientAccount, role: 'clientAccount', isClientAccount: true });
+
+          // Clear property scope — dashboard will show all properties
+          sessionStorage.removeItem('hp_selected_property_id');
+          sessionStorage.removeItem('hp_selected_property_name');
+
+          if (data.mustChangePassword) {
+            sessionStorage.setItem('hp_must_change_password', 'true');
+          } else {
+            sessionStorage.removeItem('hp_must_change_password');
+          }
+
+          showMsg(`Welcome, ${data.clientAccount.firstName}! Redirecting…`, 'success');
+          setTimeout(() => navigate('/dashboard', { replace: true }), 800);
           return;
         }
 
-        // Store the clientAccount token and record
-        auth.setToken(data.accessToken);
-        auth.setUser({ ...data.clientAccount, role: 'clientAccount', isClientAccount: true });
+        // ── Team Leader ────────────────────────────────────────────
+        // Team leaders are allowed through the __all__ flow — they have
+        // access to all properties of their assigned client (serverId).
+        if (data.user?.role === 'team_leader') {
+          auth.setToken(data.accessToken);
+          auth.setUser(data.user);
 
-        // Clear property scope — dashboard will show all properties
-        sessionStorage.removeItem('hp_selected_property_id');
-        sessionStorage.removeItem('hp_selected_property_name');
+          // Clear property scope — dashboard will show all properties
+          sessionStorage.removeItem('hp_selected_property_id');
+          sessionStorage.removeItem('hp_selected_property_name');
 
-        // If first-login, flag for dashboard's password-change modal
-        if (data.mustChangePassword) {
-          sessionStorage.setItem('hp_must_change_password', 'true');
-        } else {
-          sessionStorage.removeItem('hp_must_change_password');
+          if (data.mustChangePassword) {
+            sessionStorage.setItem('hp_must_change_password', 'true');
+          } else {
+            sessionStorage.removeItem('hp_must_change_password');
+          }
+
+          showMsg(`Welcome, ${data.user.firstName}! Redirecting…`, 'success');
+          setTimeout(() => navigate('/dashboard', { replace: true }), 800);
+          return;
         }
 
-        showMsg(`Welcome, ${data.clientAccount.firstName}! Redirecting…`, 'success');
-        setTimeout(() => navigate('/dashboard', { replace: true }), 800);
+        // Reject any other role (regular client, admin, staff, etc.)
+        showMsg('Please use your client account or team leader credentials to access all properties.');
+        setLoading(false);
         return;
       }
 
@@ -143,26 +166,26 @@ export default function DomainLoginForm({ userData, selectedPropertyId, showMsg,
   return (
     <>
       <h1 className="lp-h1">
-        {isAllProperties ? 'Client Account Sign In' : 'Staff Sign In'}
+        {isAllProperties ? 'Domain Login' : 'Staff Sign In'}
       </h1>
       <p className="lp-sub">
         {isAllProperties
-          ? 'Enter your client account credentials to access all properties.'
-          : 'Enter your staff credentials to access the selected property.'}
+          ? 'Enter your domain account credentials to access all properties.'
+          : 'Enter your domain credentials to access the selected property.'}
       </p>
 
       <div style={{ marginTop: '24px' }}>
         {/* Email field */}
         <div style={{ marginBottom: '16px' }}>
           <label className="lp-label" htmlFor="dl-email">
-            {isAllProperties ? 'Client Account Email' : 'Staff Email'}
+            {isAllProperties ? 'Email' : 'Staff Email'}
           </label>
           <div style={{ position: 'relative' }}>
             <input
               id="dl-email"
               className="lp-input"
               type="email"
-              placeholder={isAllProperties ? 'clientaccount@example.com' : 'staff@example.com'}
+              placeholder={isAllProperties ? 'account@example.com' : 'staff@example.com'}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onKeyDown={handleKeyDown}

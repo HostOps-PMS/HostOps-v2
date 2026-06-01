@@ -917,6 +917,8 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
         .acc-cancel-btn:hover { background: #f0f8f4!important; }
         .acc-save-btn:hover:not(:disabled) { background: #1a3325!important; }
         .acc-eye-btn:hover { color: #0c1c14!important; }
+        .acc-modal-scroll::-webkit-scrollbar { display: none; }
+        .acc-modal-scroll { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
       {/* OTP modal layer */}
@@ -935,7 +937,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
       )}
 
       <div style={styles.overlay} ref={overlayRef} onClick={handleOverlayClick}>
-        <div style={styles.modal} role="dialog" aria-modal="true" aria-label="Account Settings">
+        <div style={styles.modal} className="acc-modal-scroll" role="dialog" aria-modal="true" aria-label="Account Settings">
 
           {/* ── Header ── */}
           <div style={styles.header}>
