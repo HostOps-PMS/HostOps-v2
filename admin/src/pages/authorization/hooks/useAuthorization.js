@@ -12,7 +12,7 @@
  *   resend          () => void
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { verifyOtp, resendOtp, sendLoginOtp } from '../services/authService';
 
 const RESEND_COOLDOWN_SEC = 60;
@@ -59,6 +59,7 @@ export function useAuthorization(onAuthorized) {
   const [resendLoading, setResendLoading]   = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [message, setMessage]               = useState(null);
+  const otpSentRef                          = useRef(false); 
 
   // 1. Bootstrap session from URL params (_t / _u) if present.
   //    Must run synchronously before sendLoginOtp so getAdminEmail()
@@ -67,9 +68,12 @@ export function useAuthorization(onAuthorized) {
   useEffect(() => {
     bootstrapSessionFromUrlParams();
 
-    sendLoginOtp().catch((err) => {
-      console.error('Failed to send initial login OTP:', err);
-    });
+     if (!otpSentRef.current) {
+      otpSentRef.current = true;
+      sendLoginOtp().catch((err) => {
+        console.error('Failed to send initial login OTP:', err);
+      });
+    }
   }, []);
 
   function showMessage(text, type = 'error') {
