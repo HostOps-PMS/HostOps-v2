@@ -54,6 +54,13 @@ const staffSchema = new mongoose.Schema({
   },
 
   lastLoginAt: { type: Date },
+
+  // ── OTP for password-change verification ─────────────────────────
+  // Used by POST /auth/send-change-password-otp and
+  // POST /auth/verify-reset-token (staff path).
+  // Stored hashed; cleared after successful verification.
+  loginOtp:       { type: String, select: false },
+  loginOtpExpiry: { type: Date,   select: false },
 }, {
   timestamps: true,
 });
