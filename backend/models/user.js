@@ -79,6 +79,16 @@ const userSchema = new mongoose.Schema({
   // User must change password on first dashboard load; only then is isVerified set to true.
   mustChangePassword: { type: Boolean, default: false },
 
+  pin: {
+    type: String,
+    select: false,
+  },
+
+  mustChangePin: {
+    type: Boolean,
+    default: false,
+  },
+
 // Activity tracking
   lastLoginAt: { type: Date },
 
@@ -110,10 +120,14 @@ userSchema.pre('save', function(next) {
   next();
 });
 
-// ── Hash password before save ─────────────────────────────────
+// ── Hash password and pin before save ─────────────────────────────────
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
+  if (this.isModified('password')) {
+    this.password = await bcrypt.hash(this.password, 12);
+  }
+  if (this.isModified('pin')) {
+    this.pin = await bcrypt.hash(this.pin, 12);
+  }
   next();
 });
 

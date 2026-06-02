@@ -5,6 +5,7 @@ const INITIAL_FORM = {
   businessName: '',
   email:        '',
   password:     '',
+  pin:          '',
 };
 
 const newProperty = () => ({ name: '', smoobuApiKey: '' });
@@ -71,6 +72,10 @@ export default function AddClientModal({ onClose, onSuccess }) {
       setError('Password must be at least 8 characters.');
       return;
     }
+    if (!/^\d{6}$/.test(form.pin)) {
+      setError('PIN must be exactly 6 digits.');
+      return;
+    }
     for (let i = 0; i < properties.length; i++) {
       if (!properties[i].name.trim()) {
         setError(`Property ${i + 1} name is required.`);
@@ -86,6 +91,7 @@ export default function AddClientModal({ onClose, onSuccess }) {
         businessName: form.businessName.trim(),
         email:        form.email.trim(),
         password:     form.password,
+        pin:          form.pin,
         role:         'client',
         properties:   properties
           .filter((p) => p.name.trim())
@@ -181,6 +187,22 @@ export default function AddClientModal({ onClose, onSuccess }) {
                 )}
               </button>
             </div>
+          </Field>
+
+          <Field label="Temporary 6-Digit PIN" required>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="\d{6}"
+              maxLength={6}
+              placeholder="Exactly 6 digits"
+              value={form.pin}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                setForm((f) => ({ ...f, pin: val }));
+              }}
+              style={{ width: '100%' }}
+            />
           </Field>
 
           {/* ── Properties section ── */}

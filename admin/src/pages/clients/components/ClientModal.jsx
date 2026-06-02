@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { updateClient, getClientSmoobuData } from '../services/clientsService';
+import { updateClient, getClientSmoobuData, createClientProperty, updateClientProperty, deleteClientProperty } from '../services/clientsService';
 import ClientSmoobuView from './ClientSmoobuView';
 
 function initials(businessName = '') {
@@ -25,42 +25,26 @@ function Field({ label, value }) {
   );
 }
 
+function Divider({ label }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      margin: '8px 0',
+    }}>
+      <div style={{ flex: 1, height: 1, background: 'var(--color-border, #e5e9ec)' }} />
+      <span style={{
+        fontSize: '.6875rem', fontWeight: 600, letterSpacing: '.06em',
+        color: 'var(--color-muted)', textTransform: 'uppercase',
+      }}>
+        {label}
+      </span>
+      <div style={{ flex: 1, height: 1, background: 'var(--color-border, #e5e9ec)' }} />
+    </div>
+  );
+}
+
 // ── Properties panel ──────────────────────────────────────────────
-// Shown in read-only mode. Fetches the client's properties and lets
-// the admin drill into Smoobu data for each one.
-function PropertiesPanel({ clientId, onViewSmoobu }) {
-  const [properties, setProperties] = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [error,      setError]      = useState(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const BASE   = import.meta.env.VITE_API_BASE_URL ?? '';
-      const token  = sessionStorage.getItem('hp_access_token');
-      const apiKey = import.meta.env.VITE_API_KEY ?? '';
-      const res = await fetch(`${BASE}/api/clients/${clientId}/properties`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...(apiKey ? { 'x-api-key': apiKey } : {}),
-          ...(token  ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `HTTP ${res.status}`);
-      }
-      setProperties(await res.json());
-    } catch (err) {
-      setError(err.message ?? 'Failed to load properties');
-    } finally {
-      setLoading(false);
-    }
-  }, [clientId]);
-
-  useEffect(() => { load(); }, [load]);
-
+function PropertiesPanel({ properties, loading, error, onViewSmoobu }) {
   if (loading) {
     return (
       <div style={{ padding: '12px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -105,11 +89,11 @@ function PropertiesPanel({ clientId, onViewSmoobu }) {
         >
           <div>
             <div style={{ fontSize: '.875rem', fontWeight: 600, color: 'var(--color-text)' }}>
-              {p.name}
+              {p.propertyName || p.name}
             </div>
             <div style={{ fontSize: '.75rem', color: 'var(--color-muted)', marginTop: 2, display: 'flex', gap: 10 }}>
               <span>
-                {p.smoobuConnectedAt
+                {p.hasSmoobuKey
                   ? <span style={{ color: 'var(--color-success, #26a676)' }}>● Smoobu connected</span>
                   : <span>○ No Smoobu key</span>
                 }
@@ -119,7 +103,7 @@ function PropertiesPanel({ clientId, onViewSmoobu }) {
               )}
             </div>
           </div>
-          {p.smoobuConnectedAt && (
+          {p.hasSmoobuKey && (
             <button
               className="db-btn db-btn--ghost"
               style={{ fontSize: '.75rem', padding: '4px 10px' }}
@@ -138,20 +122,54 @@ function PropertiesPanel({ clientId, onViewSmoobu }) {
   );
 }
 
-// ── Main component ────────────────────────────────────────────────
 export default function ClientModal({ client, onClose, onUpdated }) {
   if (!client) return null;
 
   const [isEditing,        setIsEditing]        = useState(false);
-  const [smoobuProperty,   setSmoobuProperty]   = useState(null); // property to view in SmoobuView
+  const [smoobuProperty,   setSmoobuProperty]   = useState(null);
   const [saving,           setSaving]           = useState(false);
   const [saveError,        setSaveError]        = useState(null);
+
+  const [properties, setProperties] = useState([]);
+  const [loadingProps, setLoadingProps] = useState(true);
+  const [propsError, setPropsError] = useState(null);
 
   const [form, setForm] = useState({
     businessName:      client.businessName      ?? '',
     role:              client.role              ?? 'client',
     propertyTagPrefix: client.propertyTagPrefix ?? '',
+    password:          '',
+    pin:               '',
+    properties:        []
   });
+
+  const loadProperties = useCallback(async () => {
+    setLoadingProps(true);
+    setPropsError(null);
+    try {
+      const BASE   = import.meta.env.VITE_API_BASE_URL ?? '';
+      const token  = sessionStorage.getItem('hp_access_token');
+      const apiKey = import.meta.env.VITE_API_KEY ?? '';
+      const res = await fetch(`${BASE}/api/clients/${client._id}/properties`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(apiKey ? { 'x-api-key': apiKey } : {}),
+          ...(token  ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      setProperties(await res.json());
+    } catch (err) {
+      setPropsError(err.message ?? 'Failed to load properties');
+    } finally {
+      setLoadingProps(false);
+    }
+  }, [client._id]);
+
+  useEffect(() => { loadProperties(); }, [loadProperties]);
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -164,6 +182,14 @@ export default function ClientModal({ client, onClose, onUpdated }) {
       businessName:      client.businessName      ?? '',
       role:              client.role              ?? 'client',
       propertyTagPrefix: client.propertyTagPrefix ?? '',
+      password:          '',
+      pin:               '',
+      properties:        properties.map(p => ({
+        _id: p._id,
+        name: p.propertyName || p.name,
+        hasSmoobuKey: p.hasSmoobuKey,
+        smoobuApiKey: ''
+      }))
     });
     setIsEditing(true);
   }
@@ -173,7 +199,37 @@ export default function ClientModal({ client, onClose, onUpdated }) {
     setIsEditing(false);
   }
 
+  const setProp = (index, key) => (e) => {
+    const val = e.target.value;
+    setForm((f) => ({
+      ...f,
+      properties: f.properties.map((p, i) => (i === index ? { ...p, [key]: val } : p))
+    }));
+  };
+
+  const addProperty = () =>
+    setForm(f => ({ ...f, properties: [...f.properties, { name: '', smoobuApiKey: '' }] }));
+
+  const removeProperty = (index) =>
+    setForm(f => ({ ...f, properties: f.properties.filter((_, i) => i !== index) }));
+
+
   async function handleSave() {
+    if (form.password && form.password.length < 8) {
+      setSaveError('Password must be at least 8 characters.');
+      return;
+    }
+    if (form.pin && !/^\d{6}$/.test(form.pin)) {
+      setSaveError('PIN must be exactly 6 digits.');
+      return;
+    }
+    for (let i = 0; i < form.properties.length; i++) {
+      if (!form.properties[i].name.trim()) {
+        setSaveError(`Property ${i + 1} name is required.`);
+        return;
+      }
+    }
+
     setSaving(true);
     setSaveError(null);
     try {
@@ -182,7 +238,44 @@ export default function ClientModal({ client, onClose, onUpdated }) {
         role:              form.role,
         propertyTagPrefix: form.propertyTagPrefix,
       };
+      if (form.password) payload.password = form.password;
+      if (form.pin)      payload.pin      = form.pin;
+
       const updated = await updateClient(client._id, payload);
+
+      // Handle properties
+      const existingIds = new Set(properties.map(p => p._id));
+      const formIds = new Set(form.properties.filter(p => p._id).map(p => p._id));
+
+      // 1. Delete removed properties
+      for (const old of properties) {
+        if (!formIds.has(old._id)) {
+          await deleteClientProperty(client._id, old._id);
+        }
+      }
+
+      // 2. Create/Update properties
+      for (const p of form.properties) {
+        if (p._id) {
+          // Update only if changed
+          const oldProp = properties.find(x => x._id === p._id);
+          const needsUpdate = (oldProp.propertyName !== p.name) || p.smoobuApiKey.trim();
+          if (needsUpdate) {
+            await updateClientProperty(client._id, p._id, {
+              propertyName: p.name.trim(),
+              ...(p.smoobuApiKey.trim() ? { smoobuApiKey: p.smoobuApiKey.trim() } : {})
+            });
+          }
+        } else {
+          // Create new
+          await createClientProperty(client._id, {
+            propertyName: p.name.trim(),
+            smoobuApiKey: p.smoobuApiKey.trim() || ''
+          });
+        }
+      }
+
+      await loadProperties();
       setIsEditing(false);
       if (onUpdated) onUpdated(updated);
     } catch (err) {
@@ -192,10 +285,20 @@ export default function ClientModal({ client, onClose, onUpdated }) {
     }
   }
 
+  // Calculate status
+  let statusBadge = null;
+  if (client.mustChangePassword && client.mustChangePin) {
+    statusBadge = <span className="db-badge db-badge--warning">Unverified</span>;
+  } else if (!client.mustChangePassword && !client.mustChangePin) {
+    statusBadge = <span className="db-badge db-badge--success">✓ Verified</span>;
+  } else {
+    statusBadge = <span className="db-badge db-badge--info">Partially Verified</span>;
+  }
+
   return (
     <>
       <div className="db-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-        <div className="db-modal">
+        <div className="db-modal" style={{ width: 560, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
           {/* Header */}
           <div className="db-modal__head">
             <span className="db-modal__title">
@@ -205,7 +308,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
           </div>
 
           {/* Body */}
-          <div className="db-modal__body">
+          <div className="db-modal__body" style={{ overflowY: 'auto', flex: 1 }}>
             {/* Profile row */}
             <div className="cl-modal-profile">
               <div className="cl-modal-profile__avatar">
@@ -246,6 +349,47 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                     maxLength={150}
                   />
                 </div>
+                
+                <div className="cl-modal-field">
+                  <label className="cl-modal-field__label">Email</label>
+                  <input
+                    type="text"
+                    className="cl-edit-input"
+                    value={client.email}
+                    disabled
+                    style={{ cursor: 'not-allowed', opacity: 0.7 }}
+                  />
+                </div>
+                
+                <div className="cl-modal-field">
+                  <label className="cl-modal-field__label">New Password</label>
+                  <input
+                    name="password"
+                    type="password"
+                    className="cl-edit-input"
+                    placeholder="Leave blank to keep current password"
+                    value={form.password}
+                    onChange={handleChange}
+                    maxLength={128}
+                  />
+                </div>
+                
+                <div className="cl-modal-field">
+                  <label className="cl-modal-field__label">New 6-Digit PIN</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="\d{6}"
+                    maxLength={6}
+                    className="cl-edit-input"
+                    placeholder="Leave blank to keep current PIN"
+                    value={form.pin}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                      setForm((f) => ({ ...f, pin: val }));
+                    }}
+                  />
+                </div>
 
                 <div className="cl-modal-field">
                   <label className="cl-modal-field__label" htmlFor="edit-role">Role</label>
@@ -261,32 +405,104 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                   </select>
                 </div>
 
-                <div className="cl-modal-field">
-                  <label className="cl-modal-field__label" htmlFor="edit-prefix">
-                    Property Tag Prefix
-                  </label>
-                  <input
-                    id="edit-prefix"
-                    name="propertyTagPrefix"
-                    type="text"
-                    className="cl-edit-input"
-                    placeholder="e.g. charmaine_"
-                    value={form.propertyTagPrefix}
-                    onChange={handleChange}
-                    maxLength={100}
-                  />
+                <Divider label="Properties" />
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {form.properties.map((prop, index) => (
+                    <div
+                      key={prop._id || index}
+                      style={{
+                        border: '1px solid var(--color-border, #e5e9ec)',
+                        borderRadius: 'var(--radius-md, 10px)',
+                        padding: '14px 16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 10,
+                        background: 'var(--color-surface-2, #f8faf9)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{
+                          fontSize: '.75rem', fontWeight: 600,
+                          color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '.05em',
+                        }}>
+                          Property {index + 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeProperty(index)}
+                          style={{
+                            background: 'none', border: 'none',
+                            color: 'var(--color-danger, #b91c1c)', cursor: 'pointer',
+                            padding: '2px 6px', borderRadius: 'var(--radius-sm)',
+                            fontSize: '.75rem', fontWeight: 500,
+                            display: 'flex', alignItems: 'center', gap: 4,
+                          }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M4 4l12 12M16 4L4 16" strokeLinecap="round" />
+                          </svg>
+                          Remove
+                        </button>
+                      </div>
+
+                      <div className="db-field" style={{ margin: 0 }}>
+                        <label>
+                          Property Name
+                          <span style={{ color: 'var(--color-danger)', marginLeft: 2 }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Sunset Villas"
+                          value={prop.name}
+                          onChange={setProp(index, 'name')}
+                          maxLength={150}
+                          className="cl-edit-input"
+                        />
+                      </div>
+
+                      <div className="db-field" style={{ margin: 0 }}>
+                        <label>
+                          {prop.hasSmoobuKey ? "Update Smoobu API Key" : "Smoobu API Key"}
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={prop.hasSmoobuKey ? "Leave blank to keep existing key" : "Optional"}
+                          value={prop.smoobuApiKey}
+                          onChange={setProp(index, 'smoobuApiKey')}
+                          maxLength={512}
+                          className="cl-edit-input"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
-                <div style={{
-                  background: 'var(--color-surface-2, #f0f7f4)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '10px 14px',
-                  fontSize: '.8125rem',
-                  color: 'var(--color-muted)',
-                }}>
-                  💡 To manage Smoobu API keys, go to the Properties section of this business account.
-                </div>
+                {/* Add another property */}
+                <button
+                  type="button"
+                  onClick={addProperty}
+                  style={{
+                    width: '100%',
+                    marginTop: 4,
+                    padding: '9px 0',
+                    border: '1.5px dashed var(--color-border, #c8ddd5)',
+                    borderRadius: 'var(--radius-md, 10px)',
+                    background: 'transparent',
+                    color: 'var(--color-brand, #26a676)',
+                    fontSize: '.8125rem', fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    transition: 'background .15s',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-2, #f0f7f4)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M10 4v12M4 10h12" strokeLinecap="round" />
+                  </svg>
+                  Add Property
+                </button>
               </div>
             ) : (
               /* ── Read-only details ── */
@@ -297,12 +513,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                       {client.role}
                     </span>
                   } />
-                  <Field label="Email Status" value={
-                    <span className={`db-badge ${client.isVerified ? 'db-badge--success' : 'db-badge--warning'}`}>
-                      {client.isVerified ? '✓ Verified' : 'Unverified'}
-                    </span>
-                  } />
-                  <Field label="Property Tag Prefix" value={client.propertyTagPrefix || '—'} />
+                  <Field label="Status" value={statusBadge} />
                   <Field label="Last Login"           value={formatDate(client.lastLoginAt)} />
                   <Field label="Joined"               value={formatDate(client.createdAt)} />
                   <Field label="Updated At"           value={formatDate(client.updatedAt)} />
@@ -318,7 +529,9 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                     Properties
                   </div>
                   <PropertiesPanel
-                    clientId={client._id}
+                    properties={properties}
+                    loading={loadingProps}
+                    error={propsError}
                     onViewSmoobu={(property) => setSmoobuProperty(property)}
                   />
                 </div>
