@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE || '';
+const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:5000';
 
 export function getToken() {
   return sessionStorage.getItem('hp_access_token') || '';
@@ -32,7 +32,7 @@ export async function fetchClients() {
 }
 
 export async function fetchClientProperties(clientId) {
-  const res = await apiFetch(`/api/clients/${clientId}/properties`);
+  const res = await apiFetch(`/api/clients/${clientId}/staff-properties`);
   const data = await res.json();
   if (!res.ok) throw new Error('Failed to load properties.');
   return data;
