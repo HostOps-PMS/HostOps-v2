@@ -13,7 +13,6 @@ import dashboardRoutes      from './routes/dashboard.js';
 import clientsRoutes        from './routes/clients.js';
 import propertiesRoutes     from './routes/properties.js';
 import staffsRoutes         from './routes/staffs.js';
-import clientAccountsRoutes from './routes/clientAccounts.js'; // ← NEW
 import { requireApiKey } from './middleware/apiKeyAuth.js';
 
 const app = express();
@@ -64,7 +63,7 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   : [
       'https://hostops-frontend.onrender.com',
       'https://hostops-v2-admin.onrender.com',
-      'http://localhost:5000',
+      'https://hostpilot-smoobu.onrender.com',
     ];
 
 app.use(
@@ -105,7 +104,7 @@ const globalLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs:        15 * 60 * 1000,
-  max:             10,
+  max:             100,
   standardHeaders: true,
   legacyHeaders:   false,
   message: { error: 'Too many authentication attempts, please try again later.' },
@@ -130,7 +129,6 @@ app.use('/api',  dashboardRoutes);
 app.use('/api',  clientsRoutes);
 app.use('/api',  propertiesRoutes);
 app.use('/api',  staffsRoutes);
-app.use('/api',  clientAccountsRoutes); // ← NEW
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
