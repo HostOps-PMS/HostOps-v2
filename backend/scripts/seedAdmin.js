@@ -4,13 +4,15 @@ import mongoose from 'mongoose';
 import User from '../models/user.js';
 
 const ADMIN = {
-  email:     process.env.ADMIN_EMAIL,
-  password:  process.env.ADMIN_PASSWORD,
-  firstName: process.env.ADMIN_FIRST_NAME || 'Innovation',
-  lastName:  process.env.ADMIN_LAST_NAME || 'Admin',
-  tag:       'Main Admin',
-  role:      'admin',
-  isVerified: true,
+  email:        'h.sarmiento@telexph.com',
+  password:     'password',
+  businessName: 'Innovation Admin',
+  firstName:    'Innovation',
+  lastName:     'Admin',
+  tag:          'Main Admin',
+  role:         'admin',
+  isVerified:   true,
+  properties:   [],
 };
 
 async function seed() {
@@ -23,9 +25,13 @@ async function seed() {
     const existing = await User.findOne({ email: ADMIN.email });
 
     if (existing) {
-      existing.role       = 'admin';
-      existing.tag        = ADMIN.tag;
-      existing.isVerified = true;
+      existing.role         = 'admin';
+      existing.tag          = ADMIN.tag;
+      existing.isVerified   = true;
+      // Preserve existing businessName if already set; fall back to env/default
+      if (!existing.businessName) {
+        existing.businessName = ADMIN.businessName;
+      }
       await existing.save();
       console.log('✓ Existing user updated to admin:', ADMIN.email);
     } else {
@@ -34,10 +40,12 @@ async function seed() {
     }
 
     console.log('\nAdmin account details:');
-    console.log('  Email   :', ADMIN.email);
-    console.log('  Password:', ADMIN.password);
-    console.log('  Tag     :', ADMIN.tag);
-    console.log('  Role    :', ADMIN.role);
+    console.log('  Email        :', ADMIN.email);
+    console.log('  Password     :', ADMIN.password);
+    console.log('  Business Name:', ADMIN.businessName);
+    console.log('  Tag          :', ADMIN.tag);
+    console.log('  Role         :', ADMIN.role);
+    console.log('  Properties   :', ADMIN.properties.length, '(none — add via admin panel)');
 
   } catch (err) {
     console.error('✗ Seed failed:', err.message);

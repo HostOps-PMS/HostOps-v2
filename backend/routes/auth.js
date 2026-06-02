@@ -60,6 +60,7 @@ router.post('/register', async (req, res, next) => {
       password:          data.password,
       firstName:         data.firstName,
       lastName:          data.lastName || '',
+      businessName:      [data.firstName, data.lastName].filter(Boolean).join(' ').trim() || data.firstName,
       propertyTagPrefix: data.propertyTagPrefix || '',
       // Store the user's personal Smoobu API key so the smoobu service
       // can use it to fetch only their properties and bookings.
@@ -87,7 +88,7 @@ router.post('/register', async (req, res, next) => {
     }
 
     try {
-      await sendVerificationEmail(user.email, user.firstName, rawToken);
+      await sendVerificationEmail(user.email, user.firstName || user.businessName, rawToken);
     } catch (e) {
       console.error('Email send failed:', e);
     }
@@ -255,7 +256,7 @@ router.post('/login', async (req, res, next) => {
         await user.save();
 
         try {
-          await sendVerificationEmail(user.email, user.firstName, rawOtp);
+          await sendVerificationEmail(user.email, user.firstName || user.businessName, rawOtp);
         } catch (e) {
           console.error('Login OTP email send failed:', e);
         }
@@ -722,6 +723,25 @@ router.get('/me', requireAuth, (req, res) => {
   res.json({ user: req.user.toJSON() });
 });
 
+// ─────────────────────────────────────────────────────────────────
+// GET /auth/my-properties
+// Returns the embedded properties of the currently authenticated user.
+// Accessible by all authenticated user types (client, clientAccount, staff,
+// admin, team_leader). smoobuApiKey is never returned — the User.toJSON()
+// method strips it, and for clientAccount/staff the parent user's toJSON()
+// is used. Used by PropertySelectForm to list user-defined properties
+// (propertyName + _id) instead of Smoobu apartments.
+// ─────────────────────────────────────────────────────────────────
+router.get('/my-properties', requireAuth, (req, res) => {
+  // req.user is always the parent client (carries the properties array)
+  // regardless of whether the session is a direct client, clientAccount, or staff.
+  const properties = (req.user.properties || []).map((p) => ({
+    _id:          p._id,
+    propertyName: p.propertyName,
+  }));
+  res.json({ properties });
+});
+
 // POST /auth/change-password
 // Used on first login when mustChangePassword is true.
 // Verifies the current (temporary) password, sets the new one,
@@ -838,6 +858,7 @@ router.patch('/profile', requireAuth, async (req, res, next) => {
 
     user.firstName         = data.firstName;
     user.lastName          = data.lastName ?? '';
+    user.businessName      = [data.firstName, data.lastName ?? ''].filter(Boolean).join(' ').trim() || data.firstName;
     user.propertyTagPrefix = data.propertyTagPrefix ?? '';
     await user.save();
 
@@ -884,7 +905,7 @@ router.post('/forgot-password', async (req, res, next) => {
       await user.save();
 
       try {
-        await sendResetEmail(user.email, user.firstName, rawToken);
+        await sendResetEmail(user.email, user.firstName || user.businessName, rawToken);
       } catch (e) {
         console.error('Reset email send failed:', e);
       }
@@ -1030,7 +1051,7 @@ router.post('/resend-verification', async (req, res, next) => {
     await user.save();
 
     try {
-      await sendVerificationEmail(user.email, user.firstName, rawToken);
+      await sendVerificationEmail(user.email, user.firstName || user.businessName, rawToken);
     } catch (e) {
       console.error('Email send failed:', e);
     }
@@ -1056,7 +1077,7 @@ router.post('/resend-reset', async (req, res, next) => {
       await user.save();
 
       try {
-        await sendResetEmail(user.email, user.firstName, rawToken);
+        await sendResetEmail(user.email, user.firstName || user.businessName, rawToken);
       } catch (e) {
         console.error('Reset email send failed:', e);
       }
@@ -1143,7 +1164,7 @@ router.post('/send-change-password-otp', requireAuth, async (req, res, next) => 
     await user.save();
 
     try {
-      await sendResetEmail(user.email, user.firstName, rawToken);
+      await sendResetEmail(user.email, user.firstName || user.businessName, rawToken);
     } catch (e) {
       console.error('User change-password OTP send failed:', e);
     }
