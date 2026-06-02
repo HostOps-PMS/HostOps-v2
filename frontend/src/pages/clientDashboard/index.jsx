@@ -83,6 +83,21 @@ export default function DashboardPage() {
     loadData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Re-fetch whenever the user switches property.
+  // Skip on initial render (undefined check not needed — selectedPropertyId
+  // is always a string or null from sessionStorage, never undefined).
+  // Using a ref to skip the very first render so we don't double-fetch on mount.
+  const prevPropertyIdRef = React.useRef('__INIT__');
+  useEffect(() => {
+    if (prevPropertyIdRef.current === '__INIT__') {
+      prevPropertyIdRef.current = dashState.selectedPropertyId;
+      return;
+    }
+    if (prevPropertyIdRef.current === dashState.selectedPropertyId) return;
+    prevPropertyIdRef.current = dashState.selectedPropertyId;
+    loadData(undefined, undefined, dashState.selectedPropertyId);
+  }, [dashState.selectedPropertyId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleThreadClick(reservationId, threadInfo, listMode = false) {
     setModalListMode(listMode);
     setModalReservationId(reservationId);
