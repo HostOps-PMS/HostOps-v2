@@ -14,6 +14,10 @@ export function useDashboardData() {
   //
   // apartmentIdOverride: pass an explicit apartmentId right after selectProperty()
   // so we don't read a stale closure. Omit to use dashState.selectedPropertyId.
+  //
+  // propertyDbId: MongoDB _id of the selected property (from hp_selected_property_id
+  // in sessionStorage). Passed to the backend so it can look up the correct
+  // smoobuApiKey from user.properties[] for that specific property.
   const loadData = useCallback(async (fromOverride, toOverride, apartmentIdOverride) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
@@ -25,10 +29,14 @@ export function useDashboardData() {
       ? apartmentIdOverride
       : dashState.selectedPropertyId;
 
+    // hp_selected_property_id holds the MongoDB _id of the selected property.
+    // Send it as propertyDbId so the backend can inject the correct smoobuApiKey.
+    const propertyDbId = sessionStorage.getItem('hp_selected_property_id') || null;
+
     setBanner({ message: '⏳ Loading data…', type: 'loading' });
 
     try {
-      const res = await fetchDashboard({ from, to, apartmentId }, auth);
+      const res = await fetchDashboard({ from, to, apartmentId, propertyDbId }, auth);
 
       if (!res) {
         setBanner({ message: '⚠️ Session expired. Please sign in again.', type: 'error' });

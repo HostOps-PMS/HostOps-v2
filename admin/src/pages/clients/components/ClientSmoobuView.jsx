@@ -129,8 +129,12 @@ function CurrencyToggle({ currency, onChange }) {
 }
 
 // ── Main component ───────────────────────────────────────────────
-export default function ClientSmoobuView({ client, onClose }) {
-  if (!client) return null;
+// Props:
+//   client   — the business account (User object)
+//   property — the Property object whose Smoobu data we're viewing
+//   onClose  — callback to close this view
+export default function ClientSmoobuView({ client, property, onClose }) {
+  if (!client || !property) return null;
 
   const [dateRange, setDateRange] = useState(currentYear);
   const [data,      setData]      = useState(null);
@@ -142,14 +146,16 @@ export default function ClientSmoobuView({ client, onClose }) {
     setLoading(true);
     setError(null);
     try {
-      const result = await getClientSmoobuData(client._id, dateRange);
+      // Pass both clientId and propertyId — the server needs the property
+      // to look up the smoobuApiKey without exposing it to the frontend.
+      const result = await getClientSmoobuData(client._id, property._id, dateRange);
       setData(result);
     } catch (err) {
       setError(err.message ?? 'Failed to load Smoobu data');
     } finally {
       setLoading(false);
     }
-  }, [client._id, dateRange]);
+  }, [client._id, property._id, dateRange]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -191,147 +197,147 @@ export default function ClientSmoobuView({ client, onClose }) {
               <div style={{ fontWeight: 600, fontSize: '.9375rem', color: 'var(--color-text, #1a2e2a)' }}>
                 {client.firstName} {client.lastName}
               </div>
+              {/* Show which property we're viewing */}
               <div style={{ fontSize: '.75rem', color: 'var(--color-muted, #7a8c8e)' }}>
-                Smoobu Dashboard
+                {property.name} · Smoobu Dashboard
               </div>
             </div>
           </div>
           <button className="db-modal__close" onClick={onClose}>✕</button>
         </div>
 
-        {/* ── Date range bar ── */}
-        <div style={{
-          padding: '10px 24px',
-          borderBottom: '1px solid var(--color-border, #e5e9ec)',
-          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-          background: 'var(--color-bg, #f4f7f5)',
-        }}>
-          <label style={{ fontSize: '.8125rem', color: 'var(--color-muted, #7a8c8e)', fontWeight: 500 }}>From</label>
-          <input
-            type="date"
-            value={dateRange.from}
-            onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))}
-            style={{
-              border: '1px solid var(--color-border, #e5e9ec)',
-              borderRadius: 'var(--radius-sm, 6px)',
-              padding: '5px 10px', fontSize: '.8125rem',
-              background: 'var(--color-surface, #fff)',
-              color: 'var(--color-text, #1a2e2a)',
-            }}
-          />
-          <label style={{ fontSize: '.8125rem', color: 'var(--color-muted, #7a8c8e)', fontWeight: 500 }}>To</label>
-          <input
-            type="date"
-            value={dateRange.to}
-            onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))}
-            style={{
-              border: '1px solid var(--color-border, #e5e9ec)',
-              borderRadius: 'var(--radius-sm, 6px)',
-              padding: '5px 10px', fontSize: '.8125rem',
-              background: 'var(--color-surface, #fff)',
-              color: 'var(--color-text, #1a2e2a)',
-            }}
-          />
-          <button
-            className="db-btn db-btn--primary"
-            onClick={load}
-            disabled={loading}
-            style={{ padding: '5px 14px', fontSize: '.8125rem' }}
-          >
-            {loading ? 'Loading…' : 'Load'}
-          </button>
+        {/* ── Scrollable body ── */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-          {/* Currency toggle — right side */}
-          <div style={{ marginLeft: 'auto' }}>
+          {/* Date range controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <label style={{ fontSize: '.8125rem', color: 'var(--color-muted, #7a8c8e)', fontWeight: 500 }}>From</label>
+              <input
+                type="date"
+                value={dateRange.from}
+                onChange={(e) => setDateRange((r) => ({ ...r, from: e.target.value }))}
+                style={{
+                  fontSize: '.8125rem', padding: '5px 10px',
+                  border: '1px solid var(--color-border, #d4e8de)',
+                  borderRadius: 'var(--radius-sm, 6px)',
+                  background: 'var(--color-surface, #fff)',
+                  color: 'var(--color-text, #1a2e2a)',
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <label style={{ fontSize: '.8125rem', color: 'var(--color-muted, #7a8c8e)', fontWeight: 500 }}>To</label>
+              <input
+                type="date"
+                value={dateRange.to}
+                onChange={(e) => setDateRange((r) => ({ ...r, to: e.target.value }))}
+                style={{
+                  fontSize: '.8125rem', padding: '5px 10px',
+                  border: '1px solid var(--color-border, #d4e8de)',
+                  borderRadius: 'var(--radius-sm, 6px)',
+                  background: 'var(--color-surface, #fff)',
+                  color: 'var(--color-text, #1a2e2a)',
+                }}
+              />
+            </div>
             <CurrencyToggle currency={currency} onChange={setCurrency} />
           </div>
-        </div>
 
-        {/* ── Body ── */}
-        <div
-          className="db-modal__body"
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '20px 24px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 20,
-            /* ensure the body itself scrolls, not the outer overlay */
-            minHeight: 0,
-          }}
-        >
+          {/* Loading */}
+          {loading && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', gap: 12 }}>
+                {[1,2,3,4].map(i => (
+                  <div key={i} className="db-skeleton" style={{ height: 80, flex: 1, borderRadius: 'var(--radius-md, 10px)' }} />
+                ))}
+              </div>
+              <div className="db-skeleton" style={{ height: 120, borderRadius: 'var(--radius-md, 10px)' }} />
+              <div className="db-skeleton" style={{ height: 200, borderRadius: 'var(--radius-md, 10px)' }} />
+            </div>
+          )}
 
           {/* Error */}
-          {error && (
+          {!loading && error && (
             <div style={{
               background: '#fee2e2', color: '#b91c1c',
-              borderRadius: 'var(--radius-sm, 6px)', padding: '12px 16px',
-              fontSize: '.875rem', fontWeight: 500,
+              borderRadius: 'var(--radius-md, 10px)', padding: '16px 20px',
+              fontSize: '.875rem',
             }}>
               ⚠️ {error}
             </div>
           )}
 
           {/* Not connected */}
-          {!loading && data?.smoobuNotConnected && (
+          {!loading && !error && data?.smoobuNotConnected && (
             <div style={{
-              background: 'var(--color-surface, #fff)',
+              background: 'var(--color-surface-2, #f0f7f4)',
               border: '1px solid var(--color-border, #e5e9ec)',
-              borderRadius: 'var(--radius-md, 10px)',
-              padding: '40px 20px', textAlign: 'center',
+              borderRadius: 'var(--radius-md, 10px)', padding: '32px 24px',
+              textAlign: 'center',
             }}>
-              <div style={{ fontSize: '2rem', marginBottom: 8 }}>🔌</div>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>No Smoobu Account Connected</div>
+              <div style={{ fontSize: '2rem', marginBottom: 12 }}>🔌</div>
+              <div style={{ fontWeight: 600, fontSize: '.9375rem', color: 'var(--color-text, #1a2e2a)', marginBottom: 6 }}>
+                Smoobu Not Connected
+              </div>
               <div style={{ fontSize: '.875rem', color: 'var(--color-muted, #7a8c8e)' }}>
-                This client hasn't set a Smoobu API key yet.
+                {data.message ?? 'This property has no Smoobu API key configured.'}
               </div>
             </div>
           )}
 
-          {/* Loading skeleton */}
-          {loading && (
+          {/* Dashboard data */}
+          {!loading && !error && data && !data.smoobuNotConnected && (
             <>
-              <div style={{ display: 'flex', gap: 12 }}>
-                {[1,2,3,4].map(i => (
-                  <div key={i} style={{ flex: 1, height: 80, borderRadius: 'var(--radius-md, 10px)', background: 'var(--color-border, #e5e9ec)' }} className="db-skeleton" />
-                ))}
-              </div>
-              <div style={{ height: 200, borderRadius: 'var(--radius-md, 10px)', background: 'var(--color-border, #e5e9ec)' }} className="db-skeleton" />
-              <div style={{ height: 300, borderRadius: 'var(--radius-md, 10px)', background: 'var(--color-border, #e5e9ec)' }} className="db-skeleton" />
-            </>
-          )}
+              {/* Sub-properties (rooms/units) */}
+              {property.subProperties?.length > 0 && (
+                <div style={{
+                  background: 'var(--color-surface, #fff)',
+                  border: '1px solid var(--color-border, #e5e9ec)',
+                  borderRadius: 'var(--radius-md, 10px)',
+                  padding: '16px 20px',
+                }}>
+                  <SectionTitle>Rooms / Units ({property.subProperties.length})</SectionTitle>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {property.subProperties.map((sp) => (
+                      <span key={sp._id ?? sp.smoobuId} style={{
+                        padding: '4px 12px',
+                        background: 'var(--color-surface-2, #f0f7f4)',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: 99,
+                        fontSize: '.8125rem',
+                        color: 'var(--color-text)',
+                      }}>
+                        {sp.name}
+                        {sp.type && <span style={{ color: 'var(--color-muted)', marginLeft: 6 }}>· {sp.type}</span>}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-          {/* Data */}
-          {!loading && data && !data.smoobuNotConnected && (
-            <>
-              {/* ── Stat cards ── */}
+              {/* Stat cards */}
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 <StatCard
-                  label="Revenue"
-                  value={fmtMoney(stats.revenue, currency)}
-                  sub={`${stats.nights ?? 0} nights booked`}
+                  label="Total Revenue"
+                  value={fmtMoney(stats.totalRevenue, currency)}
                   accent="var(--color-primary, #26a676)"
                 />
                 <StatCard
                   label="Bookings"
-                  value={stats.bookings ?? 0}
-                  sub={`${stats.nights ?? 0} total nights`}
+                  value={stats.totalBookings ?? 0}
                 />
                 <StatCard
-                  label="Cancellations"
-                  value={stats.cancellations ?? 0}
-                  sub={stats.cancelledNights ? `${stats.cancelledNights} nights affected` : undefined}
-                  accent={stats.cancellations > 0 ? '#e55a3a' : undefined}
+                  label="Avg. Stay"
+                  value={`${stats.avgNights ?? 0} nights`}
                 />
                 <StatCard
                   label="Occupancy"
-                  value={`${stats.occupancy ?? 0}%`}
-                  sub={`${properties.length} propert${properties.length === 1 ? 'y' : 'ies'}`}
+                  value={`${stats.occupancyRate ?? 0}%`}
                 />
               </div>
 
-              {/* ── Properties + Channel breakdown ── */}
+              {/* 2-col grid: properties + channels */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
                 {/* Properties */}
@@ -421,7 +427,6 @@ export default function ClientSmoobuView({ client, onClose }) {
                 background: 'var(--color-surface, #fff)',
                 border: '1px solid var(--color-border, #e5e9ec)',
                 borderRadius: 'var(--radius-md, 10px)',
-                /* FIX: removed overflow:hidden which was clipping the table */
                 overflow: 'visible',
                 flexShrink: 0,
               }}>

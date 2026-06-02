@@ -1,5 +1,7 @@
-function initials(firstName = '', lastName = '') {
-  return `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase() || '?';
+function initials(businessName = '') {
+  const parts = businessName.trim().split(/\s+/);
+  if (parts.length === 1) return (parts[0][0] ?? '').toUpperCase() || '?';
+  return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase() || '?';
 }
 
 function formatDate(iso) {
@@ -82,11 +84,11 @@ export default function ClientsTable({ clients, loading, onRowClick }) {
                     <td>
                       <div className="cl-name-cell">
                         <div className="cl-avatar">
-                          {initials(client.firstName, client.lastName)}
+                          {initials(client.businessName)}
                         </div>
                         <div>
                           <div className="cl-name-cell__name">
-                            {client.firstName} {client.lastName}
+                            {client.businessName}
                           </div>
                           <div className="cl-name-cell__email">{client.email}</div>
                         </div>
