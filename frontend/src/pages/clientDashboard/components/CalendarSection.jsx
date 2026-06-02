@@ -90,6 +90,22 @@ export default function CalendarSection() {
 
   return (
     <div className="db-card" style={{ padding: 0, marginBottom: 20, overflow: 'visible', background: dark ? '#132a1e' : '#fff', border: dark ? '1px solid #1e3a2a' : undefined, transition: 'background 0.2s' }}>
+      <style>{`
+        .cal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px 14px; }
+        .cal-title { font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 800; color: #0c1c14; }
+        .cal-controls { display: flex; gap: 8px; align-items: center; }
+        .cal-btn { background: #fff; border: 1px solid #e3ede8; padding: 6px 12px; border-radius: 100px; font-size: .75rem; font-weight: 600; color: #0c1c14; cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+        .cal-btn-group { background: #f0f5f2; border-radius: 100px; padding: 3px; display: flex; }
+        .cal-btn-group button { background: transparent; border: none; padding: 5px 12px; border-radius: 100px; font-size: .75rem; font-weight: 700; color: #6a8b7c; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+        .cal-btn-group button.active { background: #26a676; color: #fff; }
+        .cal-nav { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 14px 24px; border-bottom: 1px solid #f0f5f2; background: #fff; flex-wrap: nowrap; white-space: nowrap; }
+        .cal-nav > * { flex-shrink: 0; }
+        .cal-nav-btn { width: 30px; height: 30px; border: 1px solid #e3ede8; border-radius: 50%; background: #fff; color: #6a8b7c; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; }
+        .cal-nav-btn:hover { background: #eaf8f1; color: #1e8760; border-color: #b7e4cf; }
+        .cal-nav-label { font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 800; color: #0c1c14; padding: 0 6px; flex: 1; }
+        .cal-nav-today { padding: 6px 14px; border: 1px solid #b7e4cf; background: #eaf8f1; color: #1e8760; border-radius: 100px; font-family: 'DM Sans', sans-serif; font-size: .75rem; font-weight: 700; cursor: pointer; margin-left: auto; }
+        .cal-nav-today:hover { background: #d4f0e4; }
+      `}</style>
       {/* Toolbar */}
       <div className="cal-header" style={{ borderBottom: dark ? '1px solid #1e3a2a' : '1px solid #f0f5f2' }}>
         <div className="cal-title" style={{ color: dark ? '#eaf5f0' : '#0c1c14' }}>Availability Calendar</div>
@@ -151,7 +167,19 @@ export default function CalendarSection() {
             )}
           </div>
 
-          {/* Multi/Single toggle */}
+          {/* Property selector — single view only */}
+          {dashState.view === 'single' && (
+            <select
+              value={dashState.singlePropId || ''}
+              onChange={(e) => updateDashState({ singlePropId: e.target.value })}
+              style={{ padding: '5px 10px', borderRadius: 100, border: dark ? '1px solid #2a5c3c' : '1px solid #e3ede8', fontSize: '.75rem', fontWeight: 600, color: dark ? '#a8d4bc' : '#0c1c14', background: dark ? '#1a3d28' : '#fff', cursor: 'pointer', maxWidth: 160 }}
+            >
+              {properties.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          )}
+
           <div className="cal-btn-group" style={{ background: dark ? '#0a1f15' : '#f0f5f2' }}>
             {['multi', 'single'].map((v) => (
               <button
@@ -166,8 +194,8 @@ export default function CalendarSection() {
         </div>
       </div>
 
-      {/* Calendar nav bar */}
-      <div className="cal-nav" style={{ background: dark ? '#0f2d1f' : '#fff', borderBottom: dark ? '1px solid #1e3a2a' : '1px solid #f0f5f2' }}>
+      {/* Calendar nav bar — hidden in single view */}
+      {dashState.view !== 'single' && <div className="cal-nav" style={{ background: dark ? '#0f2d1f' : '#fff', borderBottom: dark ? '1px solid #1e3a2a' : '1px solid #f0f5f2' }}>
         <button className="cal-nav-btn" onClick={() => shiftCalendar(-30)} title="Previous month">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>
@@ -176,7 +204,7 @@ export default function CalendarSection() {
         </button>
         <span className="cal-nav-label" style={{ color: dark ? '#eaf5f0' : '#0c1c14' }}>{navLabel}</span>
         <button className="cal-nav-today" onClick={goToToday}>Today</button>
-      </div>
+      </div>}
 
       <CalendarGrid
         properties={properties}
@@ -185,6 +213,7 @@ export default function CalendarSection() {
         calMonthsCount={calMonthsCount}
         view={dashState.view}
         channels={dashState.channels}
+        singlePropId={dashState.singlePropId}
         shouldScrollToToday={shouldScrollToToday}
         onScrollToTodayConsumed={consumeScrollToToday}
         onLoadMore={loadMoreMonths}
