@@ -97,7 +97,7 @@ const createStaffSchema = z.object({
   firstName:   z.string().min(1).max(50).trim(),
   lastName:    z.string().max(50).trim().optional().default(''),
   email:       z.string().email().max(254),
-  password:    z.string().min(8).max(128),
+  pin:         z.string().length(6, "PIN must be exactly 6 digits").regex(/^\d+$/, "PIN must contain only numbers"),
   propertyIds: z.array(z.string()).optional().default([]),
   staffRole:   z.string().max(100).trim().optional().default(''),
 });
@@ -126,11 +126,11 @@ router.post('/staffs', requireAdminOrTeamLeader, async (req, res, next) => {
       firstName:          data.firstName,
       lastName:           data.lastName || '',
       email:              data.email.toLowerCase(),
-      password:           data.password,
+      pin:                data.pin,
       propertyIds:        data.propertyIds,
       staffRole:          data.staffRole || '',
       isActive:           true,
-      mustChangePassword: true,
+      mustChangePin:      true,
     });
 
     res.status(201).json({
@@ -156,7 +156,7 @@ const updateStaffSchema = z.object({
   propertyIds: z.array(z.string()).optional(),
   staffRole:   z.string().max(100).trim().optional(),
   isActive:    z.boolean().optional(),
-  password:    z.string().min(8).max(128).optional(),
+  pin:         z.string().length(6, "PIN must be exactly 6 digits").regex(/^\d+$/, "PIN must contain only numbers").optional(),
 });
 
 router.patch('/staffs/:id', requireAdminOrTeamLeader, async (req, res, next) => {
@@ -175,9 +175,9 @@ router.patch('/staffs/:id', requireAdminOrTeamLeader, async (req, res, next) => 
     if (data.propertyIds !== undefined) staff.propertyIds = data.propertyIds;
     if (data.staffRole   !== undefined) staff.staffRole   = data.staffRole;
     if (data.isActive    !== undefined) staff.isActive    = data.isActive;
-    if (data.password    !== undefined) {
-      staff.password           = data.password;
-      staff.mustChangePassword = true; // force re-login with new password
+    if (data.pin         !== undefined) {
+      staff.pin                = data.pin;
+      staff.mustChangePin      = true;
     }
 
     await staff.save();

@@ -56,10 +56,10 @@ export default function StaffTable({
             cursor: 'pointer',
           }}
         >
-          <option value="">All Clients</option>
+          <option value="">All Businesses</option>
           {clients.map((c) => (
             <option key={c._id} value={c._id}>
-              {c.firstName} {c.lastName}
+              {c.businessName}
             </option>
           ))}
         </select>
@@ -105,7 +105,7 @@ export default function StaffTable({
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f7f8fa', borderBottom: '1px solid #e8ecf0' }}>
-                {['Staff', 'Client', 'Properties', 'Status', 'Created', ''].map((h) => (
+                {['Staff', 'Business', 'Properties', 'Status', 'Created', ''].map((h) => (
                   <th
                     key={h}
                     style={{
@@ -158,14 +158,14 @@ export default function StaffTable({
                             display: 'inline-block',
                           }}
                         >
-                          Must change pw
+                          Must change PIN
                         </span>
                       )}
                     </td>
 
                     {/* Client */}
                     <td style={{ padding: '13px 16px', fontSize: '0.83rem', color: '#4a5568' }}>
-                      {client ? `${client.firstName} ${client.lastName}` : <span style={{ color: '#aaa' }}>—</span>}
+                      {client ? client.businessName : <span style={{ color: '#aaa' }}>—</span>}
                     </td>
 
                     {/* Properties */}
