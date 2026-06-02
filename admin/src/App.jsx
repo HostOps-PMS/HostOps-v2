@@ -133,9 +133,9 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      {/* {!authorized && (
+      {!authorized && (
         <AuthorizationModal onAuthorized={handleAuthorized} />
-      )} */}
+      )}
 
       <Routes>
         <Route path="/login" element={<LoginPage />} />

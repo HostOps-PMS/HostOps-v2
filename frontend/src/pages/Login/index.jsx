@@ -54,7 +54,7 @@ export default function LoginPage() {
     if (data.isAdmin || data.user?.role === 'admin' || data.user?.role === 'team_leader') {
       showMsg(`Welcome, ${data.user.firstName || data.user.businessName}! Redirecting...`, 'success');
       setTimeout(() => {
-        const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5173';
+        const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'https://core.hostops.online';
         const params = new URLSearchParams({
           _t: data.accessToken,
           _u: JSON.stringify(data.user),
