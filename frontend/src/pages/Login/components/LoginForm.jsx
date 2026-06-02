@@ -38,7 +38,7 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
         // intercept and require verification before granting access.
         showMsg(`Welcome, ${data.clientAccount.firstName}! Redirecting...`, 'success');
         setTimeout(() => {
-          const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5173';
+          const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'https://core.hostops.online';
           const params = new URLSearchParams({
             _t: data.accessToken,
             _u: JSON.stringify({ ...data.clientAccount, role: 'clientAccount', isClientAccount: true }),

@@ -15,5 +15,15 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+    cors: {
+      origin: [
+        'https://hostops.online',
+        'https://core.hostops.online',
+        'https://go.hostops.online',
+        'http://localhost:5174',
+        'http://localhost:5173',
+      ],
+      credentials: true,
+    },
   },
 })
