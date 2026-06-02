@@ -130,13 +130,16 @@ router.get('/clients/:id/smoobu', requireAdmin, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.get('/clients/:id/properties', requireAdmin, async (req, res, next) => {
   try {
-    const user = await User.findById(req.params.id).lean();
+    const user = await User.findById(req.params.id).select('+properties.smoobuApiKey').lean();
     if (!user) {
       return res.status(404).json({ error: 'Client not found' });
     }
 
-    // Strip smoobuApiKey from each property before sending
-    const safe = (user.properties || []).map(({ smoobuApiKey, ...rest }) => rest);
+    // Strip smoobuApiKey from each property before sending, but provide a boolean flag
+    const safe = (user.properties || []).map(({ smoobuApiKey, ...rest }) => ({
+      ...rest,
+      hasSmoobuKey: !!(smoobuApiKey && smoobuApiKey.trim())
+    }));
     res.json(safe);
   } catch (err) {
     if (err.name === 'CastError') {
@@ -333,6 +336,7 @@ const createClientSchema = z.object({
   businessName:      z.string().min(1).max(150).trim(),
   email:             z.string().email().max(254),
   password:          z.string().min(8).max(128),
+  pin:               z.string().length(6, "PIN must be exactly 6 digits").regex(/^\d+$/, "PIN must contain only numbers"),
   role:              z.enum(['client', 'admin', 'team_leader']).optional().default('client'),
   propertyTagPrefix: z.string().max(100).trim().optional().default(''),
   serverId:          z.string().optional(),
@@ -365,11 +369,13 @@ router.post('/clients', requireAdmin, async (req, res, next) => {
       businessName:       data.businessName,
       email:              data.email.toLowerCase(),
       password:           data.password,
+      pin:                data.pin,
       role:               data.role,
       propertyTagPrefix:  data.propertyTagPrefix || '',
       serverId:           data.serverId || null,
       isVerified:         true,
-      mustChangePassword: false,
+      mustChangePassword: true,
+      mustChangePin:      true,
       properties:         data.properties.map((p) => ({
         propertyName: p.propertyName,
         smoobuApiKey: p.smoobuApiKey.trim() || '',
@@ -398,6 +404,8 @@ const updateClientSchema = z.object({
   serverId:          z.string().optional(),
   role:              z.enum(['client', 'admin', 'team_leader']).optional(),
   propertyTagPrefix: z.string().max(100).trim().optional(),
+  password:          z.string().min(8).max(128).optional(),
+  pin:               z.string().length(6, "PIN must be exactly 6 digits").regex(/^\d+$/, "PIN must contain only numbers").optional(),
 });
 
 router.patch('/clients/:id', requireAdmin, async (req, res, next) => {
@@ -409,20 +417,26 @@ router.patch('/clients/:id', requireAdmin, async (req, res, next) => {
     if (data.serverId          !== undefined) update.serverId          = data.serverId || null;
     if (data.role              !== undefined) update.role              = data.role;
     if (data.propertyTagPrefix !== undefined) update.propertyTagPrefix = data.propertyTagPrefix;
+    if (data.password          !== undefined) {
+      update.password           = data.password;
+      update.mustChangePassword = true;
+    }
+    if (data.pin               !== undefined) {
+      update.pin                = data.pin;
+      update.mustChangePin      = true;
+    }
 
-    const client = await User.findByIdAndUpdate(
-      req.params.id,
-      { $set: update },
-      { new: true, runValidators: true }
-    )
-      .select('-password -verifyToken -verifyTokenExpiry -resetToken -resetTokenExpiry -__v')
-      .lean();
-
+    const client = await User.findById(req.params.id);
     if (!client) {
       return res.status(404).json({ error: 'Client not found' });
     }
 
-    res.json(client);
+    // Use .set() and .save() to trigger pre-save hooks (for bcrypt)
+    client.set(update);
+    await client.save();
+
+    const savedClient = client.toJSON();
+    res.json(savedClient);
   } catch (err) {
     if (err.name === 'ZodError') {
       return res.status(400).json({ error: 'Validation failed', details: err.errors });
