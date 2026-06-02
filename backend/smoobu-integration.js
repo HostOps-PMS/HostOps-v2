@@ -13,9 +13,9 @@
 
   // ─── CONFIG ──────────────────────────────────────────────────────
   // Palitan mo ito ng URL ng deployed proxy mo sa Render
-  const PROXY_BASE = 'https://hostpilot-smoobu.onrender.com';
+  const PROXY_BASE = 'http://localhost:5000';
 
-  // Para sa local testing: 'https://hostpilot-smoobu.onrender.com'
+  // Para sa local testing: 'http://localhost:5000'
 
   // ─── HELPERS ─────────────────────────────────────────────────────
   const $  = sel => document.querySelector(sel);

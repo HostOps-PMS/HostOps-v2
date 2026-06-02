@@ -4,7 +4,7 @@
  * API calls for OTP verification and resend.
  *
  * Uses relative URLs so the Vite dev-server proxy forwards
- * /auth/* → https://hostpilot-smoobu.onrender.com (no port mismatch).
+ * /auth/* → http://localhost:5000 (no port mismatch).
  *
  * Endpoints on the backend:
  *   POST /auth/verify-login-otp  { email, otp, deviceId, rememberMe }
