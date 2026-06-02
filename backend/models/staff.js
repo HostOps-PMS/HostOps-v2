@@ -25,7 +25,6 @@ const staffSchema = new mongoose.Schema({
 
   password: {
     type: String,
-    required: true,
     select: false,
   },
 
@@ -53,6 +52,16 @@ const staffSchema = new mongoose.Schema({
     default: true,
   },
 
+  pin: {
+    type: String,
+    select: false,
+  },
+
+  mustChangePin: {
+    type: Boolean,
+    default: true,
+  },
+
   lastLoginAt: { type: Date },
 
   // ── OTP for password-change verification ─────────────────────────
@@ -65,10 +74,14 @@ const staffSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// ── Hash password before save ─────────────────────────────────────
+// ── Hash password and pin before save ──────────────────────────────
 staffSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
+  if (this.isModified('password')) {
+    this.password = await bcrypt.hash(this.password, 12);
+  }
+  if (this.isModified('pin')) {
+    this.pin = await bcrypt.hash(this.pin, 12);
+  }
   next();
 });
 

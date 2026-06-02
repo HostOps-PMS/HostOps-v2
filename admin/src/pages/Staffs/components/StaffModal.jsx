@@ -32,7 +32,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
     firstName:   staff?.firstName || '',
     lastName:    staff?.lastName  || '',
     email:       staff?.email     || '',
-    password:    '',
+    pin:         '',
     propertyIds: staff?.propertyIds || [],
     isActive:    staff?.isActive !== false,
   });
@@ -93,9 +93,13 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
         email:       form.email,
         propertyIds: form.propertyIds,
       };
-      if (form.password) body.password = form.password;
-      if (isEdit)        body.isActive  = form.isActive;
-      if (!isEdit)       body.password  = form.password;
+      if (form.pin)      body.pin      = form.pin;
+      
+      if (isEdit) {
+        if (form.isActive !== undefined) body.isActive = form.isActive;
+      } else {
+        body.pin      = form.pin;
+      }
 
       if (isEdit) {
         await updateStaff(staff._id, body);
@@ -421,23 +425,27 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
             />
           </div>
 
-          {/* Password */}
+          {/* PIN */}
           <div style={{ marginBottom: 14 }}>
             <label style={labelStyle}>
               {isEdit
-                ? "New Password (leave blank to keep)"
-                : "Temporary Password *"}
+                ? "New 6-Digit PIN (leave blank to keep)"
+                : "Temporary 6-Digit PIN *"}
             </label>
             <input
-              type="password"
-              value={form.password}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, password: e.target.value }))
-              }
+              type="text"
+              inputMode="numeric"
+              pattern="\d{6}"
+              maxLength={6}
+              value={form.pin}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+                setForm((f) => ({ ...f, pin: val }));
+              }}
               required={!isEdit}
               style={inputStyle}
               placeholder={
-                isEdit ? "Leave blank to keep current" : "Min. 8 characters"
+                isEdit ? "Leave blank to keep current" : "Exactly 6 digits"
               }
               autoComplete="new-password"
             />
