@@ -50,3 +50,24 @@ export function getChannelPillClass(channel) {
 export function getChannelInitial(channel) {
   return (channel?.[0] || 'D').toUpperCase();
 }
+
+export const CHANNEL_LOGOS = {
+  'Airbnb':          'https://www.airbnb.com/favicon.ico',
+  'Booking.com':     'https://cf.bstatic.com/static/img/favicon/favicon-32x32.png',
+  'VRBO':            'https://www.vrbo.com/favicon.ico',
+  'Agoda':           'https://www.agoda.com/favicon.ico',
+  'Facebook':        'https://www.facebook.com/favicon.ico',
+  'WhatsApp':        'https://static.whatsapp.net/rsrc.php/v3/yP/r/rYZqPCBaG70.png',
+  'Direct':          'https://cdn-icons-png.flaticon.com/512/25/25694.png',
+  'Direct booking':  'https://cdn-icons-png.flaticon.com/512/25/25694.png',
+  'Website':         'https://cdn-icons-png.flaticon.com/512/364/364089.png',
+  'W':               'https://cdn-icons-png.flaticon.com/512/364/364089.png',
+};
+
+export function getBookingColor(guestName) {
+  return '#1D9E75';
+}
+
+export function getChannelLogo(channel) {
+  return CHANNEL_LOGOS[channel] || null;
+}
