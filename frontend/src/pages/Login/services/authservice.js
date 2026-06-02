@@ -1,125 +1,129 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
+/**
+ * authorization/services/authService.js
+ * ─────────────────────────────────────────────────────
+ * API calls for OTP verification and resend.
+ *
+ * In local dev, Vite proxy forwards /auth/* → backend.
+ * In production (core.hostops.online), we use the absolute
+ * backend URL from VITE_API_URL env variable.
+ *
+ * Endpoints on the backend:
+ *   POST /auth/verify-login-otp  { email, otp, deviceId, rememberMe }
+ *   POST /auth/resend-login-otp  { email }
+ *   POST /auth/send-login-otp    { email }
+ */
 
-export async function loginUser({ email, password, deviceId }) {
-  const res = await fetch(`${API_BASE}/auth/login`, {
-    method: 'POST',
+const API_KEY  = import.meta.env.VITE_API_KEY ?? '';
+const API_BASE = import.meta.env.VITE_API_URL ?? '';
+
+/**
+ * Resolves the correct base URL for auth endpoints.
+ * - Local dev: relative path (Vite proxy handles it)
+ * - Production: absolute URL from VITE_API_URL
+ */
+function authUrl(path) {
+  return `${API_BASE}${path}`;
+}
+
+/**
+ * Get the admin email stored in sessionStorage after login.
+ * Returns an empty string if not found.
+ */
+function getAdminEmail() {
+  try {
+    const raw = sessionStorage.getItem('hp_user');
+    if (!raw) return '';
+    return JSON.parse(raw)?.email ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Get (or generate) a stable device ID from localStorage.
+ */
+function getDeviceId() {
+  let id = localStorage.getItem('hp_device_id');
+  if (!id) {
+    id = crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).substring(2);
+    localStorage.setItem('hp_device_id', id);
+  }
+  return id;
+}
+
+/**
+ * Verify a 6-digit OTP code for the admin's current session.
+ * @param {string} otp
+ * @returns {Promise<object>} server response body
+ * @throws {Error} with server message on failure
+ */
+export async function verifyOtp(otp) {
+  const email    = getAdminEmail();
+  const deviceId = getDeviceId();
+
+  const res = await fetch(authUrl('/auth/verify-login-otp'), {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
-    body: JSON.stringify({ email, password, deviceId }),
+    body: JSON.stringify({ email, otp, deviceId, rememberMe: false }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Login failed');
-  return data;
+
+  const body = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(body.error ?? body.message ?? 'Invalid or expired code.');
+  }
+
+  return body;
 }
 
-export async function verifyLoginOtp({ email, otp, deviceId, rememberMe }) {
-  const res = await fetch(`${API_BASE}/auth/verify-login-otp`, {
-    method: 'POST',
+/**
+ * Request a new OTP to be sent to the admin's registered email.
+ * @returns {Promise<object>} server response body
+ * @throws {Error} with server message on failure
+ */
+export async function resendOtp() {
+  const email = getAdminEmail();
+
+  const res = await fetch(authUrl('/auth/resend-login-otp'), {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
-    body: JSON.stringify({ email, otp, deviceId, rememberMe }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'OTP verification failed');
-  return data;
-}
-
-// ─────────────────────────────────────────────────────────────────
-// staffLogin
-//
-// Authenticates a staff member against POST /auth/staff-login.
-// Returns { accessToken, staff, mustChangePassword, isStaff: true }.
-// The caller (DomainLoginForm) is responsible for checking that
-// staff.propertyIds includes the property selected in PropertySelectForm
-// before proceeding to the dashboard.
-// ─────────────────────────────────────────────────────────────────
-export async function staffLogin({ email, password }) {
-  const res = await fetch(`${API_BASE}/auth/staff-login`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
-    body: JSON.stringify({ email, password }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Staff login failed');
-  return data;
-}
-
-export async function registerUser({
-  firstName,
-  lastName,
-  email,
-  password,
-  smoobuApiKey = '',
-  propertyTagPrefix = '',
-}) {
-  const res = await fetch(`${API_BASE}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
-    body: JSON.stringify({ firstName, lastName, email, password, smoobuApiKey, propertyTagPrefix }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Registration failed');
-  return data;
-}
-
-export async function forgotPassword({ email }) {
-  const res = await fetch(`${API_BASE}/auth/forgot-password`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
     body: JSON.stringify({ email }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Something went wrong');
-  return data;
+
+  const body = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(body.error ?? body.message ?? 'Unable to resend code. Try again later.');
+  }
+
+  return body;
 }
 
-export async function checkSession() {
-  let token = sessionStorage.getItem('hp_access_token');
-  
-  // First try with existing access token
-  if (token) {
-    const res = await fetch(`${API_BASE}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}`, 'x-api-key': import.meta.env.VITE_API_KEY },
-    });
-    if (res.ok) return true;
-  }
-  
-  // If access token is missing or expired, attempt silent refresh via HttpOnly cookie
-  try {
-    const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include', // Crucial to send the HttpOnly 'rt' cookie
-      headers: { 'x-api-key': import.meta.env.VITE_API_KEY },
-    });
-    
-    if (refreshRes.ok) {
-      const data = await refreshRes.json();
-      sessionStorage.setItem('hp_access_token', data.accessToken);
-      return true;
-    }
-  } catch (error) {
-    console.error('Silent refresh failed:', error);
-  }
-  
-  return false;
-}
+/**
+ * Trigger the initial OTP email when the AuthModal first mounts.
+ * @returns {Promise<object>}
+ * @throws {Error}
+ */
+export async function sendLoginOtp() {
+  const email = getAdminEmail();
+  if (!email) return; // No email yet — user hasn't come from the login redirect
 
-// POST /auth/change-password
-// Called on first login when mustChangePassword is true.
-// On success the backend sets isVerified: true and mustChangePassword: false.
-export async function changePassword({ currentPassword, newPassword }) {
-  const token = sessionStorage.getItem('hp_access_token');
-  const res = await fetch(`${API_BASE}/auth/change-password`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': import.meta.env.VITE_API_KEY,
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ currentPassword, newPassword }),
+  const res = await fetch(authUrl('/auth/send-login-otp'), {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+    credentials: 'include',
+    body: JSON.stringify({ email }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Password change failed');
-  return data;
+
+  const body = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(body.error ?? body.message ?? 'Failed to send OTP.');
+  }
+
+  return body;
 }
