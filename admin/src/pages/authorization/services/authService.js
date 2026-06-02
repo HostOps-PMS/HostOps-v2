@@ -3,15 +3,27 @@
  * ─────────────────────────────────────────────────────
  * API calls for OTP verification and resend.
  *
- * Uses relative URLs so the Vite dev-server proxy forwards
- * /auth/* → https://hostpilot-smoobu.onrender.com (no port mismatch).
+ * In local dev, Vite proxy forwards /auth/* → backend.
+ * In production (core.hostops.online), we use the absolute
+ * backend URL from VITE_API_URL env variable.
  *
  * Endpoints on the backend:
  *   POST /auth/verify-login-otp  { email, otp, deviceId, rememberMe }
  *   POST /auth/resend-login-otp  { email }
+ *   POST /auth/send-login-otp    { email }
  */
 
-const API_KEY = import.meta.env.VITE_API_KEY ?? '';
+const API_KEY  = import.meta.env.VITE_API_KEY ?? '';
+const API_BASE = import.meta.env.VITE_API_URL ?? '';
+
+/**
+ * Resolves the correct base URL for auth endpoints.
+ * - Local dev: relative path (Vite proxy handles it)
+ * - Production: absolute URL from VITE_API_URL
+ */
+function authUrl(path) {
+  return `${API_BASE}${path}`;
+}
 
 /**
  * Get the admin email stored in sessionStorage after login.
@@ -51,7 +63,7 @@ export async function verifyOtp(otp) {
   const email    = getAdminEmail();
   const deviceId = getDeviceId();
 
-  const res = await fetch('/auth/verify-login-otp', {
+  const res = await fetch(authUrl('/auth/verify-login-otp'), {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
     credentials: 'include',
@@ -75,7 +87,7 @@ export async function verifyOtp(otp) {
 export async function resendOtp() {
   const email = getAdminEmail();
 
-  const res = await fetch('/auth/resend-login-otp', {
+  const res = await fetch(authUrl('/auth/resend-login-otp'), {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
     credentials: 'include',
@@ -93,7 +105,6 @@ export async function resendOtp() {
 
 /**
  * Trigger the initial OTP email when the AuthModal first mounts.
- * Uses the same GHL webhook as email verification.
  * @returns {Promise<object>}
  * @throws {Error}
  */
@@ -101,7 +112,7 @@ export async function sendLoginOtp() {
   const email = getAdminEmail();
   if (!email) return; // No email yet — user hasn't come from the login redirect
 
-  const res = await fetch('/auth/send-login-otp', {
+  const res = await fetch(authUrl('/auth/send-login-otp'), {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
     credentials: 'include',
