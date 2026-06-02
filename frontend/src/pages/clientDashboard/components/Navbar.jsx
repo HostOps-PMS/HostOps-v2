@@ -3,6 +3,7 @@ import { useAuth } from "../../AuthContext";
 import { useDashboard } from "../context/DashboardContext";
 import { exportDashboardPDF } from "../services/pdfExportService";
 import AccountSettingsModal from "./AccountSettingsModal";
+import { useActivityLog } from "../hooks/useActivityLog";
 
 export default function Navbar() {
   const { getUser, clear } = useAuth();
@@ -168,14 +169,18 @@ export default function Navbar() {
     window.location.href = "/";
   };
 
+  const { logActivity } = useActivityLog();
+
   function openAccountSettings() {
     setDropOpen(false);
     setMenuOpen(false);
     setAccountSettingsOpen(true);
+    logActivity('opened_account_settings');
   }
 
   async function handleExportPDF() {
     if (isExporting) return;
+    logActivity('exported_pdf');
     if (!dashState.rawData) {
       alert("No dashboard data loaded yet. Please wait for data to load first.");
       return;

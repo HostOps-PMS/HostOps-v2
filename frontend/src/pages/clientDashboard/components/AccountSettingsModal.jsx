@@ -462,6 +462,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
   const user = getUser();
 
   // ── Password form ────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState("profile");
   const [pwForm, setPwForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -484,9 +485,35 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
 
   const overlayRef = useRef(null);
 
+  // ── Activity log ─────────────────────────────────────────────────
+  const [activityLog, setActivityLog] = useState([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityFilter, setActivityFilter] = useState('today');
+
+  async function fetchActivityLog() {
+    setActivityLoading(true);
+    try {
+      const token = auth.getToken();
+      const res = await fetch(`${API_BASE}/auth/activity-log`, {
+        headers: {
+          "x-api-key": import.meta.env.VITE_API_KEY,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const data = await res.json().catch(() => ({}));
+      console.log("Activity log response:", res.status, data);
+      if (res.ok) setActivityLog(data.activityLog || []);
+    } catch (e) {
+      console.error("Failed to fetch activity log:", e);
+    } finally {
+      setActivityLoading(false);
+    }
+  }
+
   // Reset password form whenever modal opens
   useEffect(() => {
     if (isOpen) {
+      setActiveTab("profile");
       setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
       setPwStatus(null);
       setPwErrorMsg("");
@@ -495,7 +522,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
       setShowSuccessModal(false);
       verifiedTokenRef.current = null;
     }
-  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // Close on Escape key
   useEffect(() => {
@@ -518,7 +545,6 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
   }, [isOpen]);
 
   function handleOverlayClick(e) {
-    if (e.target === overlayRef.current && !showOtpModal && !showSuccessModal) onClose();
   }
 
   function handlePwChange(e) {
@@ -615,8 +641,10 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
       borderRadius: "20px",
       width: "100%",
       maxWidth: "480px",
-      maxHeight: "90vh",
-      overflowY: "auto",
+      maxHeight: "80vh",
+      overflowY: "hidden",
+      display: "flex",
+      flexDirection: "column",
       boxShadow: "0 24px 64px rgba(12,28,20,0.18), 0 4px 16px rgba(12,28,20,0.08)",
       position: "relative",
       animation: "modalSlideIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)",
@@ -958,191 +986,317 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
             </button>
           </div>
 
+          {/* ── Tabs ── */}
+          <div style={{ display: "flex", borderBottom: "1px solid #eaf3ee", padding: "0 28px" }}>
+            {["profile", "password", "activity"].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => {
+                  setActiveTab(tab);
+                  setPwStatus(null);
+                  setPwErrorMsg("");
+                  if (tab === "activity") fetchActivityLog();
+                }}
+                style={{
+                  padding: "12px 16px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: activeTab === tab ? "#0c1c14" : "#9ab8a9",
+                  background: "none",
+                  border: "none",
+                  borderBottom: activeTab === tab ? "2px solid #1e8760" : "2px solid transparent",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  marginBottom: -1,
+                  transition: "color 0.15s",
+                }}
+              >
+                {tab === "profile" ? "Profile" : tab === "password" ? "Change Password" : "Activity"}
+              </button>
+            ))}
+          </div>
+
           {/* ── Body ── */}
-          <div style={styles.body}>
+          <div style={{ ...styles.body, overflowY: "auto", flex: 1 }}>
 
-            {/* Read-only info */}
-            <div style={styles.section}>
-              <p style={styles.sectionLabel}>Account Info</p>
-
-              {/* Email */}
-              <div style={styles.readOnlyRow}>
-                <i className="ti ti-mail" style={styles.readOnlyIcon} aria-hidden="true" />
-                <div style={styles.readOnlyContent}>
-                  <p style={styles.readOnlyKey}>Email</p>
-                  <p style={styles.readOnlyVal}>{user?.email || "—"}</p>
-                </div>
-              </div>
-
-              {/* Role */}
-              <div style={styles.readOnlyRow}>
-                <i className="ti ti-shield-check" style={styles.readOnlyIcon} aria-hidden="true" />
-                <div style={styles.readOnlyContent}>
-                  <p style={styles.readOnlyKey}>Role</p>
-                  <p style={styles.readOnlyVal} className="capitalize">
-                    {user?.role || "client"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Last login */}
-              <div style={{ ...styles.readOnlyRow, marginTop: 8 }}>
-                <i className="ti ti-clock" style={styles.readOnlyIcon} aria-hidden="true" />
-                <div style={styles.readOnlyContent}>
-                  <p style={styles.readOnlyKey}>Last Login</p>
-                  <p style={styles.readOnlyVal}>{formattedLastLogin}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* ── Name (read-only) ── */}
-            <div style={styles.section}>
-              <div style={styles.row2}>
-                <div style={styles.readOnlyRow}>
-                  <div style={styles.readOnlyContent}>
-                    <p style={styles.readOnlyKey}>First Name</p>
-                    <p style={styles.readOnlyVal}>{user?.firstName || "—"}</p>
+            {/* ── PROFILE TAB ── */}
+            {activeTab === "profile" && (
+              <>
+                <div style={styles.section}>
+                  <p style={styles.sectionLabel}>Account Info</p>
+                  <div style={styles.readOnlyRow}>
+                    <i className="ti ti-mail" style={styles.readOnlyIcon} aria-hidden="true" />
+                    <div style={styles.readOnlyContent}>
+                      <p style={styles.readOnlyKey}>Email</p>
+                      <p style={styles.readOnlyVal}>{user?.email || "—"}</p>
+                    </div>
+                  </div>
+                  <div style={styles.readOnlyRow}>
+                    <i className="ti ti-shield-check" style={styles.readOnlyIcon} aria-hidden="true" />
+                    <div style={styles.readOnlyContent}>
+                      <p style={styles.readOnlyKey}>Role</p>
+                      <p style={styles.readOnlyVal} className="capitalize">{user?.role || "client"}</p>
+                    </div>
+                  </div>
+                  <div style={{ ...styles.readOnlyRow, marginTop: 8 }}>
+                    <i className="ti ti-clock" style={styles.readOnlyIcon} aria-hidden="true" />
+                    <div style={styles.readOnlyContent}>
+                      <p style={styles.readOnlyKey}>Last Login</p>
+                      <p style={styles.readOnlyVal}>{formattedLastLogin}</p>
+                    </div>
                   </div>
                 </div>
-                <div style={styles.readOnlyRow}>
-                  <div style={styles.readOnlyContent}>
-                    <p style={styles.readOnlyKey}>Last Name</p>
-                    <p style={styles.readOnlyVal}>{user?.lastName || "—"}</p>
+                <div style={styles.section}>
+                  <div style={styles.row2}>
+                    <div style={styles.readOnlyRow}>
+                      <div style={styles.readOnlyContent}>
+                        <p style={styles.readOnlyKey}>First Name</p>
+                        <p style={styles.readOnlyVal}>{user?.firstName || "—"}</p>
+                      </div>
+                    </div>
+                    <div style={styles.readOnlyRow}>
+                      <div style={styles.readOnlyContent}>
+                        <p style={styles.readOnlyKey}>Last Name</p>
+                        <p style={styles.readOnlyVal}>{user?.lastName || "—"}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              </>
+            )}
 
-            {/* ── Divider ── */}
-            <div style={styles.divider} />
+            {/* ── PASSWORD TAB ── */}
+            {activeTab === "password" && (() => {
+              const pw = pwForm.newPassword;
+              const hasUpper = /[A-Z]/.test(pw);
+              const hasNumber = /[0-9]/.test(pw);
+              const hasLength = pw.length >= 8;
+              const strength = [hasUpper, hasNumber, hasLength].filter(Boolean).length;
+              const strengthLabel = pw.length === 0 ? "" : strength === 1 ? "Weak" : strength === 2 ? "Fair" : "Strong";
+              const strengthColor = strength === 1 ? "#c13515" : strength === 2 ? "#f59e0b" : "#1e8760";
+              const checks = [
+                { label: "At least 1 uppercase", ok: hasUpper },
+                { label: "At least 1 number", ok: hasNumber },
+                { label: "At least 8 characters", ok: hasLength },
+              ];
 
-            {/* ── Change Password section ── */}
-            <div style={{ ...styles.section, marginBottom: 8 }}>
-              <p style={styles.sectionLabel}>Change Password</p>
+              return (
+                <div style={{ ...styles.section, marginBottom: 8 }}>
+                  {/* Current password */}
+                  <div style={styles.fieldGroup}>
+                    <label style={styles.label} htmlFor="acc-currentPw">
+                      Current Password <span style={{ color: "#c13515" }}>*</span>
+                    </label>
+                    <div style={styles.pwInputWrap}>
+                      <input id="acc-currentPw" className="acc-pw-input" style={styles.pwInput} type={showPw.current ? "text" : "password"} name="currentPassword" value={pwForm.currentPassword} onChange={handlePwChange} placeholder="Enter current password" autoComplete="current-password" />
+                      <button type="button" className="acc-eye-btn" style={styles.eyeBtn} onClick={() => setShowPw((p) => ({ ...p, current: !p.current }))} tabIndex={-1}>
+                        <i className={showPw.current ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
 
-              {/* Current password */}
-              <div style={styles.fieldGroup}>
-                <label style={styles.label} htmlFor="acc-currentPw">Current Password</label>
-                <div style={styles.pwInputWrap}>
-                  <input
-                    id="acc-currentPw"
-                    className="acc-pw-input"
-                    style={styles.pwInput}
-                    type={showPw.current ? "text" : "password"}
-                    name="currentPassword"
-                    value={pwForm.currentPassword}
-                    onChange={handlePwChange}
-                    placeholder="Enter current password"
-                    autoComplete="current-password"
-                  />
+                  {/* New password */}
+                  <div style={styles.fieldGroup}>
+                    <label style={styles.label} htmlFor="acc-newPw">
+                      New Password <span style={{ color: "#c13515" }}>*</span>
+                    </label>
+                    <div style={styles.pwInputWrap}>
+                      <input id="acc-newPw" className="acc-pw-input" style={styles.pwInput} type={showPw.next ? "text" : "password"} name="newPassword" value={pwForm.newPassword} onChange={handlePwChange} placeholder="At least 8 characters" autoComplete="new-password" />
+                      <button type="button" className="acc-eye-btn" style={styles.eyeBtn} onClick={() => setShowPw((p) => ({ ...p, next: !p.next }))} tabIndex={-1}>
+                        <i className={showPw.next ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Confirm password */}
+                  <div style={{ ...styles.fieldGroup, marginBottom: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                      <label style={{ ...styles.label, marginBottom: 0 }} htmlFor="acc-confirmPw">
+                        Confirm New Password <span style={{ color: "#c13515" }}>*</span>
+                      </label>
+                      {pwForm.confirmPassword && (
+                        <button type="button" onClick={() => setPwForm(p => ({ ...p, confirmPassword: "" }))} style={{ fontSize: 12, fontWeight: 600, color: "#9ab8a9", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Clear</button>
+                      )}
+                    </div>
+                    <div style={styles.pwInputWrap}>
+                      <input id="acc-confirmPw" className="acc-pw-input" style={styles.pwInput} type={showPw.confirm ? "text" : "password"} name="confirmPassword" value={pwForm.confirmPassword} onChange={handlePwChange} placeholder="Re-enter new password" autoComplete="new-password" />
+                      <button type="button" className="acc-eye-btn" style={styles.eyeBtn} onClick={() => setShowPw((p) => ({ ...p, confirm: !p.confirm }))} tabIndex={-1}>
+                        <i className={showPw.confirm ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Strength bar */}
+                  {pw.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+                        {[1, 2, 3].map((s) => (
+                          <div key={s} style={{ flex: 1, height: 4, borderRadius: 4, background: s <= strength ? strengthColor : "#e3ede8", transition: "background 0.2s" }} />
+                        ))}
+                      </div>
+                      {strengthLabel && (
+                        <p style={{ fontSize: 12, color: strengthColor, fontWeight: 600, margin: 0 }}>
+                          {strengthLabel} password. {strength < 3 ? "Must contain;" : "Looks good!"}
+                        </p>
+                      )}
+                      <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+                        {checks.map((c) => (
+                          <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: c.ok ? "#1e8760" : "#9ab8a9" }}>
+                            <i className={c.ok ? "ti ti-circle-check-filled" : "ti ti-circle-x"} style={{ fontSize: 14 }} aria-hidden="true" />
+                            {c.label}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error */}
+                  {pwStatus === "error" && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, marginTop: 4 }}>
+                      <i className="ti ti-alert-circle" style={{ color: "#c13515", fontSize: 15 }} aria-hidden="true" />
+                      <span style={{ color: "#c13515" }}>{pwErrorMsg}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* ── ACTIVITY TAB ── */}
+            {activeTab === "activity" && (() => {
+              const now = new Date();
+              const filtered = activityLog.filter((e) => {
+                const d = new Date(e.timestamp);
+                if (activityFilter === 'today') {
+                  return d.toDateString() === now.toDateString();
+                }
+                if (activityFilter === 'week') {
+                  const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+                  return d >= weekAgo;
+                }
+                return true; // 'all'
+              });
+              return (
+              <div style={{ ...styles.section, marginBottom: 8 }}>
+                <div style={{ position: 'sticky', top: -24, background: '#fff', zIndex: 10, paddingTop: 4, paddingBottom: 8, marginBottom: 2 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <p style={{ ...styles.sectionLabel, marginBottom: 0 }}>Login & Security Activity</p>
                   <button
-                    type="button"
-                    className="acc-eye-btn"
-                    style={styles.eyeBtn}
-                    onClick={() => setShowPw((p) => ({ ...p, current: !p.current }))}
-                    tabIndex={-1}
-                    aria-label={showPw.current ? "Hide password" : "Show password"}
+                    onClick={() => {
+                      const rows = activityLog.map((e) => {
+                        const actionLabels = {
+                          login: 'Logged in',
+                          password_changed: 'Password changed',
+                          opened_account_settings: 'Opened account settings',
+                          exported_pdf: 'Exported PDF report',
+                          changed_date_filter: 'Changed date filter',
+                          filtered_by_channel: 'Filtered by channel',
+                          switched_calendar_view: 'Switched calendar view',
+                          opened_message_thread: 'Opened message thread',
+                        };
+                        const label = actionLabels[e.action] || e.action;
+                        const time = new Date(e.timestamp).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+                        return `"${label}","${time}","${e.ipAddress || ''}"`;
+                      });
+                      const csv = ['Action,Date & Time,IP Address', ...rows].join('\n');
+                      const blob = new Blob([csv], { type: 'text/csv' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `activity-log-${new Date().toISOString().slice(0, 10)}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    disabled={filtered.length === 0}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, border: '1px solid #d4e8dd', background: activityLog.length === 0 ? '#f7faf8' : '#eaf8f1', color: activityLog.length === 0 ? '#9ab8a9' : '#1e8760', fontSize: 12, fontWeight: 600, cursor: activityLog.length === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
                   >
-                    <i className={showPw.current ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
+                    <i className="ti ti-download" style={{ fontSize: 13 }} />
+                    Export CSV
                   </button>
                 </div>
-              </div>
-
-              {/* New password */}
-              <div style={styles.fieldGroup}>
-                <label style={styles.label} htmlFor="acc-newPw">New Password</label>
-                <div style={styles.pwInputWrap}>
-                  <input
-                    id="acc-newPw"
-                    className="acc-pw-input"
-                    style={styles.pwInput}
-                    type={showPw.next ? "text" : "password"}
-                    name="newPassword"
-                    value={pwForm.newPassword}
-                    onChange={handlePwChange}
-                    placeholder="At least 8 characters"
-                    autoComplete="new-password"
-                  />
-                  <button
-                    type="button"
-                    className="acc-eye-btn"
-                    style={styles.eyeBtn}
-                    onClick={() => setShowPw((p) => ({ ...p, next: !p.next }))}
-                    tabIndex={-1}
-                    aria-label={showPw.next ? "Hide password" : "Show password"}
-                  >
-                    <i className={showPw.next ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
-                  </button>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                  {[{id:'today',label:'Today'},{id:'week',label:'Last 7 days'},{id:'all',label:'All time'}].map((f) => (
+                    <button key={f.id} onClick={() => setActivityFilter(f.id)} style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid', borderColor: activityFilter === f.id ? '#1e8760' : '#d4e8dd', background: activityFilter === f.id ? '#eaf8f1' : 'transparent', color: activityFilter === f.id ? '#1e8760' : '#9ab8a9', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>{f.label}</button>
+                  ))}
                 </div>
-              </div>
-
-              {/* Confirm new password */}
-              <div style={{ ...styles.fieldGroup, marginBottom: 12 }}>
-                <label style={styles.label} htmlFor="acc-confirmPw">Confirm New Password</label>
-                <div style={styles.pwInputWrap}>
-                  <input
-                    id="acc-confirmPw"
-                    className="acc-pw-input"
-                    style={styles.pwInput}
-                    type={showPw.confirm ? "text" : "password"}
-                    name="confirmPassword"
-                    value={pwForm.confirmPassword}
-                    onChange={handlePwChange}
-                    placeholder="Re-enter new password"
-                    autoComplete="new-password"
-                  />
-                  <button
-                    type="button"
-                    className="acc-eye-btn"
-                    style={styles.eyeBtn}
-                    onClick={() => setShowPw((p) => ({ ...p, confirm: !p.confirm }))}
-                    tabIndex={-1}
-                    aria-label={showPw.confirm ? "Hide password" : "Show password"}
-                  >
-                    <i className={showPw.confirm ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
-                  </button>
                 </div>
+                {activityLoading ? (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "32px 0", gap: 10, color: "#9ab8a9", fontSize: 13 }}>
+                    <i className="ti ti-loader-2" style={{ fontSize: 18, animation: "spin 0.8s linear infinite" }} />
+                    Loading activity…
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "32px 0" }}>
+                    <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#f0f8f4", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
+                      <i className="ti ti-history" style={{ fontSize: 22, color: "#9ab8a9" }} />
+                    </div>
+                    <p style={{ fontSize: 13, color: "#9ab8a9", margin: 0 }}>No activity recorded yet.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "340px", overflowY: "auto", paddingRight: 2 }}>
+                    {filtered.map((entry, i) => {
+                      const isLogin = entry.action === "login";
+                      const isPwChange = entry.action === "password_changed";
+                      const icon = isLogin ? "ti-login" : isPwChange ? "ti-lock" : "ti-info-circle";
+                      const iconColor = isLogin ? "#1e8760" : isPwChange ? "#f59e0b" : "#9ab8a9";
+                      const iconBg = isLogin ? "#eaf8f1" : isPwChange ? "#fffbeb" : "#f7faf8";
+                      const label = isLogin ? "Logged in" : isPwChange ? "Password changed" : entry.action;
+                      const time = new Date(entry.timestamp).toLocaleString("en-PH", {
+                        month: "short", day: "numeric", year: "numeric",
+                        hour: "numeric", minute: "2-digit", hour12: true,
+                      });
+                      return (
+                        <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", background: "#f7faf8", borderRadius: 12, border: "1px solid #eaf3ee" }}>
+                          <div style={{ width: 36, height: 36, borderRadius: "50%", background: iconBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <i className={`ti ${icon}`} style={{ fontSize: 16, color: iconColor }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#0c1c14", marginBottom: 2 }}>{label}</div>
+                            <div style={{ fontSize: 11, color: "#9ab8a9" }}>{time}</div>
+                              {entry.performedBy && (entry.performedBy.email || entry.performedBy.firstName) && (
+                              <div style={{ fontSize: 11, color: "#b0c8ba", marginTop: 2 }}>
+                                By: {[entry.performedBy.firstName, entry.performedBy.lastName].filter(Boolean).join(" ") || entry.performedBy.email} ({entry.performedBy.role || "client"})
+                              </div>
+                            )}
+                            {entry.ipAddress && (
+                              <div style={{ fontSize: 11, color: "#b0c8ba", marginTop: 2 }}>
+                                IP: {entry.ipAddress}
+                              </div>
+                            )}
+                          </div>
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 20, background: iconBg, color: iconColor, flexShrink: 0, alignSelf: "flex-start" }}>
+                            {isLogin ? "Login" : isPwChange ? "Security" : "Event"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-
-              {/* Password error message */}
-              {pwStatus === "error" && (
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "12px", fontWeight: 500, marginTop: 4 }}>
-                  <i className="ti ti-alert-circle" style={{ color: "#c13515", fontSize: 15 }} aria-hidden="true" />
-                  <span style={{ color: "#c13515" }}>{pwErrorMsg}</span>
-                </div>
-              )}
-            </div>
+              );
+            })()}
           </div>
 
           {/* ── Footer ── */}
           <div style={{ ...styles.footer, justifyContent: "flex-end" }}>
             <div style={styles.btnGroup}>
-              <button
-                style={styles.cancelBtn}
-                className="acc-cancel-btn"
-                onClick={onClose}
-                disabled={pwSaving}
-              >
-                Cancel
+              <button style={styles.cancelBtn} className="acc-cancel-btn" onClick={onClose} disabled={pwSaving}>
+                Discard
               </button>
-              <button
-                style={styles.saveBtn(pwSaving)}
-                className="acc-save-btn"
-                onClick={handleSave}
-                disabled={pwSaving}
-              >
-                {pwSaving ? (
-                  <>
-                    <i className="ti ti-loader-2" style={{ fontSize: 14, animation: "spin 0.8s linear infinite" }} aria-hidden="true" />
-                    Sending code…
-                  </>
-                ) : (
-                  <>
-                    <i className="ti ti-check" style={{ fontSize: 14 }} aria-hidden="true" />
-                    Save changes
-                  </>
-                )}
-              </button>
+              {activeTab === "password" && (
+                <button style={styles.saveBtn(pwSaving)} className="acc-save-btn" onClick={handleSave} disabled={pwSaving}>
+                  {pwSaving ? (
+                    <>
+                      <i className="ti ti-loader-2" style={{ fontSize: 14, animation: "spin 0.8s linear infinite" }} aria-hidden="true" />
+                      Sending code…
+                    </>
+                  ) : (
+                    <>
+                      <i className="ti ti-check" style={{ fontSize: 14 }} aria-hidden="true" />
+                      Apply Changes
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
 
