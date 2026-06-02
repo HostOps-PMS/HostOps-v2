@@ -5,7 +5,7 @@ import LoginOTPForm from './components/LoginOTPForm';
 import PropertySelectForm from './components/PropertySelectForm';
 import DomainLoginForm from './components/DomainLoginForm';
 import Message from './components/Message';
-import bgImage from '../../assets/BG.png';
+import bgImage from '../../assets/bg.png';
 import './Login.css';
 
 const VIEWS = {
@@ -52,7 +52,7 @@ export default function LoginPage() {
   const handleAuthSuccess = (data) => {
     setAuthData(data);
     if (data.isAdmin || data.user?.role === 'admin' || data.user?.role === 'team_leader') {
-      showMsg(`Welcome, ${data.user.firstName}! Redirecting...`, 'success');
+      showMsg(`Welcome, ${data.user.firstName || data.user.businessName}! Redirecting...`, 'success');
       setTimeout(() => {
         const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:5173';
         const params = new URLSearchParams({
@@ -63,7 +63,7 @@ export default function LoginPage() {
       }, 800);
     } else {
       showMsg(
-        `Welcome, ${data.user.firstName}! Please select a property to continue.`,
+        `Welcome, ${data.user.firstName || data.user.businessName}! Please select a property to continue.`,
         'success',
       );
       setView(VIEWS.PROPERTY_SELECT);
@@ -138,13 +138,10 @@ export default function LoginPage() {
               }}
               onClientAccountLogin={(data) => {
                 // ── Client Account login ───────────────────────────────────────
-                // Client accounts skip OTP and DomainLoginForm on initial login.
-                // After login they go to CLIENT_ACCOUNT_PROPERTY_SELECT where they
-                // can pick "All Properties" or a specific property.
-                // Picking "All Properties" routes through DomainLoginForm for
-                // credential re-confirmation before dashboard access.
-                // The auth middleware sets req.staffPropertyIds = [] for these
-                // sessions so /api/properties returns all parent client properties.
+                // Client accounts skip OTP. After login they go to
+                // CLIENT_ACCOUNT_PROPERTY_SELECT where they pick one of their
+                // parent client's embedded properties, then navigate directly
+                // to /dashboard — no DomainLoginForm step needed.
                 setAuthData(data);
                 showMsg(
                   `Welcome, ${data.clientAccount.firstName}! Please select a property to continue.`,
@@ -168,17 +165,18 @@ export default function LoginPage() {
           )}
 
           {view === VIEWS.PROPERTY_SELECT && (
+            // ── Regular client property selection ─────────────────────────────
+            // After OTP verification, client picks a property.
+            // PropertySelectForm navigates directly to /dashboard internally —
+            // no DomainLoginForm step. onContinue is no longer called since
+            // the "All Properties" option has been removed.
             <PropertySelectForm
               userData={authData?.user}
               showMsg={showMsg}
               hideMsg={hideMsg}
               onContinue={(propertyId) => {
-                // '__all__' or a specific apartment ID.
-                // Both cases go to DomainLoginForm:
-                //   '__all__'     → DomainLoginForm uses clientAccount credentials,
-                //                   skips property access check, clears property scope.
-                //   specific id   → DomainLoginForm uses staff credentials,
-                //                   validates property access as normal.
+                // Kept for safety — not triggered in normal flow since
+                // PropertySelectForm now always navigates internally.
                 setSelectedPropertyId(propertyId);
                 hideMsg();
                 setView(VIEWS.DOMAIN_LOGIN);
@@ -201,21 +199,18 @@ export default function LoginPage() {
           )}
 
           {view === VIEWS.CLIENT_ACCOUNT_PROPERTY_SELECT && (
-            // ── Client Account Property Selection ───────────────────────────────
-            // isClientAccount=true is passed so we know the context.
-            // "All Properties" → onContinue('__all__') → DOMAIN_LOGIN view,
-            //   DomainLoginForm shows clientAccount credential form.
-            // Specific property → PropertySelectForm navigates to /dashboard
-            //   directly (already authenticated as clientAccount).
+            // ── Client Account Property Selection ─────────────────────────────
+            // isClientAccount=true so PropertySelectForm knows the context.
+            // Any property selection navigates directly to /dashboard —
+            // no DomainLoginForm step (already authenticated as clientAccount).
             <PropertySelectForm
               userData={authData?.clientAccount}
               isClientAccount={true}
               showMsg={showMsg}
               hideMsg={hideMsg}
               onContinue={(propertyId) => {
-                // Only called when '__all__' is selected (specific property
-                // navigates internally in PropertySelectForm for clientAccount).
-                // Route through DomainLoginForm for credential confirmation.
+                // Kept for safety — not triggered in normal flow since
+                // PropertySelectForm now always navigates internally.
                 setSelectedPropertyId(propertyId);
                 hideMsg();
                 setView(VIEWS.DOMAIN_LOGIN);

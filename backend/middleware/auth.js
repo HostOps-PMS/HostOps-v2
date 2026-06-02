@@ -24,7 +24,7 @@ export async function requireAuth(req, res, next) {
 
       // Load the client user WITH smoobuApiKey so dashboard routes can
       // call the Smoobu API using the client's own key.
-      const clientUser = await User.findById(staff.clientId).select('+smoobuApiKey');
+      const clientUser = await User.findById(staff.clientId).select('+properties.smoobuApiKey');
       if (!clientUser) return res.status(401).json({ error: 'Client account not found' });
 
       // Attach both to req so downstream routes and services have access.
@@ -54,7 +54,7 @@ export async function requireAuth(req, res, next) {
       if (!clientAccount.isActive) return res.status(403).json({ error: 'Client account is inactive' });
 
       // Load the parent client WITH smoobuApiKey so Smoobu calls work.
-      const parentUser = await User.findById(clientAccount.parentClientId).select('+smoobuApiKey');
+      const parentUser = await User.findById(clientAccount.parentClientId).select('+properties.smoobuApiKey');
       if (!parentUser) return res.status(401).json({ error: 'Parent client not found' });
 
       // req.user = parent client (carries smoobuApiKey for Smoobu calls)
@@ -75,15 +75,17 @@ export async function requireAuth(req, res, next) {
     // Without this, smoobuApiKey is always null (select: false in schema)
     // and every request falls back to the global env key — which belongs
     // to only one account, causing other users to see wrong/no data.
-    const user = await User.findById(decoded.sub).select('+smoobuApiKey');
+    const user = await User.findById(decoded.sub).select('+properties.smoobuApiKey');
     if (!user) return res.status(401).json({ error: 'User not found' });
 
     // For team leaders, dynamically inject their assigned client's (serverId) Smoobu API key in memory.
     // This allows them to fetch properties and view dashboards without duplicating the key in the database.
     if (user.role === 'team_leader' && user.serverId) {
-      const clientUser = await User.findById(user.serverId).select('+smoobuApiKey');
-      if (clientUser && clientUser.smoobuApiKey) {
-        user.smoobuApiKey = clientUser.smoobuApiKey;
+      const clientUser = await User.findById(user.serverId).select('+properties.smoobuApiKey');
+      if (clientUser && clientUser.properties?.length) {
+        // Inject client's properties (with smoobuApiKey) into the team leader's
+        // user object so downstream Smoobu service calls can access the keys.
+        user.properties = clientUser.properties;
       }
     }
 

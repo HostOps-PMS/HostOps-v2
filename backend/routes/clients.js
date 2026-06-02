@@ -2,6 +2,10 @@
 // ─────────────────────────────────────────────────────────────────
 // Admin-only routes for managing platform clients (users).
 // Mount in server.js: app.use('/api', clientsRoutes);
+//
+// Properties are now embedded directly in the User document as
+// user.properties[]. There is no separate Property collection.
+// smoobuApiKey lives inside each embedded property (select:false).
 // ─────────────────────────────────────────────────────────────────
 import express from 'express';
 import { z } from 'zod';
@@ -17,12 +21,12 @@ router.use(requireAuth);
 // ─────────────────────────────────────────────────────────────────
 // GET /api/clients
 // Returns all registered users.
-// Excludes sensitive fields (password, tokens, smoobuApiKey).
+// Excludes sensitive fields (password, tokens).
 // ─────────────────────────────────────────────────────────────────
 router.get('/clients', requireAdmin, async (req, res, next) => {
   try {
     const clients = await User.find({})
-      .select('-password -verifyToken -verifyTokenExpiry -resetToken -resetTokenExpiry -smoobuApiKey -__v')
+      .select('-password -verifyToken -verifyTokenExpiry -resetToken -resetTokenExpiry -__v')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -39,7 +43,7 @@ router.get('/clients', requireAdmin, async (req, res, next) => {
 router.get('/clients/:id', requireAdmin, async (req, res, next) => {
   try {
     const client = await User.findById(req.params.id)
-      .select('-password -verifyToken -verifyTokenExpiry -resetToken -resetTokenExpiry -smoobuApiKey -__v')
+      .select('-password -verifyToken -verifyTokenExpiry -resetToken -resetTokenExpiry -__v')
       .lean();
 
     if (!client) {
@@ -57,32 +61,49 @@ router.get('/clients/:id', requireAdmin, async (req, res, next) => {
 
 // ─────────────────────────────────────────────────────────────────
 // GET /api/clients/:id/smoobu
-// Admin views a client's Smoobu dashboard data.
+// Admin views Smoobu dashboard data for one of a client's properties.
 //
-// The client's smoobuApiKey is loaded server-side (+smoobuApiKey) and
-// is NEVER sent to the frontend — the server fetches Smoobu on the
-// client's behalf and returns only the dashboard payload.
+// Required query param: ?propertyId=<embedded property _id>
 //
-// If the client has no key, returns { smoobuNotConnected: true }.
+// The property's smoobuApiKey is loaded server-side (+properties.smoobuApiKey)
+// and is NEVER sent to the frontend — the server fetches Smoobu on
+// behalf of the property and returns only the dashboard payload.
+//
+// If the property has no key, returns { smoobuNotConnected: true }.
 // ─────────────────────────────────────────────────────────────────
 router.get('/clients/:id/smoobu', requireAdmin, async (req, res, next) => {
   try {
-    // Load user WITH their smoobuApiKey (select:false — must be explicit)
-    const user = await User.findById(req.params.id).select('+smoobuApiKey');
+    const { propertyId } = req.query;
 
+    if (!propertyId) {
+      return res.status(400).json({ error: 'propertyId query param is required.' });
+    }
+
+    // Load user WITH smoobuApiKey on embedded properties
+    const user = await User.findById(req.params.id).select('+properties.smoobuApiKey');
     if (!user) {
       return res.status(404).json({ error: 'Client not found' });
     }
 
-    // If no key at all, return a clean "not connected" response
-    if (!user.smoobuApiKey || !user.smoobuApiKey.trim()) {
+    const property = user.properties.id(propertyId);
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found for this client.' });
+    }
+
+    if (!property.smoobuApiKey || !property.smoobuApiKey.trim()) {
       return res.status(200).json({
         smoobuNotConnected: true,
-        message: 'This client has no Smoobu API key configured.',
+        message: 'This property has no Smoobu API key configured.',
       });
     }
 
-    const data = await getDashboard(user, {
+    // getDashboard expects a user-like object with smoobuApiKey and propertyTagPrefix.
+    const smoobuContext = {
+      smoobuApiKey:      property.smoobuApiKey,
+      propertyTagPrefix: user.propertyTagPrefix || '',
+    };
+
+    const data = await getDashboard(smoobuContext, {
       from: req.query.from,
       to:   req.query.to,
     });
@@ -90,9 +111,8 @@ router.get('/clients/:id/smoobu', requireAdmin, async (req, res, next) => {
     res.json(data);
   } catch (err) {
     if (err.name === 'CastError') {
-      return res.status(400).json({ error: 'Invalid client ID' });
+      return res.status(400).json({ error: 'Invalid ID' });
     }
-    // getDashboard throws this when there's no key — belt-and-suspenders
     if (err.code === 'NO_SMOOBU_KEY') {
       return res.status(200).json({
         smoobuNotConnected: true,
@@ -104,22 +124,222 @@ router.get('/clients/:id/smoobu', requireAdmin, async (req, res, next) => {
 });
 
 // ─────────────────────────────────────────────────────────────────
+// GET /api/clients/:id/properties
+// Returns all embedded properties of a client.
+// smoobuApiKey is excluded from the response.
+// ─────────────────────────────────────────────────────────────────
+router.get('/clients/:id/properties', requireAdmin, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id).lean();
+    if (!user) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    // Strip smoobuApiKey from each property before sending
+    const safe = (user.properties || []).map(({ smoobuApiKey, ...rest }) => rest);
+    res.json(safe);
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid client ID' });
+    }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /api/clients/:id/properties
+// Admin adds an embedded property to a client's properties array.
+// ─────────────────────────────────────────────────────────────────
+const createPropertySchema = z.object({
+  propertyName: z.string().min(1).max(150).trim(),
+  smoobuApiKey: z.string().max(512).optional().default(''),
+});
+
+router.post('/clients/:id/properties', requireAdmin, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    const data = createPropertySchema.parse(req.body);
+
+    user.properties.push({
+      propertyName: data.propertyName,
+      smoobuApiKey: data.smoobuApiKey.trim() || '',
+    });
+
+    await user.save();
+
+    // Return the newly added property without smoobuApiKey
+    const added = user.properties[user.properties.length - 1].toObject();
+    const { smoobuApiKey: _, ...safe } = added;
+    res.status(201).json(safe);
+  } catch (err) {
+    if (err.name === 'ZodError') {
+      return res.status(400).json({ error: 'Validation failed', details: err.errors });
+    }
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid client ID' });
+    }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// PATCH /api/clients/:id/properties/:propertyId
+// Admin updates an embedded property's name or smoobuApiKey.
+// ─────────────────────────────────────────────────────────────────
+const updatePropertySchema = z.object({
+  propertyName: z.string().min(1).max(150).trim().optional(),
+  smoobuApiKey: z.string().max(512).optional(),
+});
+
+router.patch('/clients/:id/properties/:propertyId', requireAdmin, async (req, res, next) => {
+  try {
+    const data = updatePropertySchema.parse(req.body);
+
+    const user = await User.findById(req.params.id).select('+properties.smoobuApiKey');
+    if (!user) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    const property = user.properties.id(req.params.propertyId);
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found for this client.' });
+    }
+
+    if (data.propertyName !== undefined) property.propertyName = data.propertyName;
+    if (data.smoobuApiKey !== undefined) property.smoobuApiKey = data.smoobuApiKey.trim();
+
+    await user.save();
+
+    const { smoobuApiKey: _, ...safe } = property.toObject();
+    res.json(safe);
+  } catch (err) {
+    if (err.name === 'ZodError') {
+      return res.status(400).json({ error: 'Validation failed', details: err.errors });
+    }
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /api/clients/:id/properties/:propertyId/sync
+// Syncs subProperties (rooms/units) from Smoobu for a given property.
+// Fetches the apartment list from Smoobu using the property's key
+// and upserts them into property.subProperties.
+// NOTE: subProperties are stored on the embedded property object.
+// ─────────────────────────────────────────────────────────────────
+router.post('/clients/:id/properties/:propertyId/sync', requireAdmin, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id).select('+properties.smoobuApiKey');
+    if (!user) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    const property = user.properties.id(req.params.propertyId);
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found for this client.' });
+    }
+
+    if (!property.smoobuApiKey || !property.smoobuApiKey.trim()) {
+      return res.status(400).json({ error: 'This property has no Smoobu API key configured.' });
+    }
+
+    // Fetch apartment list from Smoobu
+    const smoobuRes = await fetch('https://login.smoobu.com/api/apartments', {
+      headers: {
+        'Api-Key':       property.smoobuApiKey,
+        'Cache-Control': 'no-cache',
+      },
+    });
+
+    if (!smoobuRes.ok) {
+      const body = await smoobuRes.json().catch(() => ({}));
+      return res.status(502).json({
+        error: 'Smoobu API error',
+        details: body?.message ?? `HTTP ${smoobuRes.status}`,
+      });
+    }
+
+    const smoobuData = await smoobuRes.json();
+    const apartments = Array.isArray(smoobuData)
+      ? smoobuData
+      : (smoobuData.apartments ?? []);
+
+    const synced = apartments.map((apt) => ({
+      smoobuId:     apt.id,
+      name:         apt.name ?? apt.title ?? `Room ${apt.id}`,
+      type:         apt.type ?? '',
+      smoobuData:   apt,
+      lastSyncedAt: new Date(),
+    }));
+
+    property.subProperties = synced;
+    property.lastSyncedAt  = new Date();
+    await user.save();
+
+    res.json({
+      message:  `Synced ${synced.length} sub-properties from Smoobu.`,
+      count:    synced.length,
+      subProperties: synced.map(({ smoobuData: _sd, ...rest }) => rest),
+    });
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// DELETE /api/clients/:id/properties/:propertyId
+// Admin removes an embedded property from the client's properties array.
+// ─────────────────────────────────────────────────────────────────
+router.delete('/clients/:id/properties/:propertyId', requireAdmin, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    const property = user.properties.id(req.params.propertyId);
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found for this client.' });
+    }
+
+    property.deleteOne();
+    await user.save();
+
+    res.json({ message: 'Property removed successfully.' });
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
 // POST /api/clients
-// Admin creates a new user account with a temporary password.
-// Sets mustChangePassword: true so the user is forced to set
-// their own password on first login before gaining full access.
-// isVerified is intentionally left false — it becomes true only
-// after the user completes the first-login password change.
+// Admin creates a new user account with embedded properties.
+// isVerified is set to true — admin-created accounts are pre-verified.
 // ─────────────────────────────────────────────────────────────────
 const createClientSchema = z.object({
-  firstName:         z.string().min(1).max(50).trim(),
-  lastName:          z.string().max(50).trim().optional().default(''),
+  businessName:      z.string().min(1).max(150).trim(),
   email:             z.string().email().max(254),
   password:          z.string().min(8).max(128),
   role:              z.enum(['client', 'admin', 'team_leader']).optional().default('client'),
   propertyTagPrefix: z.string().max(100).trim().optional().default(''),
-  smoobuApiKey:      z.string().max(512).optional().default(''),
   serverId:          z.string().optional(),
+  properties: z.array(z.object({
+    propertyName: z.string().min(1).max(150).trim(),
+    smoobuApiKey: z.string().max(512).optional().default(''),
+  })).optional().default([]),
 });
 
 router.post('/clients', requireAdmin, async (req, res, next) => {
@@ -142,22 +362,24 @@ router.post('/clients', requireAdmin, async (req, res, next) => {
     }
 
     const user = await User.create({
-      firstName:          data.firstName,
-      lastName:           data.lastName || '',
+      businessName:       data.businessName,
       email:              data.email.toLowerCase(),
       password:           data.password,
       role:               data.role,
       propertyTagPrefix:  data.propertyTagPrefix || '',
-      smoobuApiKey:       data.smoobuApiKey || null,
       serverId:           data.serverId || null,
-      isVerified:         false,
-      mustChangePassword: true,
+      isVerified:         true,
+      mustChangePassword: false,
+      properties:         data.properties.map((p) => ({
+        propertyName: p.propertyName,
+        smoobuApiKey: p.smoobuApiKey.trim() || '',
+      })),
     });
 
     res.status(201).json({
       message: 'Account created successfully.',
-      userId: user._id,
-      user: user.toJSON(),
+      userId:  user._id,
+      user:    user.toJSON(),
     });
   } catch (err) {
     if (err.name === 'ZodError') {
@@ -169,20 +391,13 @@ router.post('/clients', requireAdmin, async (req, res, next) => {
 
 // ─────────────────────────────────────────────────────────────────
 // PATCH /api/clients/:id
-// Admin updates a client's editable fields:
-//   - role
-//   - propertyTagPrefix
-//   - smoobuApiKey (optional — only updated if provided)
-// All other fields (email, password, isVerified, etc.) are
-// intentionally excluded to prevent accidental overwrites.
+// Admin updates a client's editable fields.
 // ─────────────────────────────────────────────────────────────────
 const updateClientSchema = z.object({
-  firstName:         z.string().min(1).max(50).trim().optional(),
-  lastName:          z.string().max(50).trim().optional(),
+  businessName:      z.string().min(1).max(150).trim().optional(),
   serverId:          z.string().optional(),
   role:              z.enum(['client', 'admin', 'team_leader']).optional(),
   propertyTagPrefix: z.string().max(100).trim().optional(),
-  smoobuApiKey:      z.string().max(512).optional(),
 });
 
 router.patch('/clients/:id', requireAdmin, async (req, res, next) => {
@@ -190,22 +405,17 @@ router.patch('/clients/:id', requireAdmin, async (req, res, next) => {
     const data = updateClientSchema.parse(req.body);
 
     const update = {};
-    if (data.firstName         !== undefined) update.firstName         = data.firstName;
-    if (data.lastName          !== undefined) update.lastName          = data.lastName;
+    if (data.businessName      !== undefined) update.businessName      = data.businessName;
     if (data.serverId          !== undefined) update.serverId          = data.serverId || null;
     if (data.role              !== undefined) update.role              = data.role;
     if (data.propertyTagPrefix !== undefined) update.propertyTagPrefix = data.propertyTagPrefix;
-    if (data.smoobuApiKey      !== undefined) {
-      update.smoobuApiKey      = data.smoobuApiKey.trim() || null;
-      update.smoobuConnectedAt = data.smoobuApiKey.trim() ? new Date() : null;
-    }
 
     const client = await User.findByIdAndUpdate(
       req.params.id,
       { $set: update },
       { new: true, runValidators: true }
     )
-      .select('-password -verifyToken -verifyTokenExpiry -resetToken -resetTokenExpiry -smoobuApiKey -__v')
+      .select('-password -verifyToken -verifyTokenExpiry -resetToken -resetTokenExpiry -__v')
       .lean();
 
     if (!client) {

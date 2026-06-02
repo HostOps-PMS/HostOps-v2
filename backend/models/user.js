@@ -2,6 +2,15 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+// ── Embedded property sub-schema ──────────────────────────────
+// Each user can own multiple properties.
+// smoobuApiKey is select:false so it is never returned by default
+// in API responses — must be explicitly requested with .select('+properties.smoobuApiKey').
+const propertySchema = new mongoose.Schema({
+  propertyName: { type: String, required: true, trim: true },
+  smoobuApiKey: { type: String, default: '', trim: true, select: false },
+}, { _id: true });
+
 const userSchema = new mongoose.Schema({
   email: {
     type: String,
@@ -16,11 +25,24 @@ const userSchema = new mongoose.Schema({
     required: true,
     select: false,
   },
-  firstName: { type: String, required: true, trim: true },
+
+  // Business account display name
+  businessName: { type: String, required: true, trim: true },
+
+  // Legacy fields — kept for backward compatibility with older user documents
+  // created before the businessName migration. New accounts created via
+  // POST /api/clients will only have businessName. Auth routes reference
+  // user.firstName via the pre-save hook so nothing breaks.
+  firstName: { type: String, default: '', trim: true },
   lastName:  { type: String, default: '', trim: true },
 
   // Human-readable label for admin users (e.g. "Main Admin", "Support Admin")
   tag: { type: String, default: '', trim: true },
+
+  // ── Embedded properties ───────────────────────────────────────
+  // Replaces the separate Property collection.
+  // Each entry has a propertyName and a smoobuApiKey (hidden by default).
+  properties: { type: [propertySchema], default: [] },
 
   // Email verification
   isVerified:        { type: Boolean, default: false },
@@ -49,12 +71,8 @@ const userSchema = new mongoose.Schema({
     default: null,
   },
 
-  // ── MULTI-TENANT READY ────────────────────────────────────────
+  // Used as a filter prefix when fetching properties from Smoobu.
   propertyTagPrefix: { type: String, default: '', trim: true },
-
-  // For future multi-Smoobu — encrypted bago i-store
-  smoobuApiKey:      { type: String, select: false, default: null },
-  smoobuConnectedAt: { type: Date,   default: null },
 
   // First-login password change flag.
   // Set to true when an admin creates the account (with a default/temporary password).
@@ -65,6 +83,16 @@ const userSchema = new mongoose.Schema({
   lastLoginAt: { type: Date },
 }, {
   timestamps: true,
+});
+
+// ── Auto-populate businessName for legacy users ───────────────────
+// Users created before the businessName migration only have firstName/lastName.
+// On any save(), derive businessName from firstName so validation passes.
+userSchema.pre('save', function(next) {
+  if (!this.businessName && this.firstName) {
+    this.businessName = [this.firstName, this.lastName].filter(Boolean).join(' ').trim() || this.firstName;
+  }
+  next();
 });
 
 // ── Hash password before save ─────────────────────────────────
@@ -87,8 +115,11 @@ userSchema.methods.toJSON = function() {
   delete obj.verifyTokenExpiry;
   delete obj.resetToken;
   delete obj.resetTokenExpiry;
-  delete obj.smoobuApiKey;
   delete obj.__v;
+  // Strip smoobuApiKey from every embedded property before sending to client
+  if (Array.isArray(obj.properties)) {
+    obj.properties = obj.properties.map(({ smoobuApiKey, ...rest }) => rest);
+  }
   return obj;
 };
 

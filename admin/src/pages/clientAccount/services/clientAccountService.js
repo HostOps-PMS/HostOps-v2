@@ -4,7 +4,7 @@
 // Mirrors the pattern used in the Staffs page services.
 // ─────────────────────────────────────────────────────────────────
 
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const BASE = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
 const API_KEY = import.meta.env.VITE_API_KEY || '';
 
 function authHeaders() {

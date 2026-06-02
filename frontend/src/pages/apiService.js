@@ -1,4 +1,4 @@
-const HP_API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
+const HP_API_BASE = import.meta.env.VITE_API_BASE || 'https://hostpilot-smoobu.onrender.com';
 
 /**
  * Authenticated fetch wrapper. Automatically attaches Bearer token and
@@ -118,18 +118,22 @@ export async function verifySession(auth) {
  * Fetches dashboard data for a given date range and optional property filter.
  *
  * @param {object} opts
- * @param {string}      [opts.from]         - Date range start YYYY-MM-DD
- * @param {string}      [opts.to]           - Date range end YYYY-MM-DD
- * @param {string|null} [opts.apartmentId]  - When set, backend scopes response
- *                                            to that single property (bookings,
- *                                            inbox threads, stats, byChannel).
- *                                            null / undefined = All Properties.
+ * @param {string}      [opts.from]           - Date range start YYYY-MM-DD
+ * @param {string}      [opts.to]             - Date range end YYYY-MM-DD
+ * @param {string|null} [opts.apartmentId]    - When set, backend scopes response
+ *                                              to that single Smoobu apartment ID.
+ *                                              null / undefined = All Properties.
+ * @param {string|null} [opts.propertyDbId]   - MongoDB _id of the selected property
+ *                                              from user.properties[]. The backend
+ *                                              uses this to inject the correct
+ *                                              smoobuApiKey for per-property API calls.
  */
-export async function fetchDashboard({ from, to, apartmentId }, auth) {
+export async function fetchDashboard({ from, to, apartmentId, propertyDbId }, auth) {
   const params = new URLSearchParams();
-  if (from)        params.set('from', from);
-  if (to)          params.set('to',   to);
-  if (apartmentId) params.set('apartmentId', String(apartmentId));
+  if (from)          params.set('from', from);
+  if (to)            params.set('to',   to);
+  if (apartmentId)   params.set('apartmentId', String(apartmentId));
+  if (propertyDbId)  params.set('propertyDbId', String(propertyDbId));
 
   const query = params.toString() ? `?${params.toString()}` : '';
   return authFetch(`/api/dashboard${query}`, {}, auth);

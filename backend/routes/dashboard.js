@@ -215,13 +215,52 @@ function applyStaffPropertyFilter(data, staffPropertyIds) {
 // ─────────────────────────────────────────────────────────────────
 router.get('/dashboard', async (req, res, next) => {
   try {
-    const data = await getDashboard(req.user, {
+    // ── propertyDbId — per-property Smoobu API key injection ─────────────────
+    // When the user selects a specific property on the login screen, the frontend
+    // stores its MongoDB _id in sessionStorage (hp_selected_property_id) and
+    // passes it here as ?propertyDbId=<ObjectId string>.
+    //
+    // Each embedded property in user.properties[] has its own smoobuApiKey.
+    // We find the matching property by _id, then inject its smoobuApiKey onto
+    // the user object (as user.smoobuApiKey) so that getApiKeyForUser(user)
+    // in smoobu.js picks it up via MODE A (user.smoobuApiKey is set).
+    //
+    // This works for all session types (regular client, clientAccount, staff)
+    // because requireAuth already sets req.user = parentUser with
+    // +properties.smoobuApiKey selected.
+    //
+    // If propertyDbId is not provided, the existing MODE A / B / C logic
+    // applies unchanged (user.smoobuApiKey or env key fallback).
+    let userForDashboard = req.user;
+    const propertyDbId = req.query.propertyDbId;
+
+    if (propertyDbId) {
+      const userWithKeys = await User.findById(req.user._id)
+        .select('+properties.smoobuApiKey +smoobuApiKey')
+        .lean();
+      if (userWithKeys) {
+        const matchedProp = (userWithKeys.properties || []).find(
+          (p) => String(p._id) === String(propertyDbId)
+        );
+        if (matchedProp?.smoobuApiKey?.trim()) {
+          // Use a plain object spread so we never touch Mongoose internals.
+          // smoobu.js only reads plain properties (smoobuApiKey, _id, etc.)
+          // so a lean plain object is safe here.
+          userForDashboard = {
+            ...userWithKeys,
+            smoobuApiKey: matchedProp.smoobuApiKey.trim(),
+          };
+        }
+      }
+    }
+
+    const data = await getDashboard(userForDashboard, {
       from: req.query.from,
       to:   req.query.to,
     });
 
     // MODE A: user has own API key → smoobu already scoped the data correctly
-    if (hasOwnApiKey(req.user)) {
+    if (hasOwnApiKey(userForDashboard)) {
       applyPropertyFilter(data, req.query.apartmentId);
       // MODE C: further narrow to staff's assigned properties if applicable
       if (req.isStaff) applyStaffPropertyFilter(data, req.staffPropertyIds);
@@ -229,7 +268,7 @@ router.get('/dashboard', async (req, res, next) => {
     }
 
     // MODE B: shared key → apply propertyTagPrefix filter
-    const prefix = (req.user.propertyTagPrefix || '').trim();
+    const prefix = (userForDashboard.propertyTagPrefix || '').trim();
     if (prefix) {
       const { props, propIds } = filterPropsByPrefix(data.properties || [], prefix);
 
