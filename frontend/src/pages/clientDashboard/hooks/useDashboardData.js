@@ -22,16 +22,18 @@ export function useDashboardData() {
     if (loadingRef.current) return;
     loadingRef.current = true;
 
-    const from        = fromOverride        ?? dashState.from;
-    const to          = toOverride          ?? dashState.to;
-    // undefined as override means "use context value"; null means "All Properties"
-    const apartmentId = apartmentIdOverride !== undefined
-      ? apartmentIdOverride
-      : dashState.selectedPropertyId;
+    const from = fromOverride ?? dashState.from;
+    const to   = toOverride   ?? dashState.to;
 
-    // hp_selected_property_id holds the MongoDB _id of the selected property.
-    // Send it as propertyDbId so the backend can inject the correct smoobuApiKey.
+    // Always read fresh from sessionStorage — never from a stale closure.
+    // selectProperty() writes hp_selected_property_id synchronously before
+    // the useEffect in index.jsx fires loadData(), so this is always current.
     const propertyDbId = sessionStorage.getItem('hp_selected_property_id') || null;
+
+    // apartmentId is the Smoobu numeric ID for frontend-side filtering.
+    // When propertyDbId is set, the backend already scopes the API call to
+    // that property's smoobuApiKey — no extra apartmentId filter needed.
+    const apartmentId = apartmentIdOverride !== undefined ? apartmentIdOverride : null;
 
     setBanner({ message: '⏳ Loading data…', type: 'loading' });
 
