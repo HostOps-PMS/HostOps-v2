@@ -1,4 +1,4 @@
-const HP_API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
+const HP_API_BASE = import.meta.env.VITE_API_BASE || 'https://hostpilot-smoobu.onrender.com';
 
 /**
  * Authenticated fetch wrapper. Automatically attaches Bearer token and
