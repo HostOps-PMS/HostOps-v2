@@ -5,6 +5,8 @@ import {
   getChannelPillClass,
   getChannelColor,
   getChannelInitial,
+  getChannelLogo,
+  getBookingColor,
 } from "../utils/channelHelpers";
 import DOMPurify from "dompurify";
 
@@ -41,9 +43,22 @@ function buildDateRange(baseDate, monthsCount) {
 function ChannelBadge({ channel }) {
   const color = getChannelColor(channel);
   const initial = getChannelInitial(channel);
+  const logo = getChannelLogo(channel);
   return (
-    <span className="cal-pill-ic" style={{ background: color }}>
-      {initial}
+    <span className="cal-pill-ic" style={{ background: logo ? '#fff' : color, border: logo ? '0.5px solid #e3ede8' : 'none' }}>
+      {logo ? (
+        <img
+          src={logo}
+          alt={channel}
+          style={{ width: 13, height: 13, objectFit: 'contain', borderRadius: 2, display: 'block' }}
+          onError={(e) => {
+            e.target.style.display = 'none';
+            e.target.parentNode.style.background = color;
+            e.target.parentNode.style.border = 'none';
+            e.target.parentNode.textContent = initial;
+          }}
+        />
+      ) : initial}
     </span>
   );
 }
@@ -217,13 +232,377 @@ function PropertyRow({ prop, allBookings, dateRange, ymdRange, todayISO }) {
   );
 }
 
+function SingleCalendarView({ prop, allBookings, dark }) {
+  const today = new Date();
+  const todayISO = toYMD(today);
+  const year = today.getFullYear();
+  const month = today.getMonth();
+
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const totalDays = lastDay.getDate();
+
+  // Monday-start grid
+  let startDow = firstDay.getDay(); // 0=Sun
+  startDow = startDow === 0 ? 6 : startDow - 1; // convert to Mon=0
+
+  const propBookings = allBookings.filter((b) => {
+    if (!b.apartment) return false;
+    if (String(b.apartment.id) !== String(prop.id)) return false;
+    if (!b['guest-name'] && b['is-blocked-booking']) return false;
+    return true;
+  });
+
+  // Build a map: dateISO -> booking
+  const bookedMap = {};
+  [...propBookings].sort((a, b) =>
+    (new Date(b.departure) - new Date(b.arrival)) - (new Date(a.departure) - new Date(a.arrival))
+  ).forEach((b) => {
+    const arr = new Date(b.arrival);
+    const dep = new Date(b.departure);
+    for (let d = new Date(arr); d < dep; d.setDate(d.getDate() + 1)) {
+      const iso = toYMD(d);
+      if (!bookedMap[iso]) bookedMap[iso] = b;
+    }
+  });
+
+  // Stats
+  const monthStart = toYMD(new Date(year, month, 1));
+  const monthEnd = toYMD(new Date(year, month + 1, 0));
+  const monthBookings = propBookings.filter((b) => {
+    return toYMD(b.arrival) <= monthEnd && toYMD(b.departure) > monthStart;
+  });
+  const bookedNights = Object.keys(bookedMap).filter(
+    (d) => d >= monthStart && d <= monthEnd
+  ).length;
+  const occupancy = Math.round((bookedNights / totalDays) * 100);
+  const revenue = monthBookings.reduce((s, b) => s + (b.price || 0), 0);
+
+  const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  const cells = [];
+  // leading empty cells
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= totalDays; d++) cells.push(d);
+  // trailing empty cells
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  // Build booking bar segments — track which day starts a bar
+  const barStarts = {};
+  propBookings.forEach((b) => {
+    const arrISO = toYMD(new Date(b.arrival));
+    const effectiveStart = arrISO < monthStart ? monthStart : arrISO;
+    const depISO = toYMD(new Date(b.departure));
+    let span = 0;
+    let cur = new Date(effectiveStart);
+    while (toYMD(cur) < depISO && toYMD(cur) <= monthEnd) {
+      span++;
+      cur.setDate(cur.getDate() + 1);
+    }
+    barStarts[effectiveStart] = { booking: b, span };
+  });
+
+  const cardBg = dark ? '#0f2d1f' : '#fff';
+  const borderCol = dark ? '#1e3a2a' : '#e3ede8';
+  const textPrimary = dark ? '#eaf5f0' : '#0c1c14';
+  const textSecondary = dark ? '#7aab95' : '#9ab8a9';
+  const surfaceBg = dark ? '#0a1f15' : '#f5f9f7';
+  const cellBg = dark ? '#0d2619' : '#fff';
+  const cellBorder = dark ? '#1a3d28' : '#eef2f0';
+  const weekendBg = dark ? '#0c2416' : '#fdf8f8';
+  const todayBg = dark ? '#1a4a2e' : '#f0faf4';
+
+  const [viewYear, setViewYear] = useState(year);
+  const [viewMonth, setViewMonth] = useState(month);
+
+  const MONTHS_FULL_NAV = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const navFirstDay = new Date(viewYear, viewMonth, 1);
+  const navLastDay = new Date(viewYear, viewMonth + 1, 0);
+  const navTotalDays = navLastDay.getDate();
+  let navStartDow = navFirstDay.getDay();
+  navStartDow = navStartDow === 0 ? 6 : navStartDow - 1;
+  const navMonthStart = toYMD(new Date(viewYear, viewMonth, 1));
+  const navMonthEnd = toYMD(new Date(viewYear, viewMonth + 1, 0));
+  const navCells = [];
+  for (let i = 0; i < navStartDow; i++) navCells.push(null);
+  for (let d = 1; d <= navTotalDays; d++) navCells.push(d);
+  while (navCells.length % 7 !== 0) navCells.push(null);
+  const navBookedMap = {};
+  // Sort longer bookings first so they don't get overwritten by shorter ones
+  [...propBookings].sort((a, b) =>
+    (new Date(b.departure) - new Date(b.arrival)) - (new Date(a.departure) - new Date(a.arrival))
+  ).forEach((b) => {
+    const arr = new Date(b.arrival);
+    const dep = new Date(b.departure);
+    for (let d = new Date(arr); d < dep; d.setDate(d.getDate() + 1)) {
+      const iso = toYMD(d);
+      if (!navBookedMap[iso]) navBookedMap[iso] = b;
+    }
+  });
+  const navBarStarts = {};
+  // Sort by arrival so earlier bookings get priority, longer bookings win ties
+  const sortedNavBookings = [...propBookings].sort((a, b) => {
+    const aStart = toYMD(new Date(a.arrival)) < navMonthStart ? navMonthStart : toYMD(new Date(a.arrival));
+    const bStart = toYMD(new Date(b.arrival)) < navMonthStart ? navMonthStart : toYMD(new Date(b.arrival));
+    if (aStart !== bStart) return aStart < bStart ? -1 : 1;
+    // same start: longer booking wins
+    return (new Date(b.departure) - new Date(b.arrival)) - (new Date(a.departure) - new Date(a.arrival));
+  });
+  sortedNavBookings.forEach((b) => {
+    const arrISO = toYMD(new Date(b.arrival));
+    const effectiveStart = arrISO < navMonthStart ? navMonthStart : arrISO;
+    const depISO = toYMD(new Date(b.departure));
+
+    let cur = new Date(effectiveStart);
+    while (toYMD(cur) < depISO && toYMD(cur) <= navMonthEnd) {
+      const segStart = toYMD(cur);
+      const segIdx = navCells.findIndex(d => d !== null && toYMD(new Date(viewYear, viewMonth, d)) === segStart);
+      const segColPos = segIdx >= 0 ? segIdx % 7 : 0;
+      const daysLeftInWeek = 7 - segColPos;
+      let segSpan = 0;
+      const segCur = new Date(cur);
+      while (toYMD(segCur) < depISO && toYMD(segCur) <= navMonthEnd && segSpan < daysLeftInWeek) {
+        segSpan++;
+        segCur.setDate(segCur.getDate() + 1);
+      }
+      const isFirstSeg = segStart === (arrISO < navMonthStart ? navMonthStart : arrISO);
+      const isLastSeg = toYMD(segCur) >= depISO || toYMD(segCur) > navMonthEnd;
+      // Only register if slot is not already taken by an earlier/longer booking
+      if (!navBarStarts[segStart]) {
+        navBarStarts[segStart] = { booking: b, span: segSpan, isFirst: isFirstSeg, isLast: isLastSeg };
+      }
+      cur = segCur;
+    }
+  });
+  const navMonthBookings = propBookings.filter((b) => toYMD(b.arrival) <= navMonthEnd && toYMD(b.departure) > navMonthStart);
+  const navBookedNights = Object.keys(navBookedMap).filter((d) => d >= navMonthStart && d <= navMonthEnd).length;
+  const navOccupancy = Math.round((navBookedNights / navTotalDays) * 100);
+  const navRevenue = navMonthBookings.reduce((s, b) => s + (b.price || 0), 0);
+
+  return (
+    <div style={{ width: '100%', fontFamily: "'DM Sans', sans-serif" }}>
+      {/* Stats strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', borderBottom: `1px solid ${borderCol}` }}>
+        {[
+          { label: 'Bookings this month', value: navMonthBookings.length, green: true },
+          { label: 'Occupancy', value: `${navOccupancy}%`, green: true },
+          { label: 'Revenue (month)', value: fmtMoney(navRevenue), green: false },
+          { label: 'Nights available', value: navTotalDays - navBookedNights, green: false },
+        ].map((s, i) => (
+          <div key={i} style={{ padding: '14px 20px', borderRight: i < 3 ? `1px solid ${borderCol}` : 'none', background: surfaceBg }}>
+            <div style={{ fontSize: 11, color: textSecondary, marginBottom: 4 }}>{s.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 500, color: s.green ? '#1D9E75' : textPrimary }}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Two-column layout: calendar left, upcoming bookings right */}
+      <div style={{ display: 'flex', gap: 0, alignItems: 'flex-start' }}>
+
+      {/* LEFT: Calendar */}
+      <div style={{ flex: 1, minWidth: 0, borderRight: `1px solid ${borderCol}` }}>
+
+      {/* Month header + nav + legend */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: `1px solid ${borderCol}`, background: cardBg }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={() => { const d = new Date(viewYear, viewMonth - 1, 1); setViewMonth(d.getMonth()); setViewYear(d.getFullYear()); }} style={{ width: 28, height: 28, borderRadius: '50%', border: `1px solid ${borderCol}`, background: cardBg, color: textSecondary, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <span style={{ fontSize: 15, fontWeight: 600, color: textPrimary, minWidth: 140, textAlign: 'center' }}>{MONTHS_FULL_NAV[viewMonth]} {viewYear}</span>
+          <button onClick={() => { const d = new Date(viewYear, viewMonth + 1, 1); setViewMonth(d.getMonth()); setViewYear(d.getFullYear()); }} style={{ width: 28, height: 28, borderRadius: '50%', border: `1px solid ${borderCol}`, background: cardBg, color: textSecondary, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+        <div style={{ display: 'flex', gap: 14, fontSize: 12, color: textSecondary, alignItems: 'center' }}>
+          {[
+            { color: '#1D9E75', label: 'Booked' },
+            { color: '#9FE1CB', border: '#9FE1CB', label: 'Available' },
+          ].map((l) => (
+            <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: l.color, border: l.border ? `0.5px solid ${l.border}` : 'none', display: 'inline-block' }} />
+              {l.label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Day-of-week headers */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: surfaceBg, borderBottom: `1px solid ${borderCol}` }}>
+        {DAY_LABELS.map((d, i) => (
+          <div key={d} style={{ padding: '8px 4px', textAlign: 'center', fontSize: 11, fontWeight: 600, color: i >= 5 ? '#D4537E' : textSecondary, letterSpacing: '0.05em' }}>
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar cells */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+        {navCells.map((day, idx) => {
+          if (!day) return (
+            <div key={`empty-${idx}`} style={{ minHeight: 88, background: surfaceBg, borderRight: `1px solid ${cellBorder}`, borderBottom: `1px solid ${cellBorder}` }} />
+          );
+
+          const dateISO = toYMD(new Date(viewYear, viewMonth, day));
+          const isToday = dateISO === todayISO;
+          const colPos = idx % 7; // position in 7-col grid (0=Mon)
+          const daysRemainingInWeek = 7 - colPos; // how many cols left including this one
+          const dow = colPos;
+          const isWeekend = dow >= 5;
+          const booking = navBookedMap[dateISO];
+          const barInfo = navBarStarts[dateISO];
+          const channel = barInfo
+            ? ((barInfo.booking.channel && barInfo.booking.channel.name) || 'Direct')
+            : booking
+              ? ((booking.channel && booking.channel.name) || 'Direct')
+              : null;
+
+          let bg = cellBg;
+          if (isToday) bg = todayBg;
+          else if (isWeekend) bg = weekendBg;
+
+          return (
+            <div key={dateISO} style={{ minHeight: 88, background: bg, borderRight: `1px solid ${cellBorder}`, borderBottom: `1px solid ${cellBorder}`, padding: 6, position: 'relative' }}>
+              {/* Date number */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+                {isToday ? (
+                  <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#1D9E75', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500 }}>{day}</span>
+                ) : (
+                  <span style={{ fontSize: 13, fontWeight: 500, color: isWeekend ? '#D4537E' : textPrimary }}>{day}</span>
+                )}
+              </div>
+
+              {/* Available indicator */}
+              {!booking && (
+                <div style={{ textAlign: 'center', marginTop: 6 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#9FE1CB', margin: '0 auto 3px' }} />
+                </div>
+              )}
+
+              {/* Booking bar — only render at bar start */}
+              {barInfo && (
+                <div style={{
+                  position: 'absolute',
+                  top: 30,
+                  left: 2,
+                  width: `calc(${Math.min(barInfo.span, daysRemainingInWeek) * 100}% - 4px)`,
+                  height: 26,
+                  background: getBookingColor(barInfo.booking['guest-name']),
+                  opacity: barInfo.isFirst ? 1 : 0.88,
+                  borderRadius: barInfo.isFirst && barInfo.isLast ? 100
+                    : barInfo.isFirst ? '100px 0 0 100px'
+                    : barInfo.isLast ? '0 100px 100px 0'
+                    : 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '0 8px 0 3px',
+                  zIndex: 2,
+                  overflow: 'hidden',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.10)',
+                }}>
+                  {barInfo.isFirst && (
+                    <span style={{ width: 18, height: 18, borderRadius: '50%', background: getChannelLogo(((barInfo.booking.channel && barInfo.booking.channel.name) || 'Direct')) ? '#fff' : getChannelColor((barInfo.booking.channel && barInfo.booking.channel.name) || 'Direct'), border: getChannelLogo(((barInfo.booking.channel && barInfo.booking.channel.name) || 'Direct')) ? '0.5px solid rgba(255,255,255,0.4)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                      {getChannelLogo((barInfo.booking.channel && barInfo.booking.channel.name) || 'Direct') ? (
+                        <img src={getChannelLogo((barInfo.booking.channel && barInfo.booking.channel.name) || 'Direct')} alt="" style={{ width: 12, height: 12, objectFit: 'contain', display: 'block' }} />
+                      ) : (
+                        <span style={{ fontSize: 8, fontWeight: 700, color: '#fff' }}>{getChannelInitial((barInfo.booking.channel && barInfo.booking.channel.name) || 'Direct')}</span>
+                      )}
+                    </span>
+                  )}
+                  {!barInfo.isFirst && (
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginRight: 4, flexShrink: 0 }}>↩</span>
+                  )}
+                  <span style={{ fontSize: 11, fontWeight: 500, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {barInfo.booking['guest-name'] || 'Guest'}
+                  </span>
+                  {barInfo.isFirst && (
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', marginLeft: 6, flexShrink: 0 }}>
+                      · {fmtMoney(barInfo.booking.price)}
+                    </span>
+                  )}
+                  {!barInfo.isLast && (
+                    <span style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 8, background: 'rgba(0,0,0,0.15)', borderRadius: '0 0 0 0' }} />
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      </div> {/* end LEFT calendar column */}
+
+      {/* RIGHT: Upcoming bookings */}
+      <div style={{ width: 335, minWidth: 295, flexShrink: 0, background: surfaceBg, borderLeft: `1px solid ${borderCol}`, display: 'flex', flexDirection: 'column', alignSelf: 'stretch' }}>
+        <div style={{ padding: '13px 20px', borderBottom: `1px solid ${borderCol}`, background: cardBg }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: textSecondary, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Upcoming bookings</div>
+        </div>
+      <div style={{ padding: '12px 16px', background: surfaceBg, flex: 1, overflowY: 'auto', maxHeight: 480, minHeight: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {navMonthBookings.length === 0 ? (
+            <div style={{ fontSize: 13, color: textSecondary, fontStyle: 'italic' }}>No bookings this month</div>
+          ) : (
+            navMonthBookings.map((b, i) => {
+              const ch = (b.channel && b.channel.name) || 'Direct';
+              const initials = (b['guest-name'] || 'G').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+              const chLogo = getChannelLogo(ch);
+              const nights = Math.round((new Date(b.departure) - new Date(b.arrival)) / 86400000);
+              const guests = (b.adults || 0) + (b.children || 0) || 1;
+              const fmt = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: cardBg, border: `1px solid ${borderCol}`, borderRadius: 10, padding: '10px 14px' }}>
+                  <div style={{ width: 34, height: 34, borderRadius: '50%', background: chLogo ? '#fff' : getChannelColor(ch), border: chLogo ? '1px solid #e3ede8' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 500, color: '#fff', flexShrink: 0, overflow: 'hidden' }}>
+                    {chLogo ? (
+                      <img
+                        src={chLogo}
+                        alt={ch}
+                        style={{ width: 22, height: 22, objectFit: 'contain' }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.parentNode.style.background = getChannelColor(ch);
+                          e.target.parentNode.style.border = 'none';
+                          e.target.parentNode.textContent = initials;
+                        }}
+                      />
+                    ) : (
+                      <div style={{ width: 34, height: 34, borderRadius: '50%', background: getChannelColor(ch), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>
+                        {initials}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {b['guest-name'] || 'Guest'}
+                      <span style={{ fontSize: 10, background: '#E1F5EE', color: '#0F6E56', borderRadius: 10, padding: '2px 8px' }}>{ch}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>
+                      {fmt(b.arrival)} – {fmt(b.departure)} · {guests} guests · {nights} night{nights !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: '#0F6E56', whiteSpace: 'nowrap' }}>{fmtMoney(b.price)}</div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+      </div> {/* end RIGHT column */}
+      </div> {/* end two-column layout */}
+    </div>
+  );
+}
+
 export default function CalendarGrid({
+
   properties = [],
   bookings = [],
   calBaseDate,
   calMonthsCount,
   view = "multi",
   channels = [],
+  singlePropId,
   shouldScrollToToday,
   onScrollToTodayConsumed,
   onLoadMore,
@@ -270,7 +649,12 @@ const { dark } = useDashboard();
         })
       : bookings;
 
-  let displayedProps = view === "single" ? properties.slice(0, 1) : properties;
+  const singleProp = view === "single"
+    ? (properties.find(p => String(p.id) === String(singlePropId))
+      || (selectedProps.length > 0 ? properties.filter(p => selectedProps.includes(p.id)) : properties)[0])
+    : null;
+
+  let displayedProps = properties;
   if (selectedProps.length > 0) {
     displayedProps = displayedProps.filter((p) => selectedProps.includes(p.id));
   }
@@ -358,9 +742,68 @@ const { dark } = useDashboard();
     };
   }, []);
 
+  if (singleProp) {
+    return (
+      <div style={{ width: "100%" }}>
+        <SingleCalendarView prop={singleProp} allBookings={filteredBookings} dark={dark} />
+      </div>
+    );
+  }
+
   return (
   <div style={{ display: "flex", width: "100%", overflow: "visible", borderTop: dark ? "1px solid #1e3a2a" : "1px solid #e3ede8", borderRadius: "0 0 14px 14px", "--cal-td-bg": "#fff", "--cal-td-today": "#f0faf4", "--cal-td-weekend": "#fcfafa", "--cal-month-bg": "#f5f9f7", "--cal-month-color": "#1a3028", "--cal-dayrow-bg": "#f7faf8", "--cal-daynum-color": "#0c1c14", "--cal-border": "1px solid #e3ede8" }}>
       <style>{`
+          /* ── Tooltip ── */
+          .cal-tt {
+            display: none; position: fixed; z-index: 9999;
+            background: #fff; border: 0.5px solid #e5e7eb; border-radius: 10px;
+            min-width: 220px; font-family: 'DM Sans', sans-serif;
+            overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+          }
+          .cal-tt-top { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 0.5px solid #e5e7eb; }
+          .cal-tt-name { font-size: 13px; font-weight: 600; color: #0c1c14; }
+          .cal-tt-chip { background: #E1F5EE; color: #0F6E56; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 100px; }
+          .cal-tt-dates { display: flex; border-bottom: 0.5px solid #e5e7eb; }
+          .cal-tt-dates > div { flex: 1; padding: 9px 14px; }
+          .cal-tt-dates > div + div { border-left: 0.5px solid #e5e7eb; }
+          .cal-tt-dl { font-size: 10px; font-weight: 600; color: #9ab8a9; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 3px; }
+          .cal-tt-dv { font-size: 13px; font-weight: 600; color: #0c1c14; }
+          .cal-tt-row { display: flex; justify-content: space-between; padding: 8px 14px; border-bottom: 0.5px solid #e5e7eb; font-size: 12px; }
+          .cal-tt-last { border-bottom: none; }
+          .cal-tt-rl { color: #9ab8a9; }
+          .cal-tt-rv { font-weight: 500; color: #0c1c14; }
+          .cal-tt-price { color: #0F6E56 !important; }
+
+          /* ── Toolbar ── */
+          .cal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px 14px; }
+          .cal-title { font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 800; color: #0c1c14; }
+          .cal-controls { display: flex; gap: 8px; align-items: center; }
+          .cal-btn { background: #fff; border: 1px solid #e3ede8; padding: 6px 12px; border-radius: 100px; font-size: .75rem; font-weight: 600; color: #0c1c14; cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+          .cal-btn-group { background: #f0f5f2; border-radius: 100px; padding: 3px; display: flex; }
+          .cal-btn-group button { background: transparent; border: none; padding: 5px 12px; border-radius: 100px; font-size: .75rem; font-weight: 700; color: #6a8b7c; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+          .cal-btn-group button.active { background: #26a676; color: #fff; }
+
+          /* ── Nav bar ── */
+          .cal-nav { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 14px 24px; border-bottom: 1px solid #f0f5f2; background: #fff; flex-wrap: nowrap; white-space: nowrap; }
+          .cal-nav > * { flex-shrink: 0; }
+          .cal-nav-btn { width: 30px; height: 30px; border: 1px solid #e3ede8; border-radius: 50%; background: #fff; color: #6a8b7c; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; }
+          .cal-nav-btn:hover { background: #eaf8f1; color: #1e8760; border-color: #b7e4cf; }
+          .cal-nav-label { font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 800; color: #0c1c14; padding: 0 6px; flex: 1; }
+          .cal-nav-today { padding: 6px 14px; border: 1px solid #b7e4cf; background: #eaf8f1; color: #1e8760; border-radius: 100px; font-family: 'DM Sans', sans-serif; font-size: .75rem; font-weight: 700; cursor: pointer; margin-left: auto; }
+          .cal-nav-today:hover { background: #d4f0e4; }
+
+          /* ── Scroll container ── */
+          .cal-scroll { overflow-x: auto; overflow-y: visible; width: 100%; border-top: 1px solid #e3ede8; scroll-behavior: smooth; position: relative; border-radius: 0 0 14px 14px; }
+          .cal-scroll::-webkit-scrollbar { height: 8px; }
+          .cal-scroll::-webkit-scrollbar-track { background: #f4f7f5; border-radius: 6px; margin: 0 4px; }
+          .cal-scroll::-webkit-scrollbar-thumb { background: #b7e4cf; border-radius: 6px; border: 2px solid #f4f7f5; }
+          .cal-scroll::-webkit-scrollbar-thumb:hover { background: #56c299; }
+          .cal-scroll-inner { display: block; min-height: 500px; }
+
+          /* ── Table ── */
+          .cal-table { width: max-content; min-width: 100%; border-collapse: collapse; }
+          .cal-table th { padding: 10px 6px; border-right: 1px solid #f0f5f2; border-bottom: 1px solid #e3ede8; font-size: .72rem; font-weight: 600; color: #9ab8a9; text-align: center; }
+          .cal-table td { min-width: 56px; max-width: 56px; width: 56px; height: 48px; border-right: 1px solid #eef2f0; border-bottom: 1px solid #eef2f0; position: relative; padding: 0; background: #fff; }
           /* ── Tooltip ── */
           .cal-tt {
             display: none; position: fixed; z-index: 9999;
