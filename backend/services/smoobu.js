@@ -101,7 +101,13 @@ export function getApiKeyForUser(user) {
 }
 
 function getCacheUserId(user) {
-  return String(user._id);
+  // Include a fingerprint of the active smoobuApiKey in the cache key so that
+  // switching properties (which changes the API key) busts the cache immediately.
+  // Without this, the old property's cached data is returned even after switching.
+  const keyHint = user.smoobuApiKey
+    ? user.smoobuApiKey.trim().slice(-8)   // last 8 chars — enough to differentiate
+    : 'env';
+  return `${String(user._id)}:${keyHint}`;
 }
 
 // ─────────────────────────────────────────────────────────────────

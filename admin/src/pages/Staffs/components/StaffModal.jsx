@@ -42,7 +42,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
       const c = clients.find(
         (x) => x._id === (staff.clientId?._id || staff.clientId)
       );
-      return c ? `${c.firstName} ${c.lastName}` : '';
+      return c ? c.businessName : '';
     }
     return '';
   });
@@ -158,7 +158,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
               <div style={{ ...inputStyle, cursor: 'not-allowed', color: '#718096', background: '#f0f0f0' }}>
                 {(() => {
                   const c = clients.find((x) => x._id === form.clientId);
-                  return c ? `${c.firstName} ${c.lastName} (${c.email})` : form.clientId || '—';
+                  return c ? `${c.businessName} (${c.email})` : form.clientId || '—';
                 })()}
               </div>
             ) : (
@@ -179,7 +179,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
                     {form.clientId
                       ? (() => {
                           const c = clients.find((x) => x._id === form.clientId);
-                          return c ? `${c.firstName} ${c.lastName} (${c.email})` : '— Select a client —';
+                          return c ? `${c.businessName} (${c.email})` : '— Select a client —';
                         })()
                       : '— Select a client —'}
                   </span>
@@ -230,7 +230,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
                           const q = clientSearch.toLowerCase();
                           return (
                             !q ||
-                            `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
+                            c.businessName.toLowerCase().includes(q) ||
                             c.email.toLowerCase().includes(q)
                           );
                         })
@@ -239,7 +239,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
                             key={c._id}
                             onClick={() => {
                               setForm((f) => ({ ...f, clientId: c._id, propertyIds: [] }));
-                              setClientSearch(`${c.firstName} ${c.lastName}`);
+                              setClientSearch(c.businessName);
                               setShowClientDropdown(false);
                             }}
                             style={{
@@ -258,7 +258,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
                               e.currentTarget.style.background = form.clientId === c._id ? '#eef4ff' : 'transparent';
                             }}
                           >
-                            <div style={{ fontWeight: 600 }}>{c.firstName} {c.lastName}</div>
+                            <div style={{ fontWeight: 600 }}>{c.businessName}</div>
                             <div style={{ fontSize: '0.75rem', color: '#718096', marginTop: 1 }}>{c.email}</div>
                           </div>
                         ))}
@@ -266,7 +266,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
                         const q = clientSearch.toLowerCase();
                         return (
                           !q ||
-                          `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
+                          c.businessName.toLowerCase().includes(q) ||
                           c.email.toLowerCase().includes(q)
                         );
                       }).length === 0 && (
