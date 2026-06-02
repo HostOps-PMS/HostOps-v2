@@ -64,7 +64,7 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   : [
       'https://hostops-frontend.onrender.com',
       'https://hostops-v2-admin.onrender.com',
-      'http://localhost:5000',
+      'https://hostpilot-smoobu.onrender.com',
     ];
 
 app.use(
