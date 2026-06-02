@@ -7,7 +7,7 @@
  * API Key:   VITE_API_KEY (see .env) — sent as x-api-key header
  */
 
-const BASE = import.meta.env.VITE_API_BASE_URL ?? '';
+const BASE = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'https://hostpilot-smoobu.onrender.com';
 
 function authHeaders() {
   const token  = sessionStorage.getItem('hp_access_token');
