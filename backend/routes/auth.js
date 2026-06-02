@@ -305,6 +305,9 @@ router.post('/login', async (req, res, next) => {
     const accessToken = signAccessToken(user);
 
     user.lastLoginAt = new Date();
+    user.activityLog = user.activityLog || [];
+    user.activityLog.push({ action: 'login', ipAddress: req.ip || '', userAgent: req.get('user-agent') || '', timestamp: new Date(), performedBy: { userId: user._id, email: user.email, firstName: user.firstName || '', lastName: user.lastName || '', role: user.role || 'client' } });
+    if (user.activityLog.length > 50) user.activityLog = user.activityLog.slice(-50);
     await user.save();
 
     res.cookie('rt', refreshTokenToUse, {
@@ -451,6 +454,9 @@ router.post('/verify-login-otp', async (req, res, next) => {
       });
 
       user.lastLoginAt = new Date();
+      user.activityLog = user.activityLog || [];
+      user.activityLog.push({ action: 'login', ipAddress: req.ip || '', userAgent: req.get('user-agent') || '', timestamp: new Date(), performedBy: { userId: user._id, email: user.email, firstName: user.firstName || '', lastName: user.lastName || '', role: user.role || 'client' } });
+      if (user.activityLog.length > 50) user.activityLog = user.activityLog.slice(-50);
       await user.save();
 
       res.cookie('rt', refreshToken, {
@@ -723,6 +729,47 @@ router.get('/me', requireAuth, (req, res) => {
   res.json({ user: req.user.toJSON() });
 });
 
+// POST /auth/log-activity
+router.post('/log-activity', requireAuth, async (req, res, next) => {
+  try {
+    const { action, meta = {} } = req.body;
+    if (!action) return res.status(400).json({ error: 'action required' });
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    user.activityLog = user.activityLog || [];
+    user.activityLog.push({
+      action,
+      timestamp: new Date(),
+      ipAddress: req.ip || '',
+      userAgent: req.get('user-agent') || '',
+      meta,
+      performedBy: {
+        userId: req.user._id,
+        email: req.user.email,
+        firstName: req.user.firstName || '',
+        lastName: req.user.lastName || '',
+        role: req.user.role || 'client',
+      },
+    });
+    if (user.activityLog.length > 100) user.activityLog = user.activityLog.slice(-100);
+    await user.save();
+
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// GET /auth/activity-log
+router.get('/activity-log', requireAuth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select('activityLog');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const log = (user.activityLog || []).slice().reverse(); // newest first
+    res.json({ activityLog: log });
+  } catch (err) { next(err); }
+});
+
 // ─────────────────────────────────────────────────────────────────
 // GET /auth/my-properties
 // Returns the embedded properties of the currently authenticated user.
@@ -816,13 +863,14 @@ router.post('/change-password', requireAuth, async (req, res, next) => {
 
     user.password = newPassword;
 
-    // Complete first-login verification: the user has proven ownership of the
-    // account by logging in with the temporary password and choosing a new one.
     if (user.mustChangePassword) {
       user.mustChangePassword = false;
       user.isVerified = true;
     }
 
+    user.activityLog = user.activityLog || [];
+    user.activityLog.push({ action: 'password_changed', ipAddress: req.ip || '', userAgent: req.get('user-agent') || '' });
+    if (user.activityLog.length > 50) user.activityLog = user.activityLog.slice(-50);
     await user.save();
 
     // Revoke all existing refresh tokens so old sessions are invalidated.

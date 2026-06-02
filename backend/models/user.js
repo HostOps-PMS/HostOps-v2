@@ -79,8 +79,23 @@ const userSchema = new mongoose.Schema({
   // User must change password on first dashboard load; only then is isVerified set to true.
   mustChangePassword: { type: Boolean, default: false },
 
-  // Activity tracking
+// Activity tracking
   lastLoginAt: { type: Date },
+
+  activityLog: [{
+    action:    { type: String, required: true },
+    timestamp: { type: Date, default: Date.now },
+    ipAddress: { type: String, default: '' },
+    userAgent: { type: String, default: '' },
+    meta:      { type: mongoose.Schema.Types.Mixed, default: {} },
+    performedBy: {
+      userId:    { type: mongoose.Schema.Types.ObjectId, default: null },
+      email:     { type: String, default: '' },
+      firstName: { type: String, default: '' },
+      lastName:  { type: String, default: '' },
+      role:      { type: String, default: 'client' },
+    },
+  }],
 }, {
   timestamps: true,
 });

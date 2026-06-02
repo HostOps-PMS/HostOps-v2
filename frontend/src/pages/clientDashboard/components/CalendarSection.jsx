@@ -4,6 +4,7 @@ import { useDashboard } from '../context/DashboardContext';
 import { useCalendarNav } from '../hooks/useCalendarNav';
 import { getPresetRange, fmtDateShort, ALL_PRESETS } from '../../utils/dateHelpers';
 import { useDashboardData } from '../hooks/useDashboardData';
+import { useActivityLog } from '../hooks/useActivityLog';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -24,6 +25,7 @@ export default function CalendarSection() {
   const [localTo, setLocalTo] = useState(dashState.to || '');
   const [selectedPreset, setSelectedPreset] = useState(dashState.preset || 'ytd');
   const [tempChannels, setTempChannels] = useState([...dashState.channels]);
+  const { logActivity } = useActivityLog();
 
   const datePopRef = useRef(null);
   const filterPopRef = useRef(null);
@@ -53,6 +55,7 @@ export default function CalendarSection() {
     setShowDatePop(false);
     // Pass dates explicitly — avoids reading a stale useCallback closure
     loadData(range.from, range.to);
+    logActivity('changed_date_filter', { preset });
   }
 
   function applyCustomRange() {
@@ -68,6 +71,7 @@ export default function CalendarSection() {
   function applyChannelFilter() {
     updateDashState({ channels: tempChannels });
     setShowFilterPop(false);
+    logActivity('filtered_by_channel', { channels: tempChannels });
   }
 
   function clearChannelFilter() {
@@ -185,7 +189,7 @@ export default function CalendarSection() {
               <button
                 key={v}
                 className={dashState.view === v ? 'active' : ''}
-                onClick={() => updateDashState({ view: v })}
+                onClick={() => { updateDashState({ view: v }); logActivity('switched_calendar_view', { view: v }); }}
               >
                 {v.charAt(0).toUpperCase() + v.slice(1)}
               </button>

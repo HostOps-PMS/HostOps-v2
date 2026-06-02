@@ -2,6 +2,7 @@ import React from 'react';
 import { timeAgo } from '../../utils/dateHelpers';
 import { useDashboard } from '../context/DashboardContext';
 import { getChannelColor, getChannelInitial } from '../utils/channelHelpers';
+import { useActivityLog } from '../hooks/useActivityLog';
 
 function stripHtml(html) {
   const div = document.createElement('div');
@@ -15,6 +16,7 @@ function stripHtml(html) {
  */
 export default function UnifiedInbox({ inbox = [], totalUnread = 0, onThreadClick }) {
   const { dark } = useDashboard();
+  const { logActivity } = useActivityLog();
   const badgeStyle = totalUnread > 0
     ? { background: '#fff0ee', color: '#c13515' }
     : { background: '#d4f0e4', color: '#1e8760' };
@@ -61,6 +63,7 @@ export default function UnifiedInbox({ inbox = [], totalUnread = 0, onThreadClic
                     alert('This thread has no reservation linked yet.');
                     return;
                   }
+                  logActivity('opened_message_thread', { guest: thread.guestName, property: thread.property });
                   onThreadClick(thread.reservationId, thread);
                 }}
               >
