@@ -3,15 +3,18 @@ import express from 'express';
 import { z } from 'zod';
 import User from '../models/user.js';
 import Staff from '../models/staff.js';
-import ClientAccount from '../models/clientAccount.js';
 import RefreshToken from '../models/refreshToken.js';
 import TrustedDevice from '../models/trustedDevice.js';
 import {
-  signAccessToken, signRefreshToken, verifyRefreshToken,
-  signStaffAccessToken, signStaffRefreshToken,
-  signClientAccountAccessToken, signClientAccountRefreshToken,
-  refreshTokenExpiry, randomToken, hashToken,
-} from '../utils/tokens.js';
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+  signStaffAccessToken,
+  signStaffRefreshToken,
+  refreshTokenExpiry,
+  randomToken,
+  hashToken,
+} from "../utils/tokens.js";
 import { sendVerificationEmail, sendResetEmail } from '../services/email.js';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -142,45 +145,7 @@ router.post('/login', async (req, res, next) => {
     const data = loginSchema.parse(req.body);
     const { email, password, deviceId } = data;
 
-    // ── Check if this is a client account login FIRST ─────────────
-    // Client accounts must be checked before User because the same email
-    // could exist in both collections (e.g. the parent client's email was
-    // reused). Client accounts never go through the OTP flow.
-    const clientAccount = await ClientAccount.findOne({ email: email.toLowerCase() }).select('+password');
-    if (clientAccount && (await clientAccount.comparePassword(password))) {
-      if (!clientAccount.isActive) {
-        return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
-      }
 
-      const accessToken  = signClientAccountAccessToken(clientAccount);
-      const refreshToken = signClientAccountRefreshToken(clientAccount);
-
-      await RefreshToken.create({
-        userId:    clientAccount._id,
-        token:     hashToken(refreshToken),
-        expiresAt: refreshTokenExpiry(),
-        ipAddress: req.ip,
-        userAgent: req.get('user-agent'),
-      });
-
-      clientAccount.lastLoginAt = new Date();
-      await clientAccount.save();
-
-      res.cookie('rt', refreshToken, {
-        httpOnly: true,
-        secure:   process.env.NODE_ENV === 'production',
-        sameSite: 'none',
-        maxAge:   7 * 24 * 60 * 60 * 1000,
-        path:     '/auth',
-      });
-
-      return res.json({
-        accessToken,
-        clientAccount:      { ...clientAccount.toJSON(), role: 'clientAccount', isClientAccount: true },
-        mustChangePassword: clientAccount.mustChangePassword,
-        isClientAccount:    true,
-      });
-    }
 
     // ── Check if this is a staff login ────────────────────────────
     // Try User first. If not found or password wrong, try Staff.
@@ -476,47 +441,7 @@ router.post('/verify-login-otp', async (req, res, next) => {
       });
     }
 
-    // ── Fall back to ClientAccount ─────────────────────────────────
-    const clientAccount = await ClientAccount.findOne({
-      email:          normalizedEmail,
-      loginOtp:       hashedOtp,
-      loginOtpExpiry: { $gt: now },
-    }).select('+loginOtp +loginOtpExpiry');
-
-    if (!clientAccount) {
-      return res.status(401).json({ error: 'Invalid or expired OTP' });
-    }
-
-    clientAccount.loginOtp       = undefined;
-    clientAccount.loginOtpExpiry = undefined;
-
-    const accessToken  = signClientAccountAccessToken(clientAccount);
-    const refreshToken = signClientAccountRefreshToken(clientAccount);
-
-    await RefreshToken.create({
-      userId:    clientAccount._id,
-      token:     hashToken(refreshToken),
-      expiresAt: refreshTokenExpiry(),
-      ipAddress: req.ip,
-      userAgent: req.get('user-agent'),
-    });
-
-    clientAccount.lastLoginAt = new Date();
-    await clientAccount.save();
-
-    res.cookie('rt', refreshToken, {
-      httpOnly: true,
-      secure:   process.env.NODE_ENV === 'production',
-      sameSite: 'none',
-      maxAge:   7 * 24 * 60 * 60 * 1000,
-      path:     '/auth',
-    });
-
-    return res.json({
-      accessToken,
-      clientAccount: { ...clientAccount.toJSON(), role: 'clientAccount', isClientAccount: true },
-      isClientAccount: true,
-    });
+    return res.status(401).json({ error: 'Invalid or expired OTP' });
   } catch (err) { next(err); }
 });
 
@@ -531,13 +456,7 @@ router.post('/send-login-otp', async (req, res, next) => {
 
     const normalizedEmail = email.toLowerCase();
 
-    // Try User first, then fall back to ClientAccount.
-    const user          = await User.findOne({ email: normalizedEmail });
-    const clientAccount = !user
-      ? await ClientAccount.findOne({ email: normalizedEmail })
-      : null;
-
-    const account = user || clientAccount;
+    const account = await User.findOne({ email: normalizedEmail });
 
     // Respond with success even if not found (avoid enumeration).
     if (!account) {
@@ -570,13 +489,7 @@ router.post('/resend-login-otp', async (req, res, next) => {
 
     const normalizedEmail = email.toLowerCase();
 
-    // Try User first, then fall back to ClientAccount.
-    const user          = await User.findOne({ email: normalizedEmail });
-    const clientAccount = !user
-      ? await ClientAccount.findOne({ email: normalizedEmail })
-      : null;
-
-    const account = user || clientAccount;
+    const account = await User.findOne({ email: normalizedEmail });
 
     if (!account) {
       return res.json({ message: 'If that email is registered, a new code has been sent.' });
@@ -649,36 +562,7 @@ router.post('/refresh', async (req, res, next) => {
       return res.json({ accessToken: signStaffAccessToken(staff) });
     }
 
-    // ── Client Account refresh ─────────────────────────────────────
-    if (decoded.role === 'clientAccount') {
-      const clientAccount = await ClientAccount.findById(decoded.clientAccountId || decoded.sub);
-      if (!clientAccount || !clientAccount.isActive) {
-        return res.status(401).json({ error: 'Client account not found or inactive' });
-      }
 
-      const newRefreshToken = signClientAccountRefreshToken(clientAccount);
-      stored.revokedAt  = new Date();
-      stored.replacedBy = hashToken(newRefreshToken);
-      await stored.save();
-
-      await RefreshToken.create({
-        userId:    clientAccount._id,
-        token:     hashToken(newRefreshToken),
-        expiresAt: refreshTokenExpiry(),
-        ipAddress: req.ip,
-        userAgent: req.get('user-agent'),
-      });
-
-      res.cookie('rt', newRefreshToken, {
-        httpOnly: true,
-        secure:   process.env.NODE_ENV === 'production',
-        sameSite: 'none',
-        maxAge:   7 * 24 * 60 * 60 * 1000,
-        path:     '/auth',
-      });
-
-      return res.json({ accessToken: signClientAccountAccessToken(clientAccount) });
-    }
 
     // ── Regular user refresh ───────────────────────────────────────
     const user = await User.findById(decoded.sub);
@@ -825,28 +709,7 @@ router.post('/change-password', requireAuth, async (req, res, next) => {
       return res.json({ message: 'Password changed successfully.', staff: staff.toJSON() });
     }
 
-    // ── Client Account change-password ─────────────────────────────
-    if (req.isClientAccount) {
-      const clientAccount = await ClientAccount.findById(req.clientAccount._id).select('+password');
-      if (!clientAccount) return res.status(404).json({ error: 'Client account not found' });
 
-      const isMatch = await clientAccount.comparePassword(currentPassword);
-      if (!isMatch) return res.status(401).json({ error: 'Current password is incorrect' });
-      if (currentPassword === newPassword) {
-        return res.status(400).json({ error: 'New password must be different from the current one' });
-      }
-
-      clientAccount.password           = newPassword;
-      clientAccount.mustChangePassword = false;
-      await clientAccount.save();
-
-      await RefreshToken.updateMany(
-        { userId: clientAccount._id, revokedAt: null },
-        { revokedAt: new Date() }
-      );
-
-      return res.json({ message: 'Password changed successfully.', clientAccount: clientAccount.toJSON() });
-    }
 
     // ── Regular user change-password ───────────────────────────────
     const user = await User.findById(req.user._id).select('+password');
@@ -1049,19 +912,7 @@ router.post('/verify-reset-token', async (req, res, next) => {
       return res.json({ valid: true });
     }
 
-    // ── ClientAccount fallback ────────────────────────────────────
-    // ClientAccount uses loginOtp/loginOtpExpiry (same as Staff).
-    const clientAccount = await ClientAccount.findOne({ email: normalizedEmail })
-      .select('+loginOtp +loginOtpExpiry');
 
-    if (
-      clientAccount &&
-      clientAccount.loginOtp === hashed &&
-      clientAccount.loginOtpExpiry &&
-      clientAccount.loginOtpExpiry > now
-    ) {
-      return res.json({ valid: true });
-    }
 
     // ── Staff fallback ─────────────────────────────────────────────
     // loginOtp is select:false on the Staff schema, so we cannot filter
@@ -1185,23 +1036,7 @@ router.post('/send-change-password-otp', requireAuth, async (req, res, next) => 
       return res.json({ message: 'A verification code has been sent to your email.' });
     }
 
-    // ── Client Account ─────────────────────────────────────────────
-    if (req.isClientAccount) {
-      const clientAccount = await ClientAccount.findById(req.clientAccount._id);
-      if (!clientAccount) return res.status(404).json({ error: 'Client account not found.' });
 
-      clientAccount.loginOtp       = hashed;
-      clientAccount.loginOtpExpiry = expiry;
-      await clientAccount.save();
-
-      try {
-        await sendResetEmail(clientAccount.email, clientAccount.firstName, rawToken);
-      } catch (e) {
-        console.error('Client account change-password OTP send failed:', e);
-      }
-
-      return res.json({ message: 'A verification code has been sent to your email.' });
-    }
 
     // ── Regular User ───────────────────────────────────────────────
     const user = await User.findById(req.user._id);

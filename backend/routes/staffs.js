@@ -11,12 +11,35 @@ import { z } from 'zod';
 import Staff from '../models/staff.js';
 import User  from '../models/user.js';
 import { requireAuth, requireAdminOrTeamLeader } from '../middleware/auth.js';
-import { getApartments } from '../services/smoobu.js';
 
 const router = express.Router();
 
 // All routes require authentication
 router.use(requireAuth);
+
+router.get('/clients/:clientId/staff-properties', requireAdminOrTeamLeader, async (req, res, next) => {
+  try {
+    if (req.user.role === 'team_leader' && String(req.params.clientId) !== String(req.user.serverId)) {
+      return res.status(403).json({ error: 'Unauthorized to access these properties' });
+    }
+
+    const user = await User.findById(req.params.clientId).select('properties');
+    if (!user) return res.status(404).json({ error: 'Client not found' });
+
+    // Return the embedded properties from database
+    const properties = (user.properties || []).map((prop) => ({
+      id: prop._id.toString(),
+      propertyName: prop.propertyName,
+    }));
+
+    res.json({ properties });
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid client ID' });
+    }
+    next(err);
+  }
+});
 
 // ─────────────────────────────────────────────────────────────────
 // GET /api/staffs
@@ -59,38 +82,6 @@ router.get('/staffs/:id', requireAdminOrTeamLeader, async (req, res, next) => {
   } catch (err) {
     if (err.name === 'CastError') {
       return res.status(400).json({ error: 'Invalid staff ID' });
-    }
-    next(err);
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────
-// GET /api/clients/:clientId/properties
-// Returns the Smoobu properties for a specific client so the admin
-// can pick which properties to assign to a new staff member.
-// Reuses the same smoobu service used by the dashboard/properties routes.
-// ─────────────────────────────────────────────────────────────────
-router.get('/clients/:clientId/properties', requireAdminOrTeamLeader, async (req, res, next) => {
-  try {
-    if (req.user.role === 'team_leader' && String(req.params.clientId) !== String(req.user.serverId)) {
-      return res.status(403).json({ error: 'Unauthorized to access these properties' });
-    }
-
-    const user = await User.findById(req.params.clientId).select('+smoobuApiKey');
-    if (!user) return res.status(404).json({ error: 'Client not found' });
-
-    const data = await getApartments(user);
-    res.json({ properties: data.apartments || [] });
-  } catch (err) {
-    if (err.code === 'NO_SMOOBU_KEY') {
-      return res.status(200).json({
-        properties: [],
-        smoobuNotConnected: true,
-        message: 'No Smoobu account connected for this client.',
-      });
-    }
-    if (err.name === 'CastError') {
-      return res.status(400).json({ error: 'Invalid client ID' });
     }
     next(err);
   }

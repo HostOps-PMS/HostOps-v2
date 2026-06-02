@@ -35,7 +35,7 @@ export function useStaffs(serverId) {
         if (data.properties) {
           setPropertyMap((prev) => {
             const next = { ...prev };
-            data.properties.forEach((p) => { next[String(p.id)] = p.name; });
+            data.properties.forEach((p) => { next[String(p.id)] = p.propertyName; });
             return next;
           });
         }

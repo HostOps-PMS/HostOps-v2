@@ -28,12 +28,7 @@ export default function StaffModal({ mode, staff, serverId, onClose, onSaved }) 
     setPropsError('');
     fetchClientProperties(serverId)
       .then((data) => {
-        if (data.smoobuNotConnected) {
-          setPropsError('This server has no Smoobu account connected.');
-          setProperties([]);
-        } else {
-          setProperties(data.properties || []);
-        }
+        setProperties(data.properties || []);
       })
       .catch(() => setPropsError('Failed to load properties.'))
       .finally(() => setPropsLoading(false));
@@ -128,7 +123,7 @@ export default function StaffModal({ mode, staff, serverId, onClose, onSaved }) 
                   return (
                     <label key={prop.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', cursor: 'pointer', background: checked ? '#f0f7ff' : 'transparent', borderBottom: '1px solid #f0f0f0', fontSize: '0.875rem', color: '#2d3748', transition: 'background 0.1s' }}>
                       <input type="checkbox" checked={checked} onChange={() => toggleProperty(prop.id)} style={{ accentColor: '#3b5fc0', width: 15, height: 15, flexShrink: 0 }} />
-                      <span style={{ fontWeight: checked ? 600 : 400 }}>{prop.name}</span>
+                      <span style={{ fontWeight: checked ? 600 : 400 }}>{prop.propertyName}</span>
                     </label>
                   );
                 })}

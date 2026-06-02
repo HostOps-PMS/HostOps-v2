@@ -27,19 +27,6 @@ const NAV_ITEMS = [
     to: '/clients',
   },
   {
-    // Person with a sub-badge icon to represent a sub-account
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="8" cy="6" r="3.5" />
-        <path d="M2 17c0-3 2.5-5.5 6-5.5" strokeLinecap="round" />
-        <circle cx="15" cy="14" r="3" />
-        <path d="M15 12.5v1.5l1 1" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-    label: 'Client Accounts',
-    to: '/client-accounts',
-  },
-  {
     icon: (
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
         <circle cx="6" cy="7" r="3" />

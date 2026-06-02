@@ -6,7 +6,6 @@ import LoginPage     from './pages/Login';
 import Dashboard     from './pages/dashboard';
 import Clients       from './pages/clients';
 import Staffs        from './pages/Staffs/index';
-import ClientAccount from './pages/clientAccount/index'; // ← NEW
 import TeamLeaders from './pages/team-leaders/index';
 import AuthorizationModal from './pages/authorization';
 import TeamLeaderLayout from './pages/TeamLeader/index';
@@ -89,7 +88,6 @@ function AdminEntryRedirect() {
   try {
     const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
     if (user.role === 'team_leader') return <Navigate to="/team-leader/staffs" replace />;
-    if (user.role === 'clientAccount') return <Navigate to="/dashboard" replace />;
     // admin → main dashboard
     return <Navigate to="/dashboard" replace />;
   } catch {
@@ -100,7 +98,7 @@ function AdminEntryRedirect() {
 // ── Roles that must pass the AuthorizationModal OTP gate ──────────────────
 // 'client' is intentionally excluded — they are redirected to the frontend
 // app above and never reach this point.
-const ROLES_REQUIRING_AUTH = new Set(['admin', 'team_leader', 'clientAccount']);
+const ROLES_REQUIRING_AUTH = new Set(['admin', 'team_leader']);
 
 function getRoleFromSession() {
   try {
@@ -135,9 +133,9 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      {!authorized && (
+      {/* {!authorized && (
         <AuthorizationModal onAuthorized={handleAuthorized} />
-      )}
+      )} */}
 
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -168,16 +166,6 @@ export default function App() {
           element={
             <PrivateRoute>
               <Staffs />
-            </PrivateRoute>
-          }
-        />
-
-        {/* ── NEW: Client Accounts ─────────────────────────────── */}
-        <Route
-          path="/client-accounts"
-          element={
-            <PrivateRoute>
-              <ClientAccount />
             </PrivateRoute>
           }
         />
