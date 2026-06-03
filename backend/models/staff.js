@@ -62,6 +62,15 @@ const staffSchema = new mongoose.Schema({
     default: true,
   },
 
+  // ── PIN lockout tracking ──────────────────────────────────────
+  // pinAttempts:         cumulative wrong-PIN count (resets on success)
+  // pinLockedUntil:      time until which PIN entry is blocked (null = not locked)
+  // pinPermanentlyLocked: true when attempts exceed the final threshold — account
+  //                       disabled with no automatic recovery
+  pinAttempts:          { type: Number, default: 0 },
+  pinLockedUntil:       { type: Date,   default: null },
+  pinPermanentlyLocked: { type: Boolean, default: false },
+
   lastLoginAt: { type: Date },
 
   // ── OTP for password-change verification ─────────────────────────

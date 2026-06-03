@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
 
@@ -14,8 +14,8 @@ const PIN_LENGTH = 6;
 //   - client      → PIN verified against their own User doc.
 //   - team_leader → PIN verified against their assigned client (serverId) User doc.
 //
-// Role detection is done here via auth.getUser() so the correct identity
-// is always used regardless of how the parent passes props.
+// Account is identified via the `email` field entered by the user.
+// The email is sent to the backend along with the pin and propertyId.
 //
 // Props:
 //   userData           {object}  - user / staff object from authData (used for greeting)
@@ -36,34 +36,57 @@ export default function PinModal({
   const auth = useAuth();
   const navigate = useNavigate();
 
+  const [email, setEmail]   = useState('');
   const [digits, setDigits] = useState(Array(PIN_LENGTH).fill(''));
   const [loading, setLoading] = useState(false);
   const [shake, setShake]   = useState(false);
+
+  // ── Lockout state ─────────────────────────────────────────────────
+  // lockedUntil: Date object — account is temporarily locked until this time
+  // permanentlyLocked: boolean — account is permanently disabled
+  // lockSecondsLeft: countdown in seconds for the temp lock timer
+  const [lockedUntil, setLockedUntil]           = useState(null);
+  const [permanentlyLocked, setPermanentlyLocked] = useState(false);
+  const [lockSecondsLeft, setLockSecondsLeft]   = useState(0);
+
   const inputRefs = useRef([]);
+  const countdownRef = useRef(null);
 
-  // ── Resolve the actual logged-in user from session storage ──────
-  // This is the source of truth for role detection.
-  // - Staff login  → stored user has role: 'staff' and isStaff: true
-  // - Team leader  → stored user has role: 'team_leader'
-  // - Client       → stored user has role: 'client'
-  // We never trust only the `isStaff` prop from the parent because
-  // staff login returns `data.staff` (not `data.user`) and some parent
-  // paths may not correctly forward the isStaff flag.
-  const storedUser   = auth.getUser();
-  const resolvedRole = storedUser?.role || 'client';
-  const isStaffUser  = resolvedRole === 'staff' || storedUser?.isStaff === true || isStaff;
+  // Greeting name: from prop userData
+  const firstName = userData?.firstName || '';
 
-  // Greeting name: prefer storedUser over prop so it's always accurate
-  const firstName = storedUser?.firstName || userData?.firstName || '';
-
-  // Focus first input on mount
+  // Focus first PIN input on mount
   useEffect(() => {
     inputRefs.current[0]?.focus();
   }, []);
 
-  // ── Auto-submit when all digits filled ──────────────────────────
+  // ── Countdown timer for temporary lock ───────────────────────────
+  // Ticks every second and clears itself when the lock expires.
   useEffect(() => {
-    if (digits.every((d) => d !== '')) {
+    if (!lockedUntil) return;
+
+    const tick = () => {
+      const secondsLeft = Math.ceil((lockedUntil.getTime() - Date.now()) / 1000);
+      if (secondsLeft <= 0) {
+        setLockedUntil(null);
+        setLockSecondsLeft(0);
+        hideMsg();
+        clearInterval(countdownRef.current);
+      } else {
+        setLockSecondsLeft(secondsLeft);
+      }
+    };
+
+    tick(); // run immediately so display doesn't wait 1s
+    countdownRef.current = setInterval(tick, 1000);
+    return () => clearInterval(countdownRef.current);
+  }, [lockedUntil]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Auto-submit when all digits filled ──────────────────────────
+  // Only fires if email is also present — prevents bypassing the
+  // required email field by just completing the PIN digits.
+  useEffect(() => {
+    if (digits.every((d) => d !== '') && email.trim()) {
       handleSubmit(digits.join(''));
     }
   }, [digits]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -76,6 +99,22 @@ export default function PinModal({
   const clearDigits = () => {
     setDigits(Array(PIN_LENGTH).fill(''));
     setTimeout(() => inputRefs.current[0]?.focus(), 0);
+  };
+
+  // ── Format seconds into a human-readable string ───────────────────
+  // e.g. 65 → "1m 5s", 3600 → "1h 0m"
+  const formatCountdown = (seconds) => {
+    if (seconds >= 3600) {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      return `${h}h ${m}m`;
+    }
+    if (seconds >= 60) {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return `${m}m ${s}s`;
+    }
+    return `${seconds}s`;
   };
 
   // ── Handle digit input ───────────────────────────────────────────
@@ -124,18 +163,23 @@ export default function PinModal({
 
   // ── Submit PIN to backend ────────────────────────────────────────
   // Sends:
+  //   email        — entered by user to identify their account
   //   pin          — the entered PIN
   //   propertyId   — MongoDB _id of the selected property
-  //   isStaff      — derived from the stored session user, NOT from the prop.
-  //                  The backend ignores this field (it uses req.isStaff from
-  //                  the JWT) but we keep it for forward-compatibility.
-  //
-  // Role-specific behavior (enforced on backend, mirrored here for UX):
-  //   staff       → backend checks pin vs Staff.pin AND propertyId vs staff.propertyIds
-  //   team_leader → backend checks pin vs serverId client's User.pin
-  //   client      → backend checks pin vs own User.pin
+  //   isStaff      — hint from parent prop (backend uses JWT role as source of truth)
   const handleSubmit = async (pin) => {
     if (loading) return;
+
+    // Block submission while account is locked
+    if (lockedUntil || permanentlyLocked) return;
+
+    if (!email.trim()) {
+      showMsg('Please enter your email address.');
+      triggerShake();
+      clearDigits();
+      return;
+    }
+
     hideMsg();
     setLoading(true);
 
@@ -149,26 +193,35 @@ export default function PinModal({
           Authorization:  `Bearer ${token}`,
         },
         body: JSON.stringify({
+          email:      email.trim().toLowerCase(),
           pin,
           propertyId: selectedPropertyId,
-          // Derived from stored session — never from prop alone
-          isStaff: isStaffUser,
+          isStaff,
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        // Surface a role-aware error message so the user knows what went wrong
-        let errMsg = data.error || 'Incorrect PIN. Please try again.';
-
-        // For staff: backend returns a specific message when the property is
-        // not in their assigned list — surface it directly.
-        if (isStaffUser && data.error?.toLowerCase().includes('access')) {
-          errMsg = data.error;
+        // ── Permanent lock ─────────────────────────────────────────
+        if (data.permanentlyLocked) {
+          setPermanentlyLocked(true);
+          showMsg(data.error || 'Your account has been permanently locked. Please contact your administrator.');
+          clearDigits();
+          return;
         }
 
-        showMsg(errMsg);
+        // ── Temporary lock ─────────────────────────────────────────
+        if (res.status === 423 && data.lockedUntil) {
+          const until = new Date(data.lockedUntil);
+          setLockedUntil(until);
+          showMsg(data.error || 'Too many incorrect PIN attempts. Please wait before trying again.');
+          clearDigits();
+          return;
+        }
+
+        // ── Regular wrong PIN or other error ──────────────────────
+        showMsg(data.error || 'Incorrect PIN. Please try again.');
         triggerShake();
         clearDigits();
         return;
@@ -188,13 +241,57 @@ export default function PinModal({
 
   const filled    = digits.filter(Boolean).length;
   const allFilled = filled === PIN_LENGTH;
+  const isLocked  = permanentlyLocked || !!lockedUntil;
 
-  // ── Role-aware subtitle ──────────────────────────────────────────
-  const subtitle = (() => {
-    if (isStaffUser)              return `Enter your staff PIN to access this property.`;
-    if (resolvedRole === 'team_leader') return `Enter the property PIN to continue.`;
-    return `Enter your ${PIN_LENGTH}-digit PIN to continue.`;
-  })();
+  // ── Permanently locked screen ────────────────────────────────────
+  if (permanentlyLocked) {
+    return (
+      <>
+        <h1 className="lp-h1">Account Locked</h1>
+        <div
+          style={{
+            textAlign:    'center',
+            padding:      '32px 16px',
+            display:      'flex',
+            flexDirection:'column',
+            alignItems:   'center',
+            gap:          '16px',
+          }}
+        >
+          {/* Lock icon */}
+          <div
+            style={{
+              width:        '64px',
+              height:       '64px',
+              borderRadius: '50%',
+              background:   '#fef2f2',
+              border:       '2px solid #fecaca',
+              display:      'flex',
+              alignItems:   'center',
+              justifyContent: 'center',
+              fontSize:     '28px',
+            }}
+          >
+            🔒
+          </div>
+          <p style={{ color: '#dc2626', fontWeight: '600', margin: 0, fontSize: '15px' }}>
+            Your account has been permanently locked due to too many incorrect PIN attempts.
+          </p>
+          <p style={{ color: '#6b7280', margin: 0, fontSize: '14px', lineHeight: '1.5' }}>
+            Please contact your {isStaff ? 'manager' : 'administrator'} to restore access.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="lp-link"
+          onClick={onBack}
+          style={{ marginTop: '12px' }}
+        >
+          ← Back
+        </button>
+      </>
+    );
+  }
 
   return (
     <>
@@ -202,8 +299,51 @@ export default function PinModal({
       <h1 className="lp-h1">Enter PIN</h1>
       <p className="lp-sub">
         {firstName ? `Hi ${firstName}! ` : ''}
-        {subtitle}
+        Enter your email and {PIN_LENGTH}-digit PIN to continue.
       </p>
+
+      {/* ── Email field ── */}
+      <div className="lp-field" style={{ marginBottom: '20px' }}>
+        <label className="lp-label">Email</label>
+        <input
+          className="lp-input"
+          type="email"
+          autoComplete="email"
+          placeholder="your@email.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={loading || isLocked}
+        />
+      </div>
+
+      {/* ── Temporary lock banner ─────────────────────────────────── */}
+      {lockedUntil && (
+        <div
+          style={{
+            background:   '#fff7ed',
+            border:       '1.5px solid #fed7aa',
+            borderRadius: '12px',
+            padding:      '14px 16px',
+            marginBottom: '20px',
+            display:      'flex',
+            alignItems:   'center',
+            gap:          '12px',
+          }}
+        >
+          <span style={{ fontSize: '22px' }}>⏳</span>
+          <div>
+            <p style={{ margin: 0, fontWeight: '600', color: '#c2410c', fontSize: '14px' }}>
+              Account temporarily locked
+            </p>
+            <p style={{ margin: '2px 0 0', color: '#9a3412', fontSize: '13px' }}>
+              Try again in{' '}
+              <span style={{ fontWeight: '700', fontVariantNumeric: 'tabular-nums' }}>
+                {formatCountdown(lockSecondsLeft)}
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── PIN digit inputs ── */}
       <div
@@ -211,8 +351,10 @@ export default function PinModal({
           display:         'flex',
           gap:             '10px',
           justifyContent:  'center',
-          margin:          '28px 0 24px',
+          margin:          '0 0 24px',
           animation:       shake ? 'pin-shake 0.5s ease' : 'none',
+          opacity:         isLocked ? 0.4 : 1,
+          pointerEvents:   isLocked ? 'none' : 'auto',
         }}
         onPaste={handlePaste}
       >
@@ -226,7 +368,7 @@ export default function PinModal({
             value={digit}
             onChange={(e) => handleChange(i, e.target.value)}
             onKeyDown={(e) => handleKeyDown(i, e)}
-            disabled={loading}
+            disabled={loading || isLocked}
             style={{
               width:          '46px',
               height:         '54px',
@@ -240,8 +382,8 @@ export default function PinModal({
               outline:        'none',
               transition:     'border-color 0.15s ease, background 0.15s ease, transform 0.1s ease',
               transform:      digit ? 'scale(1.05)' : 'scale(1)',
-              cursor:         loading ? 'not-allowed' : 'text',
-              opacity:        loading ? 0.6 : 1,
+              cursor:         (loading || isLocked) ? 'not-allowed' : 'text',
+              opacity:        (loading || isLocked) ? 0.6 : 1,
             }}
             aria-label={`PIN digit ${i + 1}`}
           />
@@ -268,10 +410,10 @@ export default function PinModal({
       <button
         className="lp-btn"
         onClick={() => allFilled && handleSubmit(digits.join(''))}
-        disabled={!allFilled || loading}
+        disabled={!allFilled || loading || isLocked}
         style={{ width: '100%' }}
       >
-        {loading ? 'Verifying…' : 'Continue'}
+        {loading ? 'Verifying…' : isLocked ? `Locked — wait ${formatCountdown(lockSecondsLeft)}` : 'Continue'}
       </button>
 
       <button
