@@ -1079,6 +1079,14 @@ router.post('/send-change-password-otp', requireAuth, async (req, res, next) => 
 // Verifies the 6-digit PIN for the currently authenticated user.
 // Called by PinModal after property selection.
 //
+// The account is identified by the `email` field in the request body.
+// This replaces the previous approach of relying solely on the JWT
+// claims (req.isStaff / req.user._id) for account resolution.
+//
+// Lookup order:
+//   1. Check Staff collection for the email → staff PIN path
+//   2. Check User collection for the email  → client / team_leader / admin PIN path
+//
 // User types and their PIN logic:
 //   - staff       → PIN must match AND the selected propertyId must be
 //                   in staff.propertyIds. If the property is not assigned
@@ -1087,137 +1095,209 @@ router.post('/send-change-password-otp', requireAuth, async (req, res, next) => 
 //   - client      → PIN must match. Property access is unrestricted.
 //   - team_leader → PIN must match. Property access is unrestricted.
 //
+// Lockout schedule (cumulative wrong attempts per account):
+//   attempts 1–2  : no lock (warnings returned)
+//   attempt  3    : locked for 1 minute
+//   attempt  4    : locked for 3 minutes
+//   attempt  5    : locked for 15 minutes
+//   attempt  6    : locked for 1 hour
+//   attempt  7+   : permanently locked — pinPermanentlyLocked = true,
+//                   requires admin intervention to unlock
+//
 // Body:
-//   { pin: string, propertyId: string, isStaff: boolean }
+//   { email: string, pin: string, propertyId: string, isStaff: boolean }
 //
 // Returns:
 //   200 { ok: true }
 //   400 { error: '...' }  — missing fields
 //   403 { error: '...' }  — wrong PIN or property not assigned
+//   423 { error: '...', lockedUntil: ISO string } — account temporarily locked
+//   423 { error: '...', permanentlyLocked: true } — account permanently locked
 // ─────────────────────────────────────────────────────────────────
+
+// Lock durations in milliseconds, indexed by attempt count that triggers the lock.
+// attempt 3 → 1 min, 4 → 3 min, 5 → 15 min, 6 → 1 hr, 7+ → permanent
+const PIN_LOCK_DURATIONS = {
+  3: 1  * 60 * 1000,
+  4: 3  * 60 * 1000,
+  5: 15 * 60 * 1000,
+  6: 60 * 60 * 1000,
+};
+
+function getPinLockDuration(attempts) {
+  return PIN_LOCK_DURATIONS[attempts] ?? null; // null = permanent (7+)
+}
+
 router.post('/verify-pin', requireAuth, async (req, res, next) => {
   try {
-    const { pin, propertyId } = req.body;
+    const { email, pin, propertyId } = req.body;
 
-    // ── TEMPORARY DEBUG — remove after diagnosing PIN issues ──────
-    // Decode the raw token so we can see exactly what the client sent,
-    // independent of what the middleware resolved. This tells us whether
-    // a staff token or a user token is actually arriving.
-    const rawAuthHeader = req.headers.authorization || '';
-    const rawToken = rawAuthHeader.startsWith('Bearer ') ? rawAuthHeader.slice(7) : '';
-    let decodedClaims = null;
-    try {
-      // Decode without verifying so we can inspect claims even if expired
-      const parts = rawToken.split('.');
-      if (parts.length === 3) {
-        decodedClaims = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-      }
-    } catch (_e) { /* ignore */ }
-    console.log('[verify-pin] ─────────────────────────────────────');
-    console.log('[verify-pin] req.isStaff       :', req.isStaff);
-    console.log('[verify-pin] req.user._id      :', req.user?._id);
-    console.log('[verify-pin] req.user.role     :', req.user?.role);
-    console.log('[verify-pin] req.staff?._id    :', req.staff?._id);
-    console.log('[verify-pin] propertyId        :', propertyId);
-    console.log('[verify-pin] pin (length)      :', String(pin ?? '').length);
-    console.log('[verify-pin] TOKEN claims      :', decodedClaims);
-    console.log('[verify-pin] ─────────────────────────────────────');
-
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required.' });
+    }
     if (!pin) {
       return res.status(400).json({ error: 'PIN is required.' });
     }
 
-    // ── Staff PIN + property access check ─────────────────────────
-    // Always use req.isStaff from the middleware (decoded from the JWT).
-    // Never trust the isStaff flag from the request body.
-    if (req.isStaff) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const now = new Date();
+
+    // ── 1. Try Staff lookup by email ──────────────────────────────
+    // Staff accounts are always identified by email first, regardless
+    // of what the JWT says. This handles edge cases where a staff member's
+    // email might also exist in the User collection.
+    const staff = await Staff.findOne({ email: normalizedEmail }).select('+pin');
+
+    if (staff) {
+      if (!staff.isActive) {
+        return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
+      }
+
+      // ── Check permanent lock ──────────────────────────────────────
+      if (staff.pinPermanentlyLocked) {
+        return res.status(423).json({
+          error: 'Your account has been locked due to too many incorrect PIN attempts. Please contact your manager.',
+          permanentlyLocked: true,
+        });
+      }
+
+      // ── Check temporary lock ──────────────────────────────────────
+      if (staff.pinLockedUntil && staff.pinLockedUntil > now) {
+        return res.status(423).json({
+          error: 'Too many incorrect PIN attempts. Please try again later.',
+          lockedUntil: staff.pinLockedUntil.toISOString(),
+        });
+      }
+
       if (!propertyId) {
         return res.status(400).json({ error: 'Property selection is required.' });
       }
 
-      const staff = await Staff.findById(req.staff._id).select('+pin');
-      if (!staff) {
-        return res.status(404).json({ error: 'Staff account not found.' });
-      }
-
-      // Verify PIN
-      console.log('[verify-pin] STAFF branch');
-      console.log('[verify-pin] staff._id      :', staff._id);
-      console.log('[verify-pin] staff.pin set  :', !!staff.pin);
-      console.log('[verify-pin] staff.propertyIds:', staff.propertyIds);
+      // ── Verify PIN ────────────────────────────────────────────────
       const pinMatch = await bcrypt.compare(String(pin), staff.pin || '');
-      console.log('[verify-pin] staff pinMatch :', pinMatch);
+
       if (!pinMatch) {
-        return res.status(403).json({ error: 'Incorrect PIN. Please try again.' });
+        staff.pinAttempts = (staff.pinAttempts || 0) + 1;
+        const attempts = staff.pinAttempts;
+
+        if (attempts >= 7) {
+          // Permanent lock
+          staff.pinPermanentlyLocked = true;
+          await staff.save();
+          return res.status(423).json({
+            error: 'Your account has been locked due to too many incorrect PIN attempts. Please contact your manager.',
+            permanentlyLocked: true,
+          });
+        }
+
+        const lockDuration = getPinLockDuration(attempts);
+        if (lockDuration !== null) {
+          staff.pinLockedUntil = new Date(now.getTime() + lockDuration);
+        }
+
+        await staff.save();
+
+        const attemptsLeft = 7 - attempts;
+        if (lockDuration !== null) {
+          return res.status(423).json({
+            error: `Incorrect PIN. Account locked. Please try again later.`,
+            lockedUntil: staff.pinLockedUntil.toISOString(),
+          });
+        }
+
+        return res.status(403).json({
+          error: `Incorrect PIN. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining before lockout.`,
+        });
       }
 
-      // Verify property access
+      // ── PIN correct — verify property access ──────────────────────
       const hasAccess = (staff.propertyIds || []).some(
         (id) => String(id) === String(propertyId)
       );
-      console.log('[verify-pin] staff hasAccess:', hasAccess, '| propertyId sent:', propertyId);
       if (!hasAccess) {
-        return res.status(403).json({
-          error: 'You do not have access to this property.',
-        });
+        return res.status(403).json({ error: 'You do not have access to this property.' });
       }
+
+      // ── Reset lockout counters on success ─────────────────────────
+      staff.pinAttempts    = 0;
+      staff.pinLockedUntil = null;
+      await staff.save();
 
       return res.json({ ok: true });
     }
 
-    // ── Client / Team Leader / Admin PIN check ────────────────────
-    // These roles have unrestricted property access — only the PIN is verified.
-    //
-    // Lookup strategy per role:
-    //   - client      → PIN lives on their own User doc
-    //   - team_leader → PIN lives on their own User doc (NOT the client they serve)
-    //   - admin       → PIN lives on their own User doc
-    //
-    // Always use _id — never email. The middleware may select only
-    // '+properties.smoobuApiKey' so email is not guaranteed on req.user.
+    // ── 2. Try User lookup by email ───────────────────────────────
+    // Covers client, team_leader, and admin roles.
+    // Property access is unrestricted for these roles — only PIN is checked.
+    const ownUser = await User.findOne({ email: normalizedEmail }).select('+pin');
 
-    // ── Check if a Staff record matches this PIN + propertyId ───────
-    // Staff accounts are under a client (clientId = req.user._id).
-    // When a staff member logs in via the client email flow, their token
-    // is a client token — but their PIN lives on the Staff document.
-    // So before checking the client PIN, we check all staff under this
-    // client whose propertyIds include the selected property, and see if
-    // any of their PINs match. First match wins.
-    if (propertyId) {
-      const staffList = await Staff.find({
-        clientId: req.user._id,
-        isActive:  true,
-        propertyIds: propertyId,
-      }).select('+pin');
-
-      for (const s of staffList) {
-        if (!s.pin) continue;
-        const staffPinMatch = await bcrypt.compare(String(pin), s.pin);
-        if (staffPinMatch) {
-          console.log('[verify-pin] matched staff PIN for staff._id:', s._id);
-          return res.json({ ok: true });
-        }
-      }
+    if (!ownUser) {
+      return res.status(404).json({ error: 'Account not found.' });
     }
 
-    // ── Fall back to client/team-leader own PIN ───────────────────
-    const ownUser = await User.findById(req.user._id).select('+pin');
-    const pinHash = ownUser?.pin || null;
+    // ── Check permanent lock ──────────────────────────────────────
+    if (ownUser.pinPermanentlyLocked) {
+      return res.status(423).json({
+        error: 'Your account has been locked due to too many incorrect PIN attempts. Please contact your administrator.',
+        permanentlyLocked: true,
+      });
+    }
 
-    console.log('[verify-pin] CLIENT/TL branch');
-    console.log('[verify-pin] ownUser._id  :', ownUser?._id);
-    console.log('[verify-pin] ownUser.role :', ownUser?.role);
-    console.log('[verify-pin] pinHash set  :', !!pinHash);
+    // ── Check temporary lock ──────────────────────────────────────
+    if (ownUser.pinLockedUntil && ownUser.pinLockedUntil > now) {
+      return res.status(423).json({
+        error: 'Too many incorrect PIN attempts. Please try again later.',
+        lockedUntil: ownUser.pinLockedUntil.toISOString(),
+      });
+    }
+
+    const pinHash = ownUser.pin || null;
 
     if (!pinHash) {
       return res.status(403).json({ error: 'No PIN configured on this account. Please ask your administrator to set one.' });
     }
 
+    // ── Verify PIN ────────────────────────────────────────────────
     const pinMatch = await bcrypt.compare(String(pin), pinHash);
-    console.log('[verify-pin] client/TL pinMatch:', pinMatch);
+
     if (!pinMatch) {
-      return res.status(403).json({ error: 'Incorrect PIN. Please try again.' });
+      ownUser.pinAttempts = (ownUser.pinAttempts || 0) + 1;
+      const attempts = ownUser.pinAttempts;
+
+      if (attempts >= 7) {
+        // Permanent lock
+        ownUser.pinPermanentlyLocked = true;
+        await ownUser.save();
+        return res.status(423).json({
+          error: 'Your account has been locked due to too many incorrect PIN attempts. Please contact your administrator.',
+          permanentlyLocked: true,
+        });
+      }
+
+      const lockDuration = getPinLockDuration(attempts);
+      if (lockDuration !== null) {
+        ownUser.pinLockedUntil = new Date(now.getTime() + lockDuration);
+      }
+
+      await ownUser.save();
+
+      const attemptsLeft = 7 - attempts;
+      if (lockDuration !== null) {
+        return res.status(423).json({
+          error: `Incorrect PIN. Account locked. Please try again later.`,
+          lockedUntil: ownUser.pinLockedUntil.toISOString(),
+        });
+      }
+
+      return res.status(403).json({
+        error: `Incorrect PIN. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining before lockout.`,
+      });
     }
+
+    // ── Reset lockout counters on success ─────────────────────────
+    ownUser.pinAttempts    = 0;
+    ownUser.pinLockedUntil = null;
+    await ownUser.save();
 
     return res.json({ ok: true });
   } catch (err) {
