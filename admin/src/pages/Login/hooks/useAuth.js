@@ -28,12 +28,26 @@ export function useAutoRedirect() {
           window.location.href = `${FRONTEND_URL}/dashboard`;
           return;
         }
+        if (user.role === 'admin') {
+          navigate(DASHBOARD_URL, { replace: true });
+          return;
+        }
       } catch (e) {
-        // ignore
+        // ignore parse errors
       }
       navigate(DASHBOARD_URL, { replace: true });
     }
   }, [navigate]);
+}
+
+/**
+ * Returns the display name from a user object.
+ * Prefers firstName, falls back to businessName, then email.
+ */
+function getDisplayName(user) {
+  if (user.firstName && user.firstName.trim()) return user.firstName.trim();
+  if (user.businessName && user.businessName.trim()) return user.businessName.trim();
+  return user.email || 'User';
 }
 
 /**
@@ -49,14 +63,24 @@ export function useAuthSubmit(type, showMessage) {
     try {
       if (type === 'login') {
         const data = await login(formData);
+
+        // Guard: ensure we actually got a user back
+        if (!data || !data.user) {
+          throw new Error('Unexpected response from server. Please try again.');
+        }
+
         sessionStorage.setItem('hp_access_token', data.accessToken);
         sessionStorage.setItem('hp_user', JSON.stringify(data.user));
-        showMessage(`Welcome back, ${data.user.firstName}! Redirecting...`, 'success');
+
+        showMessage(`Welcome back, ${getDisplayName(data.user)}! Redirecting...`, 'success');
+
         setTimeout(() => {
           if (data.user.role === 'team_leader') {
             navigate('/team-leader/staffs', { replace: true });
           } else if (data.user.role === 'client') {
             window.location.href = `${FRONTEND_URL}/dashboard`;
+          } else if (data.user.role === 'admin') {
+            navigate(DASHBOARD_URL, { replace: true });
           } else {
             navigate(DASHBOARD_URL, { replace: true });
           }
