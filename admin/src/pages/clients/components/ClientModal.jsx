@@ -1,6 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
-import { updateClient, getClientSmoobuData, createClientProperty, updateClientProperty, deleteClientProperty } from '../services/clientsService';
+import { updateClient, getClientSmoobuData, createClientProperty, updateClientProperty, deleteClientProperty, getClientPropertyApiKey } from '../services/clientsService';
 import ClientSmoobuView from './ClientSmoobuView';
+import OTPModal from '../../../components/OTPModal';
+import { sendLoginOtp } from '../../authorization/services/authService';
+
+function mapPropertiesForEdit(properties = []) {
+  return properties.map((p) => ({
+    _id: p._id,
+    name: p.propertyName || p.name || '',
+    hasSmoobuKey: !!p.hasSmoobuKey,
+    maskedSmoobuApiKey: p.maskedSmoobuApiKey || '',
+    smoobuApiKey: p.maskedSmoobuApiKey || '',
+    isUnmasked: false,
+  }));
+}
 
 function initials(businessName = '') {
   const parts = businessName.trim().split(/\s+/);
@@ -129,6 +142,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
   const [smoobuProperty,   setSmoobuProperty]   = useState(null);
   const [saving,           setSaving]           = useState(false);
   const [saveError,        setSaveError]        = useState(null);
+  const [otpAction,        setOtpAction]        = useState(null);
 
   const [properties, setProperties] = useState([]);
   const [loadingProps, setLoadingProps] = useState(true);
@@ -171,6 +185,14 @@ export default function ClientModal({ client, onClose, onUpdated }) {
 
   useEffect(() => { loadProperties(); }, [loadProperties]);
 
+  useEffect(() => {
+    if (!isEditing) return;
+    setForm((prev) => ({
+      ...prev,
+      properties: mapPropertiesForEdit(properties),
+    }));
+  }, [isEditing, properties]);
+
   function handleChange(e) {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -184,12 +206,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
       propertyTagPrefix: client.propertyTagPrefix ?? '',
       password:          '',
       pin:               '',
-      properties:        properties.map(p => ({
-        _id: p._id,
-        name: p.propertyName || p.name,
-        hasSmoobuKey: p.hasSmoobuKey,
-        smoobuApiKey: ''
-      }))
+      properties:        mapPropertiesForEdit(properties)
     });
     setIsEditing(true);
   }
@@ -210,8 +227,39 @@ export default function ClientModal({ client, onClose, onUpdated }) {
   const addProperty = () =>
     setForm(f => ({ ...f, properties: [...f.properties, { name: '', smoobuApiKey: '' }] }));
 
-  const removeProperty = (index) =>
-    setForm(f => ({ ...f, properties: f.properties.filter((_, i) => i !== index) }));
+  const removeProperty = (index) => {
+    if (window.confirm("Are you sure you will remove this property?")) {
+      setOtpAction({ type: 'remove-prop', index });
+      sendLoginOtp().catch(err => alert(err.message));
+    }
+  };
+
+  const showApiKey = (index, propertyId) => {
+    if (window.confirm("Proceed in showing the API key?")) {
+      setOtpAction({ type: 'show-key', index, propertyId });
+      sendLoginOtp().catch(err => alert(err.message));
+    }
+  };
+
+  const handleOtpVerified = async (otp) => {
+    try {
+      if (otpAction?.type === 'remove-prop') {
+        setForm(f => ({ ...f, properties: f.properties.filter((_, i) => i !== otpAction.index) }));
+      } else if (otpAction?.type === 'show-key') {
+        const res = await getClientPropertyApiKey(client._id, otpAction.propertyId);
+        setForm(f => ({
+          ...f,
+          properties: f.properties.map((p, i) => (
+            i === otpAction.index ? { ...p, smoobuApiKey: res.smoobuApiKey, isUnmasked: true } : p
+          ))
+        }));
+      }
+    } catch (err) {
+      alert(err.message || 'Error executing action');
+    } finally {
+      setOtpAction(null);
+    }
+  };
 
 
   async function handleSave() {
@@ -259,11 +307,13 @@ export default function ClientModal({ client, onClose, onUpdated }) {
         if (p._id) {
           // Update only if changed
           const oldProp = properties.find(x => x._id === p._id);
-          const needsUpdate = (oldProp.propertyName !== p.name) || p.smoobuApiKey.trim();
+          const isMasked = p.smoobuApiKey === p.maskedSmoobuApiKey && p.smoobuApiKey.includes('•');
+          const finalKey = isMasked ? '' : p.smoobuApiKey.trim();
+          const needsUpdate = (oldProp.propertyName !== p.name) || finalKey;
           if (needsUpdate) {
             await updateClientProperty(client._id, p._id, {
               propertyName: p.name.trim(),
-              ...(p.smoobuApiKey.trim() ? { smoobuApiKey: p.smoobuApiKey.trim() } : {})
+              ...(finalKey ? { smoobuApiKey: finalKey } : {})
             });
           }
         } else {
@@ -465,14 +515,31 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                         <label>
                           {prop.hasSmoobuKey ? "Update Smoobu API Key" : "Smoobu API Key"}
                         </label>
-                        <input
-                          type="text"
-                          placeholder={prop.hasSmoobuKey ? "Leave blank to keep existing key" : "Optional"}
-                          value={prop.smoobuApiKey}
-                          onChange={setProp(index, 'smoobuApiKey')}
-                          maxLength={512}
-                          className="cl-edit-input"
-                        />
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            placeholder="Optional"
+                            value={prop.smoobuApiKey}
+                            onChange={setProp(index, 'smoobuApiKey')}
+                            maxLength={512}
+                            className="cl-edit-input"
+                            disabled={prop.hasSmoobuKey && !prop.isUnmasked}
+                            style={{ paddingRight: 40, width: '100%' }}
+                          />
+                          {prop.hasSmoobuKey && !prop.isUnmasked && (
+                            <button
+                              type="button"
+                              onClick={() => showApiKey(index, prop._id)}
+                              style={{
+                                position: 'absolute', right: 12, background: 'none', border: 'none',
+                                cursor: 'pointer', color: 'var(--color-muted)', display: 'flex', alignItems: 'center'
+                              }}
+                              title="Show API Key"
+                            >
+                              <i className="ti ti-eye" style={{ fontSize: 16 }} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -570,6 +637,14 @@ export default function ClientModal({ client, onClose, onUpdated }) {
           client={client}
           property={smoobuProperty}
           onClose={() => setSmoobuProperty(null)}
+        />
+      )}
+
+      {otpAction && (
+        <OTPModal 
+          email={JSON.parse(sessionStorage.getItem('hp_user') || '{}')?.email}
+          onVerified={handleOtpVerified} 
+          onCancel={() => setOtpAction(null)} 
         />
       )}
     </>
