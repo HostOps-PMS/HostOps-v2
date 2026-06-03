@@ -49,11 +49,18 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
       }
 
       auth.setToken(data.accessToken);
+
+      // Staff login returns data.staff (not data.user).
+      // Normalise so auth context and downstream handlers always have data.user.
+      if (data.isStaff && data.staff && !data.user) {
+        data = { ...data, user: { ...data.staff, role: 'staff', isStaff: true } };
+      }
+
       auth.setUser(data.user);
 
       // If the account was admin-created with a temporary password,
       // flag it so the dashboard shows the first-login password-change modal.
-      if (data.user.mustChangePassword) {
+      if (data.user?.mustChangePassword) {
         sessionStorage.setItem('hp_must_change_password', 'true');
       } else {
         sessionStorage.removeItem('hp_must_change_password');

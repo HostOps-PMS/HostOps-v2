@@ -3,7 +3,7 @@ import LoginForm from './components/LoginForm';
 import ForgotPasswordForm from './components/ForgotPasswordForm';
 import LoginOTPForm from './components/LoginOTPForm';
 import PropertySelectForm from './components/PropertySelectForm';
-import DomainLoginForm from './components/DomainLoginForm';
+import PinModal from './components/PinModal';
 import Message from './components/Message';
 import bgImage from '../../assets/bg.png';
 import './Login.css';
@@ -13,8 +13,9 @@ const VIEWS = {
   FORGOT:                          'forgot',
   LOGIN_OTP:                       'login_otp',
   PROPERTY_SELECT:                 'property_select',
-  DOMAIN_LOGIN:                    'domain_login',
+  PIN_MODAL:                       'pin_modal',
   CLIENT_ACCOUNT_PROPERTY_SELECT:  'client_account_property_select',
+  CLIENT_ACCOUNT_PIN_MODAL:        'client_account_pin_modal',
 };
 
 const SLIDES = [
@@ -31,14 +32,12 @@ export default function LoginPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
 
   // Stores the full auth payload returned after successful OTP verification.
-  // Passed down to subsequent screens (PropertySelectForm, DomainLoginForm)
+  // Passed down to subsequent screens (PropertySelectForm, PinModal)
   // so they have access to the user object without re-fetching.
   const [authData, setAuthData] = useState(null);
 
   // Stores the single selected property ID after PropertySelectForm.
-  // Passed to DomainLoginForm so it can validate the staff's propertyIds.
-  // '__all__' is a special value meaning "All Properties" — DomainLoginForm
-  // uses clientAccount credentials in this case and skips property access check.
+  // Passed to PinModal so staff PIN checks can include the property context.
   const [selectedPropertyId, setSelectedPropertyId] = useState(null);
 
   const showMsg = (text, type = 'error') => setMessage({ text, type });
@@ -50,8 +49,20 @@ export default function LoginPage() {
   };
 
   const handleAuthSuccess = (data) => {
+    // Staff login response uses data.staff (no data.user).
+    // Normalise so the rest of the flow always reads from data.user.
+    if (data.isStaff && data.staff && !data.user) {
+      data = { ...data, user: { ...data.staff, role: 'staff', isStaff: true } };
+    }
+
     setAuthData(data);
-    if (data.isAdmin || data.user?.role === 'admin' || data.user?.role === 'team_leader') {
+
+    const role = data.user?.role;
+
+    // ── Admin only → redirect straight to admin dashboard ─────────
+    // team_leader and staff must go through property select + PIN first.
+    // Previously team_leader was redirected here — that was the bug.
+    if (data.isAdmin || role === 'admin') {
       showMsg(`Welcome, ${data.user.firstName || data.user.businessName}! Redirecting...`, 'success');
       setTimeout(() => {
         const dashboardBase = import.meta.env.VITE_DASHBOARD_URL || 'https://core.hostops.online';
@@ -61,13 +72,18 @@ export default function LoginPage() {
         });
         window.location.href = `${dashboardBase}/admin?${params.toString()}`;
       }, 800);
-    } else {
-      showMsg(
-        `Welcome, ${data.user.firstName || data.user.businessName}! Please select a property to continue.`,
-        'success',
-      );
-      setView(VIEWS.PROPERTY_SELECT);
+      return;
     }
+
+    // ── Team leader, staff, client → property select → PIN ────────
+    // All three roles need to pick a property then verify their PIN
+    // before reaching the dashboard.
+    const displayName = data.user?.firstName || data.user?.businessName || '';
+    showMsg(
+      `Welcome${displayName ? `, ${displayName}` : ''}! Please select a property to continue.`,
+      'success',
+    );
+    setView(VIEWS.PROPERTY_SELECT);
   };
 
   useEffect(() => {
@@ -140,8 +156,7 @@ export default function LoginPage() {
                 // ── Client Account login ───────────────────────────────────────
                 // Client accounts skip OTP. After login they go to
                 // CLIENT_ACCOUNT_PROPERTY_SELECT where they pick one of their
-                // parent client's embedded properties, then navigate directly
-                // to /dashboard — no DomainLoginForm step needed.
+                // parent client's embedded properties, then go through PIN_MODAL.
                 setAuthData(data);
                 showMsg(
                   `Welcome, ${data.clientAccount.firstName}! Please select a property to continue.`,
@@ -165,30 +180,44 @@ export default function LoginPage() {
           )}
 
           {view === VIEWS.PROPERTY_SELECT && (
-            // ── Regular client property selection ─────────────────────────────
-            // After OTP verification, client picks a property.
-            // PropertySelectForm navigates directly to /dashboard internally —
-            // no DomainLoginForm step. onContinue is no longer called since
-            // the "All Properties" option has been removed.
+            // ── Regular client / staff / team_leader property selection ───
+            // After login (or OTP), user picks a property.
+            // onPropertySelected is called with the selected property _id
+            // and the name so we can store them and advance to PIN_MODAL.
             <PropertySelectForm
               userData={authData?.user}
               showMsg={showMsg}
               hideMsg={hideMsg}
-              onContinue={(propertyId) => {
-                // Kept for safety — not triggered in normal flow since
-                // PropertySelectForm now always navigates internally.
+              onPropertySelected={(propertyId, propertyName) => {
+                // Store in sessionStorage so the dashboard can read them,
+                // but hold navigation here — PIN gate comes first.
+                sessionStorage.setItem('hp_selected_property_id',   propertyId);
+                sessionStorage.setItem('hp_selected_property_name', propertyName || '');
                 setSelectedPropertyId(propertyId);
                 hideMsg();
-                setView(VIEWS.DOMAIN_LOGIN);
+                setView(VIEWS.PIN_MODAL);
+              }}
+              onContinue={(propertyId) => {
+                // Kept for safety — not triggered in normal flow since
+                // PropertySelectForm now calls onPropertySelected instead.
+                setSelectedPropertyId(propertyId);
+                hideMsg();
+                setView(VIEWS.PIN_MODAL);
               }}
               onBack={() => handleViewChange(VIEWS.LOGIN)}
             />
           )}
 
-          {view === VIEWS.DOMAIN_LOGIN && (
-            <DomainLoginForm
+          {view === VIEWS.PIN_MODAL && (
+            // ── PIN verification ───────────────────────────────────────────
+            // After property selection, ALL user types must enter their PIN.
+            //   - staff:        PIN verified against Staff model + property access check
+            //   - client:       PIN verified against own User doc
+            //   - team_leader:  PIN verified against their assigned client (serverId) User doc
+            <PinModal
               userData={authData?.user}
               selectedPropertyId={selectedPropertyId}
+              isStaff={authData?.isStaff || authData?.user?.role === 'staff' || false}
               showMsg={showMsg}
               hideMsg={hideMsg}
               onBack={() => {
@@ -201,21 +230,42 @@ export default function LoginPage() {
           {view === VIEWS.CLIENT_ACCOUNT_PROPERTY_SELECT && (
             // ── Client Account Property Selection ─────────────────────────────
             // isClientAccount=true so PropertySelectForm knows the context.
-            // Any property selection navigates directly to /dashboard —
-            // no DomainLoginForm step (already authenticated as clientAccount).
+            // After property selection → CLIENT_ACCOUNT_PIN_MODAL.
             <PropertySelectForm
               userData={authData?.clientAccount}
               isClientAccount={true}
               showMsg={showMsg}
               hideMsg={hideMsg}
-              onContinue={(propertyId) => {
-                // Kept for safety — not triggered in normal flow since
-                // PropertySelectForm now always navigates internally.
+              onPropertySelected={(propertyId, propertyName) => {
+                sessionStorage.setItem('hp_selected_property_id',   propertyId);
+                sessionStorage.setItem('hp_selected_property_name', propertyName || '');
                 setSelectedPropertyId(propertyId);
                 hideMsg();
-                setView(VIEWS.DOMAIN_LOGIN);
+                setView(VIEWS.CLIENT_ACCOUNT_PIN_MODAL);
+              }}
+              onContinue={(propertyId) => {
+                // Kept for safety — not triggered in normal flow.
+                setSelectedPropertyId(propertyId);
+                hideMsg();
+                setView(VIEWS.CLIENT_ACCOUNT_PIN_MODAL);
               }}
               onBack={() => handleViewChange(VIEWS.LOGIN)}
+            />
+          )}
+
+          {view === VIEWS.CLIENT_ACCOUNT_PIN_MODAL && (
+            // ── Client Account PIN verification ───────────────────────────
+            // clientAccount sessions always have full property access — PIN only.
+            <PinModal
+              userData={authData?.clientAccount}
+              selectedPropertyId={selectedPropertyId}
+              isStaff={false}
+              showMsg={showMsg}
+              hideMsg={hideMsg}
+              onBack={() => {
+                hideMsg();
+                setView(VIEWS.CLIENT_ACCOUNT_PROPERTY_SELECT);
+              }}
             />
           )}
 

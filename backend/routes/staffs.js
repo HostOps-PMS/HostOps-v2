@@ -163,7 +163,7 @@ router.patch('/staffs/:id', requireAdminOrTeamLeader, async (req, res, next) => 
   try {
     const data = updateStaffSchema.parse(req.body);
 
-    const staff = await Staff.findById(req.params.id).select('+password');
+    const staff = await Staff.findById(req.params.id).select('+password +pin');
     if (!staff) return res.status(404).json({ error: 'Staff not found' });
 
     if (req.user.role === 'team_leader' && String(staff.clientId) !== String(req.user.serverId)) {
