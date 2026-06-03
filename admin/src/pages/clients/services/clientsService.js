@@ -130,6 +130,18 @@ export async function getClientProperties(clientId) {
 }
 
 /**
+ * GET /api/clients/:id/properties/:propertyId/apikey
+ * Fetches the unmasked API key. Protected by OTP on the frontend.
+ *
+ * @param {string} clientId
+ * @param {string} propertyId
+ * @returns {Promise<{smoobuApiKey: string}>}
+ */
+export async function getClientPropertyApiKey(clientId, propertyId) {
+  return request(`/api/clients/${clientId}/properties/${propertyId}/apikey`);
+}
+
+/**
  * POST /api/clients/:id/properties
  * Admin adds an embedded property to a client's properties array.
  *
