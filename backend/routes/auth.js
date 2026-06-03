@@ -1,5 +1,6 @@
 // src/routes/auth.js
 import express from 'express';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import User from '../models/user.js';
 import Staff from '../models/staff.js';
@@ -138,62 +139,69 @@ router.post('/verify', async (req, res, next) => {
 
 // POST /auth/login
 // Handles both regular users AND staff accounts so the frontend
-// only needs one login endpoint. Staff are detected by checking the
-// Staff model when no matching User is found (or password doesn't match).
+// only needs one login endpoint.
+//
+// ── Login priority order ──────────────────────────────────────────
+// Staff is checked FIRST. This is intentional: a staff member's email
+// may coincidentally exist in the User collection (e.g. if the client
+// created a User account with the same email). If we checked User first
+// and the password matched, the staff member would receive a User token
+// instead of a Staff token — req.isStaff would be false and PIN
+// verification would fail. Checking Staff first guarantees the correct
+// token type is issued regardless of User collection overlap.
 router.post('/login', async (req, res, next) => {
   try {
     const data = loginSchema.parse(req.body);
     const { email, password, deviceId } = data;
 
+    // ── 1. Try Staff login first ───────────────────────────────────
+    // Staff accounts have no password — they authenticate via PIN only.
+    // Email match + isActive check is sufficient to issue a staff token.
+    // PIN verification happens later in /auth/verify-pin.
+    const staff = await Staff.findOne({ email: email.toLowerCase() });
+    if (staff) {
+      if (!staff.isActive) {
+        return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
+      }
 
+      const accessToken  = signStaffAccessToken(staff);
+      const refreshToken = signStaffRefreshToken(staff);
 
-    // ── Check if this is a staff login ────────────────────────────
-    // Try User first. If not found or password wrong, try Staff.
+      await RefreshToken.create({
+        userId:    staff._id,
+        token:     hashToken(refreshToken),
+        expiresAt: refreshTokenExpiry(),
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      staff.lastLoginAt = new Date();
+      await staff.save();
+
+      res.cookie('rt', refreshToken, {
+        httpOnly: true,
+        secure:   process.env.NODE_ENV === 'production',
+        sameSite: 'none',
+        maxAge:   7 * 24 * 60 * 60 * 1000,
+        path:     '/auth',
+      });
+
+      return res.json({
+        accessToken,
+        // Inject role:'staff' and isStaff:true into the staff object so the
+        // frontend can detect staff sessions from the stored hp_user object.
+        // The Staff schema has no 'role' field — we add it here explicitly.
+        staff:              { ...staff.toJSON(), role: 'staff', isStaff: true },
+        mustChangePassword: staff.mustChangePassword,
+        isStaff:            true,
+      });
+    }
+
+    // ── 2. Try User login ──────────────────────────────────────────
     const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
     const userPasswordMatch = user && (await user.comparePassword(password));
 
     if (!userPasswordMatch) {
-      // Try staff login
-      const staff = await Staff.findOne({ email: email.toLowerCase() }).select('+password');
-      if (staff && (await staff.comparePassword(password))) {
-        if (!staff.isActive) {
-          return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
-        }
-
-        const accessToken  = signStaffAccessToken(staff);
-        const refreshToken = signStaffRefreshToken(staff);
-
-        await RefreshToken.create({
-          userId:    staff._id,
-          token:     hashToken(refreshToken),
-          expiresAt: refreshTokenExpiry(),
-          ipAddress: req.ip,
-          userAgent: req.get('user-agent'),
-        });
-
-        staff.lastLoginAt = new Date();
-        await staff.save();
-
-        res.cookie('rt', refreshToken, {
-          httpOnly: true,
-          secure:   process.env.NODE_ENV === 'production',
-          sameSite: 'none',
-          maxAge:   7 * 24 * 60 * 60 * 1000,
-          path:     '/auth',
-        });
-
-        return res.json({
-          accessToken,
-          // Inject role:'staff' and isStaff:true into the staff object so the
-          // frontend can detect staff sessions from the stored hp_user object.
-          // The Staff schema has no 'role' field — we add it here explicitly.
-          staff:              { ...staff.toJSON(), role: 'staff', isStaff: true },
-          mustChangePassword: staff.mustChangePassword,
-          isStaff:            true,
-        });
-      }
-
-      // Neither user nor staff matched
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -666,11 +674,20 @@ router.get('/activity-log', requireAuth, async (req, res, next) => {
 router.get('/my-properties', requireAuth, (req, res) => {
   // req.user is always the parent client (carries the properties array)
   // regardless of whether the session is a direct client, clientAccount, or staff.
-  const properties = (req.user.properties || []).map((p) => ({
-    _id:          p._id,
-    propertyName: p.propertyName,
-  }));
-  res.json({ properties });
+  //
+  // Staff: filter down to only their assigned properties so PropertySelectForm
+  // only shows what they have access to.
+  // Client / team_leader: return all properties.
+  let list = (req.user.properties || []);
+
+  if (req.isStaff) {
+    const assigned = req.staffPropertyIds || [];
+    list = list.filter((p) => assigned.includes(String(p._id)));
+  }
+
+  res.json({
+    properties: list.map((p) => ({ _id: p._id, propertyName: p.propertyName })),
+  });
 });
 
 // POST /auth/change-password
@@ -1053,6 +1070,192 @@ router.post('/send-change-password-otp', requireAuth, async (req, res, next) => 
     }
 
     res.json({ message: 'A verification code has been sent to your email.' });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/verify-pin
+//
+// Verifies the 6-digit PIN for the currently authenticated user.
+// Called by PinModal after property selection.
+//
+// User types and their PIN logic:
+//   - staff       → PIN must match AND the selected propertyId must be
+//                   in staff.propertyIds. If the property is not assigned
+//                   to this staff member, access is denied even if the PIN
+//                   is correct.
+//   - client      → PIN must match. Property access is unrestricted.
+//   - team_leader → PIN must match. Property access is unrestricted.
+//
+// Body:
+//   { pin: string, propertyId: string, isStaff: boolean }
+//
+// Returns:
+//   200 { ok: true }
+//   400 { error: '...' }  — missing fields
+//   403 { error: '...' }  — wrong PIN or property not assigned
+// ─────────────────────────────────────────────────────────────────
+router.post('/verify-pin', requireAuth, async (req, res, next) => {
+  try {
+    const { pin, propertyId } = req.body;
+
+    // ── TEMPORARY DEBUG — remove after diagnosing PIN issues ──────
+    // Decode the raw token so we can see exactly what the client sent,
+    // independent of what the middleware resolved. This tells us whether
+    // a staff token or a user token is actually arriving.
+    const rawAuthHeader = req.headers.authorization || '';
+    const rawToken = rawAuthHeader.startsWith('Bearer ') ? rawAuthHeader.slice(7) : '';
+    let decodedClaims = null;
+    try {
+      // Decode without verifying so we can inspect claims even if expired
+      const parts = rawToken.split('.');
+      if (parts.length === 3) {
+        decodedClaims = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+      }
+    } catch (_e) { /* ignore */ }
+    console.log('[verify-pin] ─────────────────────────────────────');
+    console.log('[verify-pin] req.isStaff       :', req.isStaff);
+    console.log('[verify-pin] req.user._id      :', req.user?._id);
+    console.log('[verify-pin] req.user.role     :', req.user?.role);
+    console.log('[verify-pin] req.staff?._id    :', req.staff?._id);
+    console.log('[verify-pin] propertyId        :', propertyId);
+    console.log('[verify-pin] pin (length)      :', String(pin ?? '').length);
+    console.log('[verify-pin] TOKEN claims      :', decodedClaims);
+    console.log('[verify-pin] ─────────────────────────────────────');
+
+    if (!pin) {
+      return res.status(400).json({ error: 'PIN is required.' });
+    }
+
+    // ── Staff PIN + property access check ─────────────────────────
+    // Always use req.isStaff from the middleware (decoded from the JWT).
+    // Never trust the isStaff flag from the request body.
+    if (req.isStaff) {
+      if (!propertyId) {
+        return res.status(400).json({ error: 'Property selection is required.' });
+      }
+
+      const staff = await Staff.findById(req.staff._id).select('+pin');
+      if (!staff) {
+        return res.status(404).json({ error: 'Staff account not found.' });
+      }
+
+      // Verify PIN
+      console.log('[verify-pin] STAFF branch');
+      console.log('[verify-pin] staff._id      :', staff._id);
+      console.log('[verify-pin] staff.pin set  :', !!staff.pin);
+      console.log('[verify-pin] staff.propertyIds:', staff.propertyIds);
+      const pinMatch = await bcrypt.compare(String(pin), staff.pin || '');
+      console.log('[verify-pin] staff pinMatch :', pinMatch);
+      if (!pinMatch) {
+        return res.status(403).json({ error: 'Incorrect PIN. Please try again.' });
+      }
+
+      // Verify property access
+      const hasAccess = (staff.propertyIds || []).some(
+        (id) => String(id) === String(propertyId)
+      );
+      console.log('[verify-pin] staff hasAccess:', hasAccess, '| propertyId sent:', propertyId);
+      if (!hasAccess) {
+        return res.status(403).json({
+          error: 'You do not have access to this property.',
+        });
+      }
+
+      return res.json({ ok: true });
+    }
+
+    // ── Client / Team Leader / Admin PIN check ────────────────────
+    // These roles have unrestricted property access — only the PIN is verified.
+    //
+    // Lookup strategy per role:
+    //   - client      → PIN lives on their own User doc
+    //   - team_leader → PIN lives on their own User doc (NOT the client they serve)
+    //   - admin       → PIN lives on their own User doc
+    //
+    // Always use _id — never email. The middleware may select only
+    // '+properties.smoobuApiKey' so email is not guaranteed on req.user.
+
+    // ── Check if a Staff record matches this PIN + propertyId ───────
+    // Staff accounts are under a client (clientId = req.user._id).
+    // When a staff member logs in via the client email flow, their token
+    // is a client token — but their PIN lives on the Staff document.
+    // So before checking the client PIN, we check all staff under this
+    // client whose propertyIds include the selected property, and see if
+    // any of their PINs match. First match wins.
+    if (propertyId) {
+      const staffList = await Staff.find({
+        clientId: req.user._id,
+        isActive:  true,
+        propertyIds: propertyId,
+      }).select('+pin');
+
+      for (const s of staffList) {
+        if (!s.pin) continue;
+        const staffPinMatch = await bcrypt.compare(String(pin), s.pin);
+        if (staffPinMatch) {
+          console.log('[verify-pin] matched staff PIN for staff._id:', s._id);
+          return res.json({ ok: true });
+        }
+      }
+    }
+
+    // ── Fall back to client/team-leader own PIN ───────────────────
+    const ownUser = await User.findById(req.user._id).select('+pin');
+    const pinHash = ownUser?.pin || null;
+
+    console.log('[verify-pin] CLIENT/TL branch');
+    console.log('[verify-pin] ownUser._id  :', ownUser?._id);
+    console.log('[verify-pin] ownUser.role :', ownUser?.role);
+    console.log('[verify-pin] pinHash set  :', !!pinHash);
+
+    if (!pinHash) {
+      return res.status(403).json({ error: 'No PIN configured on this account. Please ask your administrator to set one.' });
+    }
+
+    const pinMatch = await bcrypt.compare(String(pin), pinHash);
+    console.log('[verify-pin] client/TL pinMatch:', pinMatch);
+    if (!pinMatch) {
+      return res.status(403).json({ error: 'Incorrect PIN. Please try again.' });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// GET /auth/pin-status  ← TEMPORARY DEBUG ROUTE — remove after fixing
+// Tells you whether a PIN is stored on the current account without
+// exposing the hash. Safe to call with a valid Bearer token.
+// ─────────────────────────────────────────────────────────────────
+router.get('/pin-status', requireAuth, async (req, res, next) => {
+  try {
+    const user = await User.findOne({ email: req.user.email }).select('+pin');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({
+      email:    user.email,
+      role:     user.role,
+      hasPin:   !!user.pin,
+      pinLength: user.pin ? user.pin.length : 0,
+    });
+  } catch (err) { next(err); }
+});
+
+
+// ─────────────────────────────────────────────────────────────────
+// GET /auth/debug-staff?email=xxx  ← TEMPORARY DEBUG — remove after fixing
+// ─────────────────────────────────────────────────────────────────
+router.get('/debug-staff', async (req, res, next) => {
+  try {
+    const { email } = req.query;
+    if (!email) return res.status(400).json({ error: 'email query param required' });
+    const exact = await Staff.findOne({ email: email.toLowerCase() }).lean();
+    const fuzzy = await Staff.find({
+      email: { $regex: new RegExp(email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }
+    }).select('email firstName lastName isActive clientId').lean();
+    res.json({ exact: !!exact, exactDoc: exact ? { email: exact.email, firstName: exact.firstName, isActive: exact.isActive } : null, fuzzyMatches: fuzzy });
   } catch (err) { next(err); }
 });
 

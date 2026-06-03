@@ -412,27 +412,27 @@ router.patch('/clients/:id', requireAdmin, async (req, res, next) => {
   try {
     const data = updateClientSchema.parse(req.body);
 
-    const update = {};
-    if (data.businessName      !== undefined) update.businessName      = data.businessName;
-    if (data.serverId          !== undefined) update.serverId          = data.serverId || null;
-    if (data.role              !== undefined) update.role              = data.role;
-    if (data.propertyTagPrefix !== undefined) update.propertyTagPrefix = data.propertyTagPrefix;
-    if (data.password          !== undefined) {
-      update.password           = data.password;
-      update.mustChangePassword = true;
-    }
-    if (data.pin               !== undefined) {
-      update.pin                = data.pin;
-      update.mustChangePin      = true;
-    }
-
-    const client = await User.findById(req.params.id);
+    const client = await User.findById(req.params.id).select('+pin +password');
     if (!client) {
       return res.status(404).json({ error: 'Client not found' });
     }
 
-    // Use .set() and .save() to trigger pre-save hooks (for bcrypt)
-    client.set(update);
+    // Assign fields directly (not via .set()) so Mongoose reliably marks
+    // them as modified — critical for the pre-save bcrypt hooks to fire
+    // correctly for password and pin.
+    if (data.businessName      !== undefined) client.businessName      = data.businessName;
+    if (data.serverId          !== undefined) client.serverId          = data.serverId || null;
+    if (data.role              !== undefined) client.role              = data.role;
+    if (data.propertyTagPrefix !== undefined) client.propertyTagPrefix = data.propertyTagPrefix;
+    if (data.password          !== undefined) {
+      client.password           = data.password;
+      client.mustChangePassword = true;
+    }
+    if (data.pin               !== undefined) {
+      client.pin                = data.pin;
+      client.mustChangePin      = true;
+    }
+
     await client.save();
 
     const savedClient = client.toJSON();
