@@ -1,51 +1,49 @@
 /* ═══════════════════════════════════════════════════════
-   global.css — scoped global resets for the dashboard page
-   Mirrors App.css tokens; override here without touching root.
+   global.css
    ═══════════════════════════════════════════════════════ */
 
-/* Design tokens — override or extend App.css :root vars */
 :root {
   /* Brand */
-  --color-brand:       #26a676;
-  --color-brand-dark:  #1e8760;
-  --color-brand-light: #e0f4ed;
+  --color-brand:       #1a9e6e;
+  --color-brand-dark:  #157a55;
+  --color-brand-light: #f0faf6;
 
   /* Backgrounds */
-  --color-bg:          #f4f9f6;
+  --color-bg:          #f2f4f7;
   --color-surface:     #ffffff;
-  --color-surface-2:   #f0f7f4;
+  --color-surface-2:   #f8f9fa;
 
   /* Text */
-  --color-text:        #0c1c14;
-  --color-muted:       #6a8b7c;
-  --color-placeholder: #a8c4b8;
+  --color-text:        #111827;
+  --color-muted:       #6b7280;
+  --color-placeholder: #9ca3af;
 
   /* Feedback */
-  --color-success:     #26a676;
-  --color-warning:     #f59e0b;
-  --color-danger:      #ef4444;
-  --color-info:        #3b82f6;
+  --color-success:     #059669;
+  --color-warning:     #d97706;
+  --color-danger:      #dc2626;
+  --color-info:        #2563eb;
 
   /* Borders */
-  --color-border:      #d4e8de;
+  --color-border:      #e5e7eb;
 
   /* Sidebar */
-  --sidebar-width:     240px;
-  --sidebar-bg:        #0c1c14;
-  --sidebar-text:      #c8ddd4;
-  --sidebar-active:    #26a676;
+  --sidebar-width:     220px;
+  --sidebar-bg:        #111827;
+  --sidebar-text:      #9ca3af;
+  --sidebar-active:    #1a9e6e;
 
   /* Topbar */
-  --topbar-h:          64px;
+  --topbar-h:          56px;
 
   /* Radius */
-  --radius-card:       16px;
-  --radius-sm:         8px;
+  --radius-card:       12px;
+  --radius-sm:         6px;
   --radius-pill:       999px;
 
   /* Shadow */
-  --shadow-card:       0 2px 12px rgba(12,28,20,.07);
-  --shadow-modal:      0 20px 60px rgba(12,28,20,.18);
+  --shadow-card:       0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-modal:      0 20px 60px rgba(0,0,0,.12);
 
   /* Fonts */
   --font-body:         'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -53,5 +51,5 @@
 
   /* Transitions */
   --ease:              cubic-bezier(.4,0,.2,1);
-  --transition:        180ms var(--ease);
+  --transition:        150ms var(--ease);
 }

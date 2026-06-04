@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════
-   dashboard.css — all styles scoped to the dashboard page
+   dashboard.css
    ═══════════════════════════════════════════════════════ */
 @import './global.css';
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
@@ -23,11 +23,10 @@
 .db-content {
   flex: 1;
   overflow-y: auto;
-  padding: 28px 32px;
+  padding: 24px 28px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  /* FIX: extra bottom padding so the table card is never clipped */
+  gap: 16px;
   padding-bottom: 40px;
 }
 
@@ -35,19 +34,20 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
+  margin-bottom: 4px;
 }
 
 .db-content__title {
   font-family: var(--font-display);
-  font-size: 1.75rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--color-text);
   line-height: 1.2;
 }
 
 .db-content__sub {
-  margin-top: 4px;
-  font-size: .875rem;
+  margin-top: 2px;
+  font-size: .8rem;
   color: var(--color-muted);
 }
 
@@ -57,21 +57,21 @@
   background: var(--sidebar-bg);
   display: flex;
   flex-direction: column;
-  padding: 24px 0;
+  padding: 20px 0;
   flex-shrink: 0;
 }
 
 .db-sidebar__logo {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 20px 28px;
-  border-bottom: 1px solid rgba(255,255,255,.07);
+  gap: 9px;
+  padding: 0 16px 22px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
 }
 
 .db-sidebar__logo-icon {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--radius-sm);
   background: var(--color-brand);
   display: grid;
@@ -82,27 +82,27 @@
 .db-sidebar__logo-text {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: .95rem;
+  font-size: .875rem;
   color: #fff;
   letter-spacing: -.01em;
 }
 
 .db-sidebar__nav {
   flex: 1;
-  padding: 16px 12px;
+  padding: 12px 10px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .db-nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 9px;
+  padding: 8px 10px;
   border-radius: var(--radius-sm);
   color: var(--sidebar-text);
-  font-size: .875rem;
+  font-size: .825rem;
   font-weight: 500;
   cursor: pointer;
   transition: background var(--transition), color var(--transition);
@@ -114,20 +114,20 @@
 }
 
 .db-nav-item:hover {
-  background: rgba(255,255,255,.07);
+  background: rgba(255,255,255,.06);
   color: #fff;
 }
 
 .db-nav-item--active {
-  background: rgba(38,166,118,.15);
+  background: rgba(26,158,110,.14);
   color: var(--sidebar-active);
 }
 
 .db-nav-item--active svg { color: var(--sidebar-active); }
 
 .db-sidebar__footer {
-  padding: 16px 12px 0;
-  border-top: 1px solid rgba(255,255,255,.07);
+  padding: 14px 10px 0;
+  border-top: 1px solid rgba(255,255,255,.06);
 }
 
 /* ─── TopBar ──────────────────────────────────────────── */
@@ -137,25 +137,25 @@
   border-bottom: 1px solid var(--color-border);
   display: flex;
   align-items: center;
-  padding: 0 32px;
-  gap: 16px;
+  padding: 0 28px;
+  gap: 14px;
   flex-shrink: 0;
 }
 
 .db-topbar__search {
   flex: 1;
-  max-width: 360px;
+  max-width: 300px;
   position: relative;
 }
 
 .db-topbar__search input {
   width: 100%;
-  height: 36px;
+  height: 32px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
   background: var(--color-surface-2);
-  padding: 0 16px 0 36px;
-  font-size: .875rem;
+  padding: 0 14px 0 32px;
+  font-size: .8rem;
   font-family: var(--font-body);
   color: var(--color-text);
   outline: none;
@@ -167,7 +167,7 @@
 
 .db-topbar__search-icon {
   position: absolute;
-  left: 12px;
+  left: 10px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--color-muted);
@@ -177,20 +177,20 @@
 .db-topbar__actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   margin-left: auto;
 }
 
 .db-topbar__btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 16px;
+  gap: 5px;
+  height: 32px;
+  padding: 0 14px;
   border-radius: var(--radius-pill);
   background: var(--color-brand);
   color: #fff;
-  font-size: .8125rem;
+  font-size: .775rem;
   font-weight: 600;
   border: none;
   cursor: pointer;
@@ -201,8 +201,8 @@
 .db-topbar__btn:hover { background: var(--color-brand-dark); }
 
 .db-topbar__icon-btn {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 1px solid var(--color-border);
   background: var(--color-surface);
@@ -216,14 +216,14 @@
 .db-topbar__icon-btn:hover { border-color: var(--color-brand); color: var(--color-brand); }
 
 .db-topbar__avatar {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: var(--color-brand);
   color: #fff;
   display: grid;
   place-items: center;
-  font-size: .8125rem;
+  font-size: .775rem;
   font-weight: 700;
   cursor: pointer;
   font-family: var(--font-display);
@@ -233,8 +233,7 @@
 .db-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  /* FIX: prevent stats row from stretching to fill available space */
+  gap: 14px;
   flex-shrink: 0;
 }
 
@@ -242,10 +241,10 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
-  padding: 20px 24px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   transition: box-shadow var(--transition);
 }
 
@@ -258,16 +257,16 @@
 }
 
 .db-stat-card__label {
-  font-size: .8rem;
+  font-size: .7rem;
   font-weight: 600;
   color: var(--color-muted);
   text-transform: uppercase;
-  letter-spacing: .04em;
+  letter-spacing: .05em;
 }
 
 .db-stat-card__icon {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-sm);
   display: grid;
   place-items: center;
@@ -275,18 +274,19 @@
 
 .db-stat-card__value {
   font-family: var(--font-display);
-  font-size: 1.75rem;
+  font-size: 1.6rem;
   font-weight: 700;
   color: var(--color-text);
   line-height: 1;
 }
 
 .db-stat-card__change {
-  font-size: .8rem;
-  font-weight: 600;
+  font-size: .75rem;
+  font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  color: var(--color-muted);
 }
 
 .db-stat-card__change--up   { color: var(--color-success); }
@@ -299,22 +299,18 @@
 }
 
 .db-skeleton {
-  background: linear-gradient(90deg, #e8f2ed 25%, #d0e8da 50%, #e8f2ed 75%);
+  background: linear-gradient(90deg, #f0f0f0 25%, #e4e4e4 50%, #f0f0f0 75%);
   background-size: 600px 100%;
   animation: db-shimmer 1.4s infinite;
   border-radius: var(--radius-sm);
 }
 
-/* ─── Recent Table ────────────────────────────────────── */
+/* ─── Table / Content Card ────────────────────────────── */
 .db-table-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
-  /* FIX: removed overflow: hidden — it was clipping the table body.
-     Clipping is now handled only by db-table-wrapper below. */
   overflow: visible;
-  /* FIX: prevent the card from being squished to zero height
-     in the flex column when content is tall. */
   flex-shrink: 0;
 }
 
@@ -322,19 +318,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px 16px;
+  padding: 16px 20px 14px;
   border-bottom: 1px solid var(--color-border);
 }
 
 .db-table-card__title {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 1rem;
+  font-size: .9rem;
   color: var(--color-text);
 }
 
 .db-table-card__action {
-  font-size: .8125rem;
+  font-size: .775rem;
   color: var(--color-brand);
   font-weight: 600;
   background: none;
@@ -345,8 +341,6 @@
 
 .db-table-card__action:hover { text-decoration: underline; }
 
-/* FIX: the wrapper clips horizontal overflow only,
-   so the card corners stay rounded without hiding rows. */
 .db-table-wrapper {
   overflow-x: auto;
   border-radius: 0 0 var(--radius-card) var(--radius-card);
@@ -355,13 +349,13 @@
 .db-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: .875rem;
+  font-size: .825rem;
 }
 
 .db-table th {
-  padding: 10px 24px;
+  padding: 8px 20px;
   text-align: left;
-  font-size: .75rem;
+  font-size: .7rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .05em;
@@ -370,7 +364,7 @@
 }
 
 .db-table td {
-  padding: 14px 24px;
+  padding: 11px 20px;
   border-top: 1px solid var(--color-border);
   color: var(--color-text);
   vertical-align: middle;
@@ -383,28 +377,31 @@
 
 .db-table tbody tr:hover { background: var(--color-surface-2); }
 
-/* Status badges */
+/* ─── Badges ──────────────────────────────────────────── */
 .db-badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
+  gap: 4px;
+  padding: 2px 8px;
   border-radius: var(--radius-pill);
-  font-size: .75rem;
+  font-size: .7rem;
   font-weight: 600;
 }
 
-.db-badge--success { background: #e0f4ed; color: #1e8760; }
-.db-badge--warning { background: #fef3c7; color: #b45309; }
-.db-badge--danger  { background: #fee2e2; color: #b91c1c; }
-.db-badge--info    { background: #dbeafe; color: #1d4ed8; }
-.db-badge--neutral { background: var(--color-surface-2); color: var(--color-muted); }
+/* Neutral style — used everywhere by default */
+.db-badge--neutral { background: var(--color-surface-2); color: var(--color-muted); border: 1px solid var(--color-border); }
+
+/* Subtle semantic variants — light tint only, no loud color */
+.db-badge--success { background: #f0fdf6; color: #065f46; border: 1px solid #d1fae5; }
+.db-badge--warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.db-badge--danger  { background: #fff5f5; color: #991b1b; border: 1px solid #fecaca; }
+.db-badge--info    { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
 
 /* ─── Modal ───────────────────────────────────────────── */
 .db-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(12,28,20,.45);
+  background: rgba(0,0,0,.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -420,14 +417,14 @@
 .db-modal {
   background: var(--color-surface);
   border-radius: var(--radius-card);
-  width: 480px;
+  width: 460px;
   max-width: calc(100vw - 32px);
   box-shadow: var(--shadow-modal);
   animation: db-slide-up 200ms var(--ease) forwards;
 }
 
 @keyframes db-slide-up {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -435,20 +432,20 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--color-border);
 }
 
 .db-modal__title {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 1rem;
+  font-size: .9rem;
   color: var(--color-text);
 }
 
 .db-modal__close {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   border: none;
   background: var(--color-surface-2);
@@ -456,8 +453,7 @@
   cursor: pointer;
   display: grid;
   place-items: center;
-  font-size: 1rem;
-  line-height: 1;
+  font-size: .9rem;
   transition: background var(--transition);
   font-family: var(--font-body);
 }
@@ -465,26 +461,26 @@
 .db-modal__close:hover { background: var(--color-border); }
 
 .db-modal__body {
-  padding: 24px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .db-modal__row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
 }
 
 .db-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .db-field label {
-  font-size: .8rem;
+  font-size: .72rem;
   font-weight: 600;
   color: var(--color-muted);
   text-transform: uppercase;
@@ -493,11 +489,11 @@
 
 .db-field input,
 .db-field select {
-  height: 38px;
+  height: 34px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: 0 12px;
-  font-size: .875rem;
+  padding: 0 10px;
+  font-size: .825rem;
   font-family: var(--font-body);
   color: var(--color-text);
   background: var(--color-surface);
@@ -509,18 +505,18 @@
 .db-field select:focus { border-color: var(--color-brand); }
 
 .db-modal__foot {
-  padding: 16px 24px;
+  padding: 14px 20px;
   border-top: 1px solid var(--color-border);
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
 }
 
 .db-btn {
-  height: 38px;
-  padding: 0 20px;
+  height: 34px;
+  padding: 0 18px;
   border-radius: var(--radius-pill);
-  font-size: .875rem;
+  font-size: .825rem;
   font-weight: 600;
   border: none;
   cursor: pointer;
@@ -538,3 +534,62 @@
 }
 
 .db-btn--ghost:hover { background: var(--color-border); }
+
+/* ─── Grid Layouts ────────────────────────────────────── */
+
+/* Equal 2-col */
+.db-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+/* Wider left col (60/40) — for chart + sidebar widget */
+.db-grid-2-wide {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 16px;
+  align-items: start;
+}
+
+/* 3-equal stat cards for top row */
+.db-stats-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 1024px) {
+  .db-stats-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 3-equal stat cards for top row */
+.db-stats-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 1024px) {
+  .db-stats-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .db-grid-2,
+  .db-grid-2-wide {
+    grid-template-columns: 1fr;
+  }
+.db-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .db-stats-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

@@ -1,16 +1,12 @@
 import { useState, useEffect } from 'react';
 
 const MOCK_STATS = [
-  { label: 'Total Revenue', value: '₱84,230', change: '12.4%', trend: 'up',   color: 'green',  icon: '💰' },
-  { label: 'New Orders',    value: '1,284',   change: '8.1%',  trend: 'up',   color: 'blue',   icon: '📦' },
-  { label: 'Customers',     value: '5,642',   change: '3.7%',  trend: 'up',   color: 'yellow', icon: '👥' },
-  { label: 'Cancelled',     value: '48',       change: '2.5%',  trend: 'down', color: 'red',    icon: '🚫' },
+  { label: 'Total Clients',    value: '128',    change: '15 new',        trend: 'up', color: 'green'  },
+  { label: 'Total Properties', value: '542',    change: '43 added',      trend: 'up', color: 'blue'   },
+  { label: 'Active Bookings',  value: '1,842',  change: '21% growth',    trend: 'up', color: 'yellow' },
+  { label: 'Monthly Revenue',  value: '₱12.4M', change: '8.3% increase', trend: 'up', color: 'red'    },
 ];
 
-/**
- * useStats — fetches dashboard KPI stats.
- * Replace the mock timeout with a real API call via dashboardService.
- */
 export function useStats() {
   const [stats,   setStats]   = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,7 +17,6 @@ export function useStats() {
 
     (async () => {
       try {
-        // TODO: replace with → const data = await dashboardService.getStats();
         await new Promise((r) => setTimeout(r, 900));
         if (!cancelled) setStats(MOCK_STATS);
       } catch (err) {
