@@ -12,7 +12,6 @@ import RecentActivities     from './components/RecentActivities';
 import Modal                from './components/Modal';
 
 import { useStats }  from './hooks/useStats';
-import { useOrders } from './hooks/useOrders';
 
 export default function Dashboard() {
   const [modal, setModal] = useState({ open: false, type: null, data: null });
@@ -20,7 +19,6 @@ export default function Dashboard() {
   const closeModal = ()                  => setModal({ open: false, type: null, data: null });
 
   const { stats, loading: statsLoading }   = useStats();
-  const { orders, loading: ordersLoading } = useOrders();
 
   return (
     <div className="db-layout">
