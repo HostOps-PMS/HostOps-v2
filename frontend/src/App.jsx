@@ -7,7 +7,7 @@ import { DashboardProvider } from './pages/clientDashboard/context/DashboardCont
 import { AuthProvider } from './pages/AuthContext';
 import VerifyPage from './pages/Login/verify';
 import ResetPage from './pages/Login/reset';
-import ProtectedRoute from './pages/clientDashboard/components/ProtectedRoute';
+import ProtectedRoute from './pages/ProtectedRoute';
 
 function App() {
   return (
