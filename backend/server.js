@@ -13,6 +13,8 @@ import dashboardRoutes      from './routes/dashboard.js';
 import clientsRoutes        from './routes/clients.js';
 import propertiesRoutes     from './routes/properties.js';
 import staffsRoutes         from './routes/staffs.js';
+import accountsRoutes       from './routes/accounts.js';
+import { publicRecoveryRouter, adminRecoveryRouter } from './routes/recoveryRequests.js';
 import { requireApiKey } from './middleware/apiKeyAuth.js';
 
 const app = express();
@@ -113,12 +115,13 @@ const authLimiter = rateLimit({
 });
 
 app.use(globalLimiter);
-app.use('/auth/login',           authLimiter);
-app.use('/auth/register',        authLimiter);
-app.use('/auth/forgot-password', authLimiter);
-app.use('/auth/reset-password',  authLimiter);
+app.use('/auth/login',            authLimiter);
+app.use('/auth/register',         authLimiter);
+app.use('/auth/forgot-password',  authLimiter);
+app.use('/auth/reset-password',   authLimiter);
 
 // ── Global API Key Protection ─────────────────────────────────────────────────
+// /auth routes (including /auth/recovery-request) are exempt from API key check
 app.use((req, res, next) => {
   if (req.path.startsWith('/auth')) return next();
   requireApiKey(req, res, next);
@@ -126,10 +129,13 @@ app.use((req, res, next) => {
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/auth', authRoutes);
+app.use('/auth', publicRecoveryRouter);   // POST /auth/recovery-request (public)
 app.use('/api',  dashboardRoutes);
 app.use('/api',  clientsRoutes);
 app.use('/api',  propertiesRoutes);
 app.use('/api',  staffsRoutes);
+app.use('/api',  accountsRoutes);         // GET /api/accounts (admin)
+app.use('/api',  adminRecoveryRouter);    // GET|PATCH /api/recovery-requests (admin)
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {

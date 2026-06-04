@@ -1,8 +1,9 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import AccountSettingsModal from './dashboard/components/AccountSettingsModal';
 
 /* ─── Nav data ───────────────────────────────────────────────────── */
+// Businesses has a sub-item: Staffs
 const NAV_ITEMS = [
   {
     icon: (
@@ -25,18 +26,20 @@ const NAV_ITEMS = [
     ),
     label: 'Businesses',
     to: '/clients',
-  },
-  {
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="6" cy="7" r="3" />
-        <circle cx="14" cy="7" r="3" />
-        <path d="M1 18c0-2.761 2.239-5 5-5h2" strokeLinecap="round" />
-        <path d="M10 13h4a5 5 0 015 5" strokeLinecap="round" />
-      </svg>
-    ),
-    label: 'Staffs',
-    to: '/staffs',
+    children: [
+      {
+        icon: (
+          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <circle cx="6" cy="7" r="3" />
+            <circle cx="14" cy="7" r="3" />
+            <path d="M1 18c0-2.761 2.239-5 5-5h2" strokeLinecap="round" />
+            <path d="M10 13h4a5 5 0 015 5" strokeLinecap="round" />
+          </svg>
+        ),
+        label: 'Staffs',
+        to: '/staffs',
+      },
+    ],
   },
   {
     icon: (
@@ -48,6 +51,18 @@ const NAV_ITEMS = [
     ),
     label: 'Team Leaders',
     to: '/team-leaders',
+  },
+  {
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="6" cy="6" r="3" />
+        <circle cx="14" cy="6" r="3" />
+        <circle cx="6" cy="14" r="3" />
+        <circle cx="14" cy="14" r="3" />
+      </svg>
+    ),
+    label: 'Accounts',
+    to: '/accounts',
   },
 ];
 
@@ -82,6 +97,16 @@ const ChevronLeft = ({ collapsed }) => (
   </svg>
 );
 
+const ChevronDown = ({ open }) => (
+  <svg
+    width="11" height="11" viewBox="0 0 12 12" fill="none"
+    stroke="currentColor" strokeWidth="1.8"
+    style={{ transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', flexShrink: 0 }}
+  >
+    <path d="M2 4l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 /* ─── Section Label ─────────────────────────────────────────────── */
 function SectionLabel({ label, collapsed }) {
   if (collapsed) {
@@ -109,10 +134,111 @@ function SectionLabel({ label, collapsed }) {
   );
 }
 
-/* ─── Nav Item ──────────────────────────────────────────────────── */
-function SidebarNavLink({ to, icon, label, collapsed }) {
+/* ─── Nav Item (with optional children / sub-items) ─────────────── */
+function SidebarNavLink({ to, icon, label, collapsed, children }) {
+  const location = useLocation();
+  const hasChildren = children && children.length > 0;
+
+  // Auto-open if the current path matches any child route
+  const childActive = hasChildren && children.some(c => location.pathname.startsWith(c.to));
+  const [subOpen, setSubOpen] = useState(childActive);
+
   const [hovered, setHovered] = useState(false);
 
+  return (
+    <div>
+      {/* Parent row */}
+      <NavLink
+        to={to}
+        title={label}
+        style={({ isActive }) => ({
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: collapsed ? '7px' : '8px 10px',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          borderRadius: 10,
+          cursor: 'pointer',
+          textDecoration: 'none',
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          fontSize: 13,
+          letterSpacing: '0.01em',
+          transition: 'background 0.12s, color 0.12s',
+          background: (isActive || childActive) ? '#f0faf6' : hovered ? '#f7f7f7' : 'transparent',
+          color: (isActive || childActive) ? '#0d7a55' : hovered ? '#222' : '#888',
+          fontWeight: (isActive || childActive) ? 600 : 400,
+          marginBottom: 2,
+        })}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onClick={hasChildren ? (e) => {
+          // Don't prevent navigation, just toggle sub-menu too
+          setSubOpen(v => !v);
+        } : undefined}
+      >
+        {({ isActive }) => (
+          <>
+            <span style={{
+              width: 30,
+              height: 30,
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              background: (isActive || childActive) ? '#e1f5ee' : 'transparent',
+              color: (isActive || childActive) ? '#0d7a55' : 'inherit',
+              transition: 'background 0.12s',
+            }}>
+              {icon}
+            </span>
+            {!collapsed && (
+              <>
+                <span style={{
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  flex: 1,
+                }}>
+                  {label}
+                </span>
+                {hasChildren && (
+                  <span
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSubOpen(v => !v); }}
+                    style={{ display: 'flex', alignItems: 'center', padding: '2px 4px', borderRadius: 4, cursor: 'pointer' }}
+                  >
+                    <ChevronDown open={subOpen} />
+                  </span>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </NavLink>
+
+      {/* Sub-items (only when expanded and not collapsed) */}
+      {!collapsed && hasChildren && subOpen && (
+        <div style={{ paddingLeft: 18, marginBottom: 2 }}>
+          {/* Vertical connector line */}
+          <div style={{ position: 'relative' }}>
+            <div style={{
+              position: 'absolute', left: 14, top: 0, bottom: 0,
+              width: 1, background: 'rgba(0,0,0,0.07)',
+              borderRadius: 1,
+            }} />
+            {children.map(child => (
+              <SubNavLink key={child.to} {...child} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Sub Nav Link ──────────────────────────────────────────────── */
+function SubNavLink({ to, icon, label }) {
+  const [hovered, setHovered] = useState(false);
   return (
     <NavLink
       to={to}
@@ -120,14 +246,13 @@ function SidebarNavLink({ to, icon, label, collapsed }) {
       style={({ isActive }) => ({
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
-        padding: collapsed ? '7px' : '8px 10px',
-        justifyContent: collapsed ? 'center' : 'flex-start',
-        borderRadius: 10,
+        gap: 8,
+        padding: '6px 8px 6px 22px',
+        borderRadius: 8,
         cursor: 'pointer',
         textDecoration: 'none',
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        fontSize: 13,
+        fontSize: 12,
         letterSpacing: '0.01em',
         transition: 'background 0.12s, color 0.12s',
         background: isActive ? '#e8f5f0' : hovered ? '#f5f5f5' : 'transparent',
@@ -141,12 +266,8 @@ function SidebarNavLink({ to, icon, label, collapsed }) {
       {({ isActive }) => (
         <>
           <span style={{
-            width: 30,
-            height: 30,
-            borderRadius: 8,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            width: 24, height: 24, borderRadius: 6,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0,
             background: 'transparent',
             color: isActive ? '#1a9e6e' : 'inherit',
@@ -154,16 +275,9 @@ function SidebarNavLink({ to, icon, label, collapsed }) {
           }}>
             {icon}
           </span>
-          {!collapsed && (
-            <span style={{
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              flex: 1,
-            }}>
-              {label}
-            </span>
-          )}
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+            {label}
+          </span>
         </>
       )}
     </NavLink>
@@ -240,39 +354,33 @@ export default function Sidebar() {
           width: isMobile ? 260 : isCollapsed ? 68 : 240,
           minWidth: isMobile ? 260 : isCollapsed ? 68 : 240,
           background: '#fff',
-          border: isMobile ? 'none' : '0.5px solid rgba(0,0,0,0.08)',
-          borderRadius: isMobile ? 0 : 20,
-          padding: '18px 10px',
+          borderRight: '0.5px solid rgba(0,0,0,0.07)',
           display: 'flex',
           flexDirection: 'column',
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          padding: '12px 10px',
           height: '100vh',
-          position: isMobile ? 'fixed' : 'sticky',
-          top: 0,
-          left: isMobile ? 0 : undefined,
-          zIndex: isMobile ? 1000 : undefined,
           overflowY: 'auto',
           overflowX: 'hidden',
+          transition: 'width 0.25s cubic-bezier(.4,0,.2,1), min-width 0.25s cubic-bezier(.4,0,.2,1)',
           boxSizing: 'border-box',
-          transition: 'width 0.25s ease, min-width 0.25s ease',
-          boxShadow: isMobile ? '4px 0 24px rgba(0,0,0,0.1)' : 'none',
+          position: 'relative',
         }}
       >
-        {/* Brand */}
+        {/* Logo row */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: 10,
-          padding: isCollapsed ? '4px 4px 18px' : '4px 6px 18px',
-          borderBottom: '0.5px solid rgba(0,0,0,0.07)',
-          marginBottom: 6,
+          padding: isCollapsed ? '6px 4px' : '6px 4px',
+          marginBottom: 12,
+          position: 'relative',
           justifyContent: isCollapsed ? 'center' : 'flex-start',
         }}>
           <div style={{
-            width: 36,
-            height: 36,
+            width: 32,
+            height: 32,
             background: '#1a9e6e',
-            borderRadius: 10,
+            borderRadius: 9,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -347,7 +455,7 @@ export default function Sidebar() {
           </button>
         )}
 
-        {/* Main Nav */}
+        {/* ── MENU section ──────────────────────────────────────── */}
         <SectionLabel label="Menu" collapsed={isCollapsed} />
         <nav style={{ display: 'flex', flexDirection: 'column' }}>
           {NAV_ITEMS.map((item) => (
@@ -357,6 +465,7 @@ export default function Sidebar() {
               icon={item.icon}
               label={item.label}
               collapsed={isCollapsed}
+              children={item.children}
             />
           ))}
         </nav>
@@ -364,7 +473,7 @@ export default function Sidebar() {
         {/* Spacer */}
         <div style={{ flex: 1 }} />
 
-        {/* Footer */}
+        {/* ── ACCOUNT section ───────────────────────────────────── */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',

@@ -1203,6 +1203,17 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
         });
       }
 
+      // ✅ FIX: If a previous temporary lock has expired, reset the attempt
+      // counter and clear the stale pinLockedUntil from the DB. Without this,
+      // pinAttempts keeps accumulating across lockout windows — so after a
+      // 1-minute lock expires, the very next wrong PIN immediately triggers
+      // the next (longer) lock tier instead of giving the user fresh attempts.
+      if (staff.pinLockedUntil && staff.pinLockedUntil <= now) {
+        staff.pinAttempts    = 0;
+        staff.pinLockedUntil = null;
+        await staff.save();
+      }
+
       if (!propertyId) {
         return res.status(400).json({ error: 'Property selection is required.' });
       }
@@ -1329,6 +1340,17 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
         error: 'Too many incorrect PIN attempts. Please try again later.',
         lockedUntil: ownUser.pinLockedUntil.toISOString(),
       });
+    }
+
+    // ✅ FIX: If a previous temporary lock has expired, reset the attempt
+    // counter and clear the stale pinLockedUntil from the DB. Without this,
+    // pinAttempts keeps accumulating across lockout windows — so after a
+    // 1-minute lock expires, the very next wrong PIN immediately triggers
+    // the next (longer) lock tier instead of giving the user fresh attempts.
+    if (ownUser.pinLockedUntil && ownUser.pinLockedUntil <= now) {
+      ownUser.pinAttempts    = 0;
+      ownUser.pinLockedUntil = null;
+      await ownUser.save();
     }
 
     const pinHash = ownUser.pin || null;
