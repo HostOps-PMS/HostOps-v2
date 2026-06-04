@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { updateClient, getClientSmoobuData, createClientProperty, updateClientProperty, deleteClientProperty, getClientPropertyApiKey } from '../services/clientsService';
 import ClientSmoobuView from './ClientSmoobuView';
 import OTPModal from '../../../components/OTPModal';
+import ConfirmModal from './ConfirmModal';
 import { sendLoginOtp } from '../../authorization/services/authService';
 
 function mapPropertiesForEdit(properties = []) {
@@ -144,6 +145,10 @@ export default function ClientModal({ client, onClose, onUpdated }) {
   const [saveError,        setSaveError]        = useState(null);
   const [otpAction,        setOtpAction]        = useState(null);
 
+  // ── Confirmation modal state ──────────────────────────────────────
+  const [confirmDialog, setConfirmDialog] = useState(null);
+  // confirmDialog shape: { title, message, confirmLabel, confirmVariant, onConfirm }
+
   const [properties, setProperties] = useState([]);
   const [loadingProps, setLoadingProps] = useState(true);
   const [propsError, setPropsError] = useState(null);
@@ -227,18 +232,34 @@ export default function ClientModal({ client, onClose, onUpdated }) {
   const addProperty = () =>
     setForm(f => ({ ...f, properties: [...f.properties, { name: '', smoobuApiKey: '' }] }));
 
+  // ── Replaces window.confirm for remove property ───────────────────
   const removeProperty = (index) => {
-    if (window.confirm("Are you sure you will remove this property?")) {
-      setOtpAction({ type: 'remove-prop', index });
-      sendLoginOtp().catch(err => alert(err.message));
-    }
+    setConfirmDialog({
+      title: 'Remove Property',
+      message: 'Are you sure you want to remove this property? This action cannot be undone.',
+      confirmLabel: 'Remove',
+      confirmVariant: 'danger',
+      onConfirm: () => {
+        setConfirmDialog(null);
+        setOtpAction({ type: 'remove-prop', index });
+        sendLoginOtp().catch(err => alert(err.message));
+      },
+    });
   };
 
+  // ── Replaces window.confirm for show API key ──────────────────────
   const showApiKey = (index, propertyId) => {
-    if (window.confirm("Proceed in showing the API key?")) {
-      setOtpAction({ type: 'show-key', index, propertyId });
-      sendLoginOtp().catch(err => alert(err.message));
-    }
+    setConfirmDialog({
+      title: 'Show API Key',
+      message: 'Proceed in showing the API key? You will need to verify via OTP.',
+      confirmLabel: 'Proceed',
+      confirmVariant: 'primary',
+      onConfirm: () => {
+        setConfirmDialog(null);
+        setOtpAction({ type: 'show-key', index, propertyId });
+        sendLoginOtp().catch(err => alert(err.message));
+      },
+    });
   };
 
   const handleOtpVerified = async (otp) => {
@@ -645,6 +666,18 @@ export default function ClientModal({ client, onClose, onUpdated }) {
           email={JSON.parse(sessionStorage.getItem('hp_user') || '{}')?.email}
           onVerified={handleOtpVerified} 
           onCancel={() => setOtpAction(null)} 
+        />
+      )}
+
+      {/* ── Confirm dialog — replaces window.confirm() ── */}
+      {confirmDialog && (
+        <ConfirmModal
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          confirmVariant={confirmDialog.confirmVariant}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
         />
       )}
     </>
