@@ -12,7 +12,7 @@ import RecentActivities     from './components/RecentActivities';
 import Modal                from './components/Modal';
 
 import { useStats }  from './hooks/useStats';
-import { useOrders } from './hooks/useOrders';
+
 
 export default function Dashboard() {
   const [modal, setModal] = useState({ open: false, type: null, data: null });
