@@ -33,9 +33,13 @@ export async function requireAuth(req, res, next) {
       req.user        = clientUser;
       req.staff       = staff;
       req.isStaff     = true;
-      // Normalise propertyIds to strings for comparison — Smoobu IDs are
-      // numbers but the Staff schema stores them as strings.
-      req.staffPropertyIds = (staff.propertyIds || []).map(String);
+
+      // staffPropertyDbIds: MongoDB _ids of the user.properties[] entries this
+      // staff member is authorised to access. These are NOT Smoobu apartment IDs —
+      // they identify which business-level property (and therefore which smoobuApiKey)
+      // the staff member may use. dashboard.js uses these to validate propertyDbId
+      // requests and to decide whether apartment-level filtering is applicable.
+      req.staffPropertyDbIds = (staff.propertyIds || []).map(String);
 
       return next();
     }
