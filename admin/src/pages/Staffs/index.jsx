@@ -92,27 +92,6 @@ export default function Staffs() {
               <h1 className="db-content__title">Staffs</h1>
               <p className="db-content__sub">Manage staff accounts and their property access</p>
             </div>
-            <button
-              onClick={() => setModal({ type: 'create' })}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 7,
-                padding: '9px 18px',
-                borderRadius: 9,
-                border: 'none',
-                background: '#1555C0',
-                color: '#fff',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M7 1v12M1 7h12" strokeLinecap="round" />
-              </svg>
-              New Staff
-            </button>
           </header>
 
           <StaffTable
@@ -128,6 +107,7 @@ export default function Staffs() {
             onFilterClientChange={setFilterClient}
             onEdit={(s) => setModal({ type: 'edit', staff: s })}
             onDelete={(s) => setModal({ type: 'delete', staff: s })}
+            onNew={() => setModal({ type: 'create' })}
           />
         </div>
       </div>
