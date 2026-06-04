@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { createClient } from '../services/clientsService';
+import { uploadPropertyPicture } from '../services/clientsService';
+import ImageCropModal from './ImageCropModal';
 
 const INITIAL_FORM = {
   businessName: '',
@@ -8,7 +10,7 @@ const INITIAL_FORM = {
   pin:          '',
 };
 
-const newProperty = () => ({ name: '', smoobuApiKey: '' });
+const newProperty = () => ({ name: '', smoobuApiKey: '', pictureFile: null, pictureUrl: null, originalPictureUrl: null, cropData: null });
 
 function Field({ label, required, children }) {
   return (
@@ -46,6 +48,9 @@ export default function AddClientModal({ onClose, onSuccess }) {
   const [showPass,   setShowPass]   = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState(null);
+  const [croppingIndex, setCroppingIndex] = useState(null);
+  const [cropImageUrl, setCropImageUrl] = useState(null);
+  const [initialCropData, setInitialCropData] = useState(null);
 
   const setField = (key) => (e) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -87,19 +92,34 @@ export default function AddClientModal({ onClose, onSuccess }) {
     setError(null);
 
     try {
-      await createClient({
+      const payloadProperties = properties.filter((p) => p.name.trim());
+      
+      const clientRes = await createClient({
         businessName: form.businessName.trim(),
         email:        form.email.trim(),
         password:     form.password,
         pin:          form.pin,
         role:         'client',
-        properties:   properties
-          .filter((p) => p.name.trim())
-          .map((p) => ({
+        properties:   payloadProperties.map((p) => ({
             propertyName: p.name.trim(),
             smoobuApiKey: p.smoobuApiKey.trim() || '',
           })),
       });
+
+      const createdProperties = clientRes.user?.properties || [];
+      
+      // Upload property pictures if any
+      for (let i = 0; i < payloadProperties.length; i++) {
+        if ((payloadProperties[i].pictureFile || payloadProperties[i].cropData) && createdProperties[i]) {
+          const propId = createdProperties[i]._id;
+          try {
+            await uploadPropertyPicture(clientRes.userId || clientRes.user._id, propId, payloadProperties[i].pictureFile, payloadProperties[i].cropData);
+          } catch (picErr) {
+            console.error('Failed to upload picture for property:', payloadProperties[i].name, picErr);
+            // Optionally set a warning, but the client is already created
+          }
+        }
+      }
 
       onSuccess();
     } catch (err) {
@@ -273,6 +293,66 @@ export default function AddClientModal({ onClose, onSuccess }) {
                     maxLength={512}
                   />
                 </div>
+
+                <div className="db-field" style={{ margin: 0 }}>
+                  <label>Property Picture</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {prop.pictureUrl ? (
+                      <img src={prop.pictureUrl} alt="Preview" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#c8ddd5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#26a676', fontWeight: 'bold' }}>
+                        {prop.name ? prop.name.charAt(0).toUpperCase() : '?'}
+                      </div>
+                    )}
+                    <label style={{ cursor: 'pointer', color: 'var(--color-brand)', fontSize: '.8125rem', fontWeight: 600 }}>
+                      Upload Picture
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        style={{ display: 'none' }} 
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files.length > 0) {
+                            const file = e.target.files[0];
+                            const url = URL.createObjectURL(file);
+                            setProperties((prev) =>
+                              prev.map((p, i) => (i === index ? { ...p, pictureFile: file, originalPictureUrl: url } : p))
+                            );
+                            setCropImageUrl(url);
+                            setInitialCropData(null);
+                            setCroppingIndex(index);
+                          }
+                          e.target.value = null;
+                        }} 
+                      />
+                    </label>
+                    {prop.pictureUrl && (
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setCropImageUrl(prop.originalPictureUrl);
+                          setInitialCropData(prop.cropData);
+                          setCroppingIndex(index);
+                        }}
+                        style={{ background: 'none', border: 'none', color: 'var(--color-brand)', fontSize: '.8125rem', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        Adjust Picture
+                      </button>
+                    )}
+                    {prop.pictureUrl && (
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setProperties((prev) =>
+                            prev.map((p, i) => (i === index ? { ...p, pictureFile: null, pictureUrl: null, originalPictureUrl: null, cropData: null } : p))
+                          );
+                        }}
+                        style={{ background: 'none', border: 'none', color: 'var(--color-danger)', fontSize: '.8125rem', cursor: 'pointer' }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -319,6 +399,27 @@ export default function AddClientModal({ onClose, onSuccess }) {
           </button>
         </div>
       </div>
+
+      {croppingIndex !== null && cropImageUrl && (
+        <ImageCropModal
+          imageUrl={cropImageUrl}
+          initialCropData={initialCropData}
+          onClose={() => {
+            setCroppingIndex(null);
+            setCropImageUrl(null);
+            setInitialCropData(null);
+          }}
+          onSave={(cropData, previewBlob) => {
+            const url = URL.createObjectURL(previewBlob);
+            setProperties((prev) =>
+              prev.map((p, i) => (i === croppingIndex ? { ...p, cropData, pictureUrl: url } : p))
+            );
+            setCroppingIndex(null);
+            setCropImageUrl(null);
+            setInitialCropData(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -9,6 +9,9 @@ import bcrypt from 'bcryptjs';
 const propertySchema = new mongoose.Schema({
   propertyName: { type: String, required: true, trim: true },
   smoobuApiKey: { type: String, default: '', trim: true, select: false },
+  propertyPicture: { type: String, default: '' },
+  propertyPictureOriginal: { type: String, default: '' },
+  propertyPictureCropData: { type: mongoose.Schema.Types.Mixed, default: null },
 }, { _id: true });
 
 const userSchema = new mongoose.Schema({

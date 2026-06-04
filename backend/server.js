@@ -31,6 +31,7 @@ app.use((req, res, next) => {
 });
 
 // ── Security Headers (Helmet) ─────────────────────────────────────────────────
+const CLOUDINARY_HOSTNAME = 'https://res.cloudinary.com';
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -38,8 +39,8 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc:  ["'self'"],
         styleSrc:   ["'self'", "'unsafe-inline'"],
-        imgSrc:     ["'self'", 'data:', 'https:'],
-        connectSrc: ["'self'"],
+        imgSrc:     ["'self'", 'data:', 'blob:', CLOUDINARY_HOSTNAME],
+        connectSrc: ["'self'", CLOUDINARY_HOSTNAME],
         fontSrc:    ["'self'"],
         objectSrc:  ["'none'"],
         frameSrc:   ["'none'"],
@@ -47,7 +48,7 @@ app.use(
     },
     crossOriginEmbedderPolicy: true,
     crossOriginOpenerPolicy:   { policy: 'same-origin' },
-    crossOriginResourcePolicy: { policy: 'same-origin' },
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
     referrerPolicy:            { policy: 'strict-origin-when-cross-origin' },
     hsts: {
       maxAge:            31536000,

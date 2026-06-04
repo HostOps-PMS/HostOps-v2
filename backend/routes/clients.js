@@ -12,6 +12,30 @@ import { z } from 'zod';
 import User from '../models/user.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { getDashboard } from '../services/smoobu.js';
+import { v2 as cloudinary } from 'cloudinary';
+import multer from 'multer';
+import fs from 'fs';
+import os from 'os';
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Configure Multer for temp storage
+const upload = multer({
+  dest: os.tmpdir(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB max
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  },
+});
 
 const router = express.Router();
 
@@ -150,7 +174,10 @@ router.get('/clients/:id/properties', requireAdmin, async (req, res, next) => {
       return {
         ...rest,
         hasSmoobuKey: hasKey,
-        maskedSmoobuApiKey: maskedKey
+        maskedSmoobuApiKey: maskedKey,
+        propertyPicture: rest.propertyPicture || '',
+        propertyPictureOriginal: rest.propertyPictureOriginal || '',
+        propertyPictureCropData: rest.propertyPictureCropData || null
       };
     });
     res.json(safe);
@@ -264,6 +291,102 @@ router.patch('/clients/:id/properties/:propertyId', requireAdmin, async (req, re
     }
     if (err.name === 'CastError') {
       return res.status(400).json({ error: 'Invalid ID' });
+    }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /api/clients/:id/properties/:propertyId/picture
+// Admin uploads a property picture
+// ─────────────────────────────────────────────────────────────────
+router.post('/clients/:id/properties/:propertyId/picture', requireAdmin, upload.single('picture'), async (req, res, next) => {
+  try {
+    const cropDataRaw = req.body.cropData;
+    let cropData = null;
+    if (cropDataRaw) {
+      try { cropData = JSON.parse(cropDataRaw); } catch (e) { /* ignore */ }
+    }
+
+    if (!req.file && !cropData) {
+      return res.status(400).json({ error: 'No picture file or crop data provided.' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      if (req.file) fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    const property = user.properties.id(req.params.propertyId);
+    if (!property) {
+      if (req.file) fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: 'Property not found for this client.' });
+    }
+
+    if (!req.file && !property.propertyPictureOriginal) {
+       return res.status(400).json({ error: 'No existing picture to adjust.' });
+    }
+
+    const propertyName = property.propertyName || property.name || 'property';
+    const fileName = propertyName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    const publicId = `${fileName}_${user._id}_${property._id}`;
+    let originalUrl = property.propertyPictureOriginal;
+
+    if (req.file) {
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        folder: "hostops/properties-pictures",
+        public_id: publicId,
+        overwrite: true,
+      });
+
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      originalUrl = result.secure_url;
+      property.propertyPictureOriginal = originalUrl;
+    }
+
+    let finalPictureUrl = originalUrl;
+
+    if (cropData && cropData.croppedAreaPixels) {
+      property.propertyPictureCropData = cropData;
+      const p = cropData.croppedAreaPixels;
+      
+      finalPictureUrl = cloudinary.url(`hostops/properties-pictures/${publicId}`, {
+        secure: true,
+        crop: 'crop',
+        x: Math.round(p.x),
+        y: Math.round(p.y),
+        width: Math.round(p.width),
+        height: Math.round(p.height),
+        version: Date.now() // Bypass caching
+      });
+    }
+
+    property.propertyPicture = finalPictureUrl;
+    await user.save();
+
+    res.json({ 
+      message: 'Property picture updated successfully.', 
+      propertyPicture: property.propertyPicture,
+      propertyPictureOriginal: property.propertyPictureOriginal,
+      propertyPictureCropData: property.propertyPictureCropData
+    });
+  } catch (err) {
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    console.error('[picture-upload] Error:', err.message || err);
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
+    if (err.http_code || err.message?.includes('cloudinary')) {
+      return res.status(502).json({ error: 'Image service error: ' + (err.message || 'Unknown') });
     }
     next(err);
   }

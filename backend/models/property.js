@@ -68,6 +68,24 @@ const propertySchema = new mongoose.Schema({
     trim: true,
   },
 
+  // The property picture URL (cropped)
+  propertyPicture: {
+    type: String,
+    default: '',
+  },
+
+  // The original full-resolution picture URL
+  propertyPictureOriginal: {
+    type: String,
+    default: '',
+  },
+
+  // Crop configuration data { crop: { x, y }, zoom, croppedAreaPixels }
+  propertyPictureCropData: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
+
   // The Smoobu API key for THIS property.
   // select: false — must be explicitly requested; never returned by default.
   smoobuApiKey: {

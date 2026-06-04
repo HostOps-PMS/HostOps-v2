@@ -7,11 +7,12 @@ const TOP_CLIENTS = [
   { rank: 3, name: 'Mountain View',  revenue: 1980000, occupancy: 81, bookings: 241, avatar: 'MV' },
   { rank: 4, name: 'Sun Villa',      revenue: 1540000, occupancy: 76, bookings: 198, avatar: 'SV' },
   { rank: 5, name: 'Paradise Inn',   revenue: 1320000, occupancy: 72, bookings: 175, avatar: 'PI' },
+  { rank: 6, name: 'Ocean Breeze',   revenue: 1100000, occupancy: 68, bookings: 142, avatar: 'OB' },
 ];
 
 const SORT_OPTS = ['Revenue', 'Occupancy %', 'Active Bookings'];
 
-const AVATAR_COLORS = ['#1a9e6e', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'];
+const AVATAR_COLORS = ['#1a9e6e', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4'];
 
 const RANK_BADGES = {
   1: { bg: '#fef9c3', color: '#a16207', label: '🥇' },
@@ -52,7 +53,7 @@ export default function TopClients() {
   });
 
   return (
-    <div className="db-table-card" style={{ flexShrink: 0 }}>
+    <div className="db-table-card" style={{ flexShrink: 0, height: '100%' }}>
       {/* Header */}
       <div className="db-table-card__head" style={{ flexWrap: 'wrap', gap: 8 }}>
         <h2 className="db-table-card__title">Top Clients</h2>
@@ -81,7 +82,7 @@ export default function TopClients() {
       </div>
 
       {/* List */}
-      <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ padding: '0 10px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
         {sorted.map((client, idx) => {
           const badge = RANK_BADGES[idx + 1];
           return (
@@ -89,10 +90,10 @@ export default function TopClients() {
               key={client.name}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '28px 36px 1fr 100px 80px 90px',
+                gridTemplateColumns: '24px 32px 1fr 75px 75px 55px',
                 alignItems: 'center',
                 gap: 12,
-                padding: '10px 12px',
+                padding: '8px 8px',
                 borderRadius: 10,
                 background: idx === 0 ? '#f0faf6' : 'transparent',
                 transition: 'background .12s',
@@ -118,10 +119,10 @@ export default function TopClients() {
 
               {/* Name */}
               <div>
-                <div style={{ fontSize: '.875rem', fontWeight: 600, color: 'var(--color-text)' }}>
+                <div style={{ fontSize: '.78rem', fontWeight: 600, color: 'var(--color-text)' }}>
                   {client.name}
                 </div>
-                <div style={{ fontSize: '.75rem', color: 'var(--color-muted)', marginTop: 1 }}>
+                <div style={{ fontSize: '.68rem', color: 'var(--color-muted)', marginTop: 1 }}>
                   {client.bookings} bookings
                 </div>
               </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { updateClient, getClientSmoobuData, createClientProperty, updateClientProperty, deleteClientProperty, getClientPropertyApiKey } from '../services/clientsService';
+import { updateClient, getClientSmoobuData, createClientProperty, updateClientProperty, deleteClientProperty, getClientPropertyApiKey, uploadPropertyPicture } from '../services/clientsService';
 import ClientSmoobuView from './ClientSmoobuView';
+import ImageCropModal from './ImageCropModal';
 import OTPModal from '../../../components/OTPModal';
 import ConfirmModal from './ConfirmModal';
 import { sendLoginOtp } from '../../authorization/services/authService';
@@ -13,6 +14,12 @@ function mapPropertiesForEdit(properties = []) {
     maskedSmoobuApiKey: p.maskedSmoobuApiKey || '',
     smoobuApiKey: p.maskedSmoobuApiKey || '',
     isUnmasked: false,
+    propertyPicture: p.propertyPicture || '',
+    originalPictureUrl: p.propertyPictureOriginal || '',
+    cropData: p.propertyPictureCropData || null,
+    pictureFile: null,
+    cropDirty: false,
+    pictureUrl: p.propertyPicture || '',
   }));
 }
 
@@ -144,6 +151,9 @@ export default function ClientModal({ client, onClose, onUpdated }) {
   const [saving,           setSaving]           = useState(false);
   const [saveError,        setSaveError]        = useState(null);
   const [otpAction,        setOtpAction]        = useState(null);
+  const [croppingIndex,    setCroppingIndex]    = useState(null);
+  const [cropImageUrl,     setCropImageUrl]     = useState(null);
+  const [initialCropData,  setInitialCropData]  = useState(null);
 
   // ── Confirmation modal state ──────────────────────────────────────
   const [confirmDialog, setConfirmDialog] = useState(null);
@@ -325,6 +335,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
 
       // 2. Create/Update properties
       for (const p of form.properties) {
+        let propId = p._id;
         if (p._id) {
           // Update only if changed
           const oldProp = properties.find(x => x._id === p._id);
@@ -339,10 +350,20 @@ export default function ClientModal({ client, onClose, onUpdated }) {
           }
         } else {
           // Create new
-          await createClientProperty(client._id, {
+          const createdProp = await createClientProperty(client._id, {
             propertyName: p.name.trim(),
             smoobuApiKey: p.smoobuApiKey.trim() || ''
           });
+          propId = createdProp._id;
+        }
+
+        // 3. Handle picture upload or crop update (only if user actually changed something)
+        if (p.pictureFile || p.cropDirty) {
+          try {
+            await uploadPropertyPicture(client._id, propId, p.pictureFile, p.cropData);
+          } catch (picErr) {
+            console.error('Failed to update picture for property:', p.name, picErr);
+          }
         }
       }
 
@@ -562,6 +583,56 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                           )}
                         </div>
                       </div>
+
+                      <div className="db-field" style={{ margin: 0 }}>
+                        <label>Property Picture</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          {prop.pictureUrl ? (
+                            <img src={prop.pictureUrl} crossOrigin="anonymous" alt="Preview" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />
+                          ) : (
+                            <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#c8ddd5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#26a676', fontWeight: 'bold' }}>
+                              {prop.name ? prop.name.charAt(0).toUpperCase() : '?'}
+                            </div>
+                          )}
+                          
+                          {prop.pictureUrl && (
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                setCropImageUrl(prop.originalPictureUrl || prop.pictureUrl);
+                                setInitialCropData(prop.cropData);
+                                setCroppingIndex(index);
+                              }}
+                              style={{ background: 'none', border: 'none', color: 'var(--color-brand)', fontSize: '.8125rem', cursor: 'pointer', fontWeight: 600 }}
+                            >
+                              Adjust Picture
+                            </button>
+                          )}
+
+                          <label style={{ cursor: 'pointer', color: 'var(--color-brand)', fontSize: '.8125rem', fontWeight: 600 }}>
+                            {prop.pictureUrl ? 'Change Picture' : 'Upload Picture'}
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              style={{ display: 'none' }} 
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files.length > 0) {
+                                  const file = e.target.files[0];
+                                  const url = URL.createObjectURL(file);
+                                  setForm((prev) => ({
+                                    ...prev,
+                                    properties: prev.properties.map((p, i) => (i === index ? { ...p, pictureFile: file, originalPictureUrl: url, cropDirty: true } : p))
+                                  }));
+                                  setCropImageUrl(url);
+                                  setInitialCropData(null);
+                                  setCroppingIndex(index);
+                                }
+                                e.target.value = null;
+                              }} 
+                            />
+                          </label>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -678,6 +749,28 @@ export default function ClientModal({ client, onClose, onUpdated }) {
           confirmVariant={confirmDialog.confirmVariant}
           onConfirm={confirmDialog.onConfirm}
           onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {croppingIndex !== null && cropImageUrl && (
+        <ImageCropModal
+          imageUrl={cropImageUrl}
+          initialCropData={initialCropData}
+          onClose={() => {
+            setCroppingIndex(null);
+            setCropImageUrl(null);
+            setInitialCropData(null);
+          }}
+          onSave={(cropData, previewBlob) => {
+            const url = URL.createObjectURL(previewBlob);
+            setForm((prev) => ({
+              ...prev,
+              properties: prev.properties.map((p, i) => (i === croppingIndex ? { ...p, cropData, cropDirty: true, pictureUrl: url } : p))
+            }));
+            setCroppingIndex(null);
+            setCropImageUrl(null);
+            setInitialCropData(null);
+          }}
         />
       )}
     </>
