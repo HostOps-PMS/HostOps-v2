@@ -98,7 +98,7 @@ function SectionLabel({ label, collapsed }) {
     <div style={{
       fontSize: 10,
       fontWeight: 600,
-      color: '#bbb',
+      color: '#999',
       letterSpacing: '0.1em',
       textTransform: 'uppercase',
       padding: '12px 10px 5px',
@@ -130,10 +130,10 @@ function SidebarNavLink({ to, icon, label, collapsed }) {
         fontSize: 13,
         letterSpacing: '0.01em',
         transition: 'background 0.12s, color 0.12s',
-        background: isActive ? '#f0faf6' : hovered ? '#f7f7f7' : 'transparent',
-        color: isActive ? '#0d7a55' : hovered ? '#222' : '#888',
+        background: isActive ? '#e8f5f0' : hovered ? '#f5f5f5' : 'transparent',
+        color: isActive ? '#1a9e6e' : hovered ? '#111' : '#555',
         fontWeight: isActive ? 600 : 400,
-        marginBottom: 2,
+        marginBottom: 4,
       })}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -148,8 +148,8 @@ function SidebarNavLink({ to, icon, label, collapsed }) {
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            background: isActive ? '#e1f5ee' : 'transparent',
-            color: isActive ? '#0d7a55' : 'inherit',
+            background: 'transparent',
+            color: isActive ? '#1a9e6e' : 'inherit',
             transition: 'background 0.12s',
           }}>
             {icon}
@@ -183,14 +183,14 @@ function SidebarButton({ icon, label, onClick, collapsed, danger }) {
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        padding: collapsed ? '7px' : '8px 10px',
+        padding: collapsed ? '9px' : '10px 10px',
         justifyContent: collapsed ? 'center' : 'flex-start',
         borderRadius: 10,
         cursor: 'pointer',
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         fontSize: 13,
         background: hovered ? (danger ? '#fff1f1' : '#f7f7f7') : 'transparent',
-        color: hovered ? (danger ? '#c0392b' : '#222') : (danger ? '#e05555' : '#999'),
+        color: hovered ? (danger ? '#c0392b' : '#111') : (danger ? '#d94040' : '#555'),
         border: 'none',
         width: '100%',
         textAlign: 'left',

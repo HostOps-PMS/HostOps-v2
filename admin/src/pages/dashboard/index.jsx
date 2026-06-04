@@ -7,12 +7,13 @@ import StatsRow             from './components/StatsRow';
 import RevenueChart         from './components/RevenueChart';
 import TopClients           from './components/TopClients';
 import AlertsCenter         from './components/AlertsCenter';
+import PropertyMap          from './components/PropertyMap';
+import OccupancyGauge       from './components/OccupancyGauge';
 import SubscriptionOverview from './components/SubscriptionOverview';
 import RecentActivities     from './components/RecentActivities';
 import Modal                from './components/Modal';
 
 import { useStats }  from './hooks/useStats';
-
 
 export default function Dashboard() {
   const [modal, setModal] = useState({ open: false, type: null, data: null });
@@ -20,7 +21,6 @@ export default function Dashboard() {
   const closeModal = ()                  => setModal({ open: false, type: null, data: null });
 
   const { stats, loading: statsLoading }   = useStats();
-  const { orders, loading: ordersLoading } = useOrders();
 
   return (
     <div className="db-layout">
@@ -39,22 +39,28 @@ export default function Dashboard() {
             </div>
           </header>
 
-          {/* ── Row 1: Stats with sparklines ── */}
-          <StatsRow stats={stats} loading={statsLoading} />
-
-          {/* ── Row 2: Revenue Chart (wider) + Alerts ── */}
-          <div className="db-grid-2-wide">
-            <RevenueChart />
-            <AlertsCenter />
+          {/* ── Row 1+2: Stats + Chart | Top Clients ── */}
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <StatsRow stats={stats} loading={statsLoading} />
+              <RevenueChart />
+            </div>
+            <div style={{ width: 420, flexShrink: 0, alignSelf: 'stretch' }}>
+              <TopClients />
+            </div>
           </div>
 
-          {/* ── Row 3: Top Clients + Subscription Overview ── */}
+          {/* ── Row 3: Property Map + Occupancy Gauge ── */}
           <div className="db-grid-2">
-            <TopClients />
+            <PropertyMap />
+            <OccupancyGauge />
           </div>
 
-          {/* ── Row 4: Recent Activities (full width) ── */}
-          <RecentActivities />
+          {/* ── Row 4: Alerts Center + Recent Activities ── */}
+          <div className="db-grid-2">
+            <AlertsCenter />
+            <RecentActivities />
+          </div>
 
         </div>
       </div>

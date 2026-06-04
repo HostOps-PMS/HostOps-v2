@@ -7,7 +7,6 @@ const ACTIVITIES = [
   { id: 5, type: 'booking', actor: 'Ana Reyes',     action: 'updated booking status',   target: 'Mountain View – Completed', time: '3h ago',  avatar: 'AR' },
   { id: 6, type: 'staff',   actor: 'Admin',         action: 'assigned staff',           target: 'Carlo M. → Paradise Inn',   time: '4h ago',  avatar: 'AD' },
   { id: 7, type: 'payment', actor: 'Paradise Inn',  action: 'invoice sent',             target: '₱45,000 – overdue',         time: '5h ago',  avatar: 'PI' },
-  { id: 8, type: 'client',  actor: 'Rosa Garcia',   action: 'updated property details', target: 'Sun Villa – 3 rooms added', time: '1d ago',  avatar: 'RG' },
 ];
 
 /* Single neutral dot color per type */
