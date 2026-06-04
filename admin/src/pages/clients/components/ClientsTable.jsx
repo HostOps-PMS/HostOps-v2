@@ -27,12 +27,6 @@ function RoleBadge({ role }) {
   return <span className="db-badge db-badge--neutral">Client</span>;
 }
 
-function SmoobuBadge({ connected }) {
-  return connected
-    ? <span className="db-badge db-badge--success">Connected</span>
-    : <span className="db-badge db-badge--neutral">—</span>;
-}
-
 function SkeletonRow() {
   return (
     <tr>
@@ -64,7 +58,6 @@ export default function ClientsTable({ clients, loading, onRowClick }) {
               <th>Business</th>
               <th>Role</th>
               <th>Status</th>
-              <th>Smoobu</th>
               <th>Last Login</th>
               <th>Joined</th>
             </tr>
@@ -100,7 +93,6 @@ export default function ClientsTable({ clients, loading, onRowClick }) {
                     </td>
                     <td><RoleBadge role={client.role} /></td>
                     <td><VerifiedBadge client={client} /></td>
-                    <td><SmoobuBadge connected={!!client.smoobuConnectedAt} /></td>
                     <td style={{ color: 'var(--color-muted)' }}>
                       {formatDate(client.lastLoginAt)}
                     </td>

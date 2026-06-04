@@ -3,24 +3,25 @@ import { fetchClientProperties, createStaff, updateStaff } from '../services/sta
 
 const inputStyle = {
   width: '100%',
-  padding: '8px 12px',
-  borderRadius: 8,
-  border: '1.5px solid #e2e8f0',
+  padding: '10px 14px',
+  borderRadius: 10,
+  border: '1.5px solid #e8edf2',
   fontSize: '0.875rem',
   outline: 'none',
   boxSizing: 'border-box',
-  background: '#fafafa',
-  color: '#1a202c',
-  transition: 'border-color 0.15s',
+  background: '#f8fafc',
+  color: '#0f172a',
+  transition: 'border-color 0.15s, box-shadow 0.15s',
+  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
 };
 
 const labelStyle = {
   display: 'block',
-  fontSize: '0.78rem',
-  fontWeight: 600,
-  color: '#4a5568',
-  marginBottom: 5,
-  letterSpacing: '0.03em',
+  fontSize: '0.75rem',
+  fontWeight: 700,
+  color: '#64748b',
+  marginBottom: 6,
+  letterSpacing: '0.04em',
   textTransform: 'uppercase',
 };
 
@@ -121,7 +122,8 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
         position: "fixed",
         inset: 0,
         zIndex: 1000,
-        background: "rgba(0,0,0,0.45)",
+        background: "rgba(15,23,42,0.6)",
+        backdropFilter: "blur(4px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -132,29 +134,32 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
       <div
         style={{
           background: "#fff",
-          borderRadius: 14,
+          borderRadius: 24,
           width: "100%",
-          maxWidth: 520,
-          maxHeight: "90vh",
+          maxWidth: 640,
+          maxHeight: "95vh",
           overflowY: "auto",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
+          boxShadow: "0 24px 80px rgba(0,0,0,0.2)",
+          border: "1px solid rgba(255,255,255,0.8)",
         }}
       >
         {/* Header */}
         <div
           style={{
-            padding: "20px 24px 0",
+            padding: "28px 32px 20px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            borderBottom: "1px solid #f1f5f9",
           }}
         >
           <h2
             style={{
               margin: 0,
-              fontSize: "1rem",
-              fontWeight: 700,
-              color: "#1a202c",
+              fontSize: "1.15rem",
+              fontWeight: 800,
+              color: "#0f172a",
+              letterSpacing: "-0.02em",
             }}
           >
             {isEdit ? "Edit Staff" : "Create Staff Account"}
@@ -162,19 +167,22 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
           <button
             onClick={onClose}
             style={{
-              background: "none",
+              background: "#f1f5f9",
               border: "none",
               cursor: "pointer",
-              color: "#718096",
-              fontSize: 20,
+              color: "#64748b",
+              fontSize: 16,
               lineHeight: 1,
+              width: 32, height: 32,
+              borderRadius: "50%",
+              display: "flex", alignItems: "center", justifyContent: "center",
             }}
           >
             ×
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ padding: "16px 24px 24px" }}>
+        <form onSubmit={handleSubmit} style={{ padding: "24px 32px 32px" }}>
           {/* Client selector — searchable list */}
           <div style={{ marginBottom: 14, position: "relative" }}>
             <label style={labelStyle}>Business *</label>
@@ -428,27 +436,58 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
           {/* PIN */}
           <div style={{ marginBottom: 14 }}>
             <label style={labelStyle}>
-              {isEdit
-                ? "New 6-Digit PIN (leave blank to keep)"
-                : "Temporary 6-Digit PIN *"}
+              {isEdit ? "New 6-Digit PIN (leave blank to keep)" : "Temporary 6-Digit PIN *"}
             </label>
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="\d{6}"
-              maxLength={6}
-              value={form.pin}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, "").slice(0, 6);
-                setForm((f) => ({ ...f, pin: val }));
-              }}
-              required={!isEdit}
-              style={inputStyle}
-              placeholder={
-                isEdit ? "Leave blank to keep current" : "Exactly 6 digits"
-              }
-              autoComplete="new-password"
-            />
+            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <input
+                  key={i}
+                  id={`pin-box-${i}`}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={form.pin[i] || ''}
+                  required={!isEdit && i === 0 && !form.pin}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    const pins = form.pin.split('');
+                    pins[i] = val;
+                    const newPin = pins.join('').slice(0, 6);
+                    setForm((f) => ({ ...f, pin: newPin }));
+                    if (val && i < 5) {
+                      document.getElementById(`pin-box-${i + 1}`)?.focus();
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Backspace' && !form.pin[i] && i > 0) {
+                      document.getElementById(`pin-box-${i - 1}`)?.focus();
+                    }
+                  }}
+                  onPaste={(e) => {
+                    e.preventDefault();
+                    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+                    setForm((f) => ({ ...f, pin: pasted }));
+                    const nextBox = Math.min(pasted.length, 5);
+                    document.getElementById(`pin-box-${nextBox}`)?.focus();
+                  }}
+                  style={{
+                    width: 48, height: 52,
+                    textAlign: 'center',
+                    fontSize: '1.2rem', fontWeight: 700,
+                    borderRadius: 10,
+                    border: `1.5px solid ${form.pin[i] ? '#3b5fc0' : '#ececec'}`,
+                    background: form.pin[i] ? '#f0f4ff' : '#f7f8fa',
+                    outline: 'none',
+                    color: '#1a202c',
+                    transition: 'border-color 0.15s, background 0.15s',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#3b5fc0'}
+                  onBlur={(e) => e.target.style.borderColor = form.pin[i] ? '#3b5fc0' : '#ececec'}
+                  autoComplete="new-password"
+                />
+              ))}
+            </div>
           </div>
 
           {/* Active toggle (edit only) */}
@@ -608,8 +647,8 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
               style={{
                 padding: "9px 20px",
                 borderRadius: 8,
-                border: "1.5px solid #e2e8f0",
-                background: "#fff",
+                border: "1.5px solid #ececec",
+                background: "#f7f8fa",
                 color: "#4a5568",
                 fontSize: "0.875rem",
                 fontWeight: 600,
@@ -625,7 +664,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
                 padding: "9px 24px",
                 borderRadius: 8,
                 border: "none",
-                background: saving ? "#a0aec0" : "#1555C0",
+                background: saving ? "#a0aec0" : "#5ec49a",
                 color: "#fff",
                 fontSize: "0.875rem",
                 fontWeight: 600,
