@@ -13,14 +13,12 @@ import Modal                from './components/Modal';
 
 import { useStats }  from './hooks/useStats';
 
-
 export default function Dashboard() {
   const [modal, setModal] = useState({ open: false, type: null, data: null });
   const openModal  = (type, data = null) => setModal({ open: true, type, data });
   const closeModal = ()                  => setModal({ open: false, type: null, data: null });
 
   const { stats, loading: statsLoading }   = useStats();
-  const { orders, loading: ordersLoading } = useOrders();
 
   return (
     <div className="db-layout">
