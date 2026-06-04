@@ -480,24 +480,8 @@ export default function ClientSmoobuView({ client, property, onClose }) {
       >
         {/* ── Header ── */}
         <div className="db-modal__head">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: '50%',
-              background: 'var(--color-primary-soft, #d4f0e4)',
-              color: 'var(--color-primary, #26a676)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: 700, fontSize: '.8125rem', flexShrink: 0,
-            }}>
-              {initials(client.firstName, client.lastName)}
-            </div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: '.9375rem', color: 'var(--color-text, #1a2e2a)' }}>
-                {client.firstName} {client.lastName}
-              </div>
-              <div style={{ fontSize: '.75rem', color: 'var(--color-muted, #7a8c8e)' }}>
-                {property.name} · Smoobu Dashboard
-              </div>
-            </div>
+          <div style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--color-text, #1a2e2a)' }}>
+            {client.businessName || `${client.firstName || ''} ${client.lastName || ''}`.trim() || 'Client'}
           </div>
           <button className="db-modal__close" onClick={onClose}>✕</button>
         </div>
@@ -593,24 +577,86 @@ export default function ClientSmoobuView({ client, property, onClose }) {
                 </div>
               )}
 
-              {/* Stat cards */}
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <StatCard
-                  label="Total Revenue"
-                  value={money(revenue)}
-                  accent="var(--color-primary, #26a676)"
-                />
-                <StatCard
-                  label="Bookings"
-                  value={bookings}
-                  sub={`${nights} nights total`}
-                />
-                <StatCard
-                  label="Cancellations"
-                  value={cancellations}
-                  sub={`${cancelledNights} nights affected`}
-                />
-                <StatCard label="Occupancy" value={`${occupancy}%`} />
+              {/* Property Header & Stat cards */}
+              <div>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 12, 
+                  marginBottom: 20,
+                  paddingBottom: 16,
+                  borderBottom: '1px solid var(--color-border, #e5e9ec)'
+                }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: '10px',
+                    background: 'var(--color-primary-soft, #d4f0e4)',
+                    color: 'var(--color-primary, #26a676)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                      <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text, #1a2e2a)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                      {property.propertyName || property.name || 'Property'}
+                    </div>
+                    <div style={{ fontSize: '.8125rem', color: 'var(--color-muted, #7a8c8e)', fontWeight: 500, marginTop: 4 }}>
+                      Performance Dashboard
+                    </div>
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                  {/* Left: Property Picture */}
+                  <div style={{ 
+                    width: 240, 
+                    height: 240, 
+                    flexShrink: 0,
+                    borderRadius: 'var(--radius-lg, 16px)', 
+                    overflow: 'hidden',
+                    border: '1px solid var(--color-border, #e5e9ec)',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
+                    background: 'var(--color-surface-2, #f0f7f4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '4.5rem',
+                    color: 'var(--color-primary, #26a676)',
+                    fontWeight: 700
+                  }}>
+                    {property.propertyPicture ? (
+                      <img 
+                        src={property.propertyPicture} 
+                        alt={property.name} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                      />
+                    ) : (
+                      (property.propertyName || property.name || '?').charAt(0).toUpperCase()
+                    )}
+                  </div>
+
+                  {/* Right: Stat Cards (2x2 Symmetrical Grid) */}
+                  <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <StatCard
+                      label="Total Revenue"
+                      value={money(revenue)}
+                      accent="var(--color-primary, #26a676)"
+                    />
+                    <StatCard
+                      label="Bookings"
+                      value={bookings}
+                      sub={`${nights} nights total`}
+                    />
+                    <StatCard
+                      label="Cancellations"
+                      value={cancellations}
+                      sub={`${cancelledNights} nights affected`}
+                    />
+                    <StatCard label="Occupancy" value={`${occupancy}%`} />
+                  </div>
+                </div>
               </div>
 
               {/* 2-col grid: properties + channels */}
