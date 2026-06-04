@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { verifySession } from '../../utils/apiService';
+import { useAuth } from './AuthContext';
+import { verifySession } from './apiService';
 
 const HP_LOGIN_URL = import.meta.env.VITE_LOGIN_URL || '/';
 
