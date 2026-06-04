@@ -9,7 +9,6 @@ const ICON_COLORS = {
 const SPARKLINES = {
   'TOTAL CLIENTS':    [98, 102, 105, 108, 110, 115, 119, 122, 125, 128],
   'TOTAL PROPERTIES': [480, 490, 498, 505, 512, 518, 525, 530, 537, 542],
-  'ACTIVE BOOKINGS':  [1400, 1480, 1520, 1580, 1640, 1690, 1720, 1760, 1800, 1842],
   'MONTHLY REVENUE':  [9.8, 10.2, 10.5, 11.0, 11.4, 11.8, 12.0, 12.1, 12.3, 12.4],
 };
 
@@ -75,14 +74,6 @@ const STATIC_STATS = [
     detail: 'vs last month',
   },
   {
-    label: 'ACTIVE BOOKINGS',
-    value: '1,842',
-    change: '21% growth',
-    trend: 'up',
-    color: 'yellow',
-    detail: 'vs last month',
-  },
-  {
     label: 'MONTHLY REVENUE',
     value: '₱12.4M',
     change: '8.3% increase',
@@ -111,7 +102,7 @@ function StatCard({ stat }) {
               <circle cx="10" cy="10" r="8"/><path d="M10 6v4l2.5 2.5" strokeLinecap="round"/>
             </svg>
           </div>
-          <span style={{ fontSize: '.8rem', fontWeight: 500, color: 'var(--color-text)' }}>
+          <span style={{ fontSize: '.8rem', fontWeight: 700, color: 'var(--color-text)' }}>
             {stat.label}
           </span>
         </div>
