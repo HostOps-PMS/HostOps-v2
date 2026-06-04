@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from './AuthContext';
-import { verifySession } from './apiService';
+import { useAuth } from '../../context/AuthContext';
+import { verifySession } from '../../utils/apiService';
 
-const HP_LOGIN_URL = import.meta.env.VITE_LOGIN_URL || '/login';
+const HP_LOGIN_URL = import.meta.env.VITE_LOGIN_URL || '/';
 
 /**
  * Wraps routes that require authentication.
