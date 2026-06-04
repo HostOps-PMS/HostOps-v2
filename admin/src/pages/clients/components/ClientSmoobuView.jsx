@@ -27,12 +27,12 @@ function getRangeForPreset(preset) {
     }
     case 'monthly': {
       const first = new Date(today.getFullYear(), today.getMonth(), 1);
-      const last  = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      const last = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       return { from: toYMD(first), to: toYMD(last) };
     }
     case 'yearly': {
       const first = new Date(today.getFullYear(), 0, 1);
-      const last  = new Date(today.getFullYear(), 11, 31);
+      const last = new Date(today.getFullYear(), 11, 31);
       return { from: toYMD(first), to: toYMD(last) };
     }
     default:
@@ -43,16 +43,16 @@ function getRangeForPreset(preset) {
 function fmtShort(ymd) {
   if (!ymd) return '';
   const [y, m, d] = ymd.split('-');
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${months[+m - 1]} ${+d}, ${y}`;
 }
 
 const PRESETS = [
-  { id: 'daily',   label: 'Daily' },
-  { id: 'weekly',  label: 'Weekly' },
+  { id: 'daily', label: 'Daily' },
+  { id: 'weekly', label: 'Weekly' },
   { id: 'monthly', label: 'Monthly' },
-  { id: 'yearly',  label: 'Yearly' },
-  { id: 'custom',  label: 'Custom' },
+  { id: 'yearly', label: 'Yearly' },
+  { id: 'custom', label: 'Custom' },
 ];
 
 // ── Money / formatting helpers ───────────────────────────────────
@@ -63,7 +63,7 @@ function fmtMoney(n, currency, phpRate) {
   const converted = currency === 'PHP'
     ? Number(n || 0)
     : Number(n || 0) / (phpRate || 1);
-    
+
   const symbol = currency === 'PHP' ? '₱' : '$';
   return symbol + converted.toLocaleString('en-US', {
     minimumFractionDigits: 2, maximumFractionDigits: 2,
@@ -89,14 +89,14 @@ function nightsBetween(arrival, departure) {
 }
 
 const CHANNEL_COLORS = {
-  'Airbnb':           '#FF5A5F',
-  'Booking.com':      '#003580',
-  'VRBO':             '#1555C0',
-  'Agoda':            '#E0471F',
-  'Direct':           '#26a676',
-  'Direct booking':   '#26a676',
-  'Facebook':         '#1877F2',
-  'WhatsApp':         '#25D366',
+  'Airbnb': '#FF5A5F',
+  'Booking.com': '#003580',
+  'VRBO': '#1555C0',
+  'Agoda': '#E0471F',
+  'Direct': '#26a676',
+  'Direct booking': '#26a676',
+  'Facebook': '#1877F2',
+  'WhatsApp': '#25D366',
 };
 
 function channelColor(name) {
@@ -211,7 +211,7 @@ function DatePresetBar({ activePreset, dateRange, onPresetChange, onCustomApply 
 
   function applyCustom() {
     if (!customFrom || !customTo) { alert('Please select both dates.'); return; }
-    if (customFrom > customTo)    { alert('"From" must be before "To".'); return; }
+    if (customFrom > customTo) { alert('"From" must be before "To".'); return; }
     setShowCustomPop(false);
     onCustomApply({ from: customFrom, to: customTo });
   }
@@ -256,10 +256,10 @@ function DatePresetBar({ activePreset, dateRange, onPresetChange, onCustomApply 
                 {id === 'custom' && (
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2"/>
-                    <line x1="16" y1="2" x2="16" y2="6"/>
-                    <line x1="8" y1="2" x2="8" y2="6"/>
-                    <line x1="3" y1="10" x2="21" y2="10"/>
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
                   </svg>
                 )}
                 {label}
@@ -390,11 +390,11 @@ export default function ClientSmoobuView({ client, property, onClose }) {
   // Default preset is 'yearly'
   const [activePreset, setActivePreset] = useState('yearly');
   const [dateRange, setDateRange] = useState(() => getRangeForPreset('yearly'));
-  const [data,      setData]      = useState(null);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState(null);
-  const [currency,  setCurrency]  = useState('PHP');
-  const [phpRate,   setPhpRate]   = useState(61.75);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [currency, setCurrency] = useState('PHP');
+  const [phpRate, setPhpRate] = useState(61.75);
   const [rateLabel, setRateLabel] = useState('est.');
 
   // Fetch live exchange rate once on mount
@@ -406,13 +406,13 @@ export default function ClientSmoobuView({ client, property, onClose }) {
           setRateLabel('live');
         }
       })
-      .catch(() => {}); // keep fallback silently
+      .catch(() => { }); // keep fallback silently
   }, []);
 
   // Data loader — same pattern as frontend useDashboardData
   const load = useCallback(async (fromOverride, toOverride) => {
     const from = fromOverride ?? dateRange.from;
-    const to   = toOverride   ?? dateRange.to;
+    const to = toOverride ?? dateRange.to;
 
     setLoading(true);
     setError(null);
@@ -448,15 +448,15 @@ export default function ClientSmoobuView({ client, property, onClose }) {
 
   // Read stats directly from data.stats — same field names as the backend getDashboard returns
   const stats = data?.stats ?? {};
-  const revenue        = stats.revenue        ?? 0;
-  const bookings       = stats.bookings       ?? 0;
-  const nights         = stats.nights         ?? 0;
-  const occupancy      = stats.occupancy      ?? 0;
-  const cancellations  = stats.cancellations  ?? 0;
+  const revenue = stats.revenue ?? 0;
+  const bookings = stats.bookings ?? 0;
+  const nights = stats.nights ?? 0;
+  const occupancy = stats.occupancy ?? 0;
+  const cancellations = stats.cancellations ?? 0;
   const cancelledNights = stats.cancelledNights ?? 0;
 
   const properties = data?.properties ?? [];
-  const byChannel  = data?.byChannel  ?? {};
+  const byChannel = data?.byChannel ?? {};
 
   const recentBookings = (data?.bookings ?? [])
     .filter(b => b.type !== 'cancellation' && !b['is-blocked-booking'])
@@ -506,15 +506,91 @@ export default function ClientSmoobuView({ client, property, onClose }) {
           </div>
 
           {/* Loading skeletons */}
+          {/* Loading skeletons — mirrors the real layout exactly */}
           {loading && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', gap: 12 }}>
-                {[1,2,3,4].map(i => (
-                  <div key={i} className="db-skeleton" style={{ height: 80, flex: 1, borderRadius: 'var(--radius-md, 10px)' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+              {/* Property header: icon + title block */}
+              <div style={{ paddingBottom: 16, borderBottom: '1px solid var(--color-border, #e5e9ec)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div className="db-skeleton" style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0 }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+                  <div className="db-skeleton" style={{ height: 22, width: '40%', borderRadius: 4 }} />
+                  <div className="db-skeleton" style={{ height: 13, width: '22%', borderRadius: 4 }} />
+                </div>
+              </div>
+
+              {/* Image + 2×2 stat cards */}
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                <div className="db-skeleton" style={{ width: 240, height: 240, borderRadius: 'var(--radius-lg, 16px)', flexShrink: 0 }} />
+                <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  {[1, 2, 3, 4].map(i => (
+                    <div key={i} className="db-skeleton" style={{ height: 88, borderRadius: 'var(--radius-md, 10px)' }} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Two-column section: Properties + Channels */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                {[1, 2].map(i => (
+                  <div key={i} style={{
+                    background: 'var(--color-surface, #fff)',
+                    border: '1px solid var(--color-border, #e5e9ec)',
+                    borderRadius: 'var(--radius-md, 10px)',
+                    padding: '16px 20px',
+                    display: 'flex', flexDirection: 'column', gap: 10,
+                  }}>
+                    <div className="db-skeleton" style={{ height: 11, width: '40%', borderRadius: 4 }} />
+                    {[1, 2, 3].map(j => (
+                      <div key={j} className="db-skeleton" style={{ height: 14, width: `${75 - j * 10}%`, borderRadius: 4 }} />
+                    ))}
+                  </div>
                 ))}
               </div>
-              <div className="db-skeleton" style={{ height: 120, borderRadius: 'var(--radius-md, 10px)' }} />
-              <div className="db-skeleton" style={{ height: 200, borderRadius: 'var(--radius-md, 10px)' }} />
+
+              {/* Bookings table card */}
+              <div style={{
+                background: 'var(--color-surface, #fff)',
+                border: '1px solid var(--color-border, #e5e9ec)',
+                borderRadius: 'var(--radius-md, 10px)',
+                overflow: 'hidden',
+              }}>
+                {/* Card header */}
+                <div style={{
+                  padding: '14px 20px 12px',
+                  borderBottom: '1px solid var(--color-border, #e5e9ec)',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                  <div className="db-skeleton" style={{ height: 11, width: 130, borderRadius: 4 }} />
+                  <div className="db-skeleton" style={{ height: 11, width: 60, borderRadius: 4 }} />
+                </div>
+                {/* Column headers */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1.4fr 1.2fr 1fr 1fr 1fr 0.5fr 0.9fr',
+                  gap: 8, padding: '8px 20px',
+                  background: 'var(--color-bg, #f4f7f5)',
+                  borderBottom: '1px solid var(--color-border, #e5e9ec)',
+                }}>
+                  {[90, 80, 70, 70, 80, 40, 70].map((w, i) => (
+                    <div key={i} className="db-skeleton" style={{ height: 10, width: `${w}%`, borderRadius: 4 }} />
+                  ))}
+                </div>
+                {/* Rows */}
+                {[1, 2, 3, 4, 5].map(i => (
+                  <div key={i} style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1.4fr 1.2fr 1fr 1fr 1fr 0.5fr 0.9fr',
+                    gap: 8, padding: '12px 20px',
+                    borderBottom: i < 5 ? '1px solid var(--color-border, #e5e9ec)' : 'none',
+                    alignItems: 'center',
+                  }}>
+                    {[85, 70, 55, 65, 65, 30, 60].map((w, j) => (
+                      <div key={j} className="db-skeleton" style={{ height: 13, width: `${w}%`, borderRadius: 4 }} />
+                    ))}
+                  </div>
+                ))}
+              </div>
+
             </div>
           )}
 
@@ -579,10 +655,10 @@ export default function ClientSmoobuView({ client, property, onClose }) {
 
               {/* Property Header & Stat cards */}
               <div>
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 12, 
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
                   marginBottom: 20,
                   paddingBottom: 16,
                   borderBottom: '1px solid var(--color-border, #e5e9ec)'
@@ -607,14 +683,14 @@ export default function ClientSmoobuView({ client, property, onClose }) {
                     </div>
                   </div>
                 </div>
-                
+
                 <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                   {/* Left: Property Picture */}
-                  <div style={{ 
-                    width: 240, 
-                    height: 240, 
+                  <div style={{
+                    width: 240,
+                    height: 240,
                     flexShrink: 0,
-                    borderRadius: 'var(--radius-lg, 16px)', 
+                    borderRadius: 'var(--radius-lg, 16px)',
                     overflow: 'hidden',
                     border: '1px solid var(--color-border, #e5e9ec)',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
@@ -627,10 +703,10 @@ export default function ClientSmoobuView({ client, property, onClose }) {
                     fontWeight: 700
                   }}>
                     {property.propertyPicture ? (
-                      <img 
-                        src={property.propertyPicture} 
-                        alt={property.name} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                      <img
+                        src={property.propertyPicture}
+                        alt={property.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       />
                     ) : (
                       (property.propertyName || property.name || '?').charAt(0).toUpperCase()
@@ -782,8 +858,8 @@ export default function ClientSmoobuView({ client, property, onClose }) {
                       <tbody>
                         {recentBookings.map((b, i) => {
                           const channel = b.channel?.name || 'Direct';
-                          const color   = channelColor(channel);
-                          const nts     = nightsBetween(b.arrival, b.departure);
+                          const color = channelColor(channel);
+                          const nts = nightsBetween(b.arrival, b.departure);
                           return (
                             <tr
                               key={b.id ?? i}

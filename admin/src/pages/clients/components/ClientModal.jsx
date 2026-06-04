@@ -586,52 +586,214 @@ export default function ClientModal({ client, onClose, onUpdated }) {
 
                       <div className="db-field" style={{ margin: 0 }}>
                         <label>Property Picture</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          id={`edit-picture-input-${index}`}
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files.length > 0) {
+                              const file = e.target.files[0];
+                              const url = URL.createObjectURL(file);
+                              setForm((prev) => ({
+                                ...prev,
+                                properties: prev.properties.map((p, i) =>
+                                  i === index ? { ...p, pictureFile: file, originalPictureUrl: url, cropDirty: true } : p
+                                ),
+                              }));
+                              setCropImageUrl(url);
+                              setInitialCropData(null);
+                              setCroppingIndex(index);
+                            }
+                            e.target.value = null;
+                          }}
+                        />
+                        <label
+                          htmlFor={`edit-picture-input-${index}`}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '100%',
+                            aspectRatio: '1',
+                            borderRadius: '12px',
+                            border: prop.pictureUrl ? 'none' : '2px dashed lightgray',
+                            background: prop.pictureUrl
+                              ? 'transparent'
+                              : 'linear-gradient(135deg, rgba(198, 221, 213, 0.3) 0%, rgba(38, 166, 118, 0.05) 100%)',
+                            overflow: 'hidden',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            position: 'relative',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!prop.pictureUrl) {
+                              e.currentTarget.style.borderColor = 'var(--color-brand, #26a676)';
+                              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(198, 221, 213, 0.5) 0%, rgba(38, 166, 118, 0.12) 100%)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!prop.pictureUrl) {
+                              e.currentTarget.style.borderColor = 'lightgray';
+                              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(198, 221, 213, 0.3) 0%, rgba(38, 166, 118, 0.05) 100%)';
+                            }
+                          }}
+                        >
                           {prop.pictureUrl ? (
-                            <img src={prop.pictureUrl} crossOrigin="anonymous" alt="Preview" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />
+                            <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                              <img
+                                src={prop.pictureUrl}
+                                crossOrigin="anonymous"
+                                alt="Property preview"
+                                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px' }}
+                              />
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  top: '8px',
+                                  right: '8px',
+                                  background: 'rgba(255, 255, 255, 0.7)',
+                                  backdropFilter: 'blur(8px)',
+                                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                                  borderRadius: '10px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'flex-end',
+                                  gap: '6px',
+                                  padding: '6px 6px',
+                                }}
+                              >
+                                {/* Change button */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    document.getElementById(`edit-picture-input-${index}`).click();
+                                  }}
+                                  style={{
+                                    background: 'white', border: 'none', borderRadius: '6px',
+                                    padding: '6px 6px', color: 'var(--color-brand, #26a676)', cursor: 'pointer',
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    gap: '0px', minWidth: '32px', height: '32px',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.minWidth = '80px';
+                                    e.currentTarget.style.gap = '6px';
+                                    e.currentTarget.style.paddingLeft = '8px';
+                                    e.currentTarget.style.paddingRight = '8px';
+                                    const label = e.currentTarget.querySelector('[data-label-change]');
+                                    if (label) { label.style.maxWidth = '60px'; label.style.opacity = '1'; }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.minWidth = '32px';
+                                    e.currentTarget.style.gap = '0px';
+                                    e.currentTarget.style.paddingLeft = '6px';
+                                    e.currentTarget.style.paddingRight = '6px';
+                                    const label = e.currentTarget.querySelector('[data-label-change]');
+                                    if (label) { label.style.maxWidth = '0px'; label.style.opacity = '0'; }
+                                  }}
+                                  title="Change picture"
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                    <circle cx="8.5" cy="8.5" r="1.5" />
+                                    <polyline points="21 15 16 10 5 21" />
+                                  </svg>
+                                  <span
+                                    data-label-change=""
+                                    style={{
+                                      maxWidth: '0px', overflow: 'hidden', whiteSpace: 'nowrap',
+                                      fontSize: '.65rem', fontWeight: 600, opacity: 0,
+                                      transition: 'max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    }}
+                                  >
+                                    Change
+                                  </span>
+                                </button>
+
+                                {/* Adjust button */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setCropImageUrl(prop.originalPictureUrl || prop.pictureUrl);
+                                    setInitialCropData(prop.cropData);
+                                    setCroppingIndex(index);
+                                  }}
+                                  style={{
+                                    background: 'white', border: 'none', borderRadius: '6px',
+                                    padding: '6px 6px', color: 'var(--color-brand, #26a676)', cursor: 'pointer',
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    gap: '0px', minWidth: '32px', height: '32px',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.minWidth = '80px';
+                                    e.currentTarget.style.gap = '6px';
+                                    e.currentTarget.style.paddingLeft = '8px';
+                                    e.currentTarget.style.paddingRight = '8px';
+                                    const label = e.currentTarget.querySelector('[data-label-adjust]');
+                                    if (label) { label.style.maxWidth = '60px'; label.style.opacity = '1'; }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.minWidth = '32px';
+                                    e.currentTarget.style.gap = '0px';
+                                    e.currentTarget.style.paddingLeft = '6px';
+                                    e.currentTarget.style.paddingRight = '6px';
+                                    const label = e.currentTarget.querySelector('[data-label-adjust]');
+                                    if (label) { label.style.maxWidth = '0px'; label.style.opacity = '0'; }
+                                  }}
+                                  title="Adjust picture"
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                    <line x1="4" y1="6" x2="20" y2="6" />
+                                    <line x1="4" y1="12" x2="20" y2="12" />
+                                    <line x1="4" y1="18" x2="20" y2="18" />
+                                    <circle cx="14" cy="6" r="2" fill="currentColor" stroke="none" />
+                                    <circle cx="8" cy="12" r="2" fill="currentColor" stroke="none" />
+                                    <circle cx="14" cy="18" r="2" fill="currentColor" stroke="none" />
+                                  </svg>
+                                  <span
+                                    data-label-adjust=""
+                                    style={{
+                                      maxWidth: '0px', overflow: 'hidden', whiteSpace: 'nowrap',
+                                      fontSize: '.65rem', fontWeight: 600, opacity: 0,
+                                      transition: 'max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    }}
+                                  >
+                                    Adjust
+                                  </span>
+                                </button>
+                              </div>
+                            </div>
                           ) : (
-                            <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#c8ddd5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#26a676', fontWeight: 'bold' }}>
-                              {prop.name ? prop.name.charAt(0).toUpperCase() : '?'}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 24 }}>
+                              <div style={{
+                                width: 48, height: 48, borderRadius: '10px',
+                                background: 'var(--color-brand, #26a676)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: 'white', boxShadow: '0 2px 8px rgba(38, 166, 118, 0.2)',
+                              }}>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                  <circle cx="8.5" cy="8.5" r="1.5" />
+                                  <polyline points="21 15 16 10 5 21" />
+                                </svg>
+                              </div>
+                              <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '.8125rem', fontWeight: 600, color: 'var(--color-brand, #26a676)', marginBottom: 2 }}>
+                                  Upload Picture
+                                </div>
+                                <div style={{ fontSize: '.7rem', color: 'var(--color-muted, #666)', lineHeight: 1.3 }}>
+                                  Click to upload or drag and drop
+                                </div>
+                              </div>
                             </div>
                           )}
-                          
-                          {prop.pictureUrl && (
-                            <button 
-                              type="button" 
-                              onClick={() => {
-                                setCropImageUrl(prop.originalPictureUrl || prop.pictureUrl);
-                                setInitialCropData(prop.cropData);
-                                setCroppingIndex(index);
-                              }}
-                              style={{ background: 'none', border: 'none', color: 'var(--color-brand)', fontSize: '.8125rem', cursor: 'pointer', fontWeight: 600 }}
-                            >
-                              Adjust Picture
-                            </button>
-                          )}
-
-                          <label style={{ cursor: 'pointer', color: 'var(--color-brand)', fontSize: '.8125rem', fontWeight: 600 }}>
-                            {prop.pictureUrl ? 'Change Picture' : 'Upload Picture'}
-                            <input 
-                              type="file" 
-                              accept="image/*" 
-                              style={{ display: 'none' }} 
-                              onChange={(e) => {
-                                if (e.target.files && e.target.files.length > 0) {
-                                  const file = e.target.files[0];
-                                  const url = URL.createObjectURL(file);
-                                  setForm((prev) => ({
-                                    ...prev,
-                                    properties: prev.properties.map((p, i) => (i === index ? { ...p, pictureFile: file, originalPictureUrl: url, cropDirty: true } : p))
-                                  }));
-                                  setCropImageUrl(url);
-                                  setInitialCropData(null);
-                                  setCroppingIndex(index);
-                                }
-                                e.target.value = null;
-                              }} 
-                            />
-                          </label>
-                        </div>
+                        </label>
                       </div>
                     </div>
                   ))}
