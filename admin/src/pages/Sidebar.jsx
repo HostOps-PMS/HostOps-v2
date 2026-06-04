@@ -23,7 +23,7 @@ const NAV_ITEMS = [
         <path d="M2 18c0-3.314 2.686-6 6-6h4c3.314 0 6 2.686 6 6" strokeLinecap="round" />
       </svg>
     ),
-    label: 'Clients',
+    label: 'Businesses',
     to: '/clients',
   },
   {

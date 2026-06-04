@@ -1,5 +1,6 @@
 // src/routes/auth.js
 import express from 'express';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import User from '../models/user.js';
 import Staff from '../models/staff.js';
@@ -138,62 +139,69 @@ router.post('/verify', async (req, res, next) => {
 
 // POST /auth/login
 // Handles both regular users AND staff accounts so the frontend
-// only needs one login endpoint. Staff are detected by checking the
-// Staff model when no matching User is found (or password doesn't match).
+// only needs one login endpoint.
+//
+// ── Login priority order ──────────────────────────────────────────
+// Staff is checked FIRST. This is intentional: a staff member's email
+// may coincidentally exist in the User collection (e.g. if the client
+// created a User account with the same email). If we checked User first
+// and the password matched, the staff member would receive a User token
+// instead of a Staff token — req.isStaff would be false and PIN
+// verification would fail. Checking Staff first guarantees the correct
+// token type is issued regardless of User collection overlap.
 router.post('/login', async (req, res, next) => {
   try {
     const data = loginSchema.parse(req.body);
     const { email, password, deviceId } = data;
 
+    // ── 1. Try Staff login first ───────────────────────────────────
+    // Staff accounts have no password — they authenticate via PIN only.
+    // Email match + isActive check is sufficient to issue a staff token.
+    // PIN verification happens later in /auth/verify-pin.
+    const staff = await Staff.findOne({ email: email.toLowerCase() });
+    if (staff) {
+      if (!staff.isActive) {
+        return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
+      }
 
+      const accessToken  = signStaffAccessToken(staff);
+      const refreshToken = signStaffRefreshToken(staff);
 
-    // ── Check if this is a staff login ────────────────────────────
-    // Try User first. If not found or password wrong, try Staff.
+      await RefreshToken.create({
+        userId:    staff._id,
+        token:     hashToken(refreshToken),
+        expiresAt: refreshTokenExpiry(),
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      staff.lastLoginAt = new Date();
+      await staff.save();
+
+      res.cookie('rt', refreshToken, {
+        httpOnly: true,
+        secure:   process.env.NODE_ENV === 'production',
+        sameSite: 'none',
+        maxAge:   7 * 24 * 60 * 60 * 1000,
+        path:     '/auth',
+      });
+
+      return res.json({
+        accessToken,
+        // Inject role:'staff' and isStaff:true into the staff object so the
+        // frontend can detect staff sessions from the stored hp_user object.
+        // The Staff schema has no 'role' field — we add it here explicitly.
+        staff:              { ...staff.toJSON(), role: 'staff', isStaff: true },
+        mustChangePassword: staff.mustChangePassword,
+        isStaff:            true,
+      });
+    }
+
+    // ── 2. Try User login ──────────────────────────────────────────
     const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
     const userPasswordMatch = user && (await user.comparePassword(password));
 
     if (!userPasswordMatch) {
-      // Try staff login
-      const staff = await Staff.findOne({ email: email.toLowerCase() }).select('+password');
-      if (staff && (await staff.comparePassword(password))) {
-        if (!staff.isActive) {
-          return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
-        }
-
-        const accessToken  = signStaffAccessToken(staff);
-        const refreshToken = signStaffRefreshToken(staff);
-
-        await RefreshToken.create({
-          userId:    staff._id,
-          token:     hashToken(refreshToken),
-          expiresAt: refreshTokenExpiry(),
-          ipAddress: req.ip,
-          userAgent: req.get('user-agent'),
-        });
-
-        staff.lastLoginAt = new Date();
-        await staff.save();
-
-        res.cookie('rt', refreshToken, {
-          httpOnly: true,
-          secure:   process.env.NODE_ENV === 'production',
-          sameSite: 'none',
-          maxAge:   7 * 24 * 60 * 60 * 1000,
-          path:     '/auth',
-        });
-
-        return res.json({
-          accessToken,
-          // Inject role:'staff' and isStaff:true into the staff object so the
-          // frontend can detect staff sessions from the stored hp_user object.
-          // The Staff schema has no 'role' field — we add it here explicitly.
-          staff:              { ...staff.toJSON(), role: 'staff', isStaff: true },
-          mustChangePassword: staff.mustChangePassword,
-          isStaff:            true,
-        });
-      }
-
-      // Neither user nor staff matched
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -666,11 +674,20 @@ router.get('/activity-log', requireAuth, async (req, res, next) => {
 router.get('/my-properties', requireAuth, (req, res) => {
   // req.user is always the parent client (carries the properties array)
   // regardless of whether the session is a direct client, clientAccount, or staff.
-  const properties = (req.user.properties || []).map((p) => ({
-    _id:          p._id,
-    propertyName: p.propertyName,
-  }));
-  res.json({ properties });
+  //
+  // Staff: filter down to only their assigned properties so PropertySelectForm
+  // only shows what they have access to.
+  // Client / team_leader: return all properties.
+  let list = (req.user.properties || []);
+
+  if (req.isStaff) {
+    const assigned = req.staffPropertyIds || [];
+    list = list.filter((p) => assigned.includes(String(p._id)));
+  }
+
+  res.json({
+    properties: list.map((p) => ({ _id: p._id, propertyName: p.propertyName })),
+  });
 });
 
 // POST /auth/change-password
@@ -1053,6 +1070,272 @@ router.post('/send-change-password-otp', requireAuth, async (req, res, next) => 
     }
 
     res.json({ message: 'A verification code has been sent to your email.' });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/verify-pin
+//
+// Verifies the 6-digit PIN for the currently authenticated user.
+// Called by PinModal after property selection.
+//
+// The account is identified by the `email` field in the request body.
+// This replaces the previous approach of relying solely on the JWT
+// claims (req.isStaff / req.user._id) for account resolution.
+//
+// Lookup order:
+//   1. Check Staff collection for the email → staff PIN path
+//   2. Check User collection for the email  → client / team_leader / admin PIN path
+//
+// User types and their PIN logic:
+//   - staff       → PIN must match AND the selected propertyId must be
+//                   in staff.propertyIds. If the property is not assigned
+//                   to this staff member, access is denied even if the PIN
+//                   is correct.
+//   - client      → PIN must match. Property access is unrestricted.
+//   - team_leader → PIN must match. Property access is unrestricted.
+//
+// Lockout schedule (cumulative wrong attempts per account):
+//   attempts 1–2  : no lock (warnings returned)
+//   attempt  3    : locked for 1 minute
+//   attempt  4    : locked for 3 minutes
+//   attempt  5    : locked for 15 minutes
+//   attempt  6    : locked for 1 hour
+//   attempt  7+   : permanently locked — pinPermanentlyLocked = true,
+//                   requires admin intervention to unlock
+//
+// Body:
+//   { email: string, pin: string, propertyId: string, isStaff: boolean }
+//
+// Returns:
+//   200 { ok: true }
+//   400 { error: '...' }  — missing fields
+//   403 { error: '...' }  — wrong PIN or property not assigned
+//   423 { error: '...', lockedUntil: ISO string } — account temporarily locked
+//   423 { error: '...', permanentlyLocked: true } — account permanently locked
+// ─────────────────────────────────────────────────────────────────
+
+// Lock durations in milliseconds, indexed by attempt count that triggers the lock.
+// attempt 3 → 1 min, 4 → 3 min, 5 → 15 min, 6 → 1 hr, 7+ → permanent
+const PIN_LOCK_DURATIONS = {
+  3: 1  * 60 * 1000,
+  4: 3  * 60 * 1000,
+  5: 15 * 60 * 1000,
+  6: 60 * 60 * 1000,
+};
+
+function getPinLockDuration(attempts) {
+  return PIN_LOCK_DURATIONS[attempts] ?? null; // null = permanent (7+)
+}
+
+router.post('/verify-pin', requireAuth, async (req, res, next) => {
+  try {
+    const { email, pin, propertyId } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required.' });
+    }
+    if (!pin) {
+      return res.status(400).json({ error: 'PIN is required.' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const now = new Date();
+
+    // ── 1. Try Staff lookup by email ──────────────────────────────
+    // Staff accounts are always identified by email first, regardless
+    // of what the JWT says. This handles edge cases where a staff member's
+    // email might also exist in the User collection.
+    const staff = await Staff.findOne({ email: normalizedEmail }).select('+pin');
+
+    if (staff) {
+      if (!staff.isActive) {
+        return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
+      }
+
+      // ── Check permanent lock ──────────────────────────────────────
+      if (staff.pinPermanentlyLocked) {
+        return res.status(423).json({
+          error: 'Your account has been locked due to too many incorrect PIN attempts. Please contact your manager.',
+          permanentlyLocked: true,
+        });
+      }
+
+      // ── Check temporary lock ──────────────────────────────────────
+      if (staff.pinLockedUntil && staff.pinLockedUntil > now) {
+        return res.status(423).json({
+          error: 'Too many incorrect PIN attempts. Please try again later.',
+          lockedUntil: staff.pinLockedUntil.toISOString(),
+        });
+      }
+
+      if (!propertyId) {
+        return res.status(400).json({ error: 'Property selection is required.' });
+      }
+
+      // ── Verify PIN ────────────────────────────────────────────────
+      const pinMatch = await bcrypt.compare(String(pin), staff.pin || '');
+
+      if (!pinMatch) {
+        staff.pinAttempts = (staff.pinAttempts || 0) + 1;
+        const attempts = staff.pinAttempts;
+
+        if (attempts >= 7) {
+          // Permanent lock
+          staff.pinPermanentlyLocked = true;
+          await staff.save();
+          return res.status(423).json({
+            error: 'Your account has been locked due to too many incorrect PIN attempts. Please contact your manager.',
+            permanentlyLocked: true,
+          });
+        }
+
+        const lockDuration = getPinLockDuration(attempts);
+        if (lockDuration !== null) {
+          staff.pinLockedUntil = new Date(now.getTime() + lockDuration);
+        }
+
+        await staff.save();
+
+        const attemptsLeft = 7 - attempts;
+        if (lockDuration !== null) {
+          return res.status(423).json({
+            error: `Incorrect PIN. Account locked. Please try again later.`,
+            lockedUntil: staff.pinLockedUntil.toISOString(),
+          });
+        }
+
+        return res.status(403).json({
+          error: `Incorrect PIN. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining before lockout.`,
+        });
+      }
+
+      // ── PIN correct — verify property access ──────────────────────
+      const hasAccess = (staff.propertyIds || []).some(
+        (id) => String(id) === String(propertyId)
+      );
+      if (!hasAccess) {
+        return res.status(403).json({ error: 'You do not have access to this property.' });
+      }
+
+      // ── Reset lockout counters on success ─────────────────────────
+      staff.pinAttempts    = 0;
+      staff.pinLockedUntil = null;
+      await staff.save();
+
+      return res.json({ ok: true });
+    }
+
+    // ── 2. Try User lookup by email ───────────────────────────────
+    // Covers client, team_leader, and admin roles.
+    // Property access is unrestricted for these roles — only PIN is checked.
+    const ownUser = await User.findOne({ email: normalizedEmail }).select('+pin');
+
+    if (!ownUser) {
+      return res.status(404).json({ error: 'Account not found.' });
+    }
+
+    // ── Check permanent lock ──────────────────────────────────────
+    if (ownUser.pinPermanentlyLocked) {
+      return res.status(423).json({
+        error: 'Your account has been locked due to too many incorrect PIN attempts. Please contact your administrator.',
+        permanentlyLocked: true,
+      });
+    }
+
+    // ── Check temporary lock ──────────────────────────────────────
+    if (ownUser.pinLockedUntil && ownUser.pinLockedUntil > now) {
+      return res.status(423).json({
+        error: 'Too many incorrect PIN attempts. Please try again later.',
+        lockedUntil: ownUser.pinLockedUntil.toISOString(),
+      });
+    }
+
+    const pinHash = ownUser.pin || null;
+
+    if (!pinHash) {
+      return res.status(403).json({ error: 'No PIN configured on this account. Please ask your administrator to set one.' });
+    }
+
+    // ── Verify PIN ────────────────────────────────────────────────
+    const pinMatch = await bcrypt.compare(String(pin), pinHash);
+
+    if (!pinMatch) {
+      ownUser.pinAttempts = (ownUser.pinAttempts || 0) + 1;
+      const attempts = ownUser.pinAttempts;
+
+      if (attempts >= 7) {
+        // Permanent lock
+        ownUser.pinPermanentlyLocked = true;
+        await ownUser.save();
+        return res.status(423).json({
+          error: 'Your account has been locked due to too many incorrect PIN attempts. Please contact your administrator.',
+          permanentlyLocked: true,
+        });
+      }
+
+      const lockDuration = getPinLockDuration(attempts);
+      if (lockDuration !== null) {
+        ownUser.pinLockedUntil = new Date(now.getTime() + lockDuration);
+      }
+
+      await ownUser.save();
+
+      const attemptsLeft = 7 - attempts;
+      if (lockDuration !== null) {
+        return res.status(423).json({
+          error: `Incorrect PIN. Account locked. Please try again later.`,
+          lockedUntil: ownUser.pinLockedUntil.toISOString(),
+        });
+      }
+
+      return res.status(403).json({
+        error: `Incorrect PIN. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining before lockout.`,
+      });
+    }
+
+    // ── Reset lockout counters on success ─────────────────────────
+    ownUser.pinAttempts    = 0;
+    ownUser.pinLockedUntil = null;
+    await ownUser.save();
+
+    return res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// GET /auth/pin-status  ← TEMPORARY DEBUG ROUTE — remove after fixing
+// Tells you whether a PIN is stored on the current account without
+// exposing the hash. Safe to call with a valid Bearer token.
+// ─────────────────────────────────────────────────────────────────
+router.get('/pin-status', requireAuth, async (req, res, next) => {
+  try {
+    const user = await User.findOne({ email: req.user.email }).select('+pin');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({
+      email:    user.email,
+      role:     user.role,
+      hasPin:   !!user.pin,
+      pinLength: user.pin ? user.pin.length : 0,
+    });
+  } catch (err) { next(err); }
+});
+
+
+// ─────────────────────────────────────────────────────────────────
+// GET /auth/debug-staff?email=xxx  ← TEMPORARY DEBUG — remove after fixing
+// ─────────────────────────────────────────────────────────────────
+router.get('/debug-staff', async (req, res, next) => {
+  try {
+    const { email } = req.query;
+    if (!email) return res.status(400).json({ error: 'email query param required' });
+    const exact = await Staff.findOne({ email: email.toLowerCase() }).lean();
+    const fuzzy = await Staff.find({
+      email: { $regex: new RegExp(email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }
+    }).select('email firstName lastName isActive clientId').lean();
+    res.json({ exact: !!exact, exactDoc: exact ? { email: exact.email, firstName: exact.firstName, isActive: exact.isActive } : null, fuzzyMatches: fuzzy });
   } catch (err) { next(err); }
 });
 

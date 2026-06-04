@@ -135,15 +135,54 @@ router.get('/clients/:id/properties', requireAdmin, async (req, res, next) => {
       return res.status(404).json({ error: 'Client not found' });
     }
 
-    // Strip smoobuApiKey from each property before sending, but provide a boolean flag
-    const safe = (user.properties || []).map(({ smoobuApiKey, ...rest }) => ({
-      ...rest,
-      hasSmoobuKey: !!(smoobuApiKey && smoobuApiKey.trim())
-    }));
+    // Strip smoobuApiKey from each property before sending, but provide a boolean flag and masked key
+    const safe = (user.properties || []).map(({ smoobuApiKey, ...rest }) => {
+      const hasKey = !!(smoobuApiKey && smoobuApiKey.trim());
+      let maskedKey = '';
+      if (hasKey) {
+        const keyStr = smoobuApiKey.trim();
+        if (keyStr.length > 4) {
+          maskedKey = '•'.repeat(keyStr.length - 4) + keyStr.slice(-4);
+        } else {
+          maskedKey = '•'.repeat(keyStr.length);
+        }
+      }
+      return {
+        ...rest,
+        hasSmoobuKey: hasKey,
+        maskedSmoobuApiKey: maskedKey
+      };
+    });
     res.json(safe);
   } catch (err) {
     if (err.name === 'CastError') {
       return res.status(400).json({ error: 'Invalid client ID' });
+    }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// GET /api/clients/:id/properties/:propertyId/apikey
+// Admin fetches the unmasked API key for a property.
+// Should be protected by frontend OTP verification.
+// ─────────────────────────────────────────────────────────────────
+router.get('/clients/:id/properties/:propertyId/apikey', requireAdmin, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id).select('+properties.smoobuApiKey').lean();
+    if (!user) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    const property = (user.properties || []).find(p => p._id.toString() === req.params.propertyId);
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found for this client.' });
+    }
+
+    res.json({ smoobuApiKey: property.smoobuApiKey || '' });
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid ID' });
     }
     next(err);
   }
@@ -412,27 +451,27 @@ router.patch('/clients/:id', requireAdmin, async (req, res, next) => {
   try {
     const data = updateClientSchema.parse(req.body);
 
-    const update = {};
-    if (data.businessName      !== undefined) update.businessName      = data.businessName;
-    if (data.serverId          !== undefined) update.serverId          = data.serverId || null;
-    if (data.role              !== undefined) update.role              = data.role;
-    if (data.propertyTagPrefix !== undefined) update.propertyTagPrefix = data.propertyTagPrefix;
-    if (data.password          !== undefined) {
-      update.password           = data.password;
-      update.mustChangePassword = true;
-    }
-    if (data.pin               !== undefined) {
-      update.pin                = data.pin;
-      update.mustChangePin      = true;
-    }
-
-    const client = await User.findById(req.params.id);
+    const client = await User.findById(req.params.id).select('+pin +password');
     if (!client) {
       return res.status(404).json({ error: 'Client not found' });
     }
 
-    // Use .set() and .save() to trigger pre-save hooks (for bcrypt)
-    client.set(update);
+    // Assign fields directly (not via .set()) so Mongoose reliably marks
+    // them as modified — critical for the pre-save bcrypt hooks to fire
+    // correctly for password and pin.
+    if (data.businessName      !== undefined) client.businessName      = data.businessName;
+    if (data.serverId          !== undefined) client.serverId          = data.serverId || null;
+    if (data.role              !== undefined) client.role              = data.role;
+    if (data.propertyTagPrefix !== undefined) client.propertyTagPrefix = data.propertyTagPrefix;
+    if (data.password          !== undefined) {
+      client.password           = data.password;
+      client.mustChangePassword = true;
+    }
+    if (data.pin               !== undefined) {
+      client.pin                = data.pin;
+      client.mustChangePin      = true;
+    }
+
     await client.save();
 
     const savedClient = client.toJSON();

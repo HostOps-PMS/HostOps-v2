@@ -21,22 +21,18 @@ export default function Clients() {
 
   /* ── Search / filter ── */
   const [search,     setSearch]     = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return clients.filter((c) => {
       const matchesSearch =
         !q ||
-        c.email.toLowerCase().includes(q) ||
-        `${c.firstName} ${c.lastName}`.toLowerCase().includes(q);
+        (c.email && c.email.toLowerCase().includes(q)) ||
+        (`${c.firstName || ''} ${c.lastName || ''}`.toLowerCase().includes(q));
 
-      const matchesRole =
-        roleFilter === 'all' || c.role === roleFilter;
-
-      return matchesSearch && matchesRole;
+      return matchesSearch && c.role === 'client';
     });
-  }, [clients, search, roleFilter]);
+  }, [clients, search]);
 
   /* ── Handle client updated from modal ── */
   function handleClientUpdated(updatedClient) {
@@ -128,17 +124,6 @@ export default function Clients() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-
-            <select
-              className="cl-filter-select"
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-            >
-              <option value="all">All roles</option>
-              <option value="client">Client</option>
-              <option value="admin">Admin</option>
-              <option value="team_leader">Team Leader</option>
-            </select>
           </div>
 
           {/* Table */}

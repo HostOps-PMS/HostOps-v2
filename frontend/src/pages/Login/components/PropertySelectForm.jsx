@@ -11,17 +11,24 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'https://hostpilot-smoobu.onre
 // Fetches the client's embedded properties from /auth/my-properties
 // (user.properties[] in the User model — propertyName + _id).
 //
-// ALL USER TYPES — specific property selected:
-//   - Stores the property _id (MongoDB ObjectId as string) and propertyName
-//     in sessionStorage as hp_selected_property_id / hp_selected_property_name.
-//   - Navigates directly to /dashboard. The dashboard backend reads
-//     ?propertyDbId=<_id>, looks up the matching smoobuApiKey from
-//     user.properties[], and scopes all Smoobu calls to that key.
-//   - No DomainLoginForm step — user is already authenticated.
+// After the user selects a property and taps Continue:
+//   - Calls onPropertySelected(propertyId, propertyName) so the parent
+//     (LoginPage / index.jsx) can store the selection and advance to the
+//     PIN gate (PinModal). Navigation to /dashboard is handled by PinModal
+//     on successful PIN verification — NOT here.
+//
+// Props:
+//   userData          {object}  - user / clientAccount object from authData
+//   isClientAccount   {boolean} - true for clientAccount sessions
+//   showMsg           {fn}
+//   hideMsg           {fn}
+//   onPropertySelected {fn}     - called with (propertyId, propertyName) on Continue
+//   onContinue        {fn}      - legacy fallback (kept for safety, not called in normal flow)
+//   onBack            {fn}
 // ─────────────────────────────────────────────────────────────────
-export default function PropertySelectForm({ userData, isClientAccount, showMsg, hideMsg, onContinue, onBack }) {
+export default function PropertySelectForm({ userData, isClientAccount, showMsg, hideMsg, onPropertySelected, onContinue, onBack }) {
   const auth = useAuth();
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // kept in case a future code path needs it
 
   const [properties, setProperties]     = useState([]);
   const [loadingProps, setLoadingProps] = useState(true);
@@ -67,18 +74,23 @@ export default function PropertySelectForm({ userData, isClientAccount, showMsg,
   }, []);
 
   // ── Continue ──────────────────────────────────────────────────────
-  // All user types: specific property selected → store in sessionStorage
-  // and navigate directly to /dashboard.
-  // The dashboard backend uses ?propertyDbId=<_id> to look up the correct
-  // smoobuApiKey from user.properties[] and scope all Smoobu API calls.
+  // Passes the selected property _id and name up to the parent so it can
+  // advance to PinModal. The parent stores them in sessionStorage.
   const handleContinue = () => {
     if (!selectedId) return;
 
     const prop = properties.find((p) => String(p._id) === selectedId);
-    sessionStorage.setItem('hp_selected_property_id',   selectedId);
-    sessionStorage.setItem('hp_selected_property_name', prop?.propertyName || '');
-    showMsg('Redirecting…', 'success');
-    setTimeout(() => navigate('/dashboard', { replace: true }), 800);
+    const propertyName = prop?.propertyName || '';
+
+    if (onPropertySelected) {
+      // ── New path: parent handles sessionStorage + navigation via PinModal
+      onPropertySelected(selectedId, propertyName);
+    } else {
+      // ── Legacy fallback (onContinue) — not used in normal flow
+      sessionStorage.setItem('hp_selected_property_id',   selectedId);
+      sessionStorage.setItem('hp_selected_property_name', propertyName);
+      onContinue?.(selectedId);
+    }
   };
 
   const canContinue = !loadingProps && selectedId !== null;
