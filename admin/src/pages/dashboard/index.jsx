@@ -1,64 +1,66 @@
 import { useState } from 'react';
 import './dashboard.css';
 
-import Sidebar from './components/Sidebar';
-import TopBar from './components/TopBar';
-import TopSummaryCards from './components/TopSummaryCards';
-import DashboardCharts from './components/DashboardCharts';
-import AccountsTable from './components/AccountsTable';
-import AccountDetailsModal from './components/AccountDetailsModal';
+import Sidebar              from './components/Sidebar';
+import TopBar               from './components/TopBar';
+import StatsRow             from './components/StatsRow';
+import RevenueChart         from './components/RevenueChart';
+import TopClients           from './components/TopClients';
+import AlertsCenter         from './components/AlertsCenter';
+import SubscriptionOverview from './components/SubscriptionOverview';
+import RecentActivities     from './components/RecentActivities';
+import Modal                from './components/Modal';
 
-import { useAccounts } from './hooks/useAccounts';
+import { useStats }  from './hooks/useStats';
+import { useOrders } from './hooks/useOrders';
 
 export default function Dashboard() {
-  const [selectedAccount, setSelectedAccount] = useState(null);
+  const [modal, setModal] = useState({ open: false, type: null, data: null });
+  const openModal  = (type, data = null) => setModal({ open: true, type, data });
+  const closeModal = ()                  => setModal({ open: false, type: null, data: null });
 
-  /* ── data ── */
-  const { accounts, loading, error } = useAccounts();
-
-  const handleRowClick = (account) => {
-    setSelectedAccount(account);
-  };
-
-  const closeModal = () => {
-    setSelectedAccount(null);
-  };
+  const { stats, loading: statsLoading }   = useStats();
+  const { orders, loading: ordersLoading } = useOrders();
 
   return (
     <div className="db-layout">
       <Sidebar />
 
       <div className="db-main">
-        <TopBar onAction={() => {}} />
+        <TopBar onAction={() => openModal('create')} />
 
         <div className="db-content">
+
+          {/* ── Header ── */}
           <header className="db-content__header">
             <div>
-              <h1 className="db-content__title">Account Monitoring</h1>
-              <p className="db-content__sub">Overview of all system accounts</p>
+              <h1 className="db-content__title">Overview</h1>
+              <p className="db-content__sub">Welcome back, Admin</p>
             </div>
           </header>
 
-          {error && (
-            <div className="db-error-banner">
-              <p>Error loading accounts: {error}</p>
-            </div>
-          )}
+          {/* ── Row 1: Stats with sparklines ── */}
+          <StatsRow stats={stats} loading={statsLoading} />
 
-          <TopSummaryCards accounts={accounts} loading={loading} />
-          
-          <DashboardCharts accounts={accounts} loading={loading} />
+          {/* ── Row 2: Revenue Chart (wider) + Alerts ── */}
+          <div className="db-grid-2-wide">
+            <RevenueChart />
+            <AlertsCenter />
+          </div>
 
-          <AccountsTable 
-            accounts={accounts} 
-            loading={loading} 
-            onRowClick={handleRowClick} 
-          />
+          {/* ── Row 3: Top Clients + Subscription Overview ── */}
+          <div className="db-grid-2">
+            <TopClients />
+          </div>
+
+          {/* ── Row 4: Recent Activities (full width) ── */}
+          <RecentActivities />
+
         </div>
       </div>
 
-      {selectedAccount && (
-        <AccountDetailsModal account={selectedAccount} onClose={closeModal} />
+      {modal.open && (
+        <Modal type={modal.type} data={modal.data} onClose={closeModal} />
       )}
     </div>
   );
