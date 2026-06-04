@@ -11,6 +11,7 @@ import AuthorizationModal from './pages/authorization';
 import TeamLeaderLayout from './pages/TeamLeader/index';
 import TeamLeaderStaffs from './pages/TeamLeader/staffs/index';
 import TeamLeaderDashboardPlaceholder from './pages/TeamLeader/dashboard/index';
+import AccountsPage from './pages/Accounts/index';
 
 const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5174';
 
@@ -180,6 +181,16 @@ export default function App() {
           }
         />
 
+        {/* ── Accounts page (admin view) ───────────────────────── */}
+        <Route
+          path="/accounts"
+          element={
+            <PrivateRoute>
+              <AccountsPage />
+            </PrivateRoute>
+          }
+        />
+
         {/* Team Leader Routes */}
         <Route
           path="/team-leader"
@@ -193,7 +204,7 @@ export default function App() {
           <Route path="staffs" element={<TeamLeaderStaffs />} />
           <Route index element={<Navigate to="staffs" replace />} />
         </Route>
-` `
+
         <Route
           path="/team-leaders"
           element={

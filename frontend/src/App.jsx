@@ -7,6 +7,7 @@ import { DashboardProvider } from './pages/clientDashboard/context/DashboardCont
 import { AuthProvider } from './pages/AuthContext';
 import VerifyPage from './pages/Login/verify';
 import ResetPage from './pages/Login/reset';
+import ProtectedRoute from './pages/clientDashboard/components/ProtectedRoute';
 
 function App() {
   return (
@@ -19,17 +20,21 @@ function App() {
           <Route
             path="/dashboard"
             element={
-              <DashboardProvider>
-                <DashboardPage />
-              </DashboardProvider>
+              <ProtectedRoute>
+                <DashboardProvider>
+                  <DashboardPage />
+                </DashboardProvider>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/inbox"
             element={
-              <DashboardProvider>
-                <InboxPage />
-              </DashboardProvider>
+              <ProtectedRoute>
+                <DashboardProvider>
+                  <InboxPage />
+                </DashboardProvider>
+              </ProtectedRoute>
             }
           />
           <Route path="*" element={<Navigate to="/" replace />} />

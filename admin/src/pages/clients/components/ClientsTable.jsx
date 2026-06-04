@@ -11,10 +11,14 @@ function formatDate(iso) {
   });
 }
 
-function VerifiedBadge({ isVerified }) {
-  return isVerified
-    ? <span className="db-badge db-badge--success">✓ Verified</span>
-    : <span className="db-badge db-badge--warning">Unverified</span>;
+function VerifiedBadge({ client }) {
+  if (client.mustChangePassword && client.mustChangePin) {
+    return <span className="db-badge db-badge--warning">Unverified</span>;
+  } else if (!client.mustChangePassword && !client.mustChangePin) {
+    return <span className="db-badge db-badge--success">✓ Verified</span>;
+  } else {
+    return <span className="db-badge db-badge--info">Partially Verified</span>;
+  }
 }
 
 function RoleBadge({ role }) {
@@ -95,7 +99,7 @@ export default function ClientsTable({ clients, loading, onRowClick }) {
                       </div>
                     </td>
                     <td><RoleBadge role={client.role} /></td>
-                    <td><VerifiedBadge isVerified={client.isVerified} /></td>
+                    <td><VerifiedBadge client={client} /></td>
                     <td><SmoobuBadge connected={!!client.smoobuConnectedAt} /></td>
                     <td style={{ color: 'var(--color-muted)' }}>
                       {formatDate(client.lastLoginAt)}
