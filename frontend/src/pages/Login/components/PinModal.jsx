@@ -227,7 +227,27 @@ export default function PinModal({
         return;
       }
 
-      // ── Success — navigate to dashboard ───────────────────────────
+      // ── Success — persist the new session then navigate ──────────
+      // The verify-pin endpoint returns a fresh accessToken scoped to the
+      // logged-in user (staff / team_leader / client).  We MUST store it
+      // here; otherwise the dashboard keeps using the old client token that
+      // was already in sessionStorage, so req.user on the backend is always
+      // the client account regardless of who actually entered the PIN.
+      if (data.accessToken) {
+        auth.setToken(data.accessToken);
+      }
+      if (data.user) {
+        auth.setUser(data.user);
+        // Also mirror role into sessionStorage so any component that reads
+        // hp_user directly (e.g. index.jsx currentUser block) gets the right shape.
+        sessionStorage.setItem('hp_user', JSON.stringify(data.user));
+      }
+
+      // Persist the selected property so the dashboard loads the right one.
+      if (selectedPropertyId) {
+        sessionStorage.setItem('hp_selected_property_id', selectedPropertyId);
+      }
+
       showMsg('Access granted. Redirecting…', 'success');
       setTimeout(() => navigate('/dashboard', { replace: true }), 800);
     } catch {

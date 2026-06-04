@@ -11,6 +11,48 @@ function stripHtml(html) {
   return (div.textContent || div.innerText || '').trim();
 }
 
+/* Decode a JWT payload client-side (no verification — UI gating only).
+ * Returns the decoded object, or null on failure. */
+function decodeJwt(token) {
+  if (!token) return null;
+  try {
+    const part = token.split('.')[1];
+    if (!part) return null;
+    const b64    = part.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+    const json   = decodeURIComponent(
+      atob(padded)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+/* Whether the CURRENT logged-in session is a staff account.
+ * Staff are the only accounts allowed to reply. We check every reliable
+ * signal available on the client so detection works regardless of which
+ * shape the login flow stored:
+ *   • JWT  → role === 'staff', or a staffId claim (only staff tokens carry it)
+ *   • user → role === 'staff', or a clientId / staffRole field
+ *            (Staff records have clientId & staffRole; client / admin /
+ *             team_leader User records never do). */
+function isStaffSession(auth) {
+  const payload = decodeJwt(auth.getToken());
+  if (payload) {
+    if (payload.role === 'staff') return true;
+    if (payload.staffId) return true;
+  }
+  const u = auth.getUser() || {};
+  if (u.role === 'staff') return true;
+  if (u.clientId != null && u.clientId !== '') return true;
+  if ('staffRole' in u) return true;
+  return false;
+}
+
 /* ─── Design tokens (inline, no global CSS) ──────────────────────── */
 const T = {
   bg: '#fff',
@@ -222,6 +264,10 @@ export default function MessageModal({
   onSelectThread,
 }) {
   const auth = useAuth();
+  // Reply bar reacts to the CURRENT logged-in user: staff can reply, while
+  // team leaders and clients get the read-only notice. Frontend-only — the
+  // detection reads the session token / stored user, no backend changes.
+  const isStaff = isStaffSession(auth);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -455,38 +501,116 @@ export default function MessageModal({
               ))}
             </div>
 
-            {/* ── Staff-only reply notice (non-interactive) ── */}
-            <div style={{
-              padding: '14px 20px',
-              borderTop: T.border,
-              background: T.bgSurface,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              flexShrink: 0,
-            }}>
+            {/* ── Reply bar (reacts to current logged-in user) ── */}
+            {isStaff ? (
+              /* ── Staff: interactive reply composer ── */
               <div style={{
-                width: 34, height: 34, borderRadius: '50%',
-                background: '#fff4e0', color: '#c07d00',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0, fontSize: 16,
+                padding: '14px 18px',
+                borderTop: T.border,
+                background: T.bgSurface,
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: 10,
+                flexShrink: 0,
               }}>
-                🔒
+                <textarea
+                  ref={textareaRef}
+                  value={replyText}
+                  onChange={(e) => {
+                    setReplyText(e.target.value);
+                    // Auto-grow up to a max height
+                    const el = e.target;
+                    el.style.height = 'auto';
+                    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+                  }}
+                  onFocus={() => setReplyFocused(true)}
+                  onBlur={() => setReplyFocused(false)}
+                  onKeyDown={(e) => {
+                    // Enter sends, Shift+Enter inserts a newline
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  placeholder="Type your reply…"
+                  rows={1}
+                  disabled={sending}
+                  style={{
+                    flex: 1,
+                    resize: 'none',
+                    maxHeight: 120,
+                    minHeight: 42,
+                    padding: '11px 14px',
+                    borderRadius: T.radiusSm,
+                    border: replyFocused ? `1px solid ${T.green}` : T.borderMid,
+                    outline: 'none',
+                    fontFamily: T.fontBody,
+                    fontSize: 13.5,
+                    lineHeight: 1.5,
+                    color: T.text,
+                    background: T.bg,
+                    transition: 'border .15s',
+                  }}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={sending || !replyText.trim()}
+                  style={{
+                    height: 42,
+                    padding: '0 18px',
+                    borderRadius: T.radiusSm,
+                    border: 'none',
+                    background: (sending || !replyText.trim()) ? T.faint : T.green,
+                    color: '#fff',
+                    fontFamily: T.fontBody,
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: (sending || !replyText.trim()) ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 7,
+                    flexShrink: 0,
+                    transition: 'background .15s',
+                  }}
+                >
+                  {sending ? <SpinnerIcon /> : <SendIcon />}
+                  {sending ? 'Sending' : 'Send'}
+                </button>
               </div>
-              <div>
+            ) : (
+              /* ── Non-staff (team leader / client): read-only notice ── */
+              <div style={{
+                padding: '14px 20px',
+                borderTop: T.border,
+                background: T.bgSurface,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                flexShrink: 0,
+              }}>
                 <div style={{
-                  fontFamily: T.fontBody, fontWeight: 700,
-                  fontSize: 13, color: T.text,
+                  width: 34, height: 34, borderRadius: '50%',
+                  background: '#fff4e0', color: '#c07d00',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, fontSize: 16,
                 }}>
-                  Replying is restricted to staff accounts
+                  🔒
                 </div>
-                <div style={{
-                  fontFamily: T.fontBody, fontSize: 11.5, color: T.muted, marginTop: 2,
-                }}>
-                  Only staff members can send messages to guests.
+                <div>
+                  <div style={{
+                    fontFamily: T.fontBody, fontWeight: 700,
+                    fontSize: 13, color: T.text,
+                  }}>
+                    Replying is restricted to staff accounts
+                  </div>
+                  <div style={{
+                    fontFamily: T.fontBody, fontSize: 11.5, color: T.muted, marginTop: 2,
+                  }}>
+                    Only staff members can send messages to guests.
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
           </>
         )}

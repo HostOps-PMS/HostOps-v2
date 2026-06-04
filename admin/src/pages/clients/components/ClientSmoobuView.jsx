@@ -1,17 +1,71 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getClientSmoobuData } from '../services/clientsService';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { getClientSmoobuData, getExchangeRate } from '../services/clientsService';
 
-// ── Currency config ───────────────────────────────────────────────
-const CURRENCIES = [
-  { code: 'USD', symbol: '$',  label: 'USD',  rate: 1 },
-  { code: 'PHP', symbol: '₱', label: 'PHP',  rate: 56 }, // approx fixed rate
+// ── Date helpers (same logic as frontend DateFilterBar) ──────────
+function toYMD(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function getRangeForPreset(preset) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  switch (preset) {
+    case 'daily': {
+      return { from: toYMD(today), to: toYMD(today) };
+    }
+    case 'weekly': {
+      const day = today.getDay(); // 0 = Sun
+      const mon = new Date(today);
+      mon.setDate(today.getDate() - ((day + 6) % 7)); // Monday
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      return { from: toYMD(mon), to: toYMD(sun) };
+    }
+    case 'monthly': {
+      const first = new Date(today.getFullYear(), today.getMonth(), 1);
+      const last  = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      return { from: toYMD(first), to: toYMD(last) };
+    }
+    case 'yearly': {
+      const first = new Date(today.getFullYear(), 0, 1);
+      const last  = new Date(today.getFullYear(), 11, 31);
+      return { from: toYMD(first), to: toYMD(last) };
+    }
+    default:
+      return null;
+  }
+}
+
+function fmtShort(ymd) {
+  if (!ymd) return '';
+  const [y, m, d] = ymd.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[+m - 1]} ${+d}, ${y}`;
+}
+
+const PRESETS = [
+  { id: 'daily',   label: 'Daily' },
+  { id: 'weekly',  label: 'Weekly' },
+  { id: 'monthly', label: 'Monthly' },
+  { id: 'yearly',  label: 'Yearly' },
+  { id: 'custom',  label: 'Custom' },
 ];
 
-// ── Helpers ──────────────────────────────────────────────────────
-function fmtMoney(n, currency) {
-  const c = CURRENCIES.find(x => x.code === currency) ?? CURRENCIES[0];
-  const converted = Number(n || 0) * c.rate;
-  return c.symbol + converted.toLocaleString('en-US', {
+// ── Money / formatting helpers ───────────────────────────────────
+function fmtMoney(n, currency, phpRate) {
+  // The data from the backend is originally in PHP.
+  // - If PHP, show raw value.
+  // - If USD, convert from PHP -> USD by dividing by the USD->PHP rate.
+  const converted = currency === 'PHP'
+    ? Number(n || 0)
+    : Number(n || 0) / (phpRate || 1);
+    
+  const symbol = currency === 'PHP' ? '₱' : '$';
+  return symbol + converted.toLocaleString('en-US', {
     minimumFractionDigits: 2, maximumFractionDigits: 2,
   });
 }
@@ -49,13 +103,7 @@ function channelColor(name) {
   return CHANNEL_COLORS[name] || '#8b9fa8';
 }
 
-function currentYear() {
-  const y = new Date().getFullYear();
-  return { from: `${y}-01-01`, to: `${y}-12-31` };
-}
-
 // ── Sub-components ───────────────────────────────────────────────
-
 function StatCard({ label, value, sub, accent }) {
   return (
     <div style={{
@@ -92,8 +140,7 @@ function SectionTitle({ children }) {
   );
 }
 
-// ── Currency Toggle ──────────────────────────────────────────────
-function CurrencyToggle({ currency, onChange }) {
+function CurrencyToggle({ currency, onChange, phpRate }) {
   return (
     <div style={{
       display: 'flex',
@@ -104,51 +151,273 @@ function CurrencyToggle({ currency, onChange }) {
       borderRadius: 999,
       padding: '3px 4px',
     }}>
-      {CURRENCIES.map(c => (
-        <button
-          key={c.code}
-          onClick={() => onChange(c.code)}
-          style={{
-            padding: '4px 12px',
-            borderRadius: 999,
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: '.75rem',
-            fontWeight: 600,
-            fontFamily: 'inherit',
-            transition: 'all .15s',
-            background: currency === c.code ? 'var(--color-brand, #26a676)' : 'transparent',
-            color: currency === c.code ? '#fff' : 'var(--color-muted, #6a8b7c)',
-          }}
-        >
-          {c.symbol} {c.label}
-        </button>
-      ))}
+      {['USD', 'PHP'].map(code => {
+        const symbol = code === 'PHP' ? '₱' : '$';
+        return (
+          <button
+            key={code}
+            onClick={() => onChange(code)}
+            title={code === 'PHP' ? `1 USD = ₱${phpRate.toFixed(4)}` : ''}
+            style={{
+              padding: '4px 12px',
+              borderRadius: 999,
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '.75rem',
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              transition: 'all .15s',
+              background: currency === code ? 'var(--color-brand, #26a676)' : 'transparent',
+              color: currency === code ? '#fff' : 'var(--color-muted, #6a8b7c)',
+            }}
+          >
+            {symbol} {code}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Date Filter Pill Bar ─────────────────────────────────────────
+function DatePresetBar({ activePreset, dateRange, onPresetChange, onCustomApply }) {
+  const [showCustomPop, setShowCustomPop] = useState(false);
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const popRef = useRef(null);
+
+  // Close popover on outside click
+  useEffect(() => {
+    function handler(e) {
+      if (popRef.current && !popRef.current.contains(e.target)) {
+        setShowCustomPop(false);
+      }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  function handlePreset(preset) {
+    if (preset === 'custom') {
+      setShowCustomPop(true);
+      onPresetChange('custom', null); // just mark active, don't load yet
+      return;
+    }
+    setShowCustomPop(false);
+    const range = getRangeForPreset(preset);
+    if (!range) return;
+    onPresetChange(preset, range);
+  }
+
+  function applyCustom() {
+    if (!customFrom || !customTo) { alert('Please select both dates.'); return; }
+    if (customFrom > customTo)    { alert('"From" must be before "To".'); return; }
+    setShowCustomPop(false);
+    onCustomApply({ from: customFrom, to: customTo });
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+      <div style={{
+        display: 'flex',
+        background: 'var(--color-surface-2, #f0f5f2)',
+        borderRadius: 12,
+        padding: 3,
+        gap: 2,
+      }}>
+        {PRESETS.map(({ id, label }) => {
+          const on = activePreset === id;
+          return (
+            <div
+              key={id}
+              style={{ position: id === 'custom' ? 'relative' : undefined }}
+              ref={id === 'custom' ? popRef : undefined}
+            >
+              <button
+                onClick={() => handlePreset(id)}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 9,
+                  fontSize: '.75rem',
+                  fontWeight: 600,
+                  fontFamily: 'inherit',
+                  color: on ? 'var(--color-text, #0c1c14)' : 'var(--color-muted, #6a8b7c)',
+                  background: on ? 'var(--color-surface, #fff)' : 'transparent',
+                  border: on ? '1.5px solid var(--color-border, #d6ebe0)' : '1.5px solid transparent',
+                  cursor: 'pointer',
+                  transition: 'all .15s',
+                  boxShadow: on ? '0 1px 4px rgba(0,0,0,.07)' : 'none',
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: id === 'custom' ? 5 : 0,
+                }}
+              >
+                {id === 'custom' && (
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2"/>
+                    <line x1="16" y1="2" x2="16" y2="6"/>
+                    <line x1="8" y1="2" x2="8" y2="6"/>
+                    <line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
+                )}
+                {label}
+                {id === 'custom' && on && dateRange.from && dateRange.to && (
+                  <span style={{
+                    fontSize: '.68rem',
+                    fontWeight: 600,
+                    color: 'var(--color-primary, #26a676)',
+                    marginLeft: 2,
+                    maxWidth: 160,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {fmtShort(dateRange.from)} – {fmtShort(dateRange.to)}
+                  </span>
+                )}
+              </button>
+
+              {/* Custom date popover */}
+              {id === 'custom' && showCustomPop && (
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  right: 0,
+                  background: 'var(--color-surface, #fff)',
+                  border: '1.5px solid var(--color-border, #e3ede8)',
+                  borderRadius: 14,
+                  boxShadow: '0 8px 32px rgba(0,0,0,.12)',
+                  padding: '16px',
+                  zIndex: 1200,
+                  minWidth: 280,
+                }}>
+                  <div style={{
+                    fontSize: '.7rem', fontWeight: 700,
+                    color: 'var(--color-muted, #9ab8a9)', letterSpacing: '.5px',
+                    textTransform: 'uppercase', marginBottom: 10,
+                  }}>
+                    Custom date range
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                    <label style={{ fontSize: '.75rem', color: 'var(--color-muted, #6a8b7c)', fontWeight: 600 }}>
+                      From
+                    </label>
+                    <input
+                      type="date"
+                      value={customFrom}
+                      onChange={e => setCustomFrom(e.target.value)}
+                      style={{
+                        padding: '9px 12px',
+                        border: '1.5px solid var(--color-border, #e3ede8)',
+                        borderRadius: 9,
+                        fontFamily: 'inherit',
+                        fontSize: '.82rem',
+                        color: 'var(--color-text, #0c1c14)',
+                        outline: 'none',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <label style={{ fontSize: '.75rem', color: 'var(--color-muted, #6a8b7c)', fontWeight: 600 }}>
+                      To
+                    </label>
+                    <input
+                      type="date"
+                      value={customTo}
+                      onChange={e => setCustomTo(e.target.value)}
+                      style={{
+                        padding: '9px 12px',
+                        border: '1.5px solid var(--color-border, #e3ede8)',
+                        borderRadius: 9,
+                        fontFamily: 'inherit',
+                        fontSize: '.82rem',
+                        color: 'var(--color-text, #0c1c14)',
+                        outline: 'none',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => setShowCustomPop(false)}
+                      style={{
+                        flex: 1, padding: '9px', background: 'var(--color-surface-2, #f0f5f2)',
+                        color: 'var(--color-text, #2a4e3c)', border: 'none', borderRadius: 9,
+                        fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={applyCustom}
+                      style={{
+                        flex: 1, padding: '9px', background: 'var(--color-primary, #26a676)',
+                        color: '#fff', border: 'none', borderRadius: 9,
+                        fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Display active range label */}
+      <span style={{ fontSize: '.72rem', color: 'var(--color-muted, #7a8c8e)', fontWeight: 500 }}>
+        {dateRange.from && dateRange.to && activePreset !== 'custom' && (
+          <>{fmtShort(dateRange.from)} – {fmtShort(dateRange.to)}</>
+        )}
+      </span>
     </div>
   );
 }
 
 // ── Main component ───────────────────────────────────────────────
-// Props:
-//   client   — the business account (User object)
-//   property — the Property object whose Smoobu data we're viewing
-//   onClose  — callback to close this view
 export default function ClientSmoobuView({ client, property, onClose }) {
   if (!client || !property) return null;
 
-  const [dateRange, setDateRange] = useState(currentYear);
+  // Default preset is 'yearly'
+  const [activePreset, setActivePreset] = useState('yearly');
+  const [dateRange, setDateRange] = useState(() => getRangeForPreset('yearly'));
   const [data,      setData]      = useState(null);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState(null);
-  const [currency,  setCurrency]  = useState('USD');
+  const [currency,  setCurrency]  = useState('PHP');
+  const [phpRate,   setPhpRate]   = useState(61.75);
+  const [rateLabel, setRateLabel] = useState('est.');
 
-  const load = useCallback(async () => {
+  // Fetch live exchange rate once on mount
+  useEffect(() => {
+    getExchangeRate()
+      .then(d => {
+        if (d?.rates?.PHP) {
+          setPhpRate(d.rates.PHP);
+          setRateLabel('live');
+        }
+      })
+      .catch(() => {}); // keep fallback silently
+  }, []);
+
+  // Data loader — same pattern as frontend useDashboardData
+  const load = useCallback(async (fromOverride, toOverride) => {
+    const from = fromOverride ?? dateRange.from;
+    const to   = toOverride   ?? dateRange.to;
+
     setLoading(true);
     setError(null);
     try {
-      // Pass both clientId and propertyId — the server needs the property
-      // to look up the smoobuApiKey without exposing it to the frontend.
-      const result = await getClientSmoobuData(client._id, property._id, dateRange);
+      const result = await getClientSmoobuData(client._id, property._id, { from, to });
       setData(result);
     } catch (err) {
       setError(err.message ?? 'Failed to load Smoobu data');
@@ -157,19 +426,47 @@ export default function ClientSmoobuView({ client, property, onClose }) {
     }
   }, [client._id, property._id, dateRange]);
 
-  useEffect(() => { load(); }, [load]);
+  // Load on mount
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const stats      = data?.stats      ?? {};
+  // Handle preset change
+  function handlePresetChange(preset, range) {
+    setActivePreset(preset);
+    if (range) {
+      setDateRange(range);
+      // Pass dates explicitly to avoid stale closure
+      load(range.from, range.to);
+    }
+  }
+
+  // Handle custom date apply
+  function handleCustomApply(range) {
+    setActivePreset('custom');
+    setDateRange(range);
+    load(range.from, range.to);
+  }
+
+  // Read stats directly from data.stats — same field names as the backend getDashboard returns
+  const stats = data?.stats ?? {};
+  const revenue        = stats.revenue        ?? 0;
+  const bookings       = stats.bookings       ?? 0;
+  const nights         = stats.nights         ?? 0;
+  const occupancy      = stats.occupancy      ?? 0;
+  const cancellations  = stats.cancellations  ?? 0;
+  const cancelledNights = stats.cancelledNights ?? 0;
+
   const properties = data?.properties ?? [];
   const byChannel  = data?.byChannel  ?? {};
 
-  // Limit to 10 recent bookings
-  const bookings = (data?.bookings ?? [])
+  const recentBookings = (data?.bookings ?? [])
     .filter(b => b.type !== 'cancellation' && !b['is-blocked-booking'])
     .sort((a, b) => new Date(b['created-at'] || b.arrival) - new Date(a['created-at'] || a.arrival))
     .slice(0, 10);
 
   const totalChRev = Object.values(byChannel).reduce((s, c) => s + c.revenue, 0);
+
+  // Curried money formatter with live rate
+  const money = (n) => fmtMoney(n, currency, phpRate);
 
   return (
     <div
@@ -197,7 +494,6 @@ export default function ClientSmoobuView({ client, property, onClose }) {
               <div style={{ fontWeight: 600, fontSize: '.9375rem', color: 'var(--color-text, #1a2e2a)' }}>
                 {client.firstName} {client.lastName}
               </div>
-              {/* Show which property we're viewing */}
               <div style={{ fontSize: '.75rem', color: 'var(--color-muted, #7a8c8e)' }}>
                 {property.name} · Smoobu Dashboard
               </div>
@@ -209,42 +505,23 @@ export default function ClientSmoobuView({ client, property, onClose }) {
         {/* ── Scrollable body ── */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-          {/* Date range controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {/* Date preset pills + currency controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'space-between' }}>
+            <DatePresetBar
+              activePreset={activePreset}
+              dateRange={dateRange}
+              onPresetChange={handlePresetChange}
+              onCustomApply={handleCustomApply}
+            />
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <label style={{ fontSize: '.8125rem', color: 'var(--color-muted, #7a8c8e)', fontWeight: 500 }}>From</label>
-              <input
-                type="date"
-                value={dateRange.from}
-                onChange={(e) => setDateRange((r) => ({ ...r, from: e.target.value }))}
-                style={{
-                  fontSize: '.8125rem', padding: '5px 10px',
-                  border: '1px solid var(--color-border, #d4e8de)',
-                  borderRadius: 'var(--radius-sm, 6px)',
-                  background: 'var(--color-surface, #fff)',
-                  color: 'var(--color-text, #1a2e2a)',
-                }}
-              />
+              <CurrencyToggle currency={currency} onChange={setCurrency} phpRate={phpRate} />
+              <span style={{ fontSize: '.7rem', color: 'var(--color-muted, #7a8c8e)' }}>
+                1 USD = ₱{phpRate.toFixed(2)} <span style={{ opacity: .6 }}>({rateLabel})</span>
+              </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <label style={{ fontSize: '.8125rem', color: 'var(--color-muted, #7a8c8e)', fontWeight: 500 }}>To</label>
-              <input
-                type="date"
-                value={dateRange.to}
-                onChange={(e) => setDateRange((r) => ({ ...r, to: e.target.value }))}
-                style={{
-                  fontSize: '.8125rem', padding: '5px 10px',
-                  border: '1px solid var(--color-border, #d4e8de)',
-                  borderRadius: 'var(--radius-sm, 6px)',
-                  background: 'var(--color-surface, #fff)',
-                  color: 'var(--color-text, #1a2e2a)',
-                }}
-              />
-            </div>
-            <CurrencyToggle currency={currency} onChange={setCurrency} />
           </div>
 
-          {/* Loading */}
+          {/* Loading skeletons */}
           {loading && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', gap: 12 }}>
@@ -289,7 +566,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
           {/* Dashboard data */}
           {!loading && !error && data && !data.smoobuNotConnected && (
             <>
-              {/* Sub-properties (rooms/units) */}
+              {/* Sub-properties */}
               {property.subProperties?.length > 0 && (
                 <div style={{
                   background: 'var(--color-surface, #fff)',
@@ -320,27 +597,24 @@ export default function ClientSmoobuView({ client, property, onClose }) {
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 <StatCard
                   label="Total Revenue"
-                  value={fmtMoney(stats.totalRevenue, currency)}
+                  value={money(revenue)}
                   accent="var(--color-primary, #26a676)"
                 />
                 <StatCard
                   label="Bookings"
-                  value={stats.totalBookings ?? 0}
+                  value={bookings}
+                  sub={`${nights} nights total`}
                 />
                 <StatCard
-                  label="Avg. Stay"
-                  value={`${stats.avgNights ?? 0} nights`}
+                  label="Cancellations"
+                  value={cancellations}
+                  sub={`${cancelledNights} nights affected`}
                 />
-                <StatCard
-                  label="Occupancy"
-                  value={`${stats.occupancyRate ?? 0}%`}
-                />
+                <StatCard label="Occupancy" value={`${occupancy}%`} />
               </div>
 
               {/* 2-col grid: properties + channels */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-
-                {/* Properties */}
                 <div style={{
                   background: 'var(--color-surface, #fff)',
                   border: '1px solid var(--color-border, #e5e9ec)',
@@ -374,7 +648,6 @@ export default function ClientSmoobuView({ client, property, onClose }) {
                   )}
                 </div>
 
-                {/* Channel breakdown */}
                 <div style={{
                   background: 'var(--color-surface, #fff)',
                   border: '1px solid var(--color-border, #e5e9ec)',
@@ -401,13 +674,10 @@ export default function ClientSmoobuView({ client, property, onClose }) {
                                   {name}
                                 </span>
                                 <span style={{ color: 'var(--color-muted, #7a8c8e)' }}>
-                                  {fmtMoney(ch.revenue, currency)} · {ch.bookings} bk
+                                  {money(ch.revenue)} · {ch.bookings} bk
                                 </span>
                               </div>
-                              <div style={{
-                                height: 5, borderRadius: 3,
-                                background: 'var(--color-border, #e5e9ec)', overflow: 'hidden',
-                              }}>
+                              <div style={{ height: 5, borderRadius: 3, background: 'var(--color-border, #e5e9ec)', overflow: 'hidden' }}>
                                 <div style={{
                                   height: '100%', width: `${pct}%`,
                                   background: color, borderRadius: 3,
@@ -422,7 +692,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
                 </div>
               </div>
 
-              {/* ── Recent bookings ── */}
+              {/* Recent bookings table */}
               <div style={{
                 background: 'var(--color-surface, #fff)',
                 border: '1px solid var(--color-border, #e5e9ec)',
@@ -434,15 +704,13 @@ export default function ClientSmoobuView({ client, property, onClose }) {
                   padding: '14px 20px 12px',
                   borderBottom: '1px solid var(--color-border, #e5e9ec)',
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  borderRadius: 'var(--radius-md, 10px) var(--radius-md, 10px) 0 0',
-                  background: 'var(--color-surface, #fff)',
                 }}>
                   <SectionTitle>Recent Bookings</SectionTitle>
                   <span style={{ fontSize: '.8125rem', color: 'var(--color-muted, #7a8c8e)' }}>
-                    {bookings.length} shown
+                    {recentBookings.length} shown
                   </span>
                 </div>
-                {bookings.length === 0 ? (
+                {recentBookings.length === 0 ? (
                   <div style={{ padding: '30px 20px', textAlign: 'center', color: 'var(--color-muted, #7a8c8e)', fontSize: '.875rem' }}>
                     No confirmed bookings in this period.
                   </div>
@@ -466,10 +734,10 @@ export default function ClientSmoobuView({ client, property, onClose }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {bookings.map((b, i) => {
+                        {recentBookings.map((b, i) => {
                           const channel = b.channel?.name || 'Direct';
                           const color   = channelColor(channel);
-                          const nights  = nightsBetween(b.arrival, b.departure);
+                          const nts     = nightsBetween(b.arrival, b.departure);
                           return (
                             <tr
                               key={b.id ?? i}
@@ -487,23 +755,17 @@ export default function ClientSmoobuView({ client, property, onClose }) {
                                 <span style={{
                                   display: 'inline-flex', alignItems: 'center', gap: 4,
                                   padding: '2px 8px', borderRadius: 99,
-                                  background: color + '18', color: color,
+                                  background: color + '18', color,
                                   fontWeight: 600, fontSize: '.75rem',
                                 }}>
                                   {channel}
                                 </span>
                               </td>
-                              <td style={{ padding: '10px 12px', color: 'var(--color-muted, #7a8c8e)', whiteSpace: 'nowrap' }}>
-                                {fmtDate(b.arrival)}
-                              </td>
-                              <td style={{ padding: '10px 12px', color: 'var(--color-muted, #7a8c8e)', whiteSpace: 'nowrap' }}>
-                                {fmtDate(b.departure)}
-                              </td>
-                              <td style={{ padding: '10px 12px', color: 'var(--color-muted, #7a8c8e)', textAlign: 'center' }}>
-                                {nights}
-                              </td>
+                              <td style={{ padding: '10px 12px', color: 'var(--color-muted, #7a8c8e)', whiteSpace: 'nowrap' }}>{fmtDate(b.arrival)}</td>
+                              <td style={{ padding: '10px 12px', color: 'var(--color-muted, #7a8c8e)', whiteSpace: 'nowrap' }}>{fmtDate(b.departure)}</td>
+                              <td style={{ padding: '10px 12px', color: 'var(--color-muted, #7a8c8e)', textAlign: 'center' }}>{nts}</td>
                               <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-primary, #26a676)', whiteSpace: 'nowrap' }}>
-                                {fmtMoney(b.price, currency)}
+                                {money(b.price)}
                               </td>
                             </tr>
                           );

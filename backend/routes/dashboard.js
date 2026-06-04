@@ -22,7 +22,7 @@ router.use(requireAuth);
 // We keep it here for safety — it's an indexed lookup, negligible overhead.
 router.use(async (req, res, next) => {
   try {
-    const userWithKey = await User.findById(req.user._id).select('+smoobuApiKey');
+    const userWithKey = await User.findById(req.user._id).select('+smoobuApiKey +properties.smoobuApiKey');
     if (userWithKey) req.user = userWithKey;
     next();
   } catch (err) {
@@ -235,22 +235,33 @@ router.get('/dashboard', async (req, res, next) => {
     const propertyDbId = req.query.propertyDbId;
 
     if (propertyDbId) {
-      const userWithKeys = await User.findById(req.user._id)
-        .select('+properties.smoobuApiKey +smoobuApiKey')
-        .lean();
-      if (userWithKeys) {
-        const matchedProp = (userWithKeys.properties || []).find(
-          (p) => String(p._id) === String(propertyDbId)
-        );
-        if (matchedProp?.smoobuApiKey?.trim()) {
-          // Use a plain object spread so we never touch Mongoose internals.
-          // smoobu.js only reads plain properties (smoobuApiKey, _id, etc.)
-          // so a lean plain object is safe here.
-          userForDashboard = {
-            ...userWithKeys,
-            smoobuApiKey: matchedProp.smoobuApiKey.trim(),
-          };
-        }
+      // ── Resolve the correct owner for the property lookup ──────────────────
+      // req.user is already the correct business account for staff (set by
+      // requireAuth: req.user = clientUser) and for clientAccount sessions.
+      //
+      // For team_leader: requireAuth injects the client's properties IN MEMORY
+      // onto req.user (user.properties = clientUser.properties). Combined with
+      // the router.use reload above (+properties.smoobuApiKey), req.user.properties[]
+      // already has all the data we need — no extra DB call required.
+      //
+      // For all roles: req.user.properties[] is fully loaded with smoobuApiKey
+      // (router.use selects +smoobuApiKey +properties.smoobuApiKey), so we can
+      // match the propertyDbId directly without another findById round-trip.
+      const matchedProp = (req.user.properties || []).find(
+        (p) => String(p._id) === String(propertyDbId)
+      );
+
+      if (matchedProp?.smoobuApiKey?.trim()) {
+        // Spread req.user into a plain object and inject the matched property's
+        // smoobuApiKey at root level so smoobu.js picks it up via MODE A.
+        const baseUser = typeof req.user.toObject === 'function'
+          ? req.user.toObject()
+          : { ...req.user };
+
+        userForDashboard = {
+          ...baseUser,
+          smoobuApiKey: matchedProp.smoobuApiKey.trim(),
+        };
       }
     }
 
@@ -503,6 +514,15 @@ async function assertReservationOwnership(req, reservationId) {
 // ─────────────────────────────────────────────────────────────────
 router.post('/messages/reply', async (req, res, next) => {
   try {
+    // ── Staff-only guard ───────────────────────────────────────────────
+    // Only staff accounts may reply to guest messages. Team leaders and
+    // clients (and any other non-staff role) are read-only for messaging.
+    // req.isStaff is set by requireAuth based on the JWT `role` claim, so
+    // this cannot be bypassed from the frontend.
+    if (!req.isStaff) {
+      return res.status(403).json({ error: 'Only staff accounts can reply to messages' });
+    }
+
     const { reservationId, subject, messageBody } = req.body;
     if (!reservationId || !messageBody) {
       return res.status(400).json({ error: 'reservationId and messageBody are required' });
@@ -531,7 +551,17 @@ router.get('/messages/:reservationId', async (req, res, next) => {
     await assertReservationOwnership(req, req.params.reservationId);
 
     const data = await getReservationMessages(req.user, req.params.reservationId);
-    res.json(data);
+
+    // Surface whether the current account may reply, using the SAME basis the
+    // POST /messages/reply guard enforces (req.isStaff). The frontend uses this
+    // to show/hide the reply composer authoritatively instead of guessing from
+    // the JWT — so staff always get the composer, team leaders/clients don't.
+    const isStaff = !!req.isStaff;
+    if (Array.isArray(data)) {
+      res.json({ messages: data, isStaff });
+    } else {
+      res.json({ ...data, isStaff });
+    }
   } catch (err) {
     if (err.status === 403 || err.message?.includes('Unauthorized')) {
       return res.status(403).json({ error: err.message });
@@ -667,6 +697,24 @@ router.get('/debug-bookings', async (req, res, next) => {
     console.log('\n=== DEBUG-BOOKINGS ===\n', JSON.stringify(results, null, 2), '\n=== END DEBUG ===\n');
 
     res.json(results);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// GET /api/exchange-rate
+// Proxies the exchange rate API to avoid exposing the external URL to the frontend
+// and avoids CSP/CORS issues.
+// ─────────────────────────────────────────────────────────────────
+router.get('/exchange-rate', async (req, res, next) => {
+  try {
+    const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Failed to fetch exchange rates' });
+    }
+    const data = await response.json();
+    res.json(data);
   } catch (err) {
     next(err);
   }
