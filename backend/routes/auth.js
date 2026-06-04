@@ -677,12 +677,46 @@ router.get('/my-properties', requireAuth, (req, res) => {
   //
   // Staff: filter down to only their assigned properties so PropertySelectForm
   // only shows what they have access to.
-  // Client / team_leader: return all properties.
+  //
+  // IMPORTANT — two ID spaces exist and must NOT be confused:
+  //   • p._id          — MongoDB ObjectId of the embedded property in user.properties[]
+  //                      This is what PropertySelectForm sends back as propertyDbId,
+  //                      and what dashboard.js uses to look up the smoobuApiKey.
+  //   • staff.propertyIds (req.staffPropertyIds) — Smoobu numeric apartment IDs,
+  //                      stored on the Staff document, used for Smoobu data filtering.
+  //
+  // Previously this filter compared req.staffPropertyIds (Smoobu IDs) against
+  // p._id (MongoDB ObjectId) — they never matched, so staff always got an empty
+  // property list and could never reach the PIN screen or the dashboard.
+  //
+  // Fix: each embedded property also carries its own Smoobu IDs inside
+  // p.subProperties[].smoobuId. We cross-reference through subProperties to
+  // find which embedded properties contain at least one of the staff's assigned
+  // Smoobu IDs, then return only those.
+  //
+  // Fallback: if subProperties haven't been synced yet (empty array), fall back
+  // to returning ALL of the client's properties so staff are never locked out
+  // on a fresh setup. The dashboard's MODE C filter (applyStaffPropertyFilter)
+  // will still enforce Smoobu-level access correctly.
   let list = (req.user.properties || []);
 
-  if (req.isStaff) {
-    const assigned = req.staffPropertyIds || [];
-    list = list.filter((p) => assigned.includes(String(p._id)));
+  if (req.isStaff && req.staffPropertyIds?.length) {
+    const assignedSmoobuIds = new Set(req.staffPropertyIds.map(String));
+
+    const filtered = list.filter((p) => {
+      const subs = p.subProperties || [];
+      // Match if any sub-property's Smoobu ID is in the staff's assigned set
+      return subs.some((sub) => assignedSmoobuIds.has(String(sub.smoobuId)));
+    });
+
+    // Only use the filtered list if we actually found matches.
+    // If subProperties haven't been synced yet, fall back to all properties
+    // so staff aren't shown a blank screen on a fresh account.
+    if (filtered.length > 0) {
+      list = filtered;
+    }
+    // If filtered.length === 0 (no subProperties synced), keep full list —
+    // MODE C in dashboard.js will still enforce data access correctly.
   }
 
   res.json({
@@ -1223,7 +1257,53 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
       staff.pinLockedUntil = null;
       await staff.save();
 
-      return res.json({ ok: true });
+      // ── Issue a fresh staff-scoped token ──────────────────────────
+      // Critical: the token in sessionStorage right now is the CLIENT's
+      // token (stored during /auth/login before PIN). If we don't replace
+      // it, every /api/dashboard call runs as req.user = client regardless
+      // of who entered the PIN — so staff always see the client's view.
+      //
+      // The staff token carries clientId in its payload so the auth
+      // middleware can do:
+      //   req.user  = clientUser  (for smoobuApiKey access)
+      //   req.staff = staffRecord (for property-level filtering)
+      //   req.isStaff = true
+      //
+      // This is what allows dashboard.js to use the business account's
+      // smoobu API key while still restricting data to the staff member's
+      // assigned properties only.
+      const staffAccessToken  = signStaffAccessToken(staff);
+      const staffRefreshToken = signStaffRefreshToken(staff);
+
+      await RefreshToken.create({
+        userId:    staff._id,
+        token:     hashToken(staffRefreshToken),
+        expiresAt: refreshTokenExpiry(),
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      res.cookie('rt', staffRefreshToken, {
+        httpOnly: true,
+        secure:   process.env.NODE_ENV === 'production',
+        sameSite: 'none',
+        maxAge:   7 * 24 * 60 * 60 * 1000,
+        path:     '/auth',
+      });
+
+      return res.json({
+        ok:          true,
+        accessToken: staffAccessToken,
+        // clientId is included so the frontend knows which business account
+        // owns the properties/smoobu keys — used by dashboard.js via the
+        // staff token's JWT payload (decoded by requireAuth middleware).
+        user: {
+          ...staff.toJSON(),
+          role:     'staff',
+          isStaff:  true,
+          clientId: staff.clientId.toString(),
+        },
+      });
     }
 
     // ── 2. Try User lookup by email ───────────────────────────────
@@ -1299,7 +1379,35 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
     ownUser.pinLockedUntil = null;
     await ownUser.save();
 
-    return res.json({ ok: true });
+    // ── Issue a fresh user-scoped token ───────────────────────────
+    // Same reason as the staff block above: replace whatever token was
+    // stored before PIN verification with a correctly-scoped one.
+    // For team_leader: dashboard.js will use serverId from req.user to
+    // look up the business account's smoobu keys (see dashboard.js fix).
+    const userAccessToken  = signAccessToken(ownUser);
+    const userRefreshToken = signRefreshToken(ownUser);
+
+    await RefreshToken.create({
+      userId:    ownUser._id,
+      token:     hashToken(userRefreshToken),
+      expiresAt: refreshTokenExpiry(),
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+
+    res.cookie('rt', userRefreshToken, {
+      httpOnly: true,
+      secure:   process.env.NODE_ENV === 'production',
+      sameSite: 'none',
+      maxAge:   7 * 24 * 60 * 60 * 1000,
+      path:     '/auth',
+    });
+
+    return res.json({
+      ok:          true,
+      accessToken: userAccessToken,
+      user:        ownUser.toJSON(),
+    });
   } catch (err) {
     next(err);
   }
