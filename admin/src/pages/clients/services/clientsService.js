@@ -227,6 +227,16 @@ export async function getClientSmoobuData(clientId, propertyId, { from, to } = {
   return request(`/api/clients/${clientId}/smoobu?${params.toString()}`);
 }
 
+/**
+ * GET /api/exchange-rate
+ * Fetches the exchange rate from the backend proxy.
+ *
+ * @returns {Promise<{rates: {PHP: number}}>}
+ */
+export async function getExchangeRate() {
+  return request(`/api/exchange-rate`);
+}
+
 const clientsService = {
   getClients,
   getClient,
@@ -239,5 +249,6 @@ const clientsService = {
   syncPropertySubProperties,
   deleteClientProperty,
   getClientSmoobuData,
+  getExchangeRate,
 };
 export default clientsService;

@@ -702,4 +702,22 @@ router.get('/debug-bookings', async (req, res, next) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────
+// GET /api/exchange-rate
+// Proxies the exchange rate API to avoid exposing the external URL to the frontend
+// and avoids CSP/CORS issues.
+// ─────────────────────────────────────────────────────────────────
+router.get('/exchange-rate', async (req, res, next) => {
+  try {
+    const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Failed to fetch exchange rates' });
+    }
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
