@@ -179,6 +179,52 @@ export async function updateClientProperty(clientId, propertyId, data) {
 }
 
 /**
+ * POST /api/clients/:id/properties/:propertyId/picture
+ * Admin uploads an image for a property and/or updates the crop data.
+ *
+ * @param {string} clientId
+ * @param {string} propertyId
+ * @param {File|Blob|null} file
+ * @param {Object} [cropData]
+ * @returns {Promise<{ message: string, propertyPicture: string, propertyPictureOriginal: string, propertyPictureCropData: any }>}
+ */
+export async function uploadPropertyPicture(clientId, propertyId, file, cropData) {
+  const formData = new FormData();
+  if (file) formData.append('picture', file);
+  if (cropData) formData.append('cropData', JSON.stringify(cropData));
+
+  const token = sessionStorage.getItem('hp_access_token');
+  const apiKey = import.meta.env.VITE_API_KEY ?? '';
+
+  const headers = {};
+  if (apiKey) headers['x-api-key'] = apiKey;
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  // Use raw fetch since we need to send FormData and NOT set Content-Type to application/json
+  const res = await fetch(`${BASE}/api/clients/${clientId}/properties/${propertyId}/picture`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (!res.ok) {
+    let errorMsg = `API ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body.error) errorMsg = body.error;
+    } catch {
+      // Response was not JSON (e.g., 502 HTML page from proxy)
+      errorMsg = `Server error (${res.status})`;
+    }
+    const err = new Error(errorMsg);
+    err.status = res.status;
+    throw err;
+  }
+
+  return res.json();
+}
+
+/**
  * POST /api/clients/:id/properties/:propertyId/sync
  * Triggers a Smoobu sync for a property — fetches all rooms/units
  * (apartments) from Smoobu and stores them as subProperties.
@@ -246,6 +292,7 @@ const clientsService = {
   getClientProperties,
   createClientProperty,
   updateClientProperty,
+  uploadPropertyPicture,
   syncPropertySubProperties,
   deleteClientProperty,
   getClientSmoobuData,
