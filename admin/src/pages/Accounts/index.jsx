@@ -2,6 +2,7 @@
 // ─────────────────────────────────────────────────────────────────
 // Admin-only page: shows all Users + Staffs in one view.
 // Displays pinAttempts, pinPermanentlyLocked, pinLockedUntil.
+// UI matches StaffTable style: floating tab bar + card with filter bar.
 // ─────────────────────────────────────────────────────────────────
 import { useEffect, useState, useCallback } from 'react';
 import Sidebar from '../Sidebar';
@@ -113,11 +114,8 @@ function UnlockConfirmModal({ account, onClose, onUnlocked }) {
   const [loading, setLoading]                 = useState(false);
   const [error, setError]                     = useState('');
   const [recoveryLoading, setRecoveryLoading] = useState(true);
-  const [recoveryRequest, setRecoveryRequest] = useState(null); // only pending requests
+  const [recoveryRequest, setRecoveryRequest] = useState(null);
 
-  // Fetch PENDING recovery request for this account on modal open.
-  // Resolved/dismissed requests are not returned by the backend —
-  // they belong to a past lockout instance.
   useEffect(() => {
     async function loadRecovery() {
       setRecoveryLoading(true);
@@ -135,9 +133,6 @@ function UnlockConfirmModal({ account, onClose, onUnlocked }) {
     loadRecovery();
   }, [account.email]);
 
-  // Unlock is only allowed when there is a pending recovery request.
-  // This ensures the user has formally requested recovery for this
-  // specific lockout instance before the admin can act.
   const canUnlock = !recoveryLoading && recoveryRequest !== null;
 
   async function handleUnlock() {
@@ -154,7 +149,7 @@ function UnlockConfirmModal({ account, onClose, onUnlocked }) {
         },
         body: JSON.stringify({
           email:       account.email,
-          accountType: account.accountType, // 'user' | 'staff'
+          accountType: account.accountType,
         }),
       });
 
@@ -187,7 +182,6 @@ function UnlockConfirmModal({ account, onClose, onUnlocked }) {
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* ── Header ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <div style={{
             width: 40, height: 40, borderRadius: 10,
@@ -209,7 +203,6 @@ function UnlockConfirmModal({ account, onClose, onUnlocked }) {
           <strong> pinPermanentlyLocked</strong> to false for this account.
         </p>
 
-        {/* ── Recovery Request Section ── */}
         <div style={{
           background: recoveryLoading ? '#f9fafb' : (recoveryRequest ? '#f9fafb' : '#fef9f0'),
           border: `1px solid ${recoveryLoading ? '#e5e7eb' : (recoveryRequest ? '#e5e7eb' : '#fde68a')}`,
@@ -249,7 +242,6 @@ function UnlockConfirmModal({ account, onClose, onUnlocked }) {
             </div>
           ) : recoveryRequest ? (
             <div>
-              {/* Reason */}
               <div style={{
                 background: '#fff',
                 border: '1px solid #e5e7eb',
@@ -263,14 +255,12 @@ function UnlockConfirmModal({ account, onClose, onUnlocked }) {
               }}>
                 "{recoveryRequest.reason}"
               </div>
-              {/* Meta */}
               <div style={{ display: 'flex', gap: 16, fontSize: 11, color: '#9ca3af' }}>
                 <span>Submitted: {fmt(recoveryRequest.createdAt)}</span>
                 <span>Type: {recoveryRequest.accountType}</span>
               </div>
             </div>
           ) : (
-            /* No pending request — unlock is blocked */
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>⚠️</span>
               <div>
@@ -327,23 +317,55 @@ function UnlockConfirmModal({ account, onClose, onUnlocked }) {
   );
 }
 
+/* ── Tab Icons ───────────────────────────────────────────────────── */
+const TAB_ICONS = {
+  all: (
+    <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 5h14M3 10h14M3 15h14" strokeLinecap="round"/>
+    </svg>
+  ),
+  users: (
+    <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="10" cy="7" r="3"/>
+      <path d="M4 17c0-3.314 2.686-6 6-6s6 2.686 6 6" strokeLinecap="round"/>
+    </svg>
+  ),
+  staffs: (
+    <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="7" cy="7" r="3"/>
+      <path d="M1 17c0-3.314 2.686-6 6-6"/>
+      <circle cx="14" cy="7" r="3"/>
+      <path d="M13 11c3.314 0 6 2.686 6 6" strokeLinecap="round"/>
+    </svg>
+  ),
+  locked: (
+    <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="9" width="14" height="10" rx="2"/>
+      <path d="M7 9V6a3 3 0 016 0v3" strokeLinecap="round"/>
+    </svg>
+  ),
+};
+
 /* ── Row ─────────────────────────────────────────────────────────── */
-function AccountRow({ account, onUnlock }) {
+function AccountRow({ account, onUnlock, isLast }) {
   const now = new Date();
   const tempLocked = account.pinLockedUntil && new Date(account.pinLockedUntil) > now;
   const needsAttention = account.pinPermanentlyLocked || tempLocked;
 
   return (
-    <tr style={{
-      borderBottom: '1px solid #f3f4f6',
-      background: needsAttention ? 'rgba(254,242,242,0.4)' : 'transparent',
-      transition: 'background 0.12s',
-    }}
-      onMouseEnter={e => !needsAttention && (e.currentTarget.style.background = '#fafafa')}
-      onMouseLeave={e => !needsAttention && (e.currentTarget.style.background = 'transparent')}
+    <tr
+      style={{
+        borderBottom: isLast ? 'none' : '1px solid #f7f8fa',
+        background: needsAttention ? 'rgba(254,242,242,0.5)' : 'transparent',
+        borderLeft: needsAttention ? '3px solid #fca5a5' : '3px solid transparent',
+        transition: 'background 0.1s',
+        cursor: 'default',
+      }}
+      onMouseEnter={e => { if (!needsAttention) e.currentTarget.style.background = '#fafbff'; }}
+      onMouseLeave={e => { if (!needsAttention) e.currentTarget.style.background = 'transparent'; }}
     >
       {/* Name / Email */}
-      <td style={{ padding: '12px 16px' }}>
+      <td style={{ padding: '12px 16px 12px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
             width: 32, height: 32, borderRadius: '50%',
@@ -356,13 +378,13 @@ function AccountRow({ account, onUnlock }) {
             {(account.name || account.email || '?')[0].toUpperCase()}
           </div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>{account.name || '—'}</div>
-            <div style={{ fontSize: 11, color: '#888' }}>{account.email}</div>
+            <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827' }}>{account.name || '—'}</div>
+            <div style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: 2 }}>{account.email}</div>
           </div>
         </div>
       </td>
 
-      {/* Type / Role */}
+      {/* Role */}
       <td style={{ padding: '12px 16px' }}>
         <RoleBadge role={account.role} type={account.accountType} />
       </td>
@@ -376,47 +398,50 @@ function AccountRow({ account, onUnlock }) {
         />
       </td>
 
-      {/* pinAttempts */}
+      {/* Attempts */}
       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
         <span style={{
-          fontSize: 13, fontWeight: 700,
+          fontSize: '0.83rem', fontWeight: 700,
           color: account.pinAttempts > 0 ? '#ea580c' : '#374151',
         }}>
           {account.pinAttempts ?? 0}
         </span>
       </td>
 
-      {/* pinLockedUntil */}
-      <td style={{ padding: '12px 16px', fontSize: 12, color: '#555' }}>
+      {/* Locked Until */}
+      <td style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
         {fmt(account.pinLockedUntil)}
       </td>
 
       {/* Last Login */}
-      <td style={{ padding: '12px 16px', fontSize: 12, color: '#888' }}>
+      <td style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
         {fmt(account.lastLoginAt)}
       </td>
 
       {/* Actions */}
-      <td style={{ padding: '12px 16px' }}>
-        {(account.pinPermanentlyLocked || account.pinAttempts > 0 || tempLocked) && (
-          <button
-            onClick={() => onUnlock(account)}
-            style={{
-              padding: '5px 12px', borderRadius: 7, border: '1px solid #d1fae5',
-              background: '#f0fdf4', color: '#16a34a', fontSize: 12, fontWeight: 600,
-              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5,
-              transition: 'background 0.12s',
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
-            onMouseLeave={e => e.currentTarget.style.background = '#f0fdf4'}
-          >
-            <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="9" width="14" height="10" rx="2" />
-              <path d="M7 9V6a3 3 0 016 0v3" strokeLinecap="round" />
-            </svg>
-            Unlock
-          </button>
-        )}
+      <td style={{ padding: '12px 16px 12px 8px', whiteSpace: 'nowrap' }}>
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+          {(account.pinPermanentlyLocked || account.pinAttempts > 0 || tempLocked) && (
+            <button
+              onClick={() => onUnlock(account)}
+              style={{
+                padding: '5px 14px', borderRadius: 6,
+                border: '1px solid #d1fae5', background: '#f0fdf4',
+                fontSize: '0.78rem', fontWeight: 600, color: '#16a34a', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                transition: 'background 0.12s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
+              onMouseLeave={e => e.currentTarget.style.background = '#f0fdf4'}
+            >
+              <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="9" width="14" height="10" rx="2" />
+                <path d="M7 9V6a3 3 0 016 0v3" strokeLinecap="round" />
+              </svg>
+              Unlock
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );
@@ -448,7 +473,6 @@ export default function AccountsPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Normalise into one flat list
   const combined = [
     ...users.map(u => ({
       ...u,
@@ -463,6 +487,20 @@ export default function AccountsPage() {
   ];
 
   const now = new Date();
+
+  const lockedCount = combined.filter(a =>
+    a.pinPermanentlyLocked ||
+    (a.pinLockedUntil && new Date(a.pinLockedUntil) > now) ||
+    a.pinAttempts > 0
+  ).length;
+
+  const tabs = [
+    { id: 'all',    label: 'All',         count: combined.length },
+    { id: 'users',  label: 'Users',       count: users.length },
+    { id: 'staffs', label: 'Staffs',      count: staffs.length },
+    { id: 'locked', label: 'PIN Issues',  count: lockedCount, warn: lockedCount > 0 },
+  ];
+
   const filtered = combined.filter(a => {
     const q = search.toLowerCase();
     const matchSearch = !q ||
@@ -477,19 +515,6 @@ export default function AccountsPage() {
       a.pinAttempts > 0;
     return true;
   });
-
-  const lockedCount = combined.filter(a =>
-    a.pinPermanentlyLocked ||
-    (a.pinLockedUntil && new Date(a.pinLockedUntil) > now) ||
-    a.pinAttempts > 0
-  ).length;
-
-  const tabs = [
-    { id: 'all',    label: 'All Accounts', count: combined.length },
-    { id: 'users',  label: 'Users',        count: users.length },
-    { id: 'staffs', label: 'Staffs',       count: staffs.length },
-    { id: 'locked', label: 'PIN Issues',   count: lockedCount, warn: lockedCount > 0 },
-  ];
 
   return (
     <div className="db-layout">
@@ -519,169 +544,203 @@ export default function AccountsPage() {
         </header>
 
         <div className="cl-content">
-        {/* Header */}
-        <header className="db-content__header" style={{ marginBottom: 28 }}>
-          <div>
-            <h1 className="db-content__title">Accounts</h1>
-            <p className="db-content__sub">
-              All platform users and staffs — PIN lockout status, attempts, and access control.
-            </p>
-          </div>
-        </header>
-
-        {/* Toolbar */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 12,
-          marginBottom: 16, flexWrap: 'wrap',
-        }}>
-          {/* Search */}
-          <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: 340 }}>
-            <svg
-              width="14" height="14" viewBox="0 0 20 20" fill="none"
-              stroke="#aaa" strokeWidth="1.8"
-              style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
-            >
-              <circle cx="9" cy="9" r="6" />
-              <path d="M15 15l-3.5-3.5" strokeLinecap="round" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search by name, email, role…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{
-                width: '100%', padding: '8px 10px 8px 32px',
-                borderRadius: 10, border: '1px solid #e5e7eb',
-                fontSize: 13, outline: 'none', background: '#fff',
-                color: '#222', fontFamily: 'inherit',
-              }}
-            />
-          </div>
-
-          {/* Tabs */}
-          <div style={{ display: 'flex', gap: 4, background: '#f3f4f6', borderRadius: 10, padding: 3 }}>
-            {tabs.map(t => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                style={{
-                  padding: '5px 12px', borderRadius: 7, border: 'none',
-                  background: tab === t.id ? '#fff' : 'transparent',
-                  color: tab === t.id ? '#0c1c14' : '#888',
-                  fontWeight: tab === t.id ? 600 : 400,
-                  fontSize: 12, cursor: 'pointer',
-                  boxShadow: tab === t.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                  transition: 'all 0.12s',
-                  display: 'flex', alignItems: 'center', gap: 5,
-                }}
-              >
-                {t.label}
-                <span style={{
-                  background: t.warn ? '#fef2f2' : (tab === t.id ? '#f0fdf4' : '#e5e7eb'),
-                  color: t.warn ? '#dc2626' : (tab === t.id ? '#16a34a' : '#888'),
-                  borderRadius: 10, padding: '1px 6px', fontSize: 10, fontWeight: 700,
-                }}>
-                  {t.count}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          {/* Refresh */}
-          <button
-            onClick={loadData}
-            disabled={loading}
-            style={{
-              padding: '7px 14px', borderRadius: 9, border: '1px solid #e5e7eb',
-              background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              display: 'inline-flex', alignItems: 'center', gap: 5, color: '#555',
-              transition: 'background 0.12s',
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
-            onMouseLeave={e => e.currentTarget.style.background = '#fff'}
-          >
-            <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"
-              style={{ animation: loading ? 'spin 0.8s linear infinite' : 'none' }}
-            >
-              <path d="M4 4a8 8 0 0112 0M16 16a8 8 0 01-12 0" strokeLinecap="round" />
-              <path d="M20 4l-4 0 0 4" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M0 16l4 0 0-4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Refresh
-          </button>
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div style={{
-            background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10,
-            padding: '12px 16px', marginBottom: 16, color: '#dc2626', fontSize: 13,
-          }}>
-            {error}
-          </div>
-        )}
-
-        {/* Table */}
-        <div style={{
-          background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb',
-          overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-        }}>
-          {loading ? (
-            <div style={{ padding: '60px 0', textAlign: 'center', color: '#aaa', fontSize: 14 }}>
-              Loading accounts…
+          {/* Page Header */}
+          <header className="db-content__header" style={{ marginBottom: 28 }}>
+            <div>
+              <h1 className="db-content__title">Accounts</h1>
+              <p className="db-content__sub">
+                All platform users and staffs — PIN lockout status, attempts, and access control.
+              </p>
             </div>
-          ) : filtered.length === 0 ? (
-            <div style={{ padding: '60px 0', textAlign: 'center', color: '#aaa', fontSize: 14 }}>
-              No accounts found.
-            </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f9fafb', borderBottom: '1px solid #f3f4f6' }}>
-                    {['Account', 'Role', 'PIN Status', 'Attempts', 'Locked Until', 'Last Login', 'Actions'].map(h => (
-                      <th key={h} style={{
-                        padding: '10px 16px', textAlign: h === 'Attempts' ? 'center' : 'left',
-                        fontSize: 11, fontWeight: 600, color: '#888',
-                        textTransform: 'uppercase', letterSpacing: '0.06em',
-                        whiteSpace: 'nowrap',
+          </header>
+
+          {/* ── Tab bar (floating, same as StaffTable) ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: 0, flexWrap: 'wrap', gap: 10, paddingBottom: 0,
+            }}>
+              <div style={{
+                display: 'inline-flex', alignItems: 'flex-end', gap: 0,
+                background: 'transparent',
+                marginBottom: '-1px',
+              }}>
+                {tabs.map(t => {
+                  const isActive = tab === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setTab(t.id)}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 7,
+                        padding: '9px 18px 10px',
+                        border: '1px solid',
+                        borderColor: isActive ? '#e8ecf0' : 'transparent',
+                        borderBottom: isActive ? '1px solid #fff' : 'none',
+                        borderRadius: '10px 10px 0 0',
+                        background: isActive ? '#fff' : 'transparent',
+                        marginBottom: '-1px',
+                        cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
+                        color: isActive ? '#3b5fc0' : '#9ca3af',
+                        transition: 'color 0.15s', whiteSpace: 'nowrap',
+                        position: 'relative', zIndex: isActive ? 2 : 0,
+                        boxShadow: 'none',
+                      }}
+                    >
+                      {TAB_ICONS[t.id]}
+                      {t.label}
+                      <span style={{
+                        fontSize: '0.72rem', fontWeight: 700,
+                        padding: '1px 7px', borderRadius: 999,
+                        background: t.warn
+                          ? (isActive ? '#fef2f2' : 'transparent')
+                          : (isActive ? '#eef2ff' : 'transparent'),
+                        color: t.warn
+                          ? (isActive ? '#dc2626' : '#f87171')
+                          : (isActive ? '#3b5fc0' : '#b0b7c3'),
                       }}>
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(a => (
-                    <AccountRow key={`${a.accountType}-${a._id}`} account={a} onUnlock={setUnlockTarget} />
-                  ))}
-                </tbody>
-              </table>
+                        {t.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* Footer count */}
-        {!loading && (
-          <div style={{ marginTop: 10, fontSize: 12, color: '#aaa', textAlign: 'right' }}>
-            Showing {filtered.length} of {combined.length} accounts
+            {/* ── Card (same structure as StaffTable) ── */}
+            <div style={{
+              background: '#fff', borderRadius: '0 12px 12px 12px',
+              border: '1px solid #e8ecf0', overflow: 'visible',
+              paddingBottom: 4, position: 'relative',
+            }}>
+              {/* Filter bar */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '12px 20px 14px', borderBottom: '1px solid #f0f2f5', flexWrap: 'wrap',
+              }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: 180, maxWidth: 280 }}>
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2"
+                    style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                    <circle cx="9" cy="9" r="6"/><path d="M15 15l-3.5-3.5" strokeLinecap="round"/>
+                  </svg>
+                  <input
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Search by name, email, role…"
+                    style={{
+                      width: '100%', boxSizing: 'border-box',
+                      padding: '7px 12px 7px 32px',
+                      borderRadius: 8, border: '1px solid #e5e7eb',
+                      fontSize: '0.83rem', outline: 'none', background: '#fafafa',
+                      color: '#1a202c',
+                    }}
+                  />
+                </div>
+
+                <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto' }}>
+                  {filtered.length} account{filtered.length !== 1 ? 's' : ''}
+                </span>
+
+                {/* Refresh button */}
+                <button
+                  onClick={loadData}
+                  disabled={loading}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 7,
+                    padding: '7px 16px', borderRadius: 999,
+                    border: '1px solid #e5e7eb', background: '#fff',
+                    color: '#374151', fontSize: '0.82rem', fontWeight: 700,
+                    cursor: loading ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#f9fafb'; }}
+                  onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                >
+                  <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"
+                    style={{ animation: loading ? 'spin 0.8s linear infinite' : 'none' }}>
+                    <path d="M4 4a8 8 0 0112 0M16 16a8 8 0 01-12 0" strokeLinecap="round" />
+                    <path d="M20 4l-4 0 0 4" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M0 16l4 0 0-4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Refresh
+                </button>
+              </div>
+
+              {/* Error */}
+              {error && (
+                <div style={{
+                  background: '#fff0ee', color: '#c13515',
+                  padding: '10px 20px', fontSize: '0.875rem',
+                }}>
+                  {error}
+                </div>
+              )}
+
+              {/* Table */}
+              {loading ? (
+                <div style={{ padding: 48, textAlign: 'center', color: '#a0aec0', fontSize: '0.875rem' }}>
+                  Loading accounts…
+                </div>
+              ) : filtered.length === 0 ? (
+                <div style={{ padding: 48, textAlign: 'center', color: '#a0aec0', fontSize: '0.875rem' }}>
+                  {combined.length === 0 ? 'No accounts yet.' : 'No results match your search.'}
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid #f0f2f5' }}>
+                        {['Account', 'Role', 'PIN Status', 'Attempts', 'Locked Until', 'Last Login', ''].map(h => (
+                          <th key={h} style={{
+                            padding: '10px 16px',
+                            textAlign: h === 'Attempts' ? 'center' : 'left',
+                            fontSize: '0.72rem', fontWeight: 700,
+                            color: '#9ca3af', letterSpacing: '0.06em',
+                            textTransform: 'uppercase',
+                            whiteSpace: 'nowrap', background: 'transparent',
+                          }}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((a, i) => (
+                        <AccountRow
+                          key={`${a.accountType}-${a._id}`}
+                          account={a}
+                          onUnlock={setUnlockTarget}
+                          isLast={i === filtered.length - 1}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Footer count */}
+            {!loading && (
+              <div style={{ marginTop: 10, fontSize: '0.72rem', color: '#b0b7c3', textAlign: 'right' }}>
+                Showing {filtered.length} of {combined.length} accounts
+              </div>
+            )}
           </div>
-        )}
-
-        {/* Unlock modal */}
-        {unlockTarget && (
-          <UnlockConfirmModal
-            account={unlockTarget}
-            onClose={() => setUnlockTarget(null)}
-            onUnlocked={loadData}
-          />
-        )}
-
-        <style>{`
-          @keyframes spin { to { transform: rotate(360deg); } }
-        `}</style>
+        </div>
       </div>
-      </div>
+
+      {/* Unlock modal */}
+      {unlockTarget && (
+        <UnlockConfirmModal
+          account={unlockTarget}
+          onClose={() => setUnlockTarget(null)}
+          onUnlocked={loadData}
+        />
+      )}
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }
