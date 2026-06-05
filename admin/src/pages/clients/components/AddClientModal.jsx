@@ -134,7 +134,7 @@ export default function AddClientModal({ onClose, onSuccess }) {
       className="db-modal-overlay"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="db-modal" style={{ width: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 20, padding: 0, overflow: 'hidden' }}>
+      <div className="db-modal" style={{ width: '95vw', maxWidth: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 20, padding: 0, overflow: 'hidden' }}>
         {/* Header */}
         <div style={{
           padding: '28px 32px 0 32px',
@@ -209,7 +209,7 @@ export default function AddClientModal({ onClose, onSuccess }) {
           {/* Properties Tab */}
           <div style={{ display: activeTab === 'properties' ? 'flex' : 'none', flexDirection: 'column', gap: 12 }}>
             <div style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Properties</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
               {properties.map((prop, index) => (
                 <div key={index} style={{ border: '1px solid var(--color-border, #e5e9ec)', borderRadius: 'var(--radius-md, 10px)', padding: '10px', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--color-surface-2, #f8faf9)' }}>
                   <input type="file" accept="image/*" style={{ display: 'none' }} id={`picture-input-${index}`}

@@ -59,7 +59,7 @@ export default function ImageCropModal({ imageUrl, initialCropData, onClose, onS
       <div
         className="db-modal"
         style={{
-          width: 520,
+          width: 'min(520px, 95vw)',
           display: 'flex',
           flexDirection: 'column',
           borderRadius: '16px',
@@ -138,8 +138,8 @@ export default function ImageCropModal({ imageUrl, initialCropData, onClose, onS
         <div
           style={{
             position: 'relative',
-            height: 380,
-            background: '#111',
+          height: 'clamp(240px, 45vw, 380px)',
+          background: '#111',
           }}
         >
           <Cropper
