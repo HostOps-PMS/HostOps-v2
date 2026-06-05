@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
+import safeStorage from '../../safeStorage';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://hostpilot-smoobu.onrender.com';
 const PIN_LENGTH = 6;
@@ -244,14 +245,19 @@ export default function PinModal({
       }
       if (data.user) {
         auth.setUser(data.user);
-        // Also mirror role into sessionStorage so any component that reads
-        // hp_user directly (e.g. index.jsx currentUser block) gets the right shape.
-        localStorage.setItem('hp_user', JSON.stringify(data.user));
+        // FIX: Use safeStorage instead of localStorage directly — localStorage
+        // throws a SecurityError on go.hostops.online, safeStorage catches it
+        // and falls back to an in-memory Map so the write always succeeds.
+        safeStorage.setItem('hp_user', JSON.stringify(data.user));
       }
 
       // Persist the selected property so the dashboard loads the right one.
+      // FIX: Use safeStorage instead of sessionStorage.
+      // sessionStorage is cleared on cross-origin redirects, so DashboardContext
+      // always read null on /dashboard and /inbox, set showPropertySelector:true,
+      // and triggered the ERR_TOO_MANY_REDIRECTS loop on every page refresh.
       if (selectedPropertyId) {
-        sessionStorage.setItem('hp_selected_property_id', selectedPropertyId);
+        safeStorage.setItem('hp_selected_property_id', String(selectedPropertyId));
       }
 
       showMsg('Access granted. Redirecting…', 'success');

@@ -447,7 +447,10 @@ export default function Navbar() {
       <>
         <nav style={{ ...t.navbar, position: "sticky" }}>
           <div style={t.inner}>
-            <Link to="/" style={t.logoWrap}>
+            {/* FIX: Link to /dashboard not / — clicking the logo on /inbox
+                was navigating to LoginPage which redirected back to /inbox,
+                making it impossible to get back to /dashboard from the logo. */}
+            <Link to="/dashboard" style={t.logoWrap}>
               <div style={t.logoBox}>
                 <i className="ti ti-home" style={t.logoIcon} aria-hidden="true" />
               </div>
@@ -641,7 +644,8 @@ export default function Navbar() {
     <>
       <nav style={{ ...t.navbar, position: "sticky", top: 0 }}>
         <div style={t.inner}>
-          <Link to="/" style={t.logoWrap}>
+          {/* FIX: Link to /dashboard not / — same as mobile fix above */}
+          <Link to="/dashboard" style={t.logoWrap}>
             <div style={t.logoBox}>
               <i className="ti ti-home" style={t.logoIcon} aria-hidden="true" />
             </div>
