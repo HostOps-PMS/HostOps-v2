@@ -1153,8 +1153,19 @@ router.post('/send-change-password-otp', requireAuth, async (req, res, next) => 
 //   423 { error: '...', permanentlyLocked: true } — account permanently locked
 // ─────────────────────────────────────────────────────────────────
 
-// Lock durations in milliseconds, indexed by attempt count that triggers the lock.
-// attempt 3 → 1 min, 4 → 3 min, 5 → 15 min, 6 → 1 hr, 7+ → permanent
+// ─── PIN lockout configuration ────────────────────────────────────
+// Escalation ladder (cumulative wrong attempts per account):
+//   attempt 1–2 : no lock — warning only
+//   attempt 3   : locked 1 minute
+//   attempt 4   : locked 3 minutes
+//   attempt 5   : locked 15 minutes
+//   attempt 6   : locked 1 hour
+//   attempt 7   : permanently locked (admin unlock required)
+//
+// pinAttempts is PERSISTED and keeps climbing across lock windows — it is
+// NEVER reset just because a temporary lock expired. The ONLY automatic
+// reset is the 48-hour rule below: if the last wrong attempt was 48h+ ago,
+// the counter starts fresh on the next verify call.
 const PIN_LOCK_DURATIONS = {
   3: 1  * 60 * 1000,
   4: 3  * 60 * 1000,
@@ -1162,8 +1173,125 @@ const PIN_LOCK_DURATIONS = {
   6: 60 * 60 * 1000,
 };
 
+const PIN_FIRST_LOCK_AT       = 3;                    // first attempt that triggers a lock
+const PIN_PERMANENT_THRESHOLD = 7;                    // attempt that triggers permanent lock
+const PIN_ATTEMPT_RESET_MS    = 48 * 60 * 60 * 1000;  // 48h since last wrong attempt → reset
+
 function getPinLockDuration(attempts) {
-  return PIN_LOCK_DURATIONS[attempts] ?? null; // null = permanent (7+)
+  return PIN_LOCK_DURATIONS[attempts] ?? null; // null = permanent (>= PIN_PERMANENT_THRESHOLD)
+}
+
+// ─────────────────────────────────────────────────────────────────
+// evaluatePinLockState(doc, now, contactNote)
+//
+// Runs BEFORE verifying the PIN. Shared by the staff and user paths so
+// both behave identically. It:
+//   1. Applies the 48h auto-reset (only reset trigger for attempts).
+//   2. Returns a blocking response if the account is permanently locked
+//      or inside an active temporary lock window.
+//   3. Clears an EXPIRED temporary lock flag WITHOUT touching pinAttempts,
+//      so the escalation ladder continues where it left off.
+//
+// Returns a { status, body } descriptor when the request must be blocked,
+// otherwise null (caller may proceed to verify the PIN).
+// ─────────────────────────────────────────────────────────────────
+async function evaluatePinLockState(doc, now, contactNote) {
+  // 48h rule: if the last wrong attempt was 48h+ ago, wipe the slate clean.
+  // This is the ONLY automatic reset of pinAttempts.
+  if (doc.lastPinFailAt && (now.getTime() - doc.lastPinFailAt.getTime()) >= PIN_ATTEMPT_RESET_MS) {
+    doc.pinAttempts    = 0;
+    doc.pinLockedUntil = null;
+    doc.lastPinFailAt  = null;
+    // Note: pinPermanentlyLocked is intentionally NOT cleared here — a
+    // permanent lock can only be lifted by an admin via /api/accounts/unlock.
+    await doc.save();
+  }
+
+  if (doc.pinPermanentlyLocked) {
+    return {
+      status: 423,
+      body: {
+        error: `Your account has been locked due to too many incorrect PIN attempts. Please contact your ${contactNote}.`,
+        permanentlyLocked: true,
+      },
+    };
+  }
+
+  if (doc.pinLockedUntil && doc.pinLockedUntil > now) {
+    return {
+      status: 423,
+      body: {
+        error: 'Too many incorrect PIN attempts. Please try again later.',
+        lockedUntil: doc.pinLockedUntil.toISOString(),
+      },
+    };
+  }
+
+  // Expired temporary lock → clear only the lock flag, KEEP pinAttempts so the
+  // next wrong PIN escalates to the next tier (1m → 3m → 15m → 1h → permanent).
+  if (doc.pinLockedUntil && doc.pinLockedUntil <= now) {
+    doc.pinLockedUntil = null;
+    await doc.save();
+  }
+
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// registerPinFailure(doc, now, contactNote)
+//
+// Called when a PIN is wrong. Increments the persisted attempt counter,
+// stamps lastPinFailAt (used by the 48h reset), applies the escalation
+// ladder, saves, and returns the { status, body } descriptor to send.
+// ─────────────────────────────────────────────────────────────────
+async function registerPinFailure(doc, now, contactNote) {
+  doc.pinAttempts   = (doc.pinAttempts || 0) + 1;
+  doc.lastPinFailAt = now;
+  const attempts    = doc.pinAttempts;
+
+  // attempt 7 → permanent lock
+  if (attempts >= PIN_PERMANENT_THRESHOLD) {
+    doc.pinPermanentlyLocked = true;
+    await doc.save();
+    return {
+      status: 423,
+      body: {
+        error: `Your account has been locked due to too many incorrect PIN attempts. Please contact your ${contactNote}.`,
+        permanentlyLocked: true,
+      },
+    };
+  }
+
+  // attempts 3–6 → temporary lock of escalating duration
+  const lockDuration = getPinLockDuration(attempts);
+  if (lockDuration !== null) {
+    doc.pinLockedUntil = new Date(now.getTime() + lockDuration);
+    await doc.save();
+    return {
+      status: 423,
+      body: {
+        error: 'Incorrect PIN. Account locked. Please try again later.',
+        lockedUntil: doc.pinLockedUntil.toISOString(),
+      },
+    };
+  }
+
+  // attempts 1–2 → no lock yet, just a warning
+  await doc.save();
+  const attemptsLeft = PIN_FIRST_LOCK_AT - attempts;
+  return {
+    status: 403,
+    body: {
+      error: `Incorrect PIN. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining before lockout.`,
+    },
+  };
+}
+
+// On a successful PIN entry, clear all lockout tracking for the account.
+function resetPinLockout(doc) {
+  doc.pinAttempts    = 0;
+  doc.pinLockedUntil = null;
+  doc.lastPinFailAt  = null;
 }
 
 router.post('/verify-pin', requireAuth, async (req, res, next) => {
@@ -1184,38 +1312,17 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
     // Staff accounts are always identified by email first, regardless
     // of what the JWT says. This handles edge cases where a staff member's
     // email might also exist in the User collection.
-    const staff = await Staff.findOne({ email: normalizedEmail }).select('+pin');
+    const staff = await Staff.findOne({ email: normalizedEmail }).select('+pin +lastPinFailAt');
 
     if (staff) {
       if (!staff.isActive) {
         return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
       }
 
-      // ── Check permanent lock ──────────────────────────────────────
-      if (staff.pinPermanentlyLocked) {
-        return res.status(423).json({
-          error: 'Your account has been locked due to too many incorrect PIN attempts. Please contact your manager.',
-          permanentlyLocked: true,
-        });
-      }
-
-      // ── Check temporary lock ──────────────────────────────────────
-      if (staff.pinLockedUntil && staff.pinLockedUntil > now) {
-        return res.status(423).json({
-          error: 'Too many incorrect PIN attempts. Please try again later.',
-          lockedUntil: staff.pinLockedUntil.toISOString(),
-        });
-      }
-
-      // ✅ FIX: If a previous temporary lock has expired, reset the attempt
-      // counter and clear the stale pinLockedUntil from the DB. Without this,
-      // pinAttempts keeps accumulating across lockout windows — so after a
-      // 1-minute lock expires, the very next wrong PIN immediately triggers
-      // the next (longer) lock tier instead of giving the user fresh attempts.
-      if (staff.pinLockedUntil && staff.pinLockedUntil <= now) {
-        staff.pinAttempts    = 0;
-        staff.pinLockedUntil = null;
-        await staff.save();
+      // ── Lockout pre-check (48h reset, permanent + temp lock, expiry) ──
+      const staffBlock = await evaluatePinLockState(staff, now, 'manager');
+      if (staffBlock) {
+        return res.status(staffBlock.status).json(staffBlock.body);
       }
 
       if (!propertyId) {
@@ -1226,37 +1333,8 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
       const pinMatch = await bcrypt.compare(String(pin), staff.pin || '');
 
       if (!pinMatch) {
-        staff.pinAttempts = (staff.pinAttempts || 0) + 1;
-        const attempts = staff.pinAttempts;
-
-        if (attempts >= 7) {
-          // Permanent lock
-          staff.pinPermanentlyLocked = true;
-          await staff.save();
-          return res.status(423).json({
-            error: 'Your account has been locked due to too many incorrect PIN attempts. Please contact your manager.',
-            permanentlyLocked: true,
-          });
-        }
-
-        const lockDuration = getPinLockDuration(attempts);
-        if (lockDuration !== null) {
-          staff.pinLockedUntil = new Date(now.getTime() + lockDuration);
-        }
-
-        await staff.save();
-
-        const attemptsLeft = 7 - attempts;
-        if (lockDuration !== null) {
-          return res.status(423).json({
-            error: `Incorrect PIN. Account locked. Please try again later.`,
-            lockedUntil: staff.pinLockedUntil.toISOString(),
-          });
-        }
-
-        return res.status(403).json({
-          error: `Incorrect PIN. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining before lockout.`,
-        });
+        const failResult = await registerPinFailure(staff, now, 'manager');
+        return res.status(failResult.status).json(failResult.body);
       }
 
       // ── PIN correct — verify property access ──────────────────────
@@ -1268,8 +1346,7 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
       }
 
       // ── Reset lockout counters on success ─────────────────────────
-      staff.pinAttempts    = 0;
-      staff.pinLockedUntil = null;
+      resetPinLockout(staff);
       await staff.save();
 
       // ── Issue a fresh staff-scoped token ──────────────────────────
@@ -1324,37 +1401,16 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
     // ── 2. Try User lookup by email ───────────────────────────────
     // Covers client, team_leader, and admin roles.
     // Property access is unrestricted for these roles — only PIN is checked.
-    const ownUser = await User.findOne({ email: normalizedEmail }).select('+pin');
+    const ownUser = await User.findOne({ email: normalizedEmail }).select('+pin +lastPinFailAt');
 
     if (!ownUser) {
       return res.status(404).json({ error: 'Account not found.' });
     }
 
-    // ── Check permanent lock ──────────────────────────────────────
-    if (ownUser.pinPermanentlyLocked) {
-      return res.status(423).json({
-        error: 'Your account has been locked due to too many incorrect PIN attempts. Please contact your administrator.',
-        permanentlyLocked: true,
-      });
-    }
-
-    // ── Check temporary lock ──────────────────────────────────────
-    if (ownUser.pinLockedUntil && ownUser.pinLockedUntil > now) {
-      return res.status(423).json({
-        error: 'Too many incorrect PIN attempts. Please try again later.',
-        lockedUntil: ownUser.pinLockedUntil.toISOString(),
-      });
-    }
-
-    // ✅ FIX: If a previous temporary lock has expired, reset the attempt
-    // counter and clear the stale pinLockedUntil from the DB. Without this,
-    // pinAttempts keeps accumulating across lockout windows — so after a
-    // 1-minute lock expires, the very next wrong PIN immediately triggers
-    // the next (longer) lock tier instead of giving the user fresh attempts.
-    if (ownUser.pinLockedUntil && ownUser.pinLockedUntil <= now) {
-      ownUser.pinAttempts    = 0;
-      ownUser.pinLockedUntil = null;
-      await ownUser.save();
+    // ── Lockout pre-check (48h reset, permanent + temp lock, expiry) ──
+    const userBlock = await evaluatePinLockState(ownUser, now, 'administrator');
+    if (userBlock) {
+      return res.status(userBlock.status).json(userBlock.body);
     }
 
     const pinHash = ownUser.pin || null;
@@ -1367,42 +1423,12 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
     const pinMatch = await bcrypt.compare(String(pin), pinHash);
 
     if (!pinMatch) {
-      ownUser.pinAttempts = (ownUser.pinAttempts || 0) + 1;
-      const attempts = ownUser.pinAttempts;
-
-      if (attempts >= 7) {
-        // Permanent lock
-        ownUser.pinPermanentlyLocked = true;
-        await ownUser.save();
-        return res.status(423).json({
-          error: 'Your account has been locked due to too many incorrect PIN attempts. Please contact your administrator.',
-          permanentlyLocked: true,
-        });
-      }
-
-      const lockDuration = getPinLockDuration(attempts);
-      if (lockDuration !== null) {
-        ownUser.pinLockedUntil = new Date(now.getTime() + lockDuration);
-      }
-
-      await ownUser.save();
-
-      const attemptsLeft = 7 - attempts;
-      if (lockDuration !== null) {
-        return res.status(423).json({
-          error: `Incorrect PIN. Account locked. Please try again later.`,
-          lockedUntil: ownUser.pinLockedUntil.toISOString(),
-        });
-      }
-
-      return res.status(403).json({
-        error: `Incorrect PIN. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining before lockout.`,
-      });
+      const failResult = await registerPinFailure(ownUser, now, 'administrator');
+      return res.status(failResult.status).json(failResult.body);
     }
 
     // ── Reset lockout counters on success ─────────────────────────
-    ownUser.pinAttempts    = 0;
-    ownUser.pinLockedUntil = null;
+    resetPinLockout(ownUser);
     await ownUser.save();
 
     // ── Issue a fresh user-scoped token ───────────────────────────
