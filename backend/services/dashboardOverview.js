@@ -23,7 +23,8 @@
 // ─────────────────────────────────────────────────────────────────
 
 import User  from '../models/user.js';
-import { getApartments, getBookings, getApiKeyForUser } from './smoobu.js';
+import { getApartments, getBookings, getApiKeyForUser, getApartmentDetail } from './smoobu.js';
+import { decrypt } from '../utils/encryption.js';
 
 // ── Helpers ───────────────────────────────────────────────────────
 
@@ -113,6 +114,54 @@ async function fetchPropertyData(propertyCtx, dateRange, clientId, clientName, p
 
   const apartments   = apartmentsData.apartments || [];
   const allBookings  = bookingsData.bookings     || [];
+
+  // ── Fetch per-apartment location detail (GET /apartments/{id}) ──────────────
+  // Each apartment in this Smoobu account gets its address + lat/lng so the
+  // dashboard PropertyMap can plot it. Failures per apartment are swallowed so
+  // one bad apartment id never breaks the whole property's data.
+  const apartmentLocations = await Promise.all(
+    apartments.map(async (apt) => {
+      const aptId = apt.id ?? apt;
+      try {
+        const detail = await getApartmentDetail(propertyCtx, aptId);
+        const loc = detail?.location || {};
+        const lat = parseFloat(loc.latitude);
+        const lng = parseFloat(loc.longitude);
+        return {
+          apartmentId:  aptId,
+          apartmentName: apt.name || detail?.name || `Apartment ${aptId}`,
+          propertyName,                 // the business' property group name
+          clientId,
+          clientName,
+          street:    loc.street  || '',
+          zip:       loc.zip     || '',
+          city:      loc.city    || '',
+          country:   loc.country || '',
+          latitude:  Number.isFinite(lat) ? lat : null,
+          longitude: Number.isFinite(lng) ? lng : null,
+          timeZone:  detail?.timeZone || null,
+          currency:  detail?.currency || null,
+          maxOccupancy: detail?.rooms?.maxOccupancy ?? null,
+          bedrooms:     detail?.rooms?.bedrooms ?? null,
+          bathrooms:    detail?.rooms?.bathrooms ?? null,
+          type:         detail?.type?.name || null,
+        };
+      } catch {
+        // Detail fetch failed — still return a stub so counts stay consistent.
+        return {
+          apartmentId:  aptId,
+          apartmentName: apt.name || `Apartment ${aptId}`,
+          propertyName,
+          clientId,
+          clientName,
+          street: '', zip: '', city: '', country: '',
+          latitude: null, longitude: null,
+          timeZone: null, currency: null,
+          maxOccupancy: null, bedrooms: null, bathrooms: null, type: null,
+        };
+      }
+    })
+  );
 
   // Filter bookings to the requested date range (arrival-based, matching Smoobu)
   const statsBookings = allBookings.filter((b) => {
@@ -215,12 +264,15 @@ async function fetchPropertyData(propertyCtx, dateRange, clientId, clientName, p
     clientId,
     clientName,
     propertyName,
-    stats: { revenue, nights, bookingCount, cancellations, cancelledNights, occupancy },
+    // availableNights lives inside `stats` because the aggregation reads
+    // r.stats.availableNights for the weighted overallOccupancy calculation.
+    stats: { revenue, nights, bookingCount, cancellations, cancelledNights, occupancy, availableNights },
     byChannel,
     revenueByMonth,
     bookingsByMonth,
     cancellationsByMonth,
     apartments,
+    apartmentLocations,
     confirmedBookings,
     recentCancellations,
     daysInRange,
@@ -387,12 +439,26 @@ function buildRecentActivities(propertyResults, limit = 20) {
  */
 export async function getDashboardOverview(opts = {}) {
   // ── 1. Load all clients + their embedded properties (with smoobuApiKey) ──
+  // smoobuApiKey is default-selected on the schema (no `.select('+...')`, which
+  // would re-trigger the "Path collision" error on an array sub-schema field).
+  // We still fetch every role that can own a Smoobu-connected property so the
+  // aggregated revenue/occupancy is complete.
   const allClients = await User.find({ role: { $in: ['client', 'team_leader', 'admin'] } })
-    .select('+properties.smoobuApiKey businessName firstName lastName email role createdAt properties')
+    .select('businessName firstName lastName email role createdAt propertyTagPrefix properties')
     .lean();
 
-  const totalClients    = await User.countDocuments({ role: 'client' });
-  const totalProperties = allClients.reduce((sum, c) => sum + (c.properties?.length || 0), 0);
+  // TOTAL CLIENTS = number of business accounts (role: 'client').
+  const totalClients = await User.countDocuments({ role: 'client' });
+
+  // TOTAL PROPERTIES = every property across all business accounts (role: 'client').
+  // Counted straight from the DB so it is independent of Smoobu connectivity.
+  const clientDocsForCount = await User.find({ role: 'client' })
+    .select('properties')
+    .lean();
+  const totalProperties = clientDocsForCount.reduce(
+    (sum, c) => sum + (Array.isArray(c.properties) ? c.properties.length : 0),
+    0
+  );
 
   // ── 2. Determine date ranges ──────────────────────────────────────────────
   const { from: monthFrom, to: monthTo } = getCurrentMonthRange();
@@ -411,6 +477,11 @@ export async function getDashboardOverview(opts = {}) {
   // Both passes share the same property context.
 
   const propertyTasks = [];
+  // Every property from the DB, regardless of Smoobu connectivity, so the
+  // Property Map dropdown + legend always show all business accounts. Smoobu
+  // coordinates (if the key decrypts and the apartment has lat/lng) are merged
+  // on top of these later. clientId+propertyName is the merge key.
+  const dbProperties = [];
 
   allClients.forEach((client) => {
     const clientName = client.businessName ||
@@ -418,14 +489,40 @@ export async function getDashboardOverview(opts = {}) {
       client.email;
 
     (client.properties || []).forEach((prop) => {
+      const propName = prop.propertyName || 'Property';
+
+      // Record the property for the map up front (no coords yet).
+      dbProperties.push({
+        apartmentId:  `db:${String(prop._id)}`, // unique fallback id
+        apartmentName: propName,
+        propertyName:  propName,
+        clientId:      String(client._id),
+        clientName,
+        street: '', zip: '', city: '', country: '',
+        latitude: null, longitude: null,
+        timeZone: null, currency: null,
+        maxOccupancy: null, bedrooms: null, bathrooms: null, type: null,
+      });
+
       if (!prop.smoobuApiKey || !prop.smoobuApiKey.trim()) return; // skip unconnected
+
+      // .lean() bypasses the schema getter, so prop.smoobuApiKey is still the
+      // value at rest. decrypt() returns the input unchanged if it isn't in the
+      // encrypted iv:enc:tag format, and safely returns the stored string if the
+      // auth tag check fails — so a bad/legacy key won't crash the whole request.
+      let decryptedKey = '';
+      try {
+        decryptedKey = decrypt(prop.smoobuApiKey) || '';
+      } catch {
+        decryptedKey = '';
+      }
+      if (!decryptedKey || !decryptedKey.trim()) return;
 
       const propertyCtx = {
         _id:               String(prop._id),
-        smoobuApiKey:      prop.smoobuApiKey.trim(),
+        smoobuApiKey:      decryptedKey.trim(),
         propertyTagPrefix: client.propertyTagPrefix || '',
       };
-      const propName = prop.propertyName || 'Property';
 
       propertyTasks.push({
         propName,
@@ -591,6 +688,59 @@ export async function getDashboardOverview(opts = {}) {
     .sort((a, b) => b.occupancy - a.occupancy)
     .slice(0, 10);
 
+  // ── 12b. Map locations ────────────────────────────────────────────────────
+  // Start from EVERY DB property (so all business accounts populate the map
+  // dropdown/legend even before Smoobu data resolves), then overlay Smoobu
+  // apartment coordinates/address on top, matched by clientId + propertyName.
+  const smoobuLocs = [];
+  statsResults
+    .filter((r) => r && !r.error && Array.isArray(r.apartmentLocations))
+    .forEach((r) => { smoobuLocs.push(...r.apartmentLocations); });
+
+  // Index Smoobu locations by clientId|propertyName for quick overlay.
+  const smoobuByProp = new Map();
+  smoobuLocs.forEach((loc) => {
+    const k = `${loc.clientId}|${(loc.propertyName || '').toLowerCase()}`;
+    // Prefer an entry that actually has coordinates.
+    const existing = smoobuByProp.get(k);
+    if (!existing || (loc.latitude != null && loc.longitude != null)) {
+      smoobuByProp.set(k, loc);
+    }
+  });
+
+  // Merge: DB property is the base; Smoobu fields win when present.
+  const mergedById = new Map();
+  dbProperties.forEach((dbp) => {
+    const k = `${dbp.clientId}|${(dbp.propertyName || '').toLowerCase()}`;
+    const s = smoobuByProp.get(k);
+    const merged = s
+      ? {
+          ...dbp,
+          apartmentId:  s.apartmentId ?? dbp.apartmentId,
+          apartmentName: s.apartmentName || dbp.apartmentName,
+          street:   s.street   || dbp.street,
+          zip:      s.zip      || dbp.zip,
+          city:     s.city     || dbp.city,
+          country:  s.country  || dbp.country,
+          latitude:  (typeof s.latitude === 'number') ? s.latitude : dbp.latitude,
+          longitude: (typeof s.longitude === 'number') ? s.longitude : dbp.longitude,
+          timeZone: s.timeZone ?? dbp.timeZone,
+          currency: s.currency ?? dbp.currency,
+          type:     s.type     ?? dbp.type,
+        }
+      : dbp;
+    mergedById.set(String(merged.apartmentId), merged);
+  });
+
+  // Also include any Smoobu apartments that didn't match a DB property name
+  // (e.g. a Smoobu account with more apartments than DB property entries).
+  smoobuLocs.forEach((loc) => {
+    const id = String(loc.apartmentId);
+    if (!mergedById.has(id)) mergedById.set(id, loc);
+  });
+
+  const mapLocations = Array.from(mergedById.values());
+
   // ── 13. Return assembled payload ─────────────────────────────────────────
   return {
     // KPI counters (from DB)
@@ -617,6 +767,9 @@ export async function getDashboardOverview(opts = {}) {
     occupancyBreakdown, // [{propertyName, clientName, occupancy}]
     recentBookings,     // [{reservationId, guestName, channel, arrival, departure, price, nights, propertyName, clientName}]
     recentCancellations,// [{reservationId, guestName, channel, arrival, nights, propertyName, clientName}]
+
+    // Map
+    mapLocations,       // [{apartmentId, apartmentName, propertyName, clientName, street, zip, city, country, latitude, longitude, type, ...}]
 
     // Feeds
     alerts,             // [{id, type, title, desc, time, unread, avatar, avatarBg, clientId, clientName}]

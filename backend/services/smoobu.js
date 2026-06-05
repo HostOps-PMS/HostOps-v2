@@ -121,6 +121,18 @@ export async function getApartments(user) {
   return { apartments: data.apartments || [] };
 }
 
+// ─────────────────────────────────────────────────────────────────
+// GET SINGLE APARTMENT DETAIL  (GET /apartments/{id})
+// Returns location (street/zip/city/country/lat/lng), rooms, price,
+// currency, equipments and type for one apartment. Cached like the rest.
+// ─────────────────────────────────────────────────────────────────
+export async function getApartmentDetail(user, apartmentId) {
+  const apiKey = getApiKeyForUser(user);
+  const userId = getCacheUserId(user);
+  const data = await smoobuRequest(`/apartments/${apartmentId}`, apiKey, userId);
+  return data;
+}
+
 export async function getBookings(user, { from, to, apartmentId, showCancellation = true } = {}) {
   const apiKey = getApiKeyForUser(user);
   const userId = getCacheUserId(user);
