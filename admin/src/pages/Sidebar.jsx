@@ -26,20 +26,18 @@ const NAV_ITEMS = [
     ),
     label: 'Businesses',
     to: '/clients',
-    children: [
-      {
-        icon: (
-          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <circle cx="6" cy="7" r="3" />
-            <circle cx="14" cy="7" r="3" />
-            <path d="M1 18c0-2.761 2.239-5 5-5h2" strokeLinecap="round" />
-            <path d="M10 13h4a5 5 0 015 5" strokeLinecap="round" />
-          </svg>
-        ),
-        label: 'Staffs',
-        to: '/staffs',
-      },
-    ],
+  },
+  {
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="6" cy="7" r="3" />
+        <circle cx="14" cy="7" r="3" />
+        <path d="M1 18c0-2.761 2.239-5 5-5h2" strokeLinecap="round" />
+        <path d="M10 13h4a5 5 0 015 5" strokeLinecap="round" />
+      </svg>
+    ),
+    label: 'Staffs',
+    to: '/staffs',
   },
   {
     icon: (
