@@ -1,6 +1,7 @@
 // src/models/User.js
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { encrypt, decrypt } from '../utils/encryption.js';
 
 // ── Embedded property sub-schema ──────────────────────────────
 // Each user can own multiple properties.
@@ -8,11 +9,18 @@ import bcrypt from 'bcryptjs';
 // in API responses — must be explicitly requested with .select('+properties.smoobuApiKey').
 const propertySchema = new mongoose.Schema({
   propertyName: { type: String, required: true, trim: true },
-  smoobuApiKey: { type: String, default: '', trim: true, select: false },
+  smoobuApiKey: { 
+    type: String, 
+    default: '', 
+    trim: true, 
+    select: false,
+    set: (val) => val ? encrypt(val) : val,
+    get: (val) => val ? decrypt(val) : val
+  },
   propertyPicture: { type: String, default: '' },
   propertyPictureOriginal: { type: String, default: '' },
   propertyPictureCropData: { type: mongoose.Schema.Types.Mixed, default: null },
-}, { _id: true });
+}, { _id: true, toJSON: { getters: true }, toObject: { getters: true } });
 
 const userSchema = new mongoose.Schema({
   email: {

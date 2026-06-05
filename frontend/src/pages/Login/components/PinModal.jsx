@@ -321,33 +321,36 @@ export default function PinModal({
         <div
           style={{
             textAlign:    'center',
-            padding:      '32px 16px',
+            padding:      '28px 16px 20px',
             display:      'flex',
             flexDirection:'column',
             alignItems:   'center',
-            gap:          '16px',
+            gap:          '14px',
           }}
         >
-          {/* Lock icon */}
+          {/* Lock icon — clean SVG, no emoji */}
           <div
             style={{
-              width:        '64px',
-              height:       '64px',
-              borderRadius: '50%',
-              background:   '#fef2f2',
-              border:       '2px solid #fecaca',
-              display:      'flex',
-              alignItems:   'center',
+              width:          '60px',
+              height:         '60px',
+              borderRadius:   '50%',
+              background:     '#fef2f2',
+              border:         '1.5px solid #fecaca',
+              display:        'flex',
+              alignItems:     'center',
               justifyContent: 'center',
-              fontSize:     '28px',
             }}
           >
-            🔒
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="5" y="11" width="14" height="10" rx="2" stroke="#dc2626" strokeWidth="1.6"/>
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="#dc2626" strokeWidth="1.6" strokeLinecap="round"/>
+              <circle cx="12" cy="16" r="1.2" fill="#dc2626"/>
+            </svg>
           </div>
-          <p style={{ color: '#dc2626', fontWeight: '600', margin: 0, fontSize: '15px' }}>
+          <p style={{ color: '#dc2626', fontWeight: '600', margin: 0, fontSize: '14px', lineHeight: '1.5', maxWidth: '280px' }}>
             Your account has been permanently locked due to too many incorrect PIN attempts.
           </p>
-          <p style={{ color: '#6b7280', margin: 0, fontSize: '14px', lineHeight: '1.5' }}>
+          <p style={{ color: '#6b7280', margin: 0, fontSize: '13px', lineHeight: '1.6', maxWidth: '280px' }}>
             Please contact your {isStaff ? 'manager' : 'administrator'} to restore access.
           </p>
         </div>
@@ -396,7 +399,7 @@ export default function PinModal({
       </p>
 
       {/* ── Email field ── */}
-      <div className="lp-field" style={{ marginBottom: '20px' }}>
+      <div className="lp-field" style={{ marginBottom: '18px' }}>
         <label className="lp-label">Email</label>
         <input
           className="lp-input"
@@ -416,19 +419,23 @@ export default function PinModal({
             background:   '#fff7ed',
             border:       '1.5px solid #fed7aa',
             borderRadius: '12px',
-            padding:      '14px 16px',
-            marginBottom: '20px',
+            padding:      '12px 14px',
+            marginBottom: '18px',
             display:      'flex',
             alignItems:   'center',
             gap:          '12px',
           }}
         >
-          <span style={{ fontSize: '22px' }}>⏳</span>
+          {/* Clock/timer SVG — no emoji */}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+            <circle cx="12" cy="12" r="9" stroke="#c2410c" strokeWidth="1.6"/>
+            <path d="M12 7v5l3 3" stroke="#c2410c" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
           <div>
-            <p style={{ margin: 0, fontWeight: '600', color: '#c2410c', fontSize: '14px' }}>
+            <p style={{ margin: 0, fontWeight: '600', color: '#c2410c', fontSize: '13px' }}>
               Account temporarily locked
             </p>
-            <p style={{ margin: '2px 0 0', color: '#9a3412', fontSize: '13px' }}>
+            <p style={{ margin: '2px 0 0', color: '#9a3412', fontSize: '12px' }}>
               Try again in{' '}
               <span style={{ fontWeight: '700', fontVariantNumeric: 'tabular-nums' }}>
                 {formatCountdown(lockSecondsLeft)}
@@ -444,10 +451,11 @@ export default function PinModal({
           display:         'flex',
           gap:             '10px',
           justifyContent:  'center',
-          margin:          '0 0 24px',
+          margin:          '4px 0 20px',
           animation:       shake ? 'pin-shake 0.5s ease' : 'none',
-          opacity:         isLocked ? 0.4 : 1,
+          opacity:         isLocked ? 0.35 : 1,
           pointerEvents:   isLocked ? 'none' : 'auto',
+          transition:      'opacity 0.2s ease',
         }}
         onPaste={handlePaste}
       >
@@ -473,10 +481,10 @@ export default function PinModal({
               textAlign:      'center',
               color:          '#0c1c14',
               outline:        'none',
-              transition:     'border-color 0.15s ease, background 0.15s ease, transform 0.1s ease',
-              transform:      digit ? 'scale(1.05)' : 'scale(1)',
+              transition:     'border-color 0.15s ease, background 0.15s ease, transform 0.12s ease',
+              transform:      digit ? 'scale(1.04)' : 'scale(1)',
               cursor:         (loading || isLocked) ? 'not-allowed' : 'text',
-              opacity:        (loading || isLocked) ? 0.6 : 1,
+              fontFamily:     'inherit',
             }}
             aria-label={`PIN digit ${i + 1}`}
           />
@@ -484,16 +492,16 @@ export default function PinModal({
       </div>
 
       {/* ── Progress dots ── */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '22px' }}>
         {Array.from({ length: PIN_LENGTH }).map((_, i) => (
           <div
             key={i}
             style={{
-              width:        '6px',
+              width:        i < filled ? '16px' : '6px',
               height:       '6px',
-              borderRadius: '50%',
+              borderRadius: '3px',
               background:   i < filled ? '#26a676' : '#e3ede8',
-              transition:   'background 0.15s ease',
+              transition:   'all 0.2s ease',
             }}
           />
         ))}
@@ -504,9 +512,13 @@ export default function PinModal({
         className="lp-btn"
         onClick={() => allFilled && handleSubmit(digits.join(''))}
         disabled={!allFilled || loading || isLocked}
-        style={{ width: '100%' }}
+        style={{ width: '100%', position: 'relative', overflow: 'hidden' }}
       >
-        {loading ? 'Verifying…' : isLocked ? `Locked — wait ${formatCountdown(lockSecondsLeft)}` : 'Continue'}
+        {loading
+          ? 'Verifying…'
+          : isLocked
+          ? `Locked — wait ${formatCountdown(lockSecondsLeft)}`
+          : 'Continue'}
       </button>
 
       <button
@@ -631,7 +643,9 @@ function RecoveryModal({ show, email, reason, onReasonChange, onSubmit, onClose,
             }}
             aria-label="Close"
           >
-            ✕
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
           </button>
 
           {submitted ? (
@@ -639,19 +653,20 @@ function RecoveryModal({ show, email, reason, onReasonChange, onSubmit, onClose,
             <div style={{ textAlign: 'center' }}>
               <div
                 style={{
-                  width:          '56px',
-                  height:         '56px',
+                  width:          '52px',
+                  height:         '52px',
                   borderRadius:   '50%',
                   background:     '#eaf8f1',
-                  border:         '2px solid #26a676',
+                  border:         '1.5px solid #26a676',
                   display:        'flex',
                   alignItems:     'center',
                   justifyContent: 'center',
-                  fontSize:       '24px',
                   margin:         '0 auto 16px',
                 }}
               >
-                ✓
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M5 13l4 4L19 7" stroke="#26a676" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </div>
               <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#0c1c14', margin: '0 0 10px' }}>
                 Request Submitted
@@ -671,22 +686,26 @@ function RecoveryModal({ show, email, reason, onReasonChange, onSubmit, onClose,
           ) : (
             /* ── Form state ── */
             <>
-              {/* Icon */}
+              {/* Icon — SVG lock with question, no emoji */}
               <div
                 style={{
                   width:          '48px',
                   height:         '48px',
                   borderRadius:   '50%',
                   background:     '#fff7ed',
-                  border:         '2px solid #fed7aa',
+                  border:         '1.5px solid #fed7aa',
                   display:        'flex',
                   alignItems:     'center',
                   justifyContent: 'center',
-                  fontSize:       '22px',
                   marginBottom:   '16px',
                 }}
               >
-                🔑
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="5" y="11" width="14" height="10" rx="2" stroke="#c2410c" strokeWidth="1.6"/>
+                  <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="#c2410c" strokeWidth="1.6" strokeLinecap="round"/>
+                  <path d="M12 14v1" stroke="#c2410c" strokeWidth="1.8" strokeLinecap="round"/>
+                  <circle cx="12" cy="17" r="0.8" fill="#c2410c"/>
+                </svg>
               </div>
 
               <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#0c1c14', margin: '0 0 6px' }}>

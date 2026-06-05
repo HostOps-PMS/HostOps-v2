@@ -154,10 +154,11 @@ router.get('/clients/:id/smoobu', requireAdmin, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.get('/clients/:id/properties', requireAdmin, async (req, res, next) => {
   try {
-    const user = await User.findById(req.params.id).select('+properties.smoobuApiKey').lean();
-    if (!user) {
+    const userDoc = await User.findById(req.params.id).select('+properties.smoobuApiKey');
+    if (!userDoc) {
       return res.status(404).json({ error: 'Client not found' });
     }
+    const user = userDoc.toObject({ getters: true });
 
     // Strip smoobuApiKey from each property before sending, but provide a boolean flag and masked key
     const safe = (user.properties || []).map(({ smoobuApiKey, ...rest }) => {
@@ -196,10 +197,11 @@ router.get('/clients/:id/properties', requireAdmin, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.get('/clients/:id/properties/:propertyId/apikey', requireAdmin, async (req, res, next) => {
   try {
-    const user = await User.findById(req.params.id).select('+properties.smoobuApiKey').lean();
-    if (!user) {
+    const userDoc = await User.findById(req.params.id).select('+properties.smoobuApiKey');
+    if (!userDoc) {
       return res.status(404).json({ error: 'Client not found' });
     }
+    const user = userDoc.toObject({ getters: true });
 
     const property = (user.properties || []).find(p => p._id.toString() === req.params.propertyId);
     if (!property) {

@@ -11,6 +11,7 @@
 //           └── subProperties[]  ← rooms/units fetched from Smoobu
 // ─────────────────────────────────────────────────────────────────
 import mongoose from 'mongoose';
+import { encrypt, decrypt } from '../utils/encryption.js';
 
 // ── Sub-property schema (rooms / units under a property) ──────────
 // These are populated by syncing with the Smoobu API.
@@ -92,6 +93,8 @@ const propertySchema = new mongoose.Schema({
     type: String,
     select: false,
     default: null,
+    set: (val) => val ? encrypt(val) : val,
+    get: (val) => val ? decrypt(val) : val
   },
 
   // Set when a valid smoobuApiKey is saved/updated
@@ -119,6 +122,8 @@ const propertySchema = new mongoose.Schema({
   },
 }, {
   timestamps: true,
+  toJSON: { getters: true },
+  toObject: { getters: true }
 });
 
 // ── Compound index: one owner can have many properties ────────────

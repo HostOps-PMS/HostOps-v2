@@ -144,6 +144,8 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ─── LOGO (kept for non-login views like OTP/Forgot) ────── */

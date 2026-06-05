@@ -131,9 +131,13 @@ app.use('/auth/forgot-password',  authLimiter);
 app.use('/auth/reset-password',   authLimiter);
 
 // ── Global API Key Protection ─────────────────────────────────────────────────
-// /auth routes (including /auth/recovery-request) are exempt from API key check
+// /auth routes are exempt from API key check, EXCEPT for sensitive POST operations 
+// that rely on cookies (/auth/refresh, /auth/logout) to prevent CSRF attacks.
 app.use((req, res, next) => {
-  if (req.path.startsWith('/auth')) return next();
+  const isAuthRoute = req.path.startsWith('/auth');
+  const isSensitiveAuth = req.path === '/auth/refresh' || req.path === '/auth/logout';
+  
+  if (isAuthRoute && !isSensitiveAuth) return next();
   requireApiKey(req, res, next);
 });
 
