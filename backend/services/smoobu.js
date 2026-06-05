@@ -151,7 +151,7 @@ export async function getRates(user, { apartmentIds, start, end }) {
 // ─────────────────────────────────────────────────────────────────
 // INBOX
 // ─────────────────────────────────────────────────────────────────
-export async function getInbox(user, { limit = 5 } = {}) {
+export async function getInbox(user, { limit = 250 } = {}) {
   const apiKey = getApiKeyForUser(user);
   const userId = getCacheUserId(user);
 
@@ -160,7 +160,12 @@ export async function getInbox(user, { limit = 5 } = {}) {
   const PAGE_SIZE = 50;
 
   try {
-    while (page <= 5) {
+    // FIX: Raised max page cap from 5 to 20 (20 × 50 = 1,000 threads max).
+    // The old cap of 5 pages (250 threads) was also fine for most accounts,
+    // but the real problem was limit=5 at the end that threw away 245 threads
+    // before the property filter could run. Now we keep up to `limit` threads
+    // (default 250) so the caller always has the full set to filter from.
+    while (page <= 20) {
       const data = await smoobuRequest(
         `/threads?page=${page}&pageSize=${PAGE_SIZE}`,
         apiKey,
@@ -194,6 +199,11 @@ export async function getInbox(user, { limit = 5 } = {}) {
       return {
         reservationId: t.booking?.id,
         guestName:     (t.booking?.guest_name) || 'Guest',
+        // FIX: expose apartmentId (numeric) alongside property name so
+        // applyPropertyFilter in dashboard.js can match by ID (reliable)
+        // instead of relying solely on name matching (fragile if names differ
+        // by whitespace, casing, or have duplicates across Smoobu accounts).
+        apartmentId:   t.apartment?.id ?? null,
         property:      t.apartment?.name || '',
         channel:       t.channel?.name || t.booking?.channel?.name || 'Direct',
         latestMessage: {
@@ -336,7 +346,11 @@ export async function getDashboard(user, { from, to } = {}) {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, revenue]) => ({ month, revenue }));
 
-  const inboxData = await getInbox(user, { limit: 5 }).catch(err => {
+  // FIX: limit raised to 250 so applyPropertyFilter in dashboard.js has the
+  // full thread set to filter from. With limit=5, selecting a property that
+  // wasn't in the top-5 most-recent threads returned 0 inbox items even when
+  // that property had many messages.
+  const inboxData = await getInbox(user, { limit: 250 }).catch(err => {
     console.warn('Inbox fetch failed:', err.message);
     return { threads: [], totalUnread: 0, totalThreads: 0 };
   });

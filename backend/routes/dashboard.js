@@ -154,12 +154,21 @@ function applyPropertyFilter(data, apartmentId) {
     (b) => b.apartment && (b.apartment.id === numId || String(b.apartment.id) === strId)
   );
 
-  // Filter inbox threads — threads carry the property name (string), not the ID,
-  // because getInbox() maps t.apartment?.name. Match on name after verifying
-  // the property record exists.
-  data.inbox = (data.inbox || []).filter(
-    (t) => t.property === selectedProp.name
-  );
+  // Filter inbox threads — match by apartmentId (numeric, reliable) first,
+  // then fall back to property name for threads that pre-date the apartmentId
+  // field being added to the mapping.
+  // FIX: The old code matched by name only. Because getInbox() fetched only
+  // 5 threads, threads for the selected property were often missing entirely
+  // before this filter even ran. Now that getInbox() returns up to 250 threads,
+  // this filter has a full dataset to work with, and the ID match makes it
+  // robust against name mismatches (trailing spaces, casing differences, etc.).
+  data.inbox = (data.inbox || []).filter((t) => {
+    if (t.apartmentId != null) {
+      return t.apartmentId === numId || String(t.apartmentId) === strId;
+    }
+    // Legacy threads without apartmentId: fall back to name match
+    return t.property === selectedProp.name;
+  });
 
   // Recalculate stats & channel breakdown from the filtered booking set
   const { stats, byChannel } = recalcStats(data.bookings, data.properties, data.period);
@@ -196,12 +205,17 @@ function applyStaffPropertyFilter(data, staffPropertyIds) {
     )
   );
 
-  // Filter inbox threads to assigned properties
-  // Threads use property name (string) — match against the filtered properties list
+  // Filter inbox threads to assigned properties.
+  // FIX: Now checks t.apartmentId (numeric, added by getInbox()) first for
+  // reliable matching, then falls back to property name for backwards compat.
   const allowedPropNames = new Set((data.properties || []).map((p) => p.name));
-  data.inbox = (data.inbox || []).filter(
-    (t) => allowedPropNames.has(t.property)
-  );
+  data.inbox = (data.inbox || []).filter((t) => {
+    if (t.apartmentId != null) {
+      return allowedStrIds.has(String(t.apartmentId)) || allowedNumIds.has(t.apartmentId);
+    }
+    // Legacy fallback: match by property name
+    return allowedPropNames.has(t.property);
+  });
 
   // Recalculate stats & channel breakdown from the narrowed booking set
   const { stats, byChannel } = recalcStats(data.bookings, data.properties, data.period);
@@ -286,9 +300,16 @@ router.get('/dashboard', async (req, res, next) => {
       const filteredBookings = (data.bookings || []).filter(
         (b) => b.apartment && propIds.has(b.apartment.id)
       );
-      const filteredInbox = (data.inbox || []).filter(
-        (t) => t.apartment && propIds.has(t.apartment.id)
-      );
+      // FIX: threads no longer have a t.apartment object — getInbox() maps
+      // apartment data to t.apartmentId (number) and t.property (name).
+      // The old filter `t.apartment && propIds.has(t.apartment.id)` always
+      // returned false (t.apartment is undefined), so inbox was always empty
+      // in MODE B. Now we check t.apartmentId first, then fall back to name.
+      const filteredInbox = (data.inbox || []).filter((t) => {
+        if (t.apartmentId != null) return propIds.has(t.apartmentId);
+        // Legacy fallback: match by property name
+        return (data.properties || []).some((p) => p.name === t.property);
+      });
 
       const { stats, byChannel } = recalcStats(filteredBookings, props, data.period);
 

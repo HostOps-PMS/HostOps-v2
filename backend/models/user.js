@@ -3,21 +3,18 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { encrypt, decrypt } from '../utils/encryption.js';
 
-// ── Embedded property sub-schema ──────────────────────────────
-// Each user can own multiple properties.
-// smoobuApiKey is select:false so it is never returned by default
-// in API responses — must be explicitly requested with .select('+properties.smoobuApiKey').
+// ── Embedded property sub-schema ──────────────────────────────────
 const propertySchema = new mongoose.Schema({
   propertyName: { type: String, required: true, trim: true },
-  smoobuApiKey: { 
-    type: String, 
-    default: '', 
-    trim: true, 
+  smoobuApiKey: {
+    type: String,
+    default: '',
+    trim: true,
     select: false,
     set: (val) => val ? encrypt(val) : val,
-    get: (val) => val ? decrypt(val) : val
+    get: (val) => val ? decrypt(val) : val,
   },
-  propertyPicture: { type: String, default: '' },
+  propertyPicture:         { type: String, default: '' },
   propertyPictureOriginal: { type: String, default: '' },
   propertyPictureCropData: { type: mongoose.Schema.Types.Mixed, default: null },
 }, { _id: true, toJSON: { getters: true }, toObject: { getters: true } });
@@ -37,22 +34,14 @@ const userSchema = new mongoose.Schema({
     select: false,
   },
 
-  // Business account display name
   businessName: { type: String, required: true, trim: true },
 
-  // Legacy fields — kept for backward compatibility with older user documents
-  // created before the businessName migration. New accounts created via
-  // POST /api/clients will only have businessName. Auth routes reference
-  // user.firstName via the pre-save hook so nothing breaks.
+  // Legacy fields — kept for backward compatibility
   firstName: { type: String, default: '', trim: true },
   lastName:  { type: String, default: '', trim: true },
 
-  // Human-readable label for admin users (e.g. "Main Admin", "Support Admin")
   tag: { type: String, default: '', trim: true },
 
-  // ── Embedded properties ───────────────────────────────────────
-  // Replaces the separate Property collection.
-  // Each entry has a propertyName and a smoobuApiKey (hidden by default).
   properties: { type: [propertySchema], default: [] },
 
   // Email verification
@@ -68,26 +57,20 @@ const userSchema = new mongoose.Schema({
   loginOtp:       { type: String, select: false },
   loginOtpExpiry: { type: Date,   select: false },
 
-  // Roles
   role: {
     type: String,
     enum: ['client', 'admin', 'team_leader'],
     default: 'client',
   },
 
-  // Assigned Server for Team Leaders (points to a client User ID)
   serverId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'user',
     default: null,
   },
 
-  // Used as a filter prefix when fetching properties from Smoobu.
   propertyTagPrefix: { type: String, default: '', trim: true },
 
-  // First-login password change flag.
-  // Set to true when an admin creates the account (with a default/temporary password).
-  // User must change password on first dashboard load; only then is isVerified set to true.
   mustChangePassword: { type: Boolean, default: false },
 
   pin: {
@@ -100,16 +83,20 @@ const userSchema = new mongoose.Schema({
     default: false,
   },
 
-  // ── PIN lockout tracking ──────────────────────────────────────
-  // pinAttempts:         cumulative wrong-PIN count (resets on success)
-  // pinLockedUntil:      time until which PIN entry is blocked (null = not locked)
-  // pinPermanentlyLocked: true when attempts exceed the final threshold — account
-  //                       disabled with no automatic recovery
+  // ── PIN lockout tracking ──────────────────────────────────────────
+  //
+  // pinAttempts:          cumulative wrong-PIN count since last reset
+  // lastPinFailAt:        timestamp of the most recent wrong attempt.
+  //                       If now - lastPinFailAt >= 48 h, the attempt
+  //                       counter is auto-reset on the next verify call.
+  // pinLockedUntil:       time until which PIN entry is blocked (null = not locked)
+  // pinPermanentlyLocked: true when attempts reach the final threshold —
+  //                       only an admin can clear this via POST /api/accounts/unlock
   pinAttempts:          { type: Number, default: 0 },
+  lastPinFailAt:        { type: Date,   default: null, select: false },
   pinLockedUntil:       { type: Date,   default: null },
   pinPermanentlyLocked: { type: Boolean, default: false },
 
-// Activity tracking
   lastLoginAt: { type: Date },
 
   activityLog: [{
@@ -131,8 +118,6 @@ const userSchema = new mongoose.Schema({
 });
 
 // ── Auto-populate businessName for legacy users ───────────────────
-// Users created before the businessName migration only have firstName/lastName.
-// On any save(), derive businessName from firstName so validation passes.
 userSchema.pre('save', function(next) {
   if (!this.businessName && this.firstName) {
     this.businessName = [this.firstName, this.lastName].filter(Boolean).join(' ').trim() || this.firstName;
@@ -140,7 +125,7 @@ userSchema.pre('save', function(next) {
   next();
 });
 
-// ── Hash password and pin before save ─────────────────────────────────
+// ── Hash password and pin before save ─────────────────────────────
 userSchema.pre('save', async function(next) {
   if (this.isModified('password')) {
     this.password = await bcrypt.hash(this.password, 12);
@@ -151,12 +136,12 @@ userSchema.pre('save', async function(next) {
   next();
 });
 
-// ── Compare password ──────────────────────────────────────────
+// ── Compare password ──────────────────────────────────────────────
 userSchema.methods.comparePassword = async function(plain) {
   return bcrypt.compare(plain, this.password);
 };
 
-// ── Sanitize for API response ─────────────────────────────────
+// ── Sanitize for API response ─────────────────────────────────────
 userSchema.methods.toJSON = function() {
   const obj = this.toObject();
   delete obj.password;
@@ -164,8 +149,8 @@ userSchema.methods.toJSON = function() {
   delete obj.verifyTokenExpiry;
   delete obj.resetToken;
   delete obj.resetTokenExpiry;
+  delete obj.lastPinFailAt;
   delete obj.__v;
-  // Strip smoobuApiKey from every embedded property before sending to client
   if (Array.isArray(obj.properties)) {
     obj.properties = obj.properties.map(({ smoobuApiKey, ...rest }) => rest);
   }

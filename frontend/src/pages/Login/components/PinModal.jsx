@@ -42,6 +42,9 @@ export default function PinModal({
   const [loading, setLoading] = useState(false);
   const [shake, setShake]   = useState(false);
 
+  // ── Inline error — shown below PIN inputs, not in the top banner ──
+  const [inlineError, setInlineError] = useState('');
+
   // ── Lockout state ─────────────────────────────────────────────────
   // lockedUntil: Date object — account is temporarily locked until this time
   // permanentlyLocked: boolean — account is permanently disabled
@@ -77,6 +80,7 @@ export default function PinModal({
       if (secondsLeft <= 0) {
         setLockedUntil(null);
         setLockSecondsLeft(0);
+        setInlineError('');
         hideMsg();
         clearInterval(countdownRef.current);
       } else {
@@ -181,13 +185,14 @@ export default function PinModal({
     if (lockedUntil || permanentlyLocked) return;
 
     if (!email.trim()) {
-      showMsg('Please enter your email address.');
+      setInlineError('Please enter your email address.');
       triggerShake();
       clearDigits();
       return;
     }
 
     hideMsg();
+    setInlineError('');
     setLoading(true);
 
     try {
@@ -213,7 +218,7 @@ export default function PinModal({
         // ── Permanent lock ─────────────────────────────────────────
         if (data.permanentlyLocked) {
           setPermanentlyLocked(true);
-          showMsg(data.error || 'Your account has been permanently locked. Please contact your administrator.');
+          hideMsg();
           clearDigits();
           return;
         }
@@ -222,13 +227,13 @@ export default function PinModal({
         if (res.status === 423 && data.lockedUntil) {
           const until = new Date(data.lockedUntil);
           setLockedUntil(until);
-          showMsg(data.error || 'Too many incorrect PIN attempts. Please wait before trying again.');
+          setInlineError(data.error || 'Too many incorrect PIN attempts. Please wait before trying again.');
           clearDigits();
           return;
         }
 
         // ── Regular wrong PIN or other error ──────────────────────
-        showMsg(data.error || 'Incorrect PIN. Please try again.');
+        setInlineError(data.error || 'Incorrect PIN. Please try again.');
         triggerShake();
         clearDigits();
         return;
@@ -263,7 +268,7 @@ export default function PinModal({
       showMsg('Access granted. Redirecting…', 'success');
       setTimeout(() => navigate('/dashboard', { replace: true }), 800);
     } catch {
-      showMsg('Something went wrong. Please try again.');
+      setInlineError('Something went wrong. Please try again.');
       triggerShake();
       clearDigits();
     } finally {
@@ -316,19 +321,25 @@ export default function PinModal({
   // ── Permanently locked screen ────────────────────────────────────
   if (permanentlyLocked) {
     return (
-      <>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '420px' }}>
+
+        {/* Heading — top */}
         <h1 className="lp-h1">Account Locked</h1>
+
+        {/* Body — grows to fill space */}
         <div
           style={{
-            textAlign:    'center',
-            padding:      '28px 16px 20px',
-            display:      'flex',
-            flexDirection:'column',
-            alignItems:   'center',
-            gap:          '14px',
+            flex:          1,
+            display:       'flex',
+            flexDirection: 'column',
+            alignItems:    'center',
+            justifyContent:'center',
+            textAlign:     'center',
+            gap:           '16px',
+            padding:       '12px 0',
           }}
         >
-          {/* Lock icon — clean SVG, no emoji */}
+          {/* Lock icon */}
           <div
             style={{
               width:          '60px',
@@ -347,32 +358,55 @@ export default function PinModal({
               <circle cx="12" cy="16" r="1.2" fill="#dc2626"/>
             </svg>
           </div>
-          <p style={{ color: '#dc2626', fontWeight: '600', margin: 0, fontSize: '14px', lineHeight: '1.5', maxWidth: '280px' }}>
+
+          <p style={{ color: '#dc2626', fontWeight: '600', margin: 0, fontSize: '14px', lineHeight: '1.6', maxWidth: '300px' }}>
             Your account has been permanently locked due to too many incorrect PIN attempts.
           </p>
-          <p style={{ color: '#6b7280', margin: 0, fontSize: '13px', lineHeight: '1.6', maxWidth: '280px' }}>
-            Please contact your {isStaff ? 'manager' : 'administrator'} to restore access.
-          </p>
+
+          {/* Contact note */}
+          <div style={{
+            display:      'flex',
+            alignItems:   'center',
+            gap:          '7px',
+            background:   '#fff0ee',
+            border:       '1px solid #ffd5ce',
+            borderRadius: '8px',
+            padding:      '8px 12px',
+            width:        '100%',
+            boxSizing:    'border-box',
+            textAlign:    'left',
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="9" stroke="#c13515" strokeWidth="1.7"/>
+              <path d="M12 11v5" stroke="#c13515" strokeWidth="1.7" strokeLinecap="round"/>
+              <circle cx="12" cy="8" r="0.9" fill="#c13515"/>
+            </svg>
+            <span style={{ color: '#c13515', fontSize: '12.5px', lineHeight: '1.5' }}>
+              Please contact your {isStaff ? 'manager' : 'administrator'} to restore access.
+            </span>
+          </div>
         </div>
 
-        {/* ── Recover Account button (permanently locked) ── */}
-        <button
-          type="button"
-          className="lp-btn"
-          onClick={() => setShowRecoveryModal(true)}
-          style={{ width: '100%', marginBottom: '8px' }}
-        >
-          Request Account Recovery
-        </button>
+        {/* Buttons — bottom */}
+        <div>
+          <button
+            type="button"
+            className="lp-btn"
+            onClick={() => setShowRecoveryModal(true)}
+            style={{ width: '100%', marginBottom: '8px' }}
+          >
+            Request Account Recovery
+          </button>
 
-        <button
-          type="button"
-          className="lp-link"
-          onClick={onBack}
-          style={{ marginTop: '4px' }}
-        >
-          ← Back
-        </button>
+          <button
+            type="button"
+            className="lp-link"
+            onClick={onBack}
+            style={{ marginTop: '4px' }}
+          >
+            ← Back
+          </button>
+        </div>
 
         {/* ── Recovery Modal ── */}
         <RecoveryModal
@@ -385,21 +419,21 @@ export default function PinModal({
           loading={recoveryLoading}
           submitted={recoverySubmitted}
         />
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      {/* ── Header ── */}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '420px' }}>
+      {/* ── Header — always at the top ── */}
       <h1 className="lp-h1">Enter PIN</h1>
-      <p className="lp-sub">
+      <p className="lp-sub" style={{ marginBottom: '24px' }}>
         {firstName ? `Hi ${firstName}! ` : ''}
         Enter your email and {PIN_LENGTH}-digit PIN to continue.
       </p>
 
       {/* ── Email field ── */}
-      <div className="lp-field" style={{ marginBottom: '18px' }}>
+      <div className="lp-field" style={{ marginBottom: '28px' }}>
         <label className="lp-label">Email</label>
         <input
           className="lp-input"
@@ -412,50 +446,18 @@ export default function PinModal({
         />
       </div>
 
-      {/* ── Temporary lock banner ─────────────────────────────────── */}
-      {lockedUntil && (
-        <div
-          style={{
-            background:   '#fff7ed',
-            border:       '1.5px solid #fed7aa',
-            borderRadius: '12px',
-            padding:      '12px 14px',
-            marginBottom: '18px',
-            display:      'flex',
-            alignItems:   'center',
-            gap:          '12px',
-          }}
-        >
-          {/* Clock/timer SVG — no emoji */}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-            <circle cx="12" cy="12" r="9" stroke="#c2410c" strokeWidth="1.6"/>
-            <path d="M12 7v5l3 3" stroke="#c2410c" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <div>
-            <p style={{ margin: 0, fontWeight: '600', color: '#c2410c', fontSize: '13px' }}>
-              Account temporarily locked
-            </p>
-            <p style={{ margin: '2px 0 0', color: '#9a3412', fontSize: '12px' }}>
-              Try again in{' '}
-              <span style={{ fontWeight: '700', fontVariantNumeric: 'tabular-nums' }}>
-                {formatCountdown(lockSecondsLeft)}
-              </span>
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* ── PIN digit inputs ── */}
       <div
         style={{
           display:         'flex',
           gap:             '10px',
           justifyContent:  'center',
-          margin:          '4px 0 20px',
+          marginBottom:    '14px',
           animation:       shake ? 'pin-shake 0.5s ease' : 'none',
           opacity:         isLocked ? 0.35 : 1,
           pointerEvents:   isLocked ? 'none' : 'auto',
           transition:      'opacity 0.2s ease',
+          width:           '100%',
         }}
         onPaste={handlePaste}
       >
@@ -492,7 +494,7 @@ export default function PinModal({
       </div>
 
       {/* ── Progress dots ── */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '22px' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '20px' }}>
         {Array.from({ length: PIN_LENGTH }).map((_, i) => (
           <div
             key={i}
@@ -507,41 +509,68 @@ export default function PinModal({
         ))}
       </div>
 
-      {/* ── Submit button (manual, for accessibility) ── */}
-      <button
-        className="lp-btn"
-        onClick={() => allFilled && handleSubmit(digits.join(''))}
-        disabled={!allFilled || loading || isLocked}
-        style={{ width: '100%', position: 'relative', overflow: 'hidden' }}
-      >
-        {loading
-          ? 'Verifying…'
-          : isLocked
-          ? `Locked — wait ${formatCountdown(lockSecondsLeft)}`
-          : 'Continue'}
-      </button>
+      {/* ── Buttons + error — pushed to bottom ── */}
+      <div style={{ marginTop: 'auto' }}>
+        <button
+          className="lp-btn"
+          onClick={() => allFilled && handleSubmit(digits.join(''))}
+          disabled={!allFilled || loading || isLocked}
+          style={{
+            width: '100%',
+            ...(isLocked ? {
+              background: '#ea580c',
+              color:      '#fff',
+              border:     '1.5px solid #ea580c',
+              opacity:    1,
+              cursor:     'not-allowed',
+            } : {}),
+          }}
+        >
+          {loading
+            ? 'Verifying…'
+            : isLocked
+            ? `Locked — wait ${formatCountdown(lockSecondsLeft)}`
+            : 'Continue'}
+        </button>
 
-      <button
-        type="button"
-        className="lp-link"
-        onClick={onBack}
-        disabled={loading}
-        style={{ marginTop: '12px' }}
-      >
-        ← Back
-      </button>
+        {/* ── Inline error — below button ── */}
+        {inlineError && (
+          <div style={{
+            background:   '#fff0ee',
+            border:       '1px solid #ffd5ce',
+            borderRadius: '10px',
+            padding:      '10px 14px',
+            marginTop:    '12px',
+            fontSize:     '13px',
+            color:        '#c13515',
+            lineHeight:   '1.5',
+          }}>
+            {inlineError}
+          </div>
+        )}
 
-      {/* ── Recover Account link — shown only when locked ── */}
-      {isLocked && (
         <button
           type="button"
           className="lp-link"
-          onClick={() => setShowRecoveryModal(true)}
-          style={{ marginTop: '4px', color: '#c2410c' }}
+          onClick={onBack}
+          disabled={loading}
+          style={{ marginTop: '12px' }}
         >
-          Recover account
+          ← Back
         </button>
-      )}
+
+        {/* ── Recover Account link — shown only when locked ── */}
+        {isLocked && (
+          <button
+            type="button"
+            className="lp-link"
+            onClick={() => setShowRecoveryModal(true)}
+            style={{ marginTop: '4px', color: '#c2410c' }}
+          >
+            Recover account
+          </button>
+        )}
+      </div>
 
       {/* ── Recovery Modal ── */}
       <RecoveryModal
@@ -555,7 +584,7 @@ export default function PinModal({
         submitted={recoverySubmitted}
       />
 
-      {/* ── Shake + spin keyframes ── */}
+      {/* ── Shake keyframes ── */}
       <style>{`
         @keyframes pin-shake {
           0%, 100% { transform: translateX(0); }
@@ -567,7 +596,7 @@ export default function PinModal({
           90%       { transform: translateX(3px); }
         }
       `}</style>
-    </>
+    </div>
   );
 }
 
@@ -686,28 +715,6 @@ function RecoveryModal({ show, email, reason, onReasonChange, onSubmit, onClose,
           ) : (
             /* ── Form state ── */
             <>
-              {/* Icon — SVG lock with question, no emoji */}
-              <div
-                style={{
-                  width:          '48px',
-                  height:         '48px',
-                  borderRadius:   '50%',
-                  background:     '#fff7ed',
-                  border:         '1.5px solid #fed7aa',
-                  display:        'flex',
-                  alignItems:     'center',
-                  justifyContent: 'center',
-                  marginBottom:   '16px',
-                }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="5" y="11" width="14" height="10" rx="2" stroke="#c2410c" strokeWidth="1.6"/>
-                  <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="#c2410c" strokeWidth="1.6" strokeLinecap="round"/>
-                  <path d="M12 14v1" stroke="#c2410c" strokeWidth="1.8" strokeLinecap="round"/>
-                  <circle cx="12" cy="17" r="0.8" fill="#c2410c"/>
-                </svg>
-              </div>
-
               <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#0c1c14', margin: '0 0 6px' }}>
                 Recover Account
               </h2>
