@@ -602,7 +602,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
         </div>
 
         {/* ── Scrollable body ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'row-reverse', minHeight: 0, overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'row-reverse', minHeight: 0, overflow: 'auto', flexWrap: 'wrap-reverse' }}>
 
           {/* ── LEFT: main scrollable content ── */}
           <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16, background: 'var(--color-bg, #f6f8f7)' }}>
@@ -610,7 +610,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
           {/* Date filter + Currency — sticky top */}
           <div style={{
             position: 'sticky', top: 0, zIndex: 10,
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8,
             background: 'var(--color-surface, #fff)',
             borderRadius: 12, padding: '10px 16px',
             border: '1px solid var(--color-border, #e5e9ec)',
@@ -858,7 +858,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
                 background: 'var(--color-surface, #fff)',
                 border: '1px solid var(--color-border, #e5e9ec)',
                 borderRadius: 'var(--radius-md, 10px)',
-                overflow: 'visible',
+                overflow: 'hidden',
                 flexShrink: 0,
               }}>
                 <div style={{
@@ -942,7 +942,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
 
           {/* ── RIGHT: fixed sidebar — no scroll ── */}
           <div style={{
-            width: 400, flexShrink: 0,
+            width: 'clamp(280px, 30%, 400px)', flexShrink: 0,
             borderLeft: '1px solid var(--color-border, #e5e9ec)',
             overflowY: 'auto',
             display: 'flex', flexDirection: 'column',
@@ -1026,7 +1026,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
             {/* ── Stat grid: 2×2 ── */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
+              gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
               gap: 10,
               flexShrink: 0,
             }}>

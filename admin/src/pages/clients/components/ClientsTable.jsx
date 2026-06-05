@@ -133,12 +133,14 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
 
       {/* Tab bar */}
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 0, flexWrap: 'wrap', gap: 10, paddingBottom: 0,
+        marginBottom: 0, paddingBottom: 0,
+        overflowX: 'auto', WebkitOverflowScrolling: 'touch',
+        msOverflowStyle: 'none', scrollbarWidth: 'none',
       }}>
         <div style={{
           display: 'inline-flex', alignItems: 'flex-end', gap: 0,
           background: 'transparent', marginBottom: '-1px',
+          minWidth: 'max-content',
         }}>
           {tabs.map((tab) => {
             const isActive = activeTab === tab.label;
@@ -186,9 +188,9 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
       }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10,
-          padding: '12px 20px 14px', borderBottom: '1px solid #f0f2f5', flexWrap: 'wrap',
+          padding: '10px 12px 12px', borderBottom: '1px solid #f0f2f5', flexWrap: 'wrap', rowGap: 8,
         }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: 180, maxWidth: 280 }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 140, maxWidth: 280 }}>
             <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2"
               style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
               <circle cx="9" cy="9" r="6"/><path d="M15 15l-3.5-3.5" strokeLinecap="round"/>
@@ -206,17 +208,17 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
               }}
             />
           </div>
-          <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto' }}>
+          <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
             {tabFiltered.length} {tabFiltered.length === 1 ? 'Business' : 'Businesses'}
           </span>
           <button
             onClick={onRefresh}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '7px 14px', borderRadius: 8,
+              padding: '7px 10px', borderRadius: 8,
               border: '1px solid #10b981', background: '#fff',
               fontSize: '0.82rem', fontWeight: 600, color: '#10b981',
-              cursor: 'pointer', whiteSpace: 'nowrap',
+              cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
             }}
           >
             <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
@@ -229,10 +231,10 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
             onClick={onAddClient}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 7,
-              padding: '7px 16px', borderRadius: 999,
+              padding: '7px 14px', borderRadius: 999,
               border: 'none', background: '#10b981',
               color: '#fff', fontSize: '0.82rem', fontWeight: 700,
-              cursor: 'pointer', whiteSpace: 'nowrap',
+              cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
               boxShadow: '0 2px 8px rgba(59,95,192,0.18)',
               transition: 'background 0.15s',
             }}

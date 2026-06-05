@@ -391,7 +391,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
   return (
     <>
       <div className="db-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-        <div className="db-modal" style={{ width: 480, maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 20, padding: 0, overflow: 'hidden' }}>
+        <div className="db-modal" style={{ width: '95vw', maxWidth: 480, maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 20, padding: 0, overflow: 'hidden' }}>
           {/* Header */}
           <div style={{
             padding: '28px 32px 0 32px',
@@ -963,7 +963,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
       {/* ── Edit modal — separate modal on top of ClientModal ── */}
       {isEditing && (
         <div className="db-modal-overlay" onClick={(e) => e.target === e.currentTarget && setIsEditing(false)}>
-          <div className="db-modal" style={{ width: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 20, padding: 0, overflow: 'hidden' }}>
+          <div className="db-modal" style={{ width: '95vw', maxWidth: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 20, padding: 0, overflow: 'hidden' }}>
             <div style={{ padding: '28px 32px 0 32px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <div>
                 <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0d1117', lineHeight: 1.15, margin: 0, letterSpacing: '-0.02em' }}>
@@ -1020,7 +1020,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
               </div>
               <div style={{ display: activeTab === 'properties' ? 'flex' : 'none', flexDirection: 'column', gap: 12 }}>
                   <div style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Properties</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
                   {form.properties.map((prop, index) => (
                     <div key={prop._id || index} style={{ border: '1px solid var(--color-border, #e5e9ec)', borderRadius: 'var(--radius-md, 10px)', padding: '10px', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--color-surface-2, #f8faf9)', cursor: 'pointer' }}>
                       {/* Picture */}
