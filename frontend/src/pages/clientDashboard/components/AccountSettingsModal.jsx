@@ -976,11 +976,14 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
         isOpen={showSwitchModal}
         onClose={() => setShowSwitchModal(false)}
         onSwitch={(property) => {
-          setShowSwitchModal(false);
-          if (onPropertySwitch && property) {
-            onPropertySwitch(property.id, property.name);
-          }
-        }}
+        setShowSwitchModal(false);
+        if (property) {
+          onClose(); 
+          setTimeout(() => {
+            onPropertySwitch?.(property.id, property.name);
+          }, 0);
+        }
+      }}
       />
 
       <div style={styles.overlay} ref={overlayRef} onClick={handleOverlayClick}>

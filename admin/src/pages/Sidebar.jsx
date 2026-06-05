@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import AccountSettingsModal from './dashboard/components/AccountSettingsModal';
+import { logoutUser } from './authorization/services/authService';
 
 /* ─── Nav data ───────────────────────────────────────────────────── */
 // Businesses has a sub-item: Staffs
@@ -493,7 +494,8 @@ export default function Sidebar() {
             label="Logout"
             collapsed={isCollapsed}
             danger
-            onClick={() => {
+            onClick={async () => {
+              await logoutUser();
               sessionStorage.removeItem('hp_access_token');
               sessionStorage.removeItem('hp_user');
               sessionStorage.removeItem('hp_authorized');

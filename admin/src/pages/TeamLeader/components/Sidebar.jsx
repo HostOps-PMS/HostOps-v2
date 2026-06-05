@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { logoutUser } from '../../authorization/services/authService';
 
 const NAV_ITEMS = [
   {
@@ -85,7 +86,8 @@ export default function Sidebar() {
         ))}
         <button
           className="db-nav-item"
-          onClick={() => {
+          onClick={async () => {
+            await logoutUser();
             sessionStorage.removeItem("hp_access_token");
             sessionStorage.removeItem("hp_user");
             sessionStorage.removeItem("hp_authorized");
