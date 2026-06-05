@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
+import { logoutUser } from '../../Login/services/authservice';
 import { useDashboard } from "../context/DashboardContext";
 import { exportDashboardPDF } from "../services/pdfExportService";
 import AccountSettingsModal from "./AccountSettingsModal";
@@ -8,7 +9,7 @@ import { useActivityLog } from "../hooks/useActivityLog";
 
 export default function Navbar() {
   const { getUser, clear } = useAuth();
-  const { dashState, dark, setDark } = useDashboard();
+  const { dashState, dark, setDark, selectProperty } = useDashboard();
   const user = getUser();
   const [dropOpen, setDropOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -165,7 +166,8 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logoutUser();
     clear();
     window.location.href = "/";
   };
@@ -634,6 +636,7 @@ export default function Navbar() {
         <AccountSettingsModal
           isOpen={accountSettingsOpen}
           onClose={() => setAccountSettingsOpen(false)}
+          onPropertySwitch={selectProperty}
         />
       </>
     );
@@ -822,6 +825,7 @@ export default function Navbar() {
       <AccountSettingsModal
         isOpen={accountSettingsOpen}
         onClose={() => setAccountSettingsOpen(false)}
+        onPropertySwitch={selectProperty}
       />
     </>
   );
