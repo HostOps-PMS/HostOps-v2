@@ -720,7 +720,11 @@ router.get('/my-properties', requireAuth, (req, res) => {
   }
 
   res.json({
-    properties: list.map((p) => ({ _id: p._id, propertyName: p.propertyName })),
+    properties: list.map((p) => ({
+      _id:           p._id,
+      propertyName:  p.propertyName,
+      propertyPicture: p.propertyPicture || '',
+    })),
   });
 });
 
