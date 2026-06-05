@@ -10,6 +10,7 @@ import ActivityFeed from "./components/ActivityFeed";
 import MessageModal from "./components/MessageModal";
 import DateFilterBar from "./components/DateFilterBar";
 import FirstLoginModal from "./components/FirstLoginModal";
+import FirstLoginPinModal from "./components/FirstLoginPinModal";
 import { useDashboard } from "./context/DashboardContext";
 import { useDashboardData } from "./hooks/useDashboardData";
 import Footer from "./components/Footer";
@@ -33,6 +34,17 @@ export default function DashboardPage() {
       localStorage.setItem('hp_user', JSON.stringify(updatedUser));
     }
     setShowFirstLoginModal(false);
+  };
+
+  const [showFirstLoginPinModal, setShowFirstLoginPinModal] = useState(() => {
+    return sessionStorage.getItem('hp_must_change_pin') === 'true';
+  });
+
+  const handlePinChanged = (updatedUser) => {
+    if (updatedUser) {
+      localStorage.setItem('hp_user', JSON.stringify(updatedUser));
+    }
+    setShowFirstLoginPinModal(false);
   };
 
   // ── Current logged-in user (for PricingModal pre-fill) ──────────────────────
@@ -129,6 +141,10 @@ export default function DashboardPage() {
       {/* First-login modal: blocking overlay shown until password is set */}
       {showFirstLoginModal && (
         <FirstLoginModal onComplete={handlePasswordChanged} />
+      )}
+      {/* First-login PIN modal: blocking overlay shown until PIN is set */}
+      {showFirstLoginPinModal && !showFirstLoginModal && (
+        <FirstLoginPinModal onComplete={handlePinChanged} />
       )}
 
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>

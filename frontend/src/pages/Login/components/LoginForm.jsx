@@ -32,6 +32,12 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
           sessionStorage.removeItem('hp_must_change_password');
         }
 
+        if (data.mustChangePin) {
+          sessionStorage.setItem('hp_must_change_pin', 'true');
+        } else {
+          sessionStorage.removeItem('hp_must_change_pin');
+        }
+
         // ✅ Client accounts now redirect to the admin dashboard (same as
         // admin/team_leader). Token is passed via URL params since sessionStorage
         // is port-scoped. The AuthorizationModal OTP gate on the admin app will
@@ -64,6 +70,12 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
         sessionStorage.setItem('hp_must_change_password', 'true');
       } else {
         sessionStorage.removeItem('hp_must_change_password');
+      }
+
+      if (data.user?.mustChangePin) {
+        sessionStorage.setItem('hp_must_change_pin', 'true');
+      } else {
+        sessionStorage.removeItem('hp_must_change_pin');
       }
 
       onAuthSuccess(data);

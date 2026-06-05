@@ -6,11 +6,17 @@ import { encrypt, decrypt } from '../utils/encryption.js';
 // ── Embedded property sub-schema ──────────────────────────────────
 const propertySchema = new mongoose.Schema({
   propertyName: { type: String, required: true, trim: true },
+  // NOTE: `select: false` was removed here. When this field lives inside a
+  // document-array sub-schema, doing `.select('+properties.smoobuApiKey')` makes
+  // Mongoose try to reconcile a full-array projection with a single nested-path
+  // projection in the same query tree, which throws:
+  //   "Path collision at properties.smoobuApiKey remaining portion smoobuApiKey"
+  // The field is still kept out of every API response by the toJSON() sanitizer
+  // below (it strips smoobuApiKey from each property), so it is never leaked.
   smoobuApiKey: {
     type: String,
     default: '',
     trim: true,
-    select: false,
     set: (val) => val ? encrypt(val) : val,
     get: (val) => val ? decrypt(val) : val,
   },

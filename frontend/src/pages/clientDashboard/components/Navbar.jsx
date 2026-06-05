@@ -592,19 +592,6 @@ export default function Navbar() {
                         ...t.dropBtn,
                         color: dark ? "#eaf5f0" : "#0c1c14",
                       }}
-                    >
-                      <i
-                        className="ti ti-settings"
-                        style={{ fontSize: "15px", color: "#1e8760" }}
-                        aria-hidden="true"
-                      />
-                      Settings
-                    </button>
-                    <button
-                      style={{
-                        ...t.dropBtn,
-                        color: dark ? "#eaf5f0" : "#0c1c14",
-                      }}
                       onClick={openAccountSettings}
                     >
                       <i
