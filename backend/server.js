@@ -61,8 +61,11 @@ app.use(
 // ── CORS ──────────────────────────────────────────────────────────────────────
 const isDev = process.env.NODE_ENV !== 'production';
 
+// FIX: .trim() removes spaces, .replace(/\/$/, '') removes trailing slashes.
+// Both are common mistakes in .env values that cause silent CORS failures
+// because "https://go.hostops.online/" !== "https://go.hostops.online".
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim().replace(/\/$/, ''))
   : [
       'https://hostops-frontend.onrender.com',
       'https://hostops-v2-admin.onrender.com',
