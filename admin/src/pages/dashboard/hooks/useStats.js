@@ -1,33 +1,101 @@
-import { useState, useEffect } from 'react';
+// hooks/useStats.js
+// ─────────────────────────────────────────────────────────────────
+// Fetches the admin dashboard overview from GET /api/dashboard-overview
+// and shapes the response into the stat-card format expected by StatsRow.
+//
+// TOTAL CLIENTS and TOTAL PROPERTIES come from the User collection
+// (returned by the backend as totalClients / totalProperties).
+//
+// MONTHLY REVENUE, ACTIVE BOOKINGS are aggregated from all Smoobu
+// API keys across all client properties.
+// ─────────────────────────────────────────────────────────────────
+import { useState, useEffect, useCallback } from 'react';
 
-const MOCK_STATS = [
-  { label: 'Total Clients',    value: '128',    change: '15 new',        trend: 'up', color: 'green'  },
-  { label: 'Total Properties', value: '542',    change: '43 added',      trend: 'up', color: 'blue'   },
-  { label: 'Active Bookings',  value: '1,842',  change: '21% growth',    trend: 'up', color: 'yellow' },
-  { label: 'Monthly Revenue',  value: '₱12.4M', change: '8.3% increase', trend: 'up', color: 'red'    },
-];
+function formatRevenue(value) {
+  if (value >= 1_000_000) return '₱' + (value / 1_000_000).toFixed(1) + 'M';
+  if (value >= 1_000)     return '₱' + (value / 1_000).toFixed(0) + 'K';
+  return '₱' + value.toLocaleString();
+}
 
-export function useStats() {
-  const [stats,   setStats]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(null);
+function buildStatsCards(data) {
+  return [
+    {
+      label:  'Total Clients',
+      value:  (data.totalClients ?? 0).toLocaleString(),
+      change: `${data.connectedProperties ?? 0} connected properties`,
+      trend:  'up',
+      color:  'green',
+    },
+    {
+      label:  'Total Properties',
+      value:  (data.totalProperties ?? 0).toLocaleString(),
+      change: `${data.connectedProperties ?? 0} Smoobu linked`,
+      trend:  'up',
+      color:  'blue',
+    },
+    {
+      label:  'Active Bookings',
+      value:  (data.totalBookings ?? 0).toLocaleString(),
+      change: `${data.totalCancellations ?? 0} cancellations`,
+      trend:  data.totalBookings > 0 ? 'up' : 'neutral',
+      color:  'yellow',
+    },
+    {
+      label:  'Monthly Revenue',
+      value:  formatRevenue(data.monthlyRevenue ?? 0),
+      change: `${data.overallOccupancy ?? 0}% avg occupancy`,
+      trend:  data.monthlyRevenue > 0 ? 'up' : 'neutral',
+      color:  'red',
+    },
+  ];
+}
+
+export function useStats({ from, to } = {}) {
+  const [stats,       setStats]       = useState([]);
+  const [overview,    setOverview]    = useState(null); // full payload for other hooks
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState(null);
+
+  const fetchStats = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const token = sessionStorage.getItem('hp_access_token') ?? '';
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to)   params.set('to', to);
+
+      const url = `/api/dashboard-overview${params.toString() ? '?' + params.toString() : ''}`;
+
+      const res = await fetch(url, {
+        headers: {
+          'Content-Type':  'application/json',
+          Authorization:   `Bearer ${token}`,
+          'x-api-key':     import.meta.env.VITE_API_KEY ?? '',
+        },
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const msg = await res.text().catch(() => res.statusText);
+        throw new Error(`API ${res.status}: ${msg}`);
+      }
+
+      const data = await res.json();
+
+      setOverview(data);
+      setStats(buildStatsCards(data));
+    } catch (err) {
+      setError(err.message || 'Failed to fetch dashboard stats');
+    } finally {
+      setLoading(false);
+    }
+  }, [from, to]);
 
   useEffect(() => {
-    let cancelled = false;
+    fetchStats();
+  }, [fetchStats]);
 
-    (async () => {
-      try {
-        await new Promise((r) => setTimeout(r, 900));
-        if (!cancelled) setStats(MOCK_STATS);
-      } catch (err) {
-        if (!cancelled) setError(err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, []);
-
-  return { stats, loading, error };
+  return { stats, overview, loading, error, refetch: fetchStats };
 }
