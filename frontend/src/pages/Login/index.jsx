@@ -6,6 +6,7 @@ import PropertySelectForm from './components/PropertySelectForm';
 import PinModal from './components/PinModal';
 import Message from './components/Message';
 import bgImage from '../../assets/bg.png';
+import safeStorage from '../safeStorage';
 import './Login.css';
 
 const VIEWS = {
@@ -189,10 +190,12 @@ export default function LoginPage() {
               showMsg={showMsg}
               hideMsg={hideMsg}
               onPropertySelected={(propertyId, propertyName) => {
-                // Store in sessionStorage so the dashboard can read them,
-                // but hold navigation here — PIN gate comes first.
-                sessionStorage.setItem('hp_selected_property_id',   propertyId);
-                sessionStorage.setItem('hp_selected_property_name', propertyName || '');
+                // FIX: Use safeStorage instead of sessionStorage.
+                // sessionStorage is cleared on cross-origin redirects so
+                // DashboardContext never saw the saved property, causing
+                // showPropertySelector:true → redirect loop on every refresh.
+                safeStorage.setItem('hp_selected_property_id',   propertyId);
+                safeStorage.setItem('hp_selected_property_name', propertyName || '');
                 setSelectedPropertyId(propertyId);
                 hideMsg();
                 setView(VIEWS.PIN_MODAL);
@@ -237,8 +240,9 @@ export default function LoginPage() {
               showMsg={showMsg}
               hideMsg={hideMsg}
               onPropertySelected={(propertyId, propertyName) => {
-                sessionStorage.setItem('hp_selected_property_id',   propertyId);
-                sessionStorage.setItem('hp_selected_property_name', propertyName || '');
+                // FIX: safeStorage instead of sessionStorage — same reason as above.
+                safeStorage.setItem('hp_selected_property_id',   propertyId);
+                safeStorage.setItem('hp_selected_property_name', propertyName || '');
                 setSelectedPropertyId(propertyId);
                 hideMsg();
                 setView(VIEWS.CLIENT_ACCOUNT_PIN_MODAL);
