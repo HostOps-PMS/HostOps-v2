@@ -507,53 +507,34 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
             </div>
           </div>
 
-          {/* Active toggle (edit only) */}
-          {isEdit && (
-            <div
-              style={{
-                marginBottom: 14,
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              <label style={{ ...labelStyle, margin: 0 }}>Active</label>
-              <button
-                type="button"
-                onClick={() =>
-                  setForm((f) => ({ ...f, isActive: !f.isActive }))
-                }
-                style={{
-                  width: 42,
-                  height: 24,
-                  borderRadius: 999,
-                  border: "none",
-                  cursor: "pointer",
-                  background: form.isActive ? "#26a676" : "#cbd5e0",
-                  position: "relative",
-                  transition: "background 0.2s",
-                }}
-              >
-                <span
-                  style={{
-                    position: "absolute",
-                    top: 3,
-                    left: form.isActive ? 20 : 3,
-                    width: 18,
-                    height: 18,
-                    borderRadius: "50%",
-                    background: "#fff",
-                    transition: "left 0.2s",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                  }}
-                />
-              </button>
-            </div>
-          )}
-
           {/* Properties */}
           <div style={{ marginBottom: 20 }}>
-            <label style={labelStyle}>Assign Properties</label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+              <label style={labelStyle}>Assign Properties</label>
+              {isEdit && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ ...labelStyle, margin: 0 }}>Active</span>
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, isActive: !f.isActive }))}
+                    style={{
+                      width: 42, height: 24, borderRadius: 999, border: 'none',
+                      cursor: 'pointer',
+                      background: form.isActive ? '#26a676' : '#cbd5e0',
+                      position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                    }}
+                  >
+                    <span style={{
+                      position: 'absolute', top: 3,
+                      left: form.isActive ? 20 : 3,
+                      width: 18, height: 18, borderRadius: '50%',
+                      background: '#fff', transition: 'left 0.2s',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                    }} />
+                  </button>
+                </div>
+              )}
+            </div>
             {!form.clientId && (
               <p
                 style={{ fontSize: "0.8rem", color: "#aaa", margin: "4px 0 0" }}
@@ -583,60 +564,83 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
               !propsError &&
               form.clientId &&
               (properties.length > 0 ? (
-                <div
-                  style={{
-                    border: "1.5px solid #e2e8f0",
-                    borderRadius: 8,
-                    overflow: "hidden",
-                    maxHeight: 200,
-                    overflowY: "auto",
-                  }}
-                >
-                  {properties.map((prop) => {
+                <div style={{
+                  border: '1.5px solid #e8edf2',
+                  borderRadius: 12,
+                  overflow: 'hidden',
+                  maxHeight: 240,
+                  overflowY: 'auto',
+                }}>
+                  {properties.map((prop, idx) => {
                     const checked = form.propertyIds.includes(String(prop.id));
+                    const words = (prop.propertyName || '').trim().split(/\s+/);
+                    const ini = words.length === 1
+                      ? (words[0][0] ?? '').toUpperCase()
+                      : `${words[0][0] ?? ''}${words[1][0] ?? ''}`.toUpperCase();
                     return (
-                      <label
+                      <div
                         key={prop.id}
+                        onClick={() => toggleProperty(prop.id)}
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          padding: "9px 14px",
-                          cursor: "pointer",
-                          background: checked ? "#f0f7ff" : "transparent",
-                          borderBottom: "1px solid #f0f0f0",
-                          fontSize: "0.875rem",
-                          color: "#2d3748",
-                          transition: "background 0.1s",
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '11px 14px',
+                          cursor: 'pointer',
+                          background: checked ? '#f0fdf4' : '#fff',
+                          borderBottom: idx < properties.length - 1 ? '1px solid #f0f2f5' : 'none',
+                          transition: 'background 0.12s',
                         }}
+                        onMouseEnter={e => { if (!checked) e.currentTarget.style.background = '#f8faf9'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = checked ? '#f0fdf4' : '#fff'; }}
                       >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleProperty(prop.id)}
-                          style={{
-                            accentColor: "#3b5fc0",
-                            width: 15,
-                            height: 15,
-                            flexShrink: 0,
-                          }}
-                        />
-                        <span style={{ fontWeight: checked ? 600 : 400 }}>
+                        {/* Avatar */}
+                        <div style={{
+                          width: 36, height: 36, borderRadius: 9, flexShrink: 0,
+                          background: checked
+                            ? 'linear-gradient(135deg, #26a676, #1d8a62)'
+                            : 'linear-gradient(135deg, #e5e9ec, #d1d5db)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: '#fff', fontWeight: 700, fontSize: '0.78rem',
+                          transition: 'background 0.12s',
+                        }}>
+                          {ini || '?'}
+                        </div>
+
+                        {/* Name */}
+                        <span style={{
+                          flex: 1,
+                          fontSize: '0.875rem',
+                          fontWeight: checked ? 600 : 400,
+                          color: checked ? '#0d1117' : '#4a5568',
+                          transition: 'color 0.12s',
+                        }}>
                           {prop.propertyName}
                         </span>
-                      </label>
+
+                        {/* Checkmark */}
+                        <div style={{
+                          width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                          border: checked ? 'none' : '1.5px solid #d1d5db',
+                          background: checked ? '#26a676' : 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'all 0.12s',
+                        }}>
+                          {checked && (
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="2,6 5,9 10,3" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
               ) : (
-                <p
-                  style={{
-                    fontSize: "0.8rem",
-                    color: "#888",
-                    margin: "4px 0 0",
-                    fontStyle: "italic",
-                  }}
-                >
+                <p style={{
+                  fontSize: '0.8rem', color: '#888',
+                  margin: '4px 0 0', fontStyle: 'italic',
+                }}>
                   No properties assigned to this client.
                 </p>
               ))}

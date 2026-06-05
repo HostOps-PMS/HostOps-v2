@@ -169,46 +169,88 @@ function UnlockConfirmModal({ account, onClose, onUnlocked }) {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
       zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      backdropFilter: 'blur(3px)',
+      backdropFilter: 'blur(2px)', padding: 16,
     }}
       onClick={onClose}
     >
       <div
         style={{
-          background: '#fff', borderRadius: 16, padding: '28px 32px',
-          maxWidth: 440, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+          background: '#fff', borderRadius: 20,
+          maxWidth: 460, width: '100%',
+          boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}
         onClick={e => e.stopPropagation()}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 10,
-            background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#dc2626" strokeWidth="1.8">
-              <rect x="3" y="9" width="14" height="10" rx="2" />
-              <path d="M7 9V6a3 3 0 016 0v3" strokeLinecap="round" />
-            </svg>
-          </div>
+        {/* Header */}
+        <div style={{
+          padding: '28px 32px 0 32px',
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+        }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#111' }}>Unlock PIN</div>
-            <div style={{ fontSize: 12, color: '#888' }}>{account.email}</div>
+            <h2 style={{
+              fontSize: '1.6rem', fontWeight: 800, color: '#0d1117',
+              lineHeight: 1.15, margin: 0, letterSpacing: '-0.02em',
+            }}>
+              Unlock <span style={{ color: '#26a676' }}>PIN</span>
+            </h2>
+            <p style={{ margin: '6px 0 0', fontSize: '.8125rem', color: '#9ca3af', fontWeight: 400 }}>
+              Review the recovery request before unlocking.
+            </p>
           </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: '#f3f4f6', border: 'none', borderRadius: 10,
+              width: 32, height: 32, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', cursor: 'pointer', color: '#6b7280',
+              fontSize: '1rem', flexShrink: 0, marginTop: 2,
+            }}
+          >✕</button>
         </div>
 
-        <p style={{ fontSize: 13, color: '#555', lineHeight: 1.6, marginBottom: 20 }}>
-          This will reset <strong>pinAttempts</strong> to 0, clear <strong>pinLockedUntil</strong>, and set
-          <strong> pinPermanentlyLocked</strong> to false for this account.
-        </p>
+        {/* Body */}
+        <div style={{ padding: '20px 32px 0' }}>
+          {/* Profile card */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '12px 16px', borderRadius: 12,
+            background: '#f8faf9', border: '1px solid #e5efe9',
+            marginBottom: 16,
+          }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: 'linear-gradient(135deg, #26a676, #1d8a62)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', fontWeight: 700, fontSize: '0.95rem', flexShrink: 0,
+            }}>
+              {(account.name || account.email || '?')[0].toUpperCase()}
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0d1117' }}>
+                {account.name || '—'}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: 1 }}>
+                {account.email}
+              </div>
+            </div>
+            <div style={{ marginLeft: 'auto' }}>
+              <RoleBadge role={account.role} type={account.accountType} />
+            </div>
+          </div>
+
+          <p style={{ fontSize: '.8125rem', color: '#6b7280', lineHeight: 1.6, marginBottom: 16, margin: '0 0 16px' }}>
+            This will reset <strong>pinAttempts</strong> to 0, clear <strong>pinLockedUntil</strong>, and set <strong>pinPermanentlyLocked</strong> to false for this account.
+          </p>
 
         <div style={{
           background: recoveryLoading ? '#f9fafb' : (recoveryRequest ? '#f9fafb' : '#fef9f0'),
           border: `1px solid ${recoveryLoading ? '#e5e7eb' : (recoveryRequest ? '#e5e7eb' : '#fde68a')}`,
-          borderRadius: 12,
+          borderRadius: 10,
           padding: '14px 16px',
-          marginBottom: 20,
+          marginBottom: 16,
         }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -278,20 +320,29 @@ function UnlockConfirmModal({ account, onClose, onUnlocked }) {
 
         {error && (
           <div style={{
-            background: '#fef2f2', border: '1px solid #fecaca',
-            borderRadius: 8, padding: '8px 12px', marginBottom: 16,
-            fontSize: 12, color: '#dc2626',
+            background: '#fee2e2', color: '#b91c1c',
+            borderRadius: 8, padding: '10px 14px',
+            fontSize: '.8125rem', fontWeight: 500, marginBottom: 16,
           }}>
-            {error}
+            ⚠️ {error}
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+        </div> {/* end body div */}
+
+        {/* Footer */}
+        <div style={{
+          padding: '16px 32px 24px',
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+          gap: 10, borderTop: '1px solid #f0f2f5', marginTop: 20,
+        }}>
           <button
             onClick={onClose}
             style={{
-              padding: '8px 18px', borderRadius: 8, border: '1px solid #e5e7eb',
-              background: '#fff', fontSize: 13, cursor: 'pointer', color: '#555',
+              padding: '9px 22px', borderRadius: 10,
+              border: '1.5px solid #e5e7eb', background: '#fff',
+              fontSize: '0.875rem', fontWeight: 600, color: '#374151',
+              cursor: 'pointer',
             }}
           >
             Cancel
@@ -301,12 +352,12 @@ function UnlockConfirmModal({ account, onClose, onUnlocked }) {
             disabled={!canUnlock || loading}
             title={!canUnlock && !recoveryLoading ? 'Waiting for user to submit a recovery request' : ''}
             style={{
-              padding: '8px 18px', borderRadius: 8, border: 'none',
-              background: (!canUnlock || loading) ? '#d1d5db' : '#16a34a',
-              color: (!canUnlock || loading) ? '#9ca3af' : '#fff',
-              fontSize: 13, fontWeight: 600,
+              padding: '9px 26px', borderRadius: 10, border: 'none',
+              background: (!canUnlock || loading) ? '#9ca3af' : '#0d1117',
+              color: '#fff', fontSize: '0.875rem', fontWeight: 700,
               cursor: (!canUnlock || loading) ? 'not-allowed' : 'pointer',
-              transition: 'background 0.15s, color 0.15s',
+              boxShadow: (!canUnlock || loading) ? 'none' : '0 2px 8px rgba(13,17,23,0.18)',
+              transition: 'background 0.15s',
             }}
           >
             {loading ? 'Unlocking…' : 'Unlock Account'}

@@ -30,6 +30,7 @@ export default function TeamLeaderTable({
   onEdit,
   onDelete,
   onNew,
+  onRowClick,
 }) {
   const clientMap = Object.fromEntries(clients.map((c) => [c._id, c]));
 
@@ -219,7 +220,7 @@ export default function TeamLeaderTable({
                         borderLeft: isSelected ? '3px solid #3b5fc0' : '3px solid transparent',
                         transition: 'background 0.1s',
                         cursor: 'pointer',
-                      }}
+                      }}onClick={() => onRowClick && onRowClick(tl)}
                       onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = '#fafbff'; }}
                       onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
                     >
@@ -258,7 +259,7 @@ export default function TeamLeaderTable({
                       <td style={{ padding: '12px 16px 12px 8px', whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                           <button
-                            onClick={() => onEdit(tl)}
+                            onClick={(e) => { e.stopPropagation(); onEdit(tl); }}
                             style={{
                               padding: '5px 14px', borderRadius: 6,
                               border: '1px solid #e5e7eb', background: '#fff',
@@ -268,7 +269,7 @@ export default function TeamLeaderTable({
                             Edit
                           </button>
                           <button
-                            onClick={() => onDelete(tl)}
+                            onClick={(e) => { e.stopPropagation(); onDelete(tl); }}
                             style={{
                               padding: '5px 14px', borderRadius: 6,
                               border: '1px solid #fecaca', background: '#fff5f5',
