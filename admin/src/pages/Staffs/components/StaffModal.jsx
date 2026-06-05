@@ -122,8 +122,8 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
         position: "fixed",
         inset: 0,
         zIndex: 1000,
-        background: "rgba(15,23,42,0.6)",
-        backdropFilter: "blur(4px)",
+        background: "rgba(0,0,0,0.4)",
+        backdropFilter: "blur(2px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -134,55 +134,72 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
       <div
         style={{
           background: "#fff",
-          borderRadius: 24,
+          borderRadius: 20,
           width: "100%",
-          maxWidth: 640,
-          maxHeight: "95vh",
+          maxWidth: 560,
+          maxHeight: "90vh",
           overflowY: "auto",
-          boxShadow: "0 24px 80px rgba(0,0,0,0.2)",
-          border: "1px solid rgba(255,255,255,0.8)",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
+          border: "none",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         {/* Header */}
-        <div
-          style={{
-            padding: "28px 32px 20px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderBottom: "1px solid #f1f5f9",
-          }}
-        >
-          <h2
-            style={{
-              margin: 0,
-              fontSize: "1.15rem",
-              fontWeight: 800,
-              color: "#0f172a",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            {isEdit ? "Edit Staff" : "Create Staff Account"}
-          </h2>
+        <div style={{
+          padding: '28px 32px 0 32px',
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+          flexShrink: 0,
+        }}>
+          <div>
+            <h2 style={{
+              fontSize: '1.6rem', fontWeight: 800, color: '#0d1117',
+              lineHeight: 1.15, margin: 0, letterSpacing: '-0.02em',
+            }}>
+              {isEdit ? <>Edit <span style={{ color: '#26a676' }}>Staff</span></> : <>Create <span style={{ color: '#26a676' }}>Staff</span></>}
+            </h2>
+            <p style={{ margin: '6px 0 0', fontSize: '.8125rem', color: '#9ca3af', fontWeight: 400 }}>
+              {isEdit ? 'Update the staff account details below.' : 'Fill in the details to create a staff account.'}
+            </p>
+          </div>
           <button
             onClick={onClose}
             style={{
-              background: "#f1f5f9",
-              border: "none",
-              cursor: "pointer",
-              color: "#64748b",
-              fontSize: 16,
-              lineHeight: 1,
-              width: 32, height: 32,
-              borderRadius: "50%",
-              display: "flex", alignItems: "center", justifyContent: "center",
+              background: '#f3f4f6', border: 'none', borderRadius: 10,
+              width: 32, height: 32, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', cursor: 'pointer', color: '#6b7280',
+              fontSize: '1rem', flexShrink: 0, marginTop: 2,
             }}
-          >
-            ×
-          </button>
+          >✕</button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ padding: "24px 32px 32px" }}>
+        <form onSubmit={handleSubmit} style={{ padding: '20px 32px 0', overflowY: 'auto', flex: 1 }}>
+          {/* Profile row — show selected client info */}
+          {form.clientId && (() => {
+            const c = clients.find(x => x._id === form.clientId);
+            if (!c) return null;
+            const parts = c.businessName.trim().split(/\s+/);
+            const ini = parts.length === 1 ? (parts[0][0] ?? '').toUpperCase() : `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
+            return (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 16px', borderRadius: 12,
+                background: '#f8faf9', border: '1px solid #e5efe9',
+                marginBottom: 16,
+              }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10,
+                  background: 'linear-gradient(135deg, #26a676, #1d8a62)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', fontWeight: 700, fontSize: '0.95rem', flexShrink: 0,
+                }}>{ini}</div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0d1117' }}>{c.businessName}</div>
+                  <div style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: 1 }}>{c.email}</div>
+                </div>
+              </div>
+            );
+          })()}
           {/* Client selector — searchable list */}
           <div style={{ marginBottom: 14, position: "relative" }}>
             <label style={labelStyle}>Business *</label>
@@ -626,55 +643,53 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
           </div>
 
           {error && (
-            <div
-              style={{
-                background: "#fff0ee",
-                color: "#c13515",
-                borderRadius: 8,
-                padding: "8px 12px",
-                fontSize: "0.83rem",
-                marginBottom: 14,
-              }}
-            >
-              {error}
+            <div style={{
+              background: '#fee2e2', color: '#b91c1c',
+              borderRadius: 8, padding: '10px 14px',
+              fontSize: '.8125rem', fontWeight: 500, marginBottom: 14,
+            }}>
+              ⚠️ {error}
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: "9px 20px",
-                borderRadius: 8,
-                border: "1.5px solid #ececec",
-                background: "#f7f8fa",
-                color: "#4a5568",
-                fontSize: "0.875rem",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              style={{
-                padding: "9px 24px",
-                borderRadius: 8,
-                border: "none",
-                background: saving ? "#a0aec0" : "#5ec49a",
-                color: "#fff",
-                fontSize: "0.875rem",
-                fontWeight: 600,
-                cursor: saving ? "not-allowed" : "pointer",
-              }}
-            >
-              {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Staff"}
-            </button>
-          </div>
-        </form>
+          </form>
+
+        {/* Footer */}
+        <div style={{
+          padding: '16px 32px 24px',
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+          gap: 10,
+          borderTop: '1px solid #f0f2f5',
+          flexShrink: 0,
+        }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            style={{
+              padding: '9px 22px', borderRadius: 10,
+              border: '1.5px solid #e5e7eb', background: '#fff',
+              fontSize: '0.875rem', fontWeight: 600, color: '#374151',
+              cursor: saving ? 'not-allowed' : 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); document.querySelector('form')?.requestSubmit?.() || handleSubmit(e); }}
+            disabled={saving}
+            style={{
+              padding: '9px 26px', borderRadius: 10,
+              border: 'none', background: saving ? '#9ca3af' : '#0d1117',
+              fontSize: '0.875rem', fontWeight: 700, color: '#fff',
+              cursor: saving ? 'not-allowed' : 'pointer',
+              boxShadow: saving ? 'none' : '0 2px 8px rgba(13,17,23,0.18)',
+            }}
+          >
+            {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Staff'}
+          </button>
+        </div>
       </div>
     </div>
   );

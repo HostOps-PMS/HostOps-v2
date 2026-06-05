@@ -236,8 +236,8 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
               boxShadow: '0 2px 8px rgba(59,95,192,0.18)',
               transition: 'background 0.15s',
             }}
-            onMouseEnter={e => e.currentTarget.style.background = '#2d4faa'}
-            onMouseLeave={e => e.currentTarget.style.background = '#3b5fc0'}
+            onMouseEnter={e => e.currentTarget.style.background = '#059669'}
+            onMouseLeave={e => e.currentTarget.style.background = '#10b981'}
           >
             + Add Business
           </button>
@@ -262,7 +262,7 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
                       type="checkbox"
                       checked={allChecked}
                       onChange={toggleAll}
-                      style={{ width: 15, height: 15, accentColor: '#3b5fc0', cursor: 'pointer' }}
+                      style={{ width: 15, height: 15, accentColor: '#10b981', cursor: 'pointer' }}
                     />
                   </th>
                   {['Business', 'Role', 'Status', 'Last Login', 'Joined'].map((h) => (
@@ -286,12 +286,12 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
                       onClick={() => onRowClick(client)}
                       style={{
                         borderBottom: i < tabFiltered.length - 1 ? '1px solid #f7f8fa' : 'none',
-                        background: isSelected ? '#f8f9ff' : 'transparent',
-                        borderLeft: isSelected ? '3px solid #3b5fc0' : '3px solid transparent',
+                        background: isSelected ? '#f0fdf4' : 'transparent',
+                        borderLeft: isSelected ? '3px solid #10b981' : '3px solid transparent',
                         transition: 'background 0.1s',
                         cursor: 'pointer',
                       }}
-                      onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = '#fafbff'; }}
+                      onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = '#f0fdf4'; }}
                       onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
                     >
                       <td
@@ -302,7 +302,7 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleOne(client._id)}
-                          style={{ width: 15, height: 15, accentColor: '#3b5fc0', cursor: 'pointer' }}
+                          style={{ width: 15, height: 15, accentColor: '#10b981', cursor: 'pointer' }}
                         />
                       </td>
 
