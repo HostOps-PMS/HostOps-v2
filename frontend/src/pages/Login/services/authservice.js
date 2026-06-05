@@ -105,6 +105,37 @@ export async function checkSession() {
   return false;
 }
 
+// POST /auth/logout
+// Invalidates the refresh token cookie on the server, then clears all
+// client-side tokens so the user is fully signed out.
+export async function logoutUser() {
+  try {
+    const token = sessionStorage.getItem('hp_access_token');
+    await fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include', // sends the HttpOnly 'rt' cookie so the server can revoke it
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': import.meta.env.VITE_API_KEY,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+  } catch (err) {
+    // Even if the server call fails, proceed with local cleanup
+    console.warn('Logout request failed:', err);
+  } finally {
+    // Clear all client-side auth state regardless of server response
+    sessionStorage.removeItem('hp_access_token');
+    sessionStorage.removeItem('hp_must_change_password');
+    sessionStorage.removeItem('hp_selected_property_id');
+    localStorage.removeItem('hp_user');
+    localStorage.removeItem('user');
+    localStorage.removeItem('auth_user');
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('hostpilot_user');
+  }
+}
+
 // POST /auth/change-password
 // Called on first login when mustChangePassword is true.
 // On success the backend sets isVerified: true and mustChangePassword: false.
