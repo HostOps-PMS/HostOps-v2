@@ -588,9 +588,15 @@ export default function ClientSmoobuView({ client, property, onClose }) {
         style={{ maxWidth: 1400, width: '98vw', maxHeight: '95vh', display: 'flex', flexDirection: 'column', borderRadius: 20, overflow: 'hidden' }}
       >
         {/* ── Header ── */}
-        <div className="db-modal__head" style={{ padding: '18px 24px', borderBottom: '1px solid var(--color-border, #e5e9ec)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text, #1a2e2a)' }}>
-            {client.businessName || `${client.firstName || ''} ${client.lastName || ''}`.trim() || 'Client'}
+        <div className="db-modal__head" style={{ padding: '18px 24px', borderBottom: '1px solid var(--color-border, #e5e9ec)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--color-text, #1a2e2a)' }}>
+              {client.businessName || `${client.firstName || ''} ${client.lastName || ''}`.trim() || 'Client'}{' '}
+              <span style={{ color: 'var(--color-primary, #26a676)' }}>Details</span>
+            </div>
+            <div style={{ fontSize: '.8rem', color: 'var(--color-muted, #7a8c8e)', marginTop: 3 }}>
+              Performance overview and booking data.
+            </div>
           </div>
           <button className="db-modal__close" onClick={onClose}>✕</button>
         </div>
