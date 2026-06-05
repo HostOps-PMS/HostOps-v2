@@ -153,7 +153,33 @@ export default function InboxPage() {
     }
   }
 
-  useEffect(() => { loadData(); }, []); // eslint-disable-line
+  // ── Load data on mount, scoped to the currently selected property ──────────
+  // FIX: The old call was loadData() with no args, so apartmentIdOverride was
+  // always undefined → null → backend returned ALL properties' inbox (up to
+  // limit=5 threads before our smoobu.js fix).
+  //
+  // Now we derive the Smoobu apartmentId from dashState:
+  //   - If rawData already has properties (dashboard loaded before inbox),
+  //     find the matching property by name and pass its Smoobu ID.
+  //   - Either way, loadData() picks up propertyDbId from safeStorage
+  //     (hp_selected_property_id) internally, which injects the per-property
+  //     Smoobu API key on the backend. The apartmentId is a second narrowing
+  //     filter on top of that.
+  useEffect(() => {
+    const selectedName = dashState.selectedPropertyName;
+    const properties   = dashState.rawData?.properties || [];
+
+    // Resolve the Smoobu numeric apartment ID for the selected property
+    let smoobuApartmentId = null;
+    if (selectedName && properties.length > 0) {
+      const match = properties.find((p) => p.name === selectedName);
+      if (match?.id) smoobuApartmentId = match.id;
+    }
+
+    // Pass apartmentId as the 3rd argument; from/to as undefined so they
+    // fall back to dashState.from / dashState.to inside loadData.
+    loadData(undefined, undefined, smoobuApartmentId);
+  }, []); // eslint-disable-line
 
   const inbox = dashState.rawData?.inbox || [];
   const totalUnread = dashState.rawData?.totalUnread || 0;
@@ -259,7 +285,37 @@ export default function InboxPage() {
               </span>
             </div>
 
-            {/* Search */}
+            {/* Property scope indicator — shows which property's messages are displayed */}
+            {dashState.selectedPropertyName ? (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 10px", marginBottom: "10px",
+                borderRadius: "8px", background: dark ? "#0f2d1f" : "#eaf7f0",
+                border: `1px solid ${dark ? "#1e3a2a" : "#c3e8d4"}`,
+              }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#26a676" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                  <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#26a676", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {dashState.selectedPropertyName}
+                </span>
+              </div>
+            ) : (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 10px", marginBottom: "10px",
+                borderRadius: "8px", background: dark ? "#0f2d1f" : "#f4f7f5",
+                border: `1px solid ${border}`,
+              }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={textSub} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                </svg>
+                <span style={{ fontSize: "11px", fontWeight: 600, color: textSub }}>
+                  All Properties
+                </span>
+              </div>
+            )}
             <div style={{ position: "relative", marginBottom: "10px" }}>
               <svg style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: textSub, pointerEvents: "none" }}
                 width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

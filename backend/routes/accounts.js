@@ -131,6 +131,7 @@ router.post('/accounts/unlock', async (req, res, next) => {
 
     const unlockFields = {
       pinAttempts:          0,
+      lastPinFailAt:        null,
       pinLockedUntil:       null,
       pinPermanentlyLocked: false,
     };

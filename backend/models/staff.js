@@ -3,7 +3,6 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 const staffSchema = new mongoose.Schema({
-  // The client (user) this staff belongs to
   clientId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'user',
@@ -28,14 +27,11 @@ const staffSchema = new mongoose.Schema({
     select: false,
   },
 
-  // Which Smoobu property IDs this staff member can access
-  // These are Smoobu apartment IDs (numbers), stored as strings for safety
   propertyIds: {
     type: [String],
     default: [],
   },
 
-  // Optional label / role descriptor (e.g. "Cleaner", "Maintenance", "Receptionist")
   staffRole: {
     type: String,
     default: '',
@@ -62,21 +58,23 @@ const staffSchema = new mongoose.Schema({
     default: true,
   },
 
-  // ── PIN lockout tracking ──────────────────────────────────────
-  // pinAttempts:         cumulative wrong-PIN count (resets on success)
-  // pinLockedUntil:      time until which PIN entry is blocked (null = not locked)
-  // pinPermanentlyLocked: true when attempts exceed the final threshold — account
-  //                       disabled with no automatic recovery
-  pinAttempts:          { type: Number, default: 0 },
-  pinLockedUntil:       { type: Date,   default: null },
-  pinPermanentlyLocked: { type: Boolean, default: false },
+  // ── PIN lockout tracking ──────────────────────────────────────────
+  //
+  // pinAttempts:          cumulative wrong-PIN count since last reset
+  // lastPinFailAt:        timestamp of the most recent wrong attempt.
+  //                       If now - lastPinFailAt >= 48 h, the attempt
+  //                       counter is auto-reset on the next verify call.
+  // pinLockedUntil:       time until which PIN entry is blocked (null = not locked)
+  // pinPermanentlyLocked: true when attempts reach the final threshold —
+  //                       only an admin can clear this via POST /api/accounts/unlock
+  pinAttempts:          { type: Number,   default: 0 },
+  lastPinFailAt:        { type: Date,     default: null, select: false },
+  pinLockedUntil:       { type: Date,     default: null },
+  pinPermanentlyLocked: { type: Boolean,  default: false },
 
   lastLoginAt: { type: Date },
 
   // ── OTP for password-change verification ─────────────────────────
-  // Used by POST /auth/send-change-password-otp and
-  // POST /auth/verify-reset-token (staff path).
-  // Stored hashed; cleared after successful verification.
   loginOtp:       { type: String, select: false },
   loginOtpExpiry: { type: Date,   select: false },
 }, {
@@ -103,6 +101,7 @@ staffSchema.methods.comparePassword = async function (plain) {
 staffSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
+  delete obj.lastPinFailAt;
   delete obj.__v;
   return obj;
 };
