@@ -383,6 +383,115 @@ function DatePresetBar({ activePreset, dateRange, onPresetChange, onCustomApply 
   );
 }
 
+// ── Expandable property list ────────────────────────────────────
+function ExpandablePropertyList({ properties }) {
+  const [expandedId, setExpandedId] = useState(null);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      {properties.map((p, idx) => {
+        const isOpen = expandedId === p.id;
+        return (
+          <div key={p.id} style={{
+            borderRadius: 10,
+            border: `1px solid ${isOpen ? 'var(--color-primary, #26a676)' : 'var(--color-border, #e5e9ec)'}`,
+            background: isOpen ? '#f0faf5' : 'var(--color-surface-2, #f8faf9)',
+            overflow: 'hidden',
+            transition: 'border-color .15s',
+          }}>
+            {/* Row — always visible */}
+            <div
+              onClick={() => setExpandedId(isOpen ? null : p.id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '7px 10px',
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{
+                width: 20, height: 20, borderRadius: '50%',
+                background: isOpen ? 'var(--color-primary, #26a676)' : 'var(--color-primary-soft, #d4f0e4)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, transition: 'background .15s',
+              }}>
+                <span style={{ fontSize: '.6rem', fontWeight: 800, color: isOpen ? '#fff' : 'var(--color-primary, #26a676)' }}>
+                  {idx + 1}
+                </span>
+              </div>
+              <div style={{
+                width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                background: 'var(--color-border, #e5e9ec)',
+                overflow: 'hidden',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '1px solid var(--color-border, #e5e9ec)',
+              }}>
+                {p.picture ? (
+                  <img src={p.picture} alt={p.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                    stroke="var(--color-primary, #26a676)" strokeWidth="1.5"
+                    strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                  </svg>
+                )}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: '.75rem', fontWeight: 600,
+                  color: 'var(--color-text, #1a2e2a)',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {p.name}
+                </div>
+                {p.type && (
+                  <div style={{ fontSize: '.65rem', color: 'var(--color-muted, #7a8c8e)', marginTop: 1 }}>
+                    {p.type}
+                  </div>
+                )}
+              </div>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                stroke="var(--color-muted, #7a8c8e)" strokeWidth="2.5" strokeLinecap="round"
+                style={{ flexShrink: 0, transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }}>
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </div>
+
+            {/* Expanded: full image */}
+            {isOpen && (
+              <div style={{ borderTop: '1px solid var(--color-border, #e5e9ec)' }}>
+                {p.picture ? (
+                  <img src={p.picture} alt={p.name}
+                    style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <div style={{
+                    width: '100%', aspectRatio: '16/9',
+                    background: 'var(--color-surface-2, #f0f7f4)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
+                      stroke="var(--color-primary, #26a676)" strokeWidth="1"
+                      strokeLinecap="round" strokeLinejoin="round" style={{ opacity: .4 }}>
+                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                      <polyline points="9 22 9 12 15 12 15 22" />
+                    </svg>
+                  </div>
+                )}
+                {p.type && (
+                  <div style={{ padding: '8px 12px', fontSize: '.75rem', color: 'var(--color-muted, #7a8c8e)', fontWeight: 500 }}>
+                    {p.type}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────
 export default function ClientSmoobuView({ client, property, onClose }) {
   if (!client || !property) return null;
@@ -476,33 +585,43 @@ export default function ClientSmoobuView({ client, property, onClose }) {
     >
       <div
         className="db-modal"
-        style={{ maxWidth: 860, width: '96vw', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
+        style={{ maxWidth: 1400, width: '98vw', maxHeight: '95vh', display: 'flex', flexDirection: 'column', borderRadius: 20, overflow: 'hidden' }}
       >
         {/* ── Header ── */}
-        <div className="db-modal__head">
-          <div style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--color-text, #1a2e2a)' }}>
-            {client.businessName || `${client.firstName || ''} ${client.lastName || ''}`.trim() || 'Client'}
+        <div className="db-modal__head" style={{ padding: '18px 24px', borderBottom: '1px solid var(--color-border, #e5e9ec)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--color-text, #1a2e2a)' }}>
+              {client.businessName || `${client.firstName || ''} ${client.lastName || ''}`.trim() || 'Client'}{' '}
+              <span style={{ color: 'var(--color-primary, #26a676)' }}>Details</span>
+            </div>
+            <div style={{ fontSize: '.8rem', color: 'var(--color-muted, #7a8c8e)', marginTop: 3 }}>
+              Performance overview and booking data.
+            </div>
           </div>
           <button className="db-modal__close" onClick={onClose}>✕</button>
         </div>
 
         {/* ── Scrollable body ── */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'row-reverse', minHeight: 0, overflow: 'hidden' }}>
 
-          {/* Date preset pills + currency controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'space-between' }}>
+          {/* ── LEFT: main scrollable content ── */}
+          <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16, background: 'var(--color-bg, #f6f8f7)' }}>
+
+          {/* Date filter + Currency — sticky top */}
+          <div style={{
+            position: 'sticky', top: 0, zIndex: 10,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: 'var(--color-surface, #fff)',
+            borderRadius: 12, padding: '10px 16px',
+            border: '1px solid var(--color-border, #e5e9ec)',
+            boxShadow: '0 2px 8px rgba(0,0,0,.06)',
+          }}>
             <DatePresetBar
               activePreset={activePreset}
               dateRange={dateRange}
               onPresetChange={handlePresetChange}
               onCustomApply={handleCustomApply}
             />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <CurrencyToggle currency={currency} onChange={setCurrency} phpRate={phpRate} />
-              <span style={{ fontSize: '.7rem', color: 'var(--color-muted, #7a8c8e)' }}>
-                1 USD = ₱{phpRate.toFixed(2)} <span style={{ opacity: .6 }}>({rateLabel})</span>
-              </span>
-            </div>
           </div>
 
           {/* Loading skeletons */}
@@ -653,123 +772,10 @@ export default function ClientSmoobuView({ client, property, onClose }) {
                 </div>
               )}
 
-              {/* Property Header & Stat cards */}
-              <div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  marginBottom: 20,
-                  paddingBottom: 16,
-                  borderBottom: '1px solid var(--color-border, #e5e9ec)'
-                }}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: '10px',
-                    background: 'var(--color-primary-soft, #d4f0e4)',
-                    color: 'var(--color-primary, #26a676)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                      <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                    </svg>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text, #1a2e2a)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-                      {property.propertyName || property.name || 'Property'}
-                    </div>
-                    <div style={{ fontSize: '.8125rem', color: 'var(--color-muted, #7a8c8e)', fontWeight: 500, marginTop: 4 }}>
-                      Performance Dashboard
-                    </div>
-                  </div>
-                </div>
+              {/* Properties card grid + Channels ranked list */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-                <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                  {/* Left: Property Picture */}
-                  <div style={{
-                    width: 240,
-                    height: 240,
-                    flexShrink: 0,
-                    borderRadius: 'var(--radius-lg, 16px)',
-                    overflow: 'hidden',
-                    border: '1px solid var(--color-border, #e5e9ec)',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
-                    background: 'var(--color-surface-2, #f0f7f4)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '4.5rem',
-                    color: 'var(--color-primary, #26a676)',
-                    fontWeight: 700
-                  }}>
-                    {property.propertyPicture ? (
-                      <img
-                        src={property.propertyPicture}
-                        alt={property.name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      (property.propertyName || property.name || '?').charAt(0).toUpperCase()
-                    )}
-                  </div>
-
-                  {/* Right: Stat Cards (2x2 Symmetrical Grid) */}
-                  <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                    <StatCard
-                      label="Total Revenue"
-                      value={money(revenue)}
-                      accent="var(--color-primary, #26a676)"
-                    />
-                    <StatCard
-                      label="Bookings"
-                      value={bookings}
-                      sub={`${nights} nights total`}
-                    />
-                    <StatCard
-                      label="Cancellations"
-                      value={cancellations}
-                      sub={`${cancelledNights} nights affected`}
-                    />
-                    <StatCard label="Occupancy" value={`${occupancy}%`} />
-                  </div>
-                </div>
-              </div>
-
-              {/* 2-col grid: properties + channels */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div style={{
-                  background: 'var(--color-surface, #fff)',
-                  border: '1px solid var(--color-border, #e5e9ec)',
-                  borderRadius: 'var(--radius-md, 10px)',
-                  padding: '16px 20px',
-                }}>
-                  <SectionTitle>Properties ({properties.length})</SectionTitle>
-                  {properties.length === 0 ? (
-                    <div style={{ fontSize: '.8125rem', color: 'var(--color-muted, #7a8c8e)', padding: '12px 0' }}>
-                      No properties found.
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {properties.map((p) => (
-                        <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{
-                            width: 6, height: 6, borderRadius: '50%',
-                            background: 'var(--color-primary, #26a676)', flexShrink: 0,
-                          }} />
-                          <span style={{ fontSize: '.875rem', color: 'var(--color-text, #1a2e2a)' }}>
-                            {p.name}
-                          </span>
-                          {p.type && (
-                            <span style={{ fontSize: '.75rem', color: 'var(--color-muted, #7a8c8e)', marginLeft: 'auto' }}>
-                              {p.type}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
+                {/* ── Channels: ranked list with % badge ── */}
                 <div style={{
                   background: 'var(--color-surface, #fff)',
                   border: '1px solid var(--color-border, #e5e9ec)',
@@ -782,30 +788,63 @@ export default function ClientSmoobuView({ client, property, onClose }) {
                       No channel data.
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {Object.entries(byChannel)
                         .sort((a, b) => b[1].revenue - a[1].revenue)
-                        .map(([name, ch]) => {
+                        .map(([name, ch], idx) => {
                           const pct = totalChRev ? Math.round((ch.revenue / totalChRev) * 100) : 0;
                           const color = channelColor(name);
+                          const rankColors = ['#f59e0b', '#94a3b8', '#cd7c3a'];
+                          const rankColor = rankColors[idx] ?? 'var(--color-border, #e5e9ec)';
                           return (
-                            <div key={name}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: '.8125rem' }}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500, color: 'var(--color-text, #1a2e2a)' }}>
-                                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }} />
+                            <div key={name} style={{
+                              display: 'flex', alignItems: 'center', gap: 12,
+                              padding: '10px 14px',
+                              borderRadius: 10,
+                              background: idx === 0 ? 'linear-gradient(90deg, #fefce8, #fff)' : 'var(--color-surface-2, #f8faf9)',
+                              border: `1px solid ${idx === 0 ? '#fde68a' : 'var(--color-border, #e5e9ec)'}`,
+                            }}>
+                              <div style={{
+                                width: 24, height: 24, borderRadius: '50%',
+                                background: rankColor,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                flexShrink: 0,
+                              }}>
+                                <span style={{ fontSize: '.7rem', fontWeight: 800, color: '#fff' }}>
+                                  {idx + 1}
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0 }}>
+                                <span style={{
+                                  width: 9, height: 9, borderRadius: '50%',
+                                  background: color, flexShrink: 0, display: 'inline-block',
+                                }} />
+                                <span style={{
+                                  fontSize: '.875rem', fontWeight: 600,
+                                  color: 'var(--color-text, #1a2e2a)',
+                                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                }}>
                                   {name}
                                 </span>
-                                <span style={{ color: 'var(--color-muted, #7a8c8e)' }}>
-                                  {money(ch.revenue)} · {ch.bookings} bk
-                                </span>
                               </div>
-                              <div style={{ height: 5, borderRadius: 3, background: 'var(--color-border, #e5e9ec)', overflow: 'hidden' }}>
-                                <div style={{
-                                  height: '100%', width: `${pct}%`,
-                                  background: color, borderRadius: 3,
-                                  transition: 'width .4s ease',
-                                }} />
-                              </div>
+                              <span style={{ fontSize: '.75rem', color: 'var(--color-muted, #7a8c8e)', flexShrink: 0 }}>
+                                {ch.bookings} bk
+                              </span>
+                              <span style={{
+                                fontSize: '.875rem', fontWeight: 700,
+                                color: 'var(--color-text, #1a2e2a)', flexShrink: 0, minWidth: 80, textAlign: 'right',
+                              }}>
+                                {money(ch.revenue)}
+                              </span>
+                              <span style={{
+                                fontSize: '.72rem', fontWeight: 700,
+                                color: color,
+                                background: color + '18',
+                                borderRadius: 99, padding: '3px 8px',
+                                flexShrink: 0, minWidth: 38, textAlign: 'center',
+                              }}>
+                                {pct}%
+                              </span>
                             </div>
                           );
                         })}
@@ -899,10 +938,192 @@ export default function ClientSmoobuView({ client, property, onClose }) {
               </div>
             </>
           )}
-        </div>
+        </div>{/* end LEFT */}
+
+          {/* ── RIGHT: fixed sidebar — no scroll ── */}
+          <div style={{
+            width: 400, flexShrink: 0,
+            borderLeft: '1px solid var(--color-border, #e5e9ec)',
+            overflowY: 'auto',
+            display: 'flex', flexDirection: 'column',
+            background: '#fafaf8',
+            padding: '16px 14px',
+            gap: 12,
+            minHeight: '100%',
+            boxSizing: 'border-box',
+            justifyContent: 'flex-start',
+          }}>
+
+            {/* ── Property identity block ── */}
+            <div style={{
+              background: 'linear-gradient(135deg, #1a3d2e 0%, #26a676 100%)',
+              borderRadius: 16,
+              overflow: 'hidden',
+              flexShrink: 0,
+              padding: '18px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 52, height: 52, borderRadius: 12, flexShrink: 0,
+                  background: 'rgba(255,255,255,.15)',
+                  overflow: 'hidden',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: '2px solid rgba(255,255,255,.25)',
+                }}>
+                  {property.propertyPicture ? (
+                    <img src={property.propertyPicture} alt={property.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+                      stroke="rgba(255,255,255,.9)" strokeWidth="1.5"
+                      strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                      <polyline points="9 22 9 12 15 12 15 22" />
+                    </svg>
+                  )}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{
+                    fontSize: '1rem', fontWeight: 800,
+                    color: '#fff',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}>
+                    {property.propertyName || property.name || 'Property'}
+                  </div>
+                  <div style={{
+                    fontSize: '.6rem', fontWeight: 700,
+                    color: 'rgba(255,255,255,.65)',
+                    textTransform: 'uppercase', letterSpacing: '.07em', marginTop: 3,
+                  }}>
+                    Performance Dashboard
+                  </div>
+                </div>
+              </div>
+              <div style={{ height: 1, background: 'rgba(255,255,255,.15)', borderRadius: 99 }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                <div>
+                  <div style={{ fontSize: '.6rem', fontWeight: 700, color: 'rgba(255,255,255,.55)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>
+                    Total Revenue
+                  </div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#fff', lineHeight: 1 }}>
+                    {money(revenue)}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '.6rem', fontWeight: 700, color: 'rgba(255,255,255,.55)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>
+                    Occupancy
+                  </div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#fff', lineHeight: 1 }}>
+                    {occupancy}%
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Stat grid: 2×2 ── */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 10,
+              flexShrink: 0,
+            }}>
+              {[
+                { label: 'Bookings', value: bookings, accent: 'var(--color-text, #1a2e2a)', sub: `${nights} nights`, emoji: '🗓️' },
+                { label: 'Cancelled', value: cancellations, accent: '#e55b5b', sub: `${cancelledNights} nights`, emoji: '🚫' },
+              ].map((s) => (
+                <div key={s.label} style={{
+                  background: '#fff',
+                  border: '1px solid var(--color-border, #e5e9ec)',
+                  borderRadius: 14,
+                  padding: '14px',
+                  display: 'flex', flexDirection: 'column', gap: 6,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{
+                      fontSize: '.6rem', fontWeight: 700,
+                      color: 'var(--color-muted, #9ab8a9)',
+                      textTransform: 'uppercase', letterSpacing: '.06em',
+                    }}>
+                      {s.label}
+                    </span>
+                    <span style={{ fontSize: '.9rem' }}>{s.emoji}</span>
+                  </div>
+                  <div style={{
+                    fontSize: '1.4rem', fontWeight: 900,
+                    color: s.accent,
+                    lineHeight: 1,
+                  }}>
+                    {s.value}
+                  </div>
+                  {s.sub && (
+                    <div style={{ fontSize: '.65rem', color: 'var(--color-muted, #9ab8a9)' }}>
+                      {s.sub}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* ── Properties list ── */}
+            {data && !data.smoobuNotConnected && properties.length > 0 && (
+              <div style={{
+                background: '#fff',
+                border: '1px solid var(--color-border, #e5e9ec)',
+                borderRadius: 14,
+                padding: '12px 14px',
+                flexShrink: 0,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div style={{ fontSize: '.6rem', fontWeight: 700, color: 'var(--color-muted, #9ab8a9)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                    Properties
+                  </div>
+                  <span style={{
+                    fontSize: '.6rem', fontWeight: 700,
+                    color: 'var(--color-primary, #26a676)',
+                    background: 'var(--color-primary-soft, #d4f0e4)',
+                    borderRadius: 99, padding: '2px 7px',
+                  }}>
+                    {properties.length}
+                  </span>
+                </div>
+                <ExpandablePropertyList properties={properties} />
+              </div>
+            )}
+
+            {/* ── Currency toggle ── */}
+            <div style={{
+              background: '#fff',
+              border: '1px solid var(--color-border, #e5e9ec)',
+              borderRadius: 14,
+              padding: '12px 14px',
+              flexShrink: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}>
+              <div style={{ fontSize: '.6rem', fontWeight: 700, color: 'var(--color-muted, #9ab8a9)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                Display Currency
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '.75rem', color: 'var(--color-muted, #7a8c8e)', fontWeight: 500 }}>
+                  1 USD = ₱{phpRate.toFixed(2)}
+                  <span style={{ opacity: .55, marginLeft: 4 }}>({rateLabel})</span>
+                </span>
+                <CurrencyToggle currency={currency} onChange={setCurrency} phpRate={phpRate} />
+              </div>
+            </div>
+
+            {/* spacer fills remaining space with same bg */}
+            <div style={{ flex: 1, minHeight: 0, background: '#fafaf8' }} />
+
+          </div>{/* end RIGHT sidebar */}
+        </div>{/* end body row */}
 
         {/* ── Footer ── */}
-        <div className="db-modal__foot">
+        <div className="db-modal__foot" style={{ padding: '14px 24px', borderTop: '1px solid var(--color-border, #e5e9ec)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
           <button className="db-btn db-btn--ghost" onClick={onClose}>Close</button>
         </div>
       </div>

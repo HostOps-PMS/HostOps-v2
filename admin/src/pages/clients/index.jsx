@@ -77,24 +77,6 @@ export default function Clients() {
               <h1 className="cl-content__title">Businesses</h1>
               <p className="cl-content__sub">All registered users on the platform</p>
             </div>
-            <div className="cl-header-actions">
-              <button
-                className="db-btn db-btn--primary"
-                onClick={() => setShowAddClient(true)}
-              >
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2">
-                  <path d="M10 4v12M4 10h12" strokeLinecap="round" />
-                </svg>
-                Add Business
-              </button>
-              <button className="db-btn db-btn--ghost" onClick={refetch} title="Refresh">
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M4 4a8 8 0 0112.97 3M16 16a8 8 0 01-12.97-3" strokeLinecap="round" />
-                  <path d="M4 8V4H0" strokeLinecap="round" strokeLinejoin="round" transform="translate(4 0)" />
-                </svg>
-                Refresh
-              </button>
-            </div>
           </header>
 
           {/* Error banner */}
@@ -108,29 +90,15 @@ export default function Clients() {
             </div>
           )}
 
-          {/* Filter bar */}
-          <div className="cl-filterbar">
-            <div className="cl-search">
-              <span className="cl-search__icon">
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="9" cy="9" r="7" />
-                  <path d="M15 15l3 3" strokeLinecap="round" />
-                </svg>
-              </span>
-              <input
-                type="text"
-                placeholder="Search by name or email…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-          </div>
-
           {/* Table */}
           <ClientsTable
             clients={filtered}
             loading={loading}
             onRowClick={openModal}
+            search={search}
+            onSearchChange={setSearch}
+            onAddClient={() => setShowAddClient(true)}
+            onRefresh={refetch}
           />
         </div>
       </div>
