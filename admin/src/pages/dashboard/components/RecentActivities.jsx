@@ -1,5 +1,7 @@
-/* ── Recent Activities ──────────────────────────────────────── */
-const ACTIVITIES = [
+// components/RecentActivities.jsx
+
+// ── Static fallback activities (shown while loading or no Smoobu data) ──
+const FALLBACK_ACTIVITIES = [
   { id: 1, type: 'booking', actor: 'Maria Santos',  action: 'created a new booking',   target: 'Haido Ville – Room 204',    time: '2m ago',  avatar: 'MS' },
   { id: 2, type: 'payment', actor: 'Sun Villa',     action: 'payment received',         target: '₱120,000',                  time: '15m ago', avatar: 'SV' },
   { id: 3, type: 'cancel',  actor: 'Pedro Lim',     action: 'cancelled booking',        target: 'ABC Resort – Jun 14',       time: '1h ago',  avatar: 'PL' },
@@ -26,41 +28,79 @@ function hashColor(str) {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
 }
 
-export default function RecentActivities() {
+/**
+ * @param {object}  props
+ * @param {Array}   [props.activities]  — live activity array from /api/dashboard-overview.
+ *                                       Shape: [{ id, type, actor, action, target, time, avatar, channel, clientName }]
+ *                                       If null/undefined, falls back to static list.
+ * @param {boolean} [props.loading]
+ */
+export default function RecentActivities({ activities, loading }) {
+  const displayActivities = (!loading && activities && activities.length > 0)
+    ? activities
+    : FALLBACK_ACTIVITIES;
+  const isLive = !loading && activities && activities.length > 0;
+
+  if (loading) {
+    return (
+      <div className="db-table-card" style={{ flexShrink: 0 }}>
+        <div className="db-table-card__head">
+          <h2 className="db-table-card__title">Recent Activities</h2>
+        </div>
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <div className="db-skeleton" style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div className="db-skeleton" style={{ height: 11, width: '70%', marginBottom: 6 }} />
+                <div className="db-skeleton" style={{ height: 10, width: '50%' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="db-table-card" style={{ flexShrink: 0 }}>
       <div className="db-table-card__head">
-        <h2 className="db-table-card__title">Recent Activities</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 className="db-table-card__title">Recent Activities</h2>
+          {isLive && (
+            <span style={{
+              fontSize: '.68rem', fontWeight: 700,
+              color: '#059669', background: '#d1fae5',
+              border: '1px solid #6ee7b7',
+              padding: '2px 8px', borderRadius: 999,
+            }}>
+              ● Live
+            </span>
+          )}
+        </div>
         <button className="db-table-card__action">View all →</button>
       </div>
 
       <div style={{ padding: '4px 16px 12px', display: 'flex', flexDirection: 'column' }}>
-        {ACTIVITIES.map((act, i) => {
-          const dot = TYPE_DOT[act.type] ?? TYPE_DOT.booking;
-          const avatarBg = hashColor(act.avatar);
+        {displayActivities.map((act, i) => {
+          const dot       = TYPE_DOT[act.type] ?? TYPE_DOT.booking;
+          const avatarBg  = hashColor(act.avatar || act.actor || 'G');
           return (
             <div key={act.id} style={{
               display: 'flex',
               alignItems: 'center',
               gap: 12,
               padding: '10px 4px',
-              borderBottom: i < ACTIVITIES.length - 1 ? '1px solid var(--color-border)' : 'none',
+              borderBottom: i < displayActivities.length - 1 ? '1px solid var(--color-border)' : 'none',
             }}>
               {/* Avatar */}
               <div style={{
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
+                width: 32, height: 32, borderRadius: '50%',
                 background: avatarBg,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '10px',
-                fontWeight: 700,
-                color: '#fff',
-                flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '10px', fontWeight: 700, color: '#fff', flexShrink: 0,
               }}>
-                {act.avatar}
+                {act.avatar || (act.actor || 'G').slice(0, 2).toUpperCase()}
               </div>
 
               {/* Content */}
@@ -69,31 +109,25 @@ export default function RecentActivities() {
                   <strong>{act.actor}</strong>{' '}{act.action}
                 </div>
                 <div style={{
-                  fontSize: '.75rem',
-                  color: 'var(--color-muted)',
-                  marginTop: 1,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
+                  fontSize: '.75rem', color: 'var(--color-muted)', marginTop: 1,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                 }}>
                   {act.target}
                 </div>
+                {/* Show client name for live activities */}
+                {isLive && act.clientName && (
+                  <div style={{ fontSize: '.7rem', color: 'var(--color-brand)', marginTop: 1, fontWeight: 600 }}>
+                    {act.clientName}
+                    {act.channel && act.channel !== 'Direct' && (
+                      <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}> · {act.channel}</span>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Type label (plain text) + time */}
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-end',
-                gap: 3,
-                flexShrink: 0,
-              }}>
-                <span style={{
-                  fontSize: '.7rem',
-                  fontWeight: 600,
-                  color: dot,
-                  textTransform: 'capitalize',
-                }}>
+              {/* Type label + time */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
+                <span style={{ fontSize: '.7rem', fontWeight: 600, color: dot, textTransform: 'capitalize' }}>
                   {act.type}
                 </span>
                 <span style={{ fontSize: '.7rem', color: 'var(--color-muted)' }}>{act.time}</span>
@@ -101,6 +135,13 @@ export default function RecentActivities() {
             </div>
           );
         })}
+
+        {/* Empty state */}
+        {isLive && displayActivities.length === 0 && (
+          <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--color-muted)', fontSize: '.8rem' }}>
+            No recent booking activity.
+          </div>
+        )}
       </div>
     </div>
   );

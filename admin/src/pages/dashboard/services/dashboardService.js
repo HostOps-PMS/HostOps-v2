@@ -9,9 +9,19 @@
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? '';
 
+function getToken() {
+  return sessionStorage.getItem('hp_access_token') ?? '';
+}
+
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization:  `Bearer ${getToken()}`,
+      'x-api-key':    import.meta.env.VITE_API_KEY ?? '',
+      ...options.headers,
+    },
+    credentials: 'include',
     ...options,
   });
 
@@ -23,7 +33,7 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-/* ── Stats ─────────────────────────────────────────────── */
+/* ── Stats (legacy mock-backed) ────────────────────────────────── */
 
 /**
  * GET /dashboard/stats
@@ -33,7 +43,29 @@ export async function getStats() {
   return request('/dashboard/stats');
 }
 
-/* ── Orders ─────────────────────────────────────────────── */
+/* ── Dashboard Overview (live Smoobu aggregation) ───────────────── */
+
+/**
+ * GET /api/dashboard-overview
+ *
+ * Returns aggregated admin overview from all client Smoobu API keys.
+ * Includes: totalClients, totalProperties, monthlyRevenue, totalBookings,
+ * totalCancellations, overallOccupancy, revenueChart, topClients,
+ * occupancyBreakdown, recentBookings, recentCancellations, alerts,
+ * recentActivities, byChannel.
+ *
+ * @param {{ from?: string, to?: string }} opts  — optional YYYY-MM-DD date range
+ * @returns {Promise<DashboardOverviewPayload>}
+ */
+export async function getDashboardOverview({ from, to } = {}) {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to)   params.set('to', to);
+  const qs = params.toString() ? '?' + params.toString() : '';
+  return request(`/api/dashboard-overview${qs}`);
+}
+
+/* ── Orders ─────────────────────────────────────────────────────── */
 
 /**
  * GET /orders/recent?limit=N
@@ -52,5 +84,5 @@ export async function createOrder(payload) {
   return request('/orders', { method: 'POST', body: JSON.stringify(payload) });
 }
 
-const dashboardService = { getStats, getRecentOrders, createOrder };
+const dashboardService = { getStats, getDashboardOverview, getRecentOrders, createOrder };
 export default dashboardService;
