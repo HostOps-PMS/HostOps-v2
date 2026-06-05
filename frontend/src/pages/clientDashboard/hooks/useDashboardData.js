@@ -16,7 +16,7 @@ export function useDashboardData() {
   // so we don't read a stale closure. Omit to use dashState.selectedPropertyId.
   //
   // propertyDbId: MongoDB _id of the selected property (from hp_selected_property_id
-  // in sessionStorage). Passed to the backend so it can look up the correct
+  // in localStorage). Passed to the backend so it can look up the correct
   // smoobuApiKey from user.properties[] for that specific property.
   const loadData = useCallback(async (fromOverride, toOverride, apartmentIdOverride) => {
     if (loadingRef.current) return;
@@ -25,10 +25,13 @@ export function useDashboardData() {
     const from = fromOverride ?? dashState.from;
     const to   = toOverride   ?? dashState.to;
 
-    // Always read fresh from sessionStorage — never from a stale closure.
-    // selectProperty() writes hp_selected_property_id synchronously before
-    // the useEffect in index.jsx fires loadData(), so this is always current.
-    const propertyDbId = sessionStorage.getItem('hp_selected_property_id') || null;
+    // FIX: Read from localStorage instead of sessionStorage.
+    // sessionStorage is cleared when the login app redirects to the dashboard
+    // app across origins — localStorage persists correctly.
+    // selectProperty() writes hp_selected_property_id synchronously to
+    // localStorage before the useEffect in index.jsx fires loadData(),
+    // so this is always current.
+    const propertyDbId = localStorage.getItem('hp_selected_property_id') || null;
 
     // apartmentId is the Smoobu numeric ID for frontend-side filtering.
     // When propertyDbId is set, the backend already scopes the API call to

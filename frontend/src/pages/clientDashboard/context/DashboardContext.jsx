@@ -5,16 +5,20 @@ const DashboardContext = createContext(null);
 
 const defaultRange = getPresetRange('ytd');
 
-// ── Restore property selection from sessionStorage ────────────────────────────
-// Persisted so that page refreshes within the same session keep the selection.
-// Cleared automatically when the browser session ends (tab close / logout).
-const SESSION_PROP_ID_KEY   = 'hp_selected_property_id';
-const SESSION_PROP_NAME_KEY = 'hp_selected_property_name';
+// ── Persist property selection in localStorage ────────────────────────────────
+// FIX: Dati ito ay nakalagay sa sessionStorage, na HINDI nananatili
+// kapag nag-redirect mula sa ibang origin (core.hostops.online → go.hostops.online).
+// Ang sessionStorage ay per-tab at per-origin — kapag nag-cross-origin redirect
+// ang login app, blangko ang sessionStorage ng dashboard app, kaya lagi itong
+// nagpapakita ng PropertySelectorModal at nagdudulot ng redirect loop.
+// localStorage ay nananatili across origins (same browser), tabs, at page refreshes.
+const PROP_ID_KEY   = 'hp_selected_property_id';
+const PROP_NAME_KEY = 'hp_selected_property_name';
 
-function readSessionProperty() {
+function readStoredProperty() {
   try {
-    const id   = sessionStorage.getItem(SESSION_PROP_ID_KEY)   || null;
-    const name = sessionStorage.getItem(SESSION_PROP_NAME_KEY) || '';
+    const id   = localStorage.getItem(PROP_ID_KEY)   || null;
+    const name = localStorage.getItem(PROP_NAME_KEY) || '';
     return { id, name };
   } catch {
     return { id: null, name: '' };
@@ -22,7 +26,7 @@ function readSessionProperty() {
 }
 
 export function DashboardProvider({ children }) {
-  const restoredProp = readSessionProperty();
+  const restoredProp = readStoredProperty();
 
   const [dashState, setDashState] = useState({
     from: defaultRange.from,
@@ -37,10 +41,10 @@ export function DashboardProvider({ children }) {
 
     // ── Property selection ────────────────────────────────────────────────────
     // selectedPropertyId: null means "All Properties" (no per-property filter).
-    // When set, every /api/dashboard call includes ?apartmentId=<id> so the
+    // When set, every /api/dashboard call includes ?propertyDbId=<id> so the
     // backend narrows bookings, inbox, and stats to that single property.
     //
-    // showPropertySelector: true on first visit (no session value) so the
+    // showPropertySelector: true on first visit (no stored value) so the
     // PropertySelectorModal is displayed before any data loads.
     // Set to false after the user confirms their selection.
     selectedPropertyId:   restoredProp.id,
@@ -60,14 +64,16 @@ export function DashboardProvider({ children }) {
   const selectProperty = useCallback((id, name) => {
     try {
       if (id) {
-        sessionStorage.setItem(SESSION_PROP_ID_KEY,   String(id));
-        sessionStorage.setItem(SESSION_PROP_NAME_KEY, name || '');
+        // FIX: localStorage instead of sessionStorage — persists across
+        // cross-origin redirects (login app → dashboard app).
+        localStorage.setItem(PROP_ID_KEY,   String(id));
+        localStorage.setItem(PROP_NAME_KEY, name || '');
       } else {
-        sessionStorage.removeItem(SESSION_PROP_ID_KEY);
-        sessionStorage.removeItem(SESSION_PROP_NAME_KEY);
+        localStorage.removeItem(PROP_ID_KEY);
+        localStorage.removeItem(PROP_NAME_KEY);
       }
     } catch {
-      // sessionStorage unavailable (private mode quota) — ignore, state still updates
+      // localStorage write failed (private mode quota) — ignore, state still updates
     }
 
     setDashState((prev) => ({
