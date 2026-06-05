@@ -163,6 +163,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
   const [loadingProps, setLoadingProps] = useState(true);
   const [propsError, setPropsError] = useState(null);
 
+  const [activeTab, setActiveTab] = useState('details');
   const [form, setForm] = useState({
     businessName:      client.businessName      ?? '',
     role:              client.role              ?? 'client',
@@ -390,27 +391,56 @@ export default function ClientModal({ client, onClose, onUpdated }) {
   return (
     <>
       <div className="db-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-        <div className="db-modal" style={{ width: 560, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+        <div className="db-modal" style={{ width: 480, maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 20, padding: 0, overflow: 'hidden' }}>
           {/* Header */}
-          <div className="db-modal__head">
-            <span className="db-modal__title">
-              {isEditing ? 'Edit Business' : 'Business Details'}
-            </span>
-            <button className="db-modal__close" onClick={onClose}>✕</button>
+          <div style={{
+            padding: '28px 32px 0 32px',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+          }}>
+            <div>
+              <h2 style={{
+                fontSize: '1.6rem', fontWeight: 800, color: '#0d1117',
+                lineHeight: 1.15, margin: 0, letterSpacing: '-0.02em',
+              }}>
+                Business <span style={{ color: '#26a676' }}>Details</span>
+              </h2>
+              <p style={{ margin: '6px 0 0', fontSize: '.8125rem', color: '#9ca3af', fontWeight: 400 }}>
+                Please review the business details below.
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                background: '#f3f4f6', border: 'none', borderRadius: 10,
+                width: 32, height: 32, display: 'flex', alignItems: 'center',
+                justifyContent: 'center', cursor: 'pointer', color: '#6b7280',
+                fontSize: '1rem', flexShrink: 0, marginTop: 2,
+              }}
+            >✕</button>
           </div>
 
           {/* Body */}
-          <div className="db-modal__body" style={{ overflowY: 'auto', flex: 1 }}>
+          <div className="db-modal__body" style={{ overflowY: 'auto', flex: 1, padding: '20px 32px 8px' }}>
             {/* Profile row */}
-            <div className="cl-modal-profile">
-              <div className="cl-modal-profile__avatar">
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '12px 16px', borderRadius: 12,
+              background: '#f8faf9', border: '1px solid #e5efe9',
+              marginBottom: 16,
+            }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: 'linear-gradient(135deg, #26a676, #1d8a62)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#fff', fontWeight: 700, fontSize: '0.95rem', flexShrink: 0,
+              }}>
                 {initials(client.businessName)}
               </div>
               <div>
-                <div className="cl-modal-profile__name">
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0d1117' }}>
                   {client.businessName}
                 </div>
-                <div className="cl-modal-profile__email">{client.email}</div>
+                <div style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: 1 }}>{client.email}</div>
               </div>
             </div>
 
@@ -425,9 +455,10 @@ export default function ClientModal({ client, onClose, onUpdated }) {
               </div>
             )}
 
-            {isEditing ? (
+            {false ? (
               /* ── Edit form ── */
-              <div className="cl-modal-edit-form">
+              <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0 }} className="cl-modal-edit-form">
                 <div className="cl-modal-field">
                   <label className="cl-modal-field__label" htmlFor="edit-businessName">Business Name</label>
                   <input
@@ -497,8 +528,9 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                   </select>
                 </div>
 
-                <Divider label="Properties" />
-
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Properties</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {form.properties.map((prop, index) => (
                     <div
@@ -824,6 +856,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                   </svg>
                   Add Property
                 </button>
+                </div>
               </div>
             ) : (
               /* ── Read-only details ── */
@@ -861,22 +894,64 @@ export default function ClientModal({ client, onClose, onUpdated }) {
           </div>
 
           {/* Footer */}
-          <div className="db-modal__foot">
+          <div style={{
+            padding: '16px 32px 24px',
+            display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+            gap: 10,
+            borderTop: '1px solid #f0f2f5',
+            marginTop: 4,
+          }}>
             {isEditing ? (
               <>
-                <button className="db-btn db-btn--ghost" onClick={handleCancel} disabled={saving}>
+                <button
+                  onClick={handleCancel}
+                  disabled={saving}
+                  style={{
+                    padding: '9px 22px', borderRadius: 10,
+                    border: '1.5px solid #e5e7eb', background: '#fff',
+                    fontSize: '0.875rem', fontWeight: 600, color: '#374151',
+                    cursor: saving ? 'not-allowed' : 'pointer',
+                  }}
+                >
                   Cancel
                 </button>
-                <button className="db-btn db-btn--primary" onClick={handleSave} disabled={saving}>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  style={{
+                    padding: '9px 26px', borderRadius: 10,
+                    border: 'none', background: saving ? '#9ca3af' : '#0d1117',
+                    fontSize: '0.875rem', fontWeight: 700, color: '#fff',
+                    cursor: saving ? 'not-allowed' : 'pointer',
+                    boxShadow: saving ? 'none' : '0 2px 8px rgba(13,17,23,0.18)',
+                  }}
+                >
                   {saving ? 'Saving…' : 'Save Changes'}
                 </button>
               </>
             ) : (
               <>
-                <button className="db-btn db-btn--ghost" onClick={onClose}>
+                <button
+                  onClick={onClose}
+                  style={{
+                    padding: '9px 22px', borderRadius: 10,
+                    border: '1.5px solid #e5e7eb', background: '#fff',
+                    fontSize: '0.875rem', fontWeight: 600, color: '#374151',
+                    cursor: 'pointer',
+                  }}
+                >
                   Close
                 </button>
-                <button className="db-btn db-btn--primary" onClick={handleEditToggle}>
+                <button
+                  onClick={handleEditToggle}
+                  style={{
+                    padding: '9px 26px', borderRadius: 10,
+                    border: 'none', background: '#0d1117',
+                    fontSize: '0.875rem', fontWeight: 700, color: '#fff',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(13,17,23,0.18)',
+                  }}
+                >
                   Edit
                 </button>
               </>
@@ -884,6 +959,110 @@ export default function ClientModal({ client, onClose, onUpdated }) {
           </div>
         </div>
       </div>
+
+      {/* ── Edit modal — separate modal on top of ClientModal ── */}
+      {isEditing && (
+        <div className="db-modal-overlay" onClick={(e) => e.target === e.currentTarget && setIsEditing(false)}>
+          <div className="db-modal" style={{ width: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 20, padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '28px 32px 0 32px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              <div>
+                <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0d1117', lineHeight: 1.15, margin: 0, letterSpacing: '-0.02em' }}>
+                  Edit <span style={{ color: '#26a676' }}>Business</span>
+                </h2>
+                <p style={{ margin: '6px 0 0', fontSize: '.8125rem', color: '#9ca3af', fontWeight: 400 }}>
+                  Update the business information below.
+                </p>
+              </div>
+              <button onClick={() => { setSaveError(null); setIsEditing(false); }} style={{ background: '#f3f4f6', border: 'none', borderRadius: 10, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#6b7280', fontSize: '1rem', flexShrink: 0, marginTop: 2 }}>✕</button>
+            </div>
+            <div className="db-modal__body" style={{ overflowY: 'auto', flex: 1, padding: '20px 32px 8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 12, background: '#f8faf9', border: '1px solid #e5efe9', marginBottom: 16 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #26a676, #1d8a62)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '0.95rem', flexShrink: 0 }}>{initials(client.businessName)}</div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0d1117' }}>{client.businessName}</div>
+                  <div style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: 1 }}>{client.email}</div>
+                </div>
+              </div>
+              {saveError && (
+                <div style={{ background: '#fee2e2', color: '#b91c1c', borderRadius: 'var(--radius-sm)', padding: '10px 14px', fontSize: '.8125rem', fontWeight: 500, marginBottom: 12 }}>⚠️ {saveError}</div>
+              )}
+              {/* Tabs */}
+              <div style={{ display: 'flex', borderBottom: '2px solid #e5e9ec', marginBottom: 20 }}>
+                <button type="button" onClick={() => setActiveTab('details')} style={{ padding: '8px 20px', fontSize: '.85rem', fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', color: activeTab === 'details' ? '#26a676' : '#9ca3af', borderBottom: activeTab === 'details' ? '2px solid #26a676' : '2px solid transparent', marginBottom: -2 }}>Details</button>
+                <button type="button" onClick={() => setActiveTab('properties')} style={{ padding: '8px 20px', fontSize: '.85rem', fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', color: activeTab === 'properties' ? '#26a676' : '#9ca3af', borderBottom: activeTab === 'properties' ? '2px solid #26a676' : '2px solid transparent', marginBottom: -2 }}>Properties</button>
+              </div>
+              <div style={{ display: activeTab === 'details' ? 'block' : 'none' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }} className="cl-modal-edit-form">
+                <div className="cl-modal-field">
+                  <label className="cl-modal-field__label" htmlFor="edit-businessName">Business Name</label>
+                  <input id="edit-businessName" name="businessName" type="text" className="cl-edit-input" placeholder="e.g. Acme Properties Inc." value={form.businessName} onChange={handleChange} maxLength={150} />
+                </div>
+                <div className="cl-modal-field">
+                  <label className="cl-modal-field__label">Email</label>
+                  <input type="text" className="cl-edit-input" value={client.email} disabled style={{ cursor: 'not-allowed', opacity: 0.7 }} />
+                </div>
+                <div className="cl-modal-field">
+                  <label className="cl-modal-field__label">New Password</label>
+                  <input name="password" type="password" className="cl-edit-input" placeholder="Leave blank to keep current password" value={form.password} onChange={handleChange} maxLength={128} />
+                </div>
+                <div className="cl-modal-field">
+                  <label className="cl-modal-field__label">New 6-Digit PIN</label>
+                  <input type="text" inputMode="numeric" pattern="\d{6}" maxLength={6} className="cl-edit-input" placeholder="Leave blank to keep current PIN" value={form.pin} onChange={(e) => { const val = e.target.value.replace(/\D/g, '').slice(0, 6); setForm((f) => ({ ...f, pin: val })); }} />
+                </div>
+                <div className="cl-modal-field">
+                  <label className="cl-modal-field__label" htmlFor="edit-role">Role</label>
+                  <select id="edit-role" name="role" className="cl-edit-select" value={form.role} onChange={handleChange}>
+                    <option value="client">Client</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                </div>
+              </div>
+              <div style={{ display: activeTab === 'properties' ? 'flex' : 'none', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Properties</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                  {form.properties.map((prop, index) => (
+                    <div key={prop._id || index} style={{ border: '1px solid var(--color-border, #e5e9ec)', borderRadius: 'var(--radius-md, 10px)', padding: '10px', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--color-surface-2, #f8faf9)', cursor: 'pointer' }}>
+                      {/* Picture */}
+                      <input type="file" accept="image/*" style={{ display: 'none' }} id={`edit-picture-input-${index}`} onChange={(e) => { if (e.target.files && e.target.files.length > 0) { const file = e.target.files[0]; const url = URL.createObjectURL(file); setForm((prev) => ({ ...prev, properties: prev.properties.map((p, i) => i === index ? { ...p, pictureFile: file, originalPictureUrl: url, cropDirty: true } : p) })); setCropImageUrl(url); setInitialCropData(null); setCroppingIndex(index); } e.target.value = null; }} />
+                      <div style={{ width: '100%', aspectRatio: '4/3', borderRadius: 8, overflow: 'hidden', background: prop.pictureUrl ? 'transparent' : 'linear-gradient(135deg, rgba(198,221,213,0.3), rgba(38,166,118,0.05))', border: prop.pictureUrl ? 'none' : '2px dashed #c8ddd5', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}
+                        onClick={() => document.getElementById(`edit-picture-input-${index}`).click()}>
+                        {prop.pictureUrl ? (
+                          <img src={prop.pictureUrl} crossOrigin="anonymous" alt={prop.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: 8, background: '#26a676', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
+                            </div>
+                            <span style={{ fontSize: '.65rem', color: '#26a676', fontWeight: 600 }}>Upload</span>
+                          </div>
+                        )}
+                      </div>
+                      {/* Name input */}
+                      <input type="text" placeholder="Property name *" value={prop.name} onChange={setProp(index, 'name')} maxLength={150} className="cl-edit-input" style={{ fontSize: '.8rem', textAlign: 'center' }} />
+                      {/* Actions row */}
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                        {prop.pictureUrl && (
+                          <button type="button" onClick={() => { setCropImageUrl(prop.originalPictureUrl || prop.pictureUrl); setInitialCropData(prop.cropData); setCroppingIndex(index); }} style={{ flex: 1, fontSize: '.7rem', padding: '4px 0', border: '1px solid #e5e9ec', borderRadius: 6, background: 'white', color: '#26a676', cursor: 'pointer', fontWeight: 600 }}>Adjust</button>
+                        )}
+                        <button type="button" onClick={() => removeProperty(index)} style={{ flex: 1, fontSize: '.7rem', padding: '4px 0', border: '1px solid #fecaca', borderRadius: 6, background: 'white', color: '#b91c1c', cursor: 'pointer', fontWeight: 600 }}>Remove</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={addProperty} style={{ width: '100%', marginTop: 4, padding: '9px 0', border: '1.5px dashed var(--color-border, #c8ddd5)', borderRadius: 'var(--radius-md, 10px)', background: 'transparent', color: 'var(--color-brand, #26a676)', fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'background .15s' }} onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-2, #f0f7f4)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                  <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10 4v12M4 10h12" strokeLinecap="round" /></svg>
+                  Add Property
+                </button>
+                </div>
+            </div>
+            <div style={{ padding: '16px 32px 24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid #f0f2f5', marginTop: 4 }}>
+              <button onClick={() => { setSaveError(null); setIsEditing(false); }} disabled={saving} style={{ padding: '9px 22px', borderRadius: 10, border: '1.5px solid #e5e7eb', background: '#fff', fontSize: '0.875rem', fontWeight: 600, color: '#374151', cursor: saving ? 'not-allowed' : 'pointer' }}>Cancel</button>
+              <button onClick={handleSave} disabled={saving} style={{ padding: '9px 26px', borderRadius: 10, border: 'none', background: saving ? '#9ca3af' : '#0d1117', fontSize: '0.875rem', fontWeight: 700, color: '#fff', cursor: saving ? 'not-allowed' : 'pointer', boxShadow: saving ? 'none' : '0 2px 8px rgba(13,17,23,0.18)' }}>{saving ? 'Saving…' : 'Save Changes'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Smoobu data view — rendered on top of ClientModal */}
       {smoobuProperty && (
