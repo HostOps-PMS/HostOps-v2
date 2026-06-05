@@ -29,6 +29,7 @@ export default function TeamLeaderTable({
   onSearchChange,
   onEdit,
   onDelete,
+  onNew,
 }) {
   const clientMap = Object.fromEntries(clients.map((c) => [c._id, c]));
 
@@ -91,7 +92,7 @@ export default function TeamLeaderTable({
                   background: isActive ? '#fff' : 'transparent',
                   marginBottom: '-1px',
                   cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
-                  color: isActive ? '#3b5fc0' : '#9ca3af',
+                  color: isActive ? '#10b981' : '#9ca3af',
                   transition: 'color 0.15s', whiteSpace: 'nowrap',
                   position: 'relative', zIndex: isActive ? 2 : 0,
                   boxShadow: 'none',
@@ -102,8 +103,8 @@ export default function TeamLeaderTable({
                 <span style={{
                   fontSize: '0.72rem', fontWeight: 700,
                   padding: '1px 7px', borderRadius: 999,
-                  background: isActive ? '#eef2ff' : 'transparent',
-                  color: isActive ? '#3b5fc0' : '#b0b7c3',
+                  background: isActive ? '#d1fae5' : 'transparent',
+                  color: isActive ? '#10b981' : '#b0b7c3',
                 }}>
                   {tab.count}
                 </span>
@@ -144,6 +145,22 @@ export default function TeamLeaderTable({
           <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto' }}>
             {tabFiltered.length} team leader{tabFiltered.length !== 1 ? 's' : ''}
           </span>
+          <button
+            onClick={onNew}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '7px 16px', borderRadius: 999,
+              border: 'none', background: '#10b981',
+              color: '#fff', fontSize: '0.82rem', fontWeight: 700,
+              cursor: 'pointer', whiteSpace: 'nowrap',
+              boxShadow: '0 2px 8px rgba(16,185,129,0.18)',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#059669'}
+            onMouseLeave={e => e.currentTarget.style.background = '#10b981'}
+          >
+            + New Team Leader
+          </button>
         </div>
 
         {/* Error */}

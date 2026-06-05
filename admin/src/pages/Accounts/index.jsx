@@ -369,10 +369,10 @@ function AccountRow({ account, onUnlock, isLast }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
             width: 32, height: 32, borderRadius: '50%',
-            background: account.accountType === 'staff' ? '#e0f2fe' : '#ede9fe',
+            background: account.accountType === 'staff' ? '#d1fae5' : '#d1fae5',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 11, fontWeight: 700,
-            color: account.accountType === 'staff' ? '#0369a1' : '#7c3aed',
+            color: account.accountType === 'staff' ? '#059669' : '#059669',
             flexShrink: 0,
           }}>
             {(account.name || account.email || '?')[0].toUpperCase()}
@@ -581,7 +581,7 @@ export default function AccountsPage() {
                         background: isActive ? '#fff' : 'transparent',
                         marginBottom: '-1px',
                         cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
-                        color: isActive ? '#3b5fc0' : '#9ca3af',
+                        color: isActive ? '#10b981' : '#9ca3af',
                         transition: 'color 0.15s', whiteSpace: 'nowrap',
                         position: 'relative', zIndex: isActive ? 2 : 0,
                         boxShadow: 'none',
@@ -594,10 +594,10 @@ export default function AccountsPage() {
                         padding: '1px 7px', borderRadius: 999,
                         background: t.warn
                           ? (isActive ? '#fef2f2' : 'transparent')
-                          : (isActive ? '#eef2ff' : 'transparent'),
+                          : (isActive ? '#d1fae5' : 'transparent'),
                         color: t.warn
                           ? (isActive ? '#dc2626' : '#f87171')
-                          : (isActive ? '#3b5fc0' : '#b0b7c3'),
+                          : (isActive ? '#10b981' : '#b0b7c3'),
                       }}>
                         {t.count}
                       </span>
