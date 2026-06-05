@@ -16,6 +16,7 @@ export default function StaffTable({
   onEdit,
   onDelete,
   onNew,
+  onRowClick,
 }) {
   const clientMap = Object.fromEntries(clients.map((c) => [c._id, c]));
 
@@ -222,6 +223,7 @@ return (
                       transition: 'background 0.1s',
                       cursor: 'pointer',
                     }}
+                    onClick={() => onRowClick && onRowClick(s)}
                     onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = '#fafbff'; }}
                     onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
                   >
@@ -270,14 +272,14 @@ return (
                     {/* Actions */}
                     <td style={{ padding: '12px 16px 12px 8px', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                        <button onClick={() => onEdit(s)} style={{
+                        <button onClick={(e) => { e.stopPropagation(); onEdit(s); }} style={{
                           padding: '5px 14px', borderRadius: 6,
                           border: '1px solid #e5e7eb', background: '#fff',
                           fontSize: '0.78rem', fontWeight: 600, color: '#374151', cursor: 'pointer',
                         }}>
                           Edit
                         </button>
-                        <button onClick={() => onDelete(s)} style={{
+                        <button onClick={(e) => { e.stopPropagation(); onDelete(s); }} style={{
                           padding: '5px 14px', borderRadius: 6,
                           border: '1px solid #fecaca', background: '#fff5f5',
                           fontSize: '0.78rem', fontWeight: 600, color: '#dc2626', cursor: 'pointer',
