@@ -3,11 +3,11 @@ import React, { createContext, useContext, useCallback, useEffect } from 'react'
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const getToken = useCallback(() => sessionStorage.getItem('hp_access_token'), []);
+  const getToken = useCallback(() => localStorage.getItem('hp_access_token'), []);
 
   const getUser = useCallback(() => {
     try {
-      return JSON.parse(sessionStorage.getItem('hp_user') || 'null');
+      return JSON.parse(localStorage.getItem('hp_user') || 'null');
     } catch {
       return null;
     }
@@ -15,31 +15,31 @@ export function AuthProvider({ children }) {
 
   const setToken = useCallback((t) => {
     if (t) {
-      sessionStorage.setItem('hp_access_token', t);
+      localStorage.setItem('hp_access_token', t);
     } else {
-      sessionStorage.removeItem('hp_access_token');
+      localStorage.removeItem('hp_access_token');
     }
   }, []);
 
   // ✅ FIX: setUser was missing — any call to auth.setUser(...) was silently
   // doing nothing (undefined), so the stored user object was never updated
-  // after login, refresh, or verifySession. Now persists to sessionStorage.
+  // after login, refresh, or verifySession. Now persists to localStorage.
   const setUser = useCallback((u) => {
     if (u) {
-      sessionStorage.setItem('hp_user', JSON.stringify(u));
+      localStorage.setItem('hp_user', JSON.stringify(u));
     } else {
-      sessionStorage.removeItem('hp_user');
+      localStorage.removeItem('hp_user');
     }
   }, []);
 
   const clear = useCallback(() => {
-    sessionStorage.removeItem('hp_access_token');
-    sessionStorage.removeItem('hp_user');
+    localStorage.removeItem('hp_access_token');
+    localStorage.removeItem('hp_user');
   }, []);
 
   // ✅ FIX: Consume cross-origin handoff token from URL params.
-  // When the login app (localhost:5174) redirects here with ?_t=...&_u=...,
-  // we store them into this app's sessionStorage and immediately clean the
+  // When the login app redirects here with ?_t=...&_u=...,
+  // we store them into this app's localStorage and immediately clean the
   // URL so the token is never visible in the address bar or browser history.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -48,10 +48,10 @@ export function AuthProvider({ children }) {
 
     if (token && userRaw) {
       try {
-        sessionStorage.setItem('hp_access_token', token);
-        sessionStorage.setItem('hp_user', userRaw);
+        localStorage.setItem('hp_access_token', token);
+        localStorage.setItem('hp_user', userRaw);
       } catch {
-        // sessionStorage write failed (private browsing quota, etc.) — ignore
+        // localStorage write failed (private browsing quota, etc.) — ignore
       }
 
       // Remove _t and _u from the URL without triggering a page reload

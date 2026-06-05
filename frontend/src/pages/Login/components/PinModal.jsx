@@ -246,7 +246,7 @@ export default function PinModal({
         auth.setUser(data.user);
         // Also mirror role into sessionStorage so any component that reads
         // hp_user directly (e.g. index.jsx currentUser block) gets the right shape.
-        sessionStorage.setItem('hp_user', JSON.stringify(data.user));
+        localStorage.setItem('hp_user', JSON.stringify(data.user));
       }
 
       // Persist the selected property so the dashboard loads the right one.
