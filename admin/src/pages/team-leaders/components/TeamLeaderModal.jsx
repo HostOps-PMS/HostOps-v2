@@ -3,24 +3,25 @@ import { createClient, updateClient } from '../../clients/services/clientsServic
 
 const inputStyle = {
   width: '100%',
-  padding: '8px 12px',
-  borderRadius: 8,
-  border: '1.5px solid #e2e8f0',
+  padding: '11px 14px',
+  borderRadius: 10,
+  border: '1.5px solid #e8edf2',
   fontSize: '0.875rem',
   outline: 'none',
   boxSizing: 'border-box',
-  background: '#fafafa',
-  color: '#1a202c',
-  transition: 'border-color 0.15s',
+  background: '#fff',
+  color: '#0d1117',
+  transition: 'border-color 0.15s, box-shadow 0.15s',
+  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
 };
 
 const labelStyle = {
   display: 'block',
-  fontSize: '0.78rem',
-  fontWeight: 600,
-  color: '#4a5568',
+  fontSize: '0.72rem',
+  fontWeight: 700,
+  color: '#64748b',
   marginBottom: 5,
-  letterSpacing: '0.03em',
+  letterSpacing: '0.06em',
   textTransform: 'uppercase',
 };
 
@@ -87,28 +88,72 @@ export default function TeamLeaderModal({ mode, teamLeader, clients, onClose, on
       <div
         style={{
           background: '#fff',
-          borderRadius: 14,
+          borderRadius: 20,
           width: '100%',
           maxWidth: 520,
           maxHeight: '90vh',
-          overflowY: 'auto',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+          boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+          border: 'none',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
-        <div style={{ padding: '20px 24px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#1a202c' }}>
-            {isEdit ? 'Edit Team Leader' : 'Create Team Leader'}
-          </h2>
+        <div style={{
+          padding: '28px 32px 0 32px',
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+          flexShrink: 0,
+        }}>
+          <div>
+            <h2 style={{
+              fontSize: '1.6rem', fontWeight: 800, color: '#0d1117',
+              lineHeight: 1.15, margin: 0, letterSpacing: '-0.02em',
+            }}>
+              {isEdit ? <>Edit <span style={{ color: '#26a676' }}>Team Leader</span></> : <>Create <span style={{ color: '#26a676' }}>Team Leader</span></>}
+            </h2>
+            <p style={{ margin: '6px 0 0', fontSize: '.8125rem', color: '#9ca3af', fontWeight: 400 }}>
+              {isEdit ? 'Update the team leader details below.' : 'Fill in the details to create a team leader.'}
+            </p>
+          </div>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#718096', fontSize: 20, lineHeight: 1 }}
-          >
-            ×
-          </button>
+            style={{
+              background: '#f3f4f6', border: 'none', borderRadius: 10,
+              width: 32, height: 32, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', cursor: 'pointer', color: '#6b7280',
+              fontSize: '1rem', flexShrink: 0, marginTop: 2,
+            }}
+          >✕</button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ padding: '16px 24px 24px' }}>
-          
+        <form id="team-leader-form" onSubmit={handleSubmit} style={{ padding: '20px 32px 0', overflowY: 'auto', flex: 1 }}>
+
+          {/* Profile row — show selected server info */}
+          {form.serverId && (() => {
+            const c = clients.find(x => x._id === form.serverId);
+            if (!c) return null;
+            const parts = `${c.firstName} ${c.lastName}`.trim().split(/\s+/);
+            const ini = parts.length === 1 ? (parts[0][0] ?? '').toUpperCase() : `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
+            return (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 16px', borderRadius: 12,
+                background: '#f8faf9', border: '1px solid #e5efe9',
+                marginBottom: 16,
+              }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10,
+                  background: 'linear-gradient(135deg, #26a676, #1d8a62)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', fontWeight: 700, fontSize: '0.95rem', flexShrink: 0,
+                }}>{ini}</div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0d1117' }}>{c.firstName} {c.lastName}</div>
+                  <div style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: 1 }}>{c.email}</div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Assigned Server */}
           <div style={{ marginBottom: 14 }}>
             <label style={labelStyle}>Assigned Server (Client) *</label>
@@ -180,37 +225,52 @@ export default function TeamLeaderModal({ mode, teamLeader, clients, onClose, on
 
           {error && (
             <div style={{
-              background: '#fff0ee', color: '#c13515', borderRadius: 8,
-              padding: '8px 12px', fontSize: '0.83rem', marginBottom: 14,
+              background: '#fee2e2', color: '#b91c1c',
+              borderRadius: 8, padding: '10px 14px',
+              fontSize: '.8125rem', fontWeight: 500, marginBottom: 14,
             }}>
-              {error}
+              ⚠️ {error}
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              style={{
-                padding: '9px 20px', borderRadius: 8, border: '1.5px solid #e2e8f0',
-                background: '#fff', color: '#4a5568', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer'
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              style={{
-                padding: '9px 24px', borderRadius: 8, border: 'none',
-                background: saving ? '#a0aec0' : '#1555C0', color: '#fff', fontSize: '0.875rem', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Team Leader'}
-            </button>
-          </div>
-        </form>
+          </form>
+
+        {/* Footer */}
+        <div style={{
+          padding: '16px 32px 24px',
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+          gap: 10,
+          borderTop: '1px solid #f0f2f5',
+          flexShrink: 0,
+        }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            style={{
+              padding: '9px 22px', borderRadius: 10,
+              border: '1.5px solid #e5e7eb', background: '#fff',
+              fontSize: '0.875rem', fontWeight: 600, color: '#374151',
+              cursor: saving ? 'not-allowed' : 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="team-leader-form"
+            disabled={saving}
+            style={{
+              padding: '9px 26px', borderRadius: 10,
+              border: 'none', background: saving ? '#9ca3af' : '#0d1117',
+              fontSize: '0.875rem', fontWeight: 700, color: '#fff',
+              cursor: saving ? 'not-allowed' : 'pointer',
+              boxShadow: saving ? 'none' : '0 2px 8px rgba(13,17,23,0.18)',
+            }}
+          >
+            {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Team Leader'}
+          </button>
+        </div>
       </div>
     </div>
   );
