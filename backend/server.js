@@ -13,7 +13,8 @@ import dashboardRoutes      from './routes/dashboard.js';
 import clientsRoutes        from './routes/clients.js';
 import propertiesRoutes     from './routes/properties.js';
 import staffsRoutes         from './routes/staffs.js';
-import accountsRoutes       from './routes/accounts.js';
+import accountsRoutes            from './routes/accounts.js';
+import dashboardOverviewRoute    from './routes/dashboardOverviewRoute.js';
 import { publicRecoveryRouter, adminRecoveryRouter } from './routes/recoveryRequests.js';
 import { requireApiKey } from './middleware/apiKeyAuth.js';
 
@@ -149,6 +150,7 @@ app.use('/api',  clientsRoutes);
 app.use('/api',  propertiesRoutes);
 app.use('/api',  staffsRoutes);
 app.use('/api',  accountsRoutes);         // GET /api/accounts (admin)
+app.use('/api',  dashboardOverviewRoute); // GET /api/dashboard-overview (admin)
 app.use('/api',  adminRecoveryRouter);    // GET|PATCH /api/recovery-requests (admin)
 
 // ── Health Check ──────────────────────────────────────────────────────────────

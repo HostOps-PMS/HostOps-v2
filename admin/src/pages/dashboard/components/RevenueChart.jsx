@@ -1,10 +1,12 @@
+// components/RevenueChart.jsx
 import { useState } from 'react';
 import {
   ResponsiveContainer, ComposedChart, Line, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts';
 
-const RAW = {
+// ── Static mock data (shown while loading or when no Smoobu data) ──
+const MOCK = {
   Daily: {
     labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
     revenue:       [42000,58000,51000,67000,73000,89000,61000],
@@ -44,24 +46,44 @@ function formatRevenue(v) {
   return '₱' + v;
 }
 
-function buildData(period) {
-  const d = RAW[period];
+function buildMockData(period) {
+  const d = MOCK[period];
   return d.labels.map((lbl, i) => ({
-    name: lbl,
+    name:          lbl,
     revenue:       d.revenue[i],
     bookings:      d.bookings[i],
     cancellations: d.cancellations[i],
   }));
 }
 
-export default function RevenueChart() {
-  const [period, setPeriod]         = useState('Monthly');
-  const [activeSeries, setActive]   = useState(['revenue','bookings','cancellations']);
-  const data = buildData(period);
+/**
+ * Convert the Smoobu revenueChart array (from /api/dashboard-overview)
+ * into the shape Recharts expects.
+ *
+ * smoobuChartData: [{ month, label, revenue, bookings, cancellations }]
+ */
+function buildSmoobuData(smoobuChartData) {
+  return smoobuChartData.map((d) => ({
+    name:          d.label || d.month,
+    revenue:       d.revenue       || 0,
+    bookings:      d.bookings      || 0,
+    cancellations: d.cancellations || 0,
+  }));
+}
 
-  const totRev = RAW[period].revenue.reduce((a,b) => a+b, 0);
-  const totBk  = RAW[period].bookings.reduce((a,b) => a+b, 0);
-  const totCx  = RAW[period].cancellations.reduce((a,b) => a+b, 0);
+export default function RevenueChart({ smoobuChartData }) {
+  const [period, setPeriod]       = useState('Monthly');
+  const [activeSeries, setActive] = useState(['revenue','bookings','cancellations']);
+
+  // Use real Smoobu data in Monthly view if available; mock otherwise
+  const isLive  = smoobuChartData && smoobuChartData.length > 0;
+  const data    = isLive && period === 'Monthly'
+    ? buildSmoobuData(smoobuChartData)
+    : buildMockData(period);
+
+  const totRev = data.reduce((a, d) => a + d.revenue, 0);
+  const totBk  = data.reduce((a, d) => a + d.bookings, 0);
+  const totCx  = data.reduce((a, d) => a + d.cancellations, 0);
 
   function toggle(key) {
     setActive(prev =>
@@ -75,7 +97,19 @@ export default function RevenueChart() {
     <div className="db-table-card" style={{ width: '100%' }}>
       {/* Header */}
       <div className="db-table-card__head" style={{ flexWrap: 'wrap', gap: 6, padding: '10px 14px' }}>
-        <h2 className="db-table-card__title">Revenue & Booking Trends</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 className="db-table-card__title">Revenue & Booking Trends</h2>
+          {isLive && (
+            <span style={{
+              fontSize: '.68rem', fontWeight: 700,
+              color: '#059669', background: '#d1fae5',
+              border: '1px solid #6ee7b7',
+              padding: '2px 8px', borderRadius: 999,
+            }}>
+              ● Live
+            </span>
+          )}
+        </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {PERIODS.map(p => (
             <button key={p} onClick={() => setPeriod(p)} style={{
@@ -91,7 +125,22 @@ export default function RevenueChart() {
         </div>
       </div>
 
-      {/* Pills */}
+      {/* Live-only notice when not on Monthly */}
+      {isLive && period !== 'Monthly' && (
+        <div style={{
+          margin: '0 20px 4px',
+          padding: '6px 12px',
+          background: '#fef9c3',
+          border: '1px solid #fde68a',
+          borderRadius: 'var(--radius-sm)',
+          fontSize: '.75rem',
+          color: '#92400e',
+        }}>
+          Live Smoobu data is shown in Monthly view. Other periods show sample data.
+        </div>
+      )}
+
+      {/* Series Pills */}
       <div style={{ display: 'flex', gap: 6, padding: '8px 20px 10px', flexWrap: 'wrap' }}>
         {SERIES.map(s => {
           const total = s.key === 'revenue' ? formatRevenue(totRev)

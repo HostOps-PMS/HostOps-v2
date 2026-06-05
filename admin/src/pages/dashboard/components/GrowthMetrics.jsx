@@ -1,102 +1,148 @@
-/* ── Growth Metrics Row ─────────────────────────────────────── */
-const GROWTH_DATA = [
-  {
-    label: 'New Clients This Month',
-    value: '+15',
-    sub: '128 total clients',
-    color: 'green',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="8" cy="7" r="4" />
-        <path d="M2 18c0-3.314 2.686-6 6-6h4c3.314 0 6 2.686 6 6" strokeLinecap="round" />
-        <path d="M16 3v6M13 6h6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    label: 'New Properties Added',
-    value: '+43',
-    sub: '542 total properties',
-    color: 'blue',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M3 10L10 3l7 7" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M5 8.5V17h4v-4h2v4h4V8.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M13 3v3" strokeLinecap="round" />
-        <path d="M12 3h3" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Booking Growth',
-    value: '+21%',
-    sub: '1,842 active bookings',
-    color: 'yellow',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <polyline points="2,15 7,9 11,12 18,5" strokeLinecap="round" strokeLinejoin="round" />
-        <polyline points="14,5 18,5 18,9" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Monthly Revenue Processed',
-    value: '+8.3%',
-    sub: '₱12.4M total this month',
-    color: 'red',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="10" cy="10" r="8" />
-        <path d="M10 6v1.5M10 12.5V14" strokeLinecap="round" />
-        <path d="M7.5 8.5a2.5 2 0 0 1 5 0c0 1.5-1.5 2-2.5 2.5S8 12 8 13.5h4" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
+// components/RecentActivities.jsx
+
+// ── Static fallback activities (shown while loading or no Smoobu data) ──
+const FALLBACK_ACTIVITIES = [
+  { id: 1, type: 'booking', actor: 'Maria Santos',  action: 'created a new booking',   target: 'Haido Ville – Room 204',    time: '2m ago',  avatar: 'MS' },
+  { id: 2, type: 'payment', actor: 'Sun Villa',     action: 'payment received',         target: '₱120,000',                  time: '15m ago', avatar: 'SV' },
+  { id: 3, type: 'cancel',  actor: 'Pedro Lim',     action: 'cancelled booking',        target: 'ABC Resort – Jun 14',       time: '1h ago',  avatar: 'PL' },
+  { id: 4, type: 'client',  actor: 'Admin',         action: 'added new client',         target: 'Ocean Breeze Resort',       time: '2h ago',  avatar: 'AD' },
+  { id: 5, type: 'booking', actor: 'Ana Reyes',     action: 'updated booking status',   target: 'Mountain View – Completed', time: '3h ago',  avatar: 'AR' },
+  { id: 6, type: 'staff',   actor: 'Admin',         action: 'assigned staff',           target: 'Carlo M. → Paradise Inn',   time: '4h ago',  avatar: 'AD' },
+  { id: 7, type: 'payment', actor: 'Paradise Inn',  action: 'invoice sent',             target: '₱45,000 – overdue',         time: '5h ago',  avatar: 'PI' },
 ];
 
-const PALETTE = {
-  green:  { bg: '#e0f4ed', color: '#26a676', bar: '#1a9e6e' },
-  blue:   { bg: '#dbeafe', color: '#3b82f6', bar: '#3b82f6' },
-  yellow: { bg: '#fef3c7', color: '#d97706', bar: '#f59e0b' },
-  red:    { bg: '#fee2e2', color: '#ef4444', bar: '#ef4444' },
+/* Single neutral dot color per type */
+const TYPE_DOT = {
+  booking: '#2563eb',
+  payment: '#059669',
+  cancel:  '#dc2626',
+  client:  '#1a9e6e',
+  staff:   '#7c3aed',
 };
 
-function GrowthCard({ item }) {
-  const p = PALETTE[item.color] ?? PALETTE.green;
-  return (
-    <div className="db-stat-card" style={{ position: 'relative', overflow: 'hidden' }}>
-      {/* Accent bar */}
-      <div style={{
-        position: 'absolute', left: 0, top: 0, bottom: 0,
-        width: 4, background: p.bar, borderRadius: '4px 0 0 4px',
-      }} />
-      <div style={{ paddingLeft: 8 }}>
-        <div className="db-stat-card__top">
-          <span className="db-stat-card__label">{item.label}</span>
-          <div className="db-stat-card__icon" style={{ background: p.bg, color: p.color }}>
-            {item.icon}
-          </div>
-        </div>
-        <div className="db-stat-card__value" style={{ color: p.color }}>{item.value}</div>
-        <div style={{
-          fontSize: '.78rem',
-          color: 'var(--color-muted)',
-          marginTop: 4,
-          fontFamily: 'var(--font-body)',
-        }}>
-          {item.sub}
-        </div>
-      </div>
-    </div>
-  );
+const AVATAR_COLORS = ['#1a9e6e','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#ec4899','#14b8a6'];
+
+function hashColor(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
 }
 
-export default function GrowthMetrics() {
+/**
+ * @param {object}  props
+ * @param {Array}   [props.activities]  — live activity array from /api/dashboard-overview.
+ *                                       Shape: [{ id, type, actor, action, target, time, avatar, channel, clientName }]
+ *                                       If null/undefined, falls back to static list.
+ * @param {boolean} [props.loading]
+ */
+export default function RecentActivities({ activities, loading }) {
+  const displayActivities = (!loading && activities && activities.length > 0)
+    ? activities
+    : FALLBACK_ACTIVITIES;
+  const isLive = !loading && activities && activities.length > 0;
+
+  if (loading) {
+    return (
+      <div className="db-table-card" style={{ flexShrink: 0 }}>
+        <div className="db-table-card__head">
+          <h2 className="db-table-card__title">Recent Activities</h2>
+        </div>
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <div className="db-skeleton" style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div className="db-skeleton" style={{ height: 11, width: '70%', marginBottom: 6 }} />
+                <div className="db-skeleton" style={{ height: 10, width: '50%' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="db-stats">
-      {GROWTH_DATA.map(item => (
-        <GrowthCard key={item.label} item={item} />
-      ))}
+    <div className="db-table-card" style={{ flexShrink: 0 }}>
+      <div className="db-table-card__head">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 className="db-table-card__title">Recent Activities</h2>
+          {isLive && (
+            <span style={{
+              fontSize: '.68rem', fontWeight: 700,
+              color: '#059669', background: '#d1fae5',
+              border: '1px solid #6ee7b7',
+              padding: '2px 8px', borderRadius: 999,
+            }}>
+              ● Live
+            </span>
+          )}
+        </div>
+        <button className="db-table-card__action">View all →</button>
+      </div>
+
+      <div style={{ padding: '4px 16px 12px', display: 'flex', flexDirection: 'column' }}>
+        {displayActivities.map((act, i) => {
+          const dot       = TYPE_DOT[act.type] ?? TYPE_DOT.booking;
+          const avatarBg  = hashColor(act.avatar || act.actor || 'G');
+          return (
+            <div key={act.id} style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '10px 4px',
+              borderBottom: i < displayActivities.length - 1 ? '1px solid var(--color-border)' : 'none',
+            }}>
+              {/* Avatar */}
+              <div style={{
+                width: 32, height: 32, borderRadius: '50%',
+                background: avatarBg,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '10px', fontWeight: 700, color: '#fff', flexShrink: 0,
+              }}>
+                {act.avatar || (act.actor || 'G').slice(0, 2).toUpperCase()}
+              </div>
+
+              {/* Content */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '.8rem', color: 'var(--color-text)', lineHeight: 1.4 }}>
+                  <strong>{act.actor}</strong>{' '}{act.action}
+                </div>
+                <div style={{
+                  fontSize: '.75rem', color: 'var(--color-muted)', marginTop: 1,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {act.target}
+                </div>
+                {/* Show client name for live activities */}
+                {isLive && act.clientName && (
+                  <div style={{ fontSize: '.7rem', color: 'var(--color-brand)', marginTop: 1, fontWeight: 600 }}>
+                    {act.clientName}
+                    {act.channel && act.channel !== 'Direct' && (
+                      <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}> · {act.channel}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Type label + time */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
+                <span style={{ fontSize: '.7rem', fontWeight: 600, color: dot, textTransform: 'capitalize' }}>
+                  {act.type}
+                </span>
+                <span style={{ fontSize: '.7rem', color: 'var(--color-muted)' }}>{act.time}</span>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Empty state */}
+        {isLive && displayActivities.length === 0 && (
+          <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--color-muted)', fontSize: '.8rem' }}>
+            No recent booking activity.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

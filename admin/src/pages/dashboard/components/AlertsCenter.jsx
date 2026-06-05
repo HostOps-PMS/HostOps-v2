@@ -1,4 +1,7 @@
-const ALERTS = [
+// components/AlertsCenter.jsx
+
+// ── Static fallback alerts (shown while loading or no Smoobu data) ──
+const FALLBACK_ALERTS = [
   { id: 1, type: 'warning', title: 'Lease Expiring Soon',     desc: 'Haido Ville contract ends in 7 days.',         time: '2m ago',  unread: 0,  avatar: 'HV', avatarBg: '#d97706' },
   { id: 2, type: 'danger',  title: 'Overdue Payment',         desc: 'ABC Resort has an unpaid balance of ₱45,000.', time: '1h ago',  unread: 3,  avatar: 'AR', avatarBg: '#dc2626' },
   { id: 3, type: 'info',    title: 'New Booking Request',     desc: 'Mountain View submitted a new booking.',       time: '3h ago',  unread: 0,  avatar: 'MV', avatarBg: '#2563eb' },
@@ -13,16 +16,59 @@ const ALERT_STYLES = {
   success: { dot: '#059669' },
 };
 
-export default function AlertsCenter() {
-  const urgentCount = ALERTS.filter(a => a.type === 'danger' || a.type === 'warning').length;
+/**
+ * @param {object}  props
+ * @param {Array}   [props.alerts]   — live alert array from /api/dashboard-overview.
+ *                                    If null/undefined, falls back to static list.
+ * @param {boolean} [props.loading]
+ */
+export default function AlertsCenter({ alerts, loading }) {
+  const displayAlerts  = (!loading && alerts && alerts.length > 0) ? alerts : FALLBACK_ALERTS;
+  const isLive         = !loading && alerts && alerts.length > 0;
+  const urgentCount    = displayAlerts.filter(a => a.type === 'danger' || a.type === 'warning').length;
+
+  if (loading) {
+    return (
+      <div className="db-table-card" style={{ flexShrink: 0 }}>
+        <div className="db-table-card__head">
+          <h2 className="db-table-card__title">Alerts Center</h2>
+        </div>
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <div className="db-skeleton" style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div className="db-skeleton" style={{ height: 12, width: '60%', marginBottom: 6 }} />
+                <div className="db-skeleton" style={{ height: 10, width: '90%' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="db-table-card" style={{ flexShrink: 0 }}>
       {/* Header */}
       <div className="db-table-card__head">
         <div>
-          <h2 className="db-table-card__title">Alerts Center</h2>
-          <p style={{ fontSize: '.75rem', color: 'var(--color-muted)', marginTop: 2 }}>All notifications</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h2 className="db-table-card__title">Alerts Center</h2>
+            {isLive && (
+              <span style={{
+                fontSize: '.68rem', fontWeight: 700,
+                color: '#059669', background: '#d1fae5',
+                border: '1px solid #6ee7b7',
+                padding: '2px 8px', borderRadius: 999,
+              }}>
+                ● Live
+              </span>
+            )}
+          </div>
+          <p style={{ fontSize: '.75rem', color: 'var(--color-muted)', marginTop: 2 }}>
+            {isLive ? `Auto-generated from Smoobu data` : 'All notifications'}
+          </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{
@@ -49,15 +95,15 @@ export default function AlertsCenter() {
 
       {/* Alert rows */}
       <div style={{ padding: '4px 16px 8px', display: 'flex', flexDirection: 'column' }}>
-        {ALERTS.map((alert, i) => {
-          const dot = ALERT_STYLES[alert.type].dot;
+        {displayAlerts.map((alert, i) => {
+          const dot = ALERT_STYLES[alert.type]?.dot ?? '#9ca3af';
           return (
             <div key={alert.id} style={{
               display: 'flex',
               alignItems: 'center',
               gap: 12,
               padding: '11px 4px',
-              borderBottom: i < ALERTS.length - 1 ? '1px solid var(--color-border)' : 'none',
+              borderBottom: i < displayAlerts.length - 1 ? '1px solid var(--color-border)' : 'none',
               cursor: 'pointer',
             }}>
               {/* Avatar circle */}
@@ -75,26 +121,25 @@ export default function AlertsCenter() {
 
               {/* Content */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontSize: '.85rem', fontWeight: 700,
-                  color: '#111827', lineHeight: 1.3,
-                }}>
+                <div style={{ fontSize: '.85rem', fontWeight: 700, color: '#111827', lineHeight: 1.3 }}>
                   {alert.title}
                 </div>
                 <div style={{
-                  fontSize: '.78rem', color: '#6b7280',
-                  marginTop: 3, lineHeight: 1.4,
+                  fontSize: '.78rem', color: '#6b7280', marginTop: 3, lineHeight: 1.4,
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                 }}>
                   {alert.desc}
                 </div>
+                {/* Show client name for live alerts */}
+                {isLive && alert.clientName && (
+                  <div style={{ fontSize: '.7rem', color: 'var(--color-brand)', marginTop: 2, fontWeight: 600 }}>
+                    {alert.clientName}
+                  </div>
+                )}
               </div>
 
               {/* Time + unread badge */}
-              <div style={{
-                display: 'flex', flexDirection: 'column',
-                alignItems: 'flex-end', gap: 4, flexShrink: 0,
-              }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                 <span style={{ fontSize: '.72rem', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
                   {alert.time}
                 </span>
@@ -113,6 +158,13 @@ export default function AlertsCenter() {
           );
         })}
       </div>
+
+      {/* Empty state for live mode */}
+      {isLive && displayAlerts.length === 0 && (
+        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-muted)', fontSize: '.8rem' }}>
+          No alerts — all properties look healthy.
+        </div>
+      )}
 
       {/* View all button */}
       <div style={{ padding: '8px 20px 16px', textAlign: 'center' }}>
