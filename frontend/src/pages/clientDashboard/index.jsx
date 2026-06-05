@@ -30,7 +30,7 @@ export default function DashboardPage() {
   const handlePasswordChanged = (updatedUser) => {
     // Store the refreshed user object (now with isVerified: true)
     if (updatedUser) {
-      sessionStorage.setItem('hp_user', JSON.stringify(updatedUser));
+      localStorage.setItem('hp_user', JSON.stringify(updatedUser));
     }
     setShowFirstLoginModal(false);
   };
