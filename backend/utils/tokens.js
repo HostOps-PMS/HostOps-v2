@@ -11,7 +11,7 @@ export function signAccessToken(user) {
       role: user.role,
     },
     process.env.JWT_ACCESS_SECRET,
-    { expiresIn: process.env.JWT_ACCESS_EXPIRES || '8h' }
+    { expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m' }
   );
 }
 
@@ -30,7 +30,7 @@ export function signStaffAccessToken(staff) {
       role:     'staff',
     },
     process.env.JWT_ACCESS_SECRET,
-    { expiresIn: process.env.JWT_ACCESS_EXPIRES || '8h' }
+    { expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m' }
   );
 }
 
@@ -76,7 +76,7 @@ export function signClientAccountAccessToken(account) {
       role:            'clientAccount',
     },
     process.env.JWT_ACCESS_SECRET,
-    { expiresIn: process.env.JWT_ACCESS_EXPIRES || '8h' }
+    { expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m' }
   );
 }
 
