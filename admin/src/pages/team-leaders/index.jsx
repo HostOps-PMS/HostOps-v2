@@ -7,6 +7,8 @@ import TeamLeaderTable from './components/TeamLeaderTable';
 
 export default function TeamLeaders() {
   const [search, setSearch]             = useState('');
+  const [page,   setPage]               = useState(1);
+  const PAGE_SIZE = 10;
   const [modal, setModal]               = useState(null); // null | { type: 'create'|'edit'|'delete', teamLeader? }
 
   const { teamLeaders, clients, loading, error, refetch } = useTeamLeaders();
@@ -20,6 +22,14 @@ export default function TeamLeaders() {
       tl.email?.toLowerCase().includes(q)
     );
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  function handleSearchChange(val) {
+    setSearch(val);
+    setPage(1);
+  }
 
   function handleSaved() {
     setModal(null);
@@ -96,14 +106,19 @@ export default function TeamLeaders() {
           <TeamLeaderTable
             teamLeaders={teamLeaders}
             clients={clients}
-            filtered={filtered}
+            filtered={paginated}
             loading={loading}
             error={error}
             search={search}
-            onSearchChange={setSearch}
+            onSearchChange={handleSearchChange}
             onEdit={(tl) => setModal({ type: 'edit', teamLeader: tl })}
             onDelete={(tl) => setModal({ type: 'delete', teamLeader: tl })}
             onNew={() => setModal({ type: 'create' })}
+            page={page}
+            totalPages={totalPages}
+            totalCount={filtered.length}
+            onPrev={() => setPage(p => Math.max(1, p - 1))}
+            onNext={() => setPage(p => Math.min(totalPages, p + 1))}
           />
         </div>
       </div>

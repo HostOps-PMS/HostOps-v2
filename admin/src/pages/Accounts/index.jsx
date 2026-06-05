@@ -507,6 +507,8 @@ export default function AccountsPage() {
   const [search, setSearch]     = useState('');
   const [tab, setTab]           = useState('all');
   const [unlockTarget, setUnlockTarget] = useState(null);
+  const [page,         setPage]         = useState(1);
+  const PAGE_SIZE = 10;
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -552,7 +554,7 @@ export default function AccountsPage() {
     { id: 'locked', label: 'PIN Issues',  count: lockedCount, warn: lockedCount > 0 },
   ];
 
-  const filtered = combined.filter(a => {
+  const totalFiltered = combined.filter(a => {
     const q = search.toLowerCase();
     const matchSearch = !q ||
       (a.name || '').toLowerCase().includes(q) ||
@@ -566,6 +568,9 @@ export default function AccountsPage() {
       a.pinAttempts > 0;
     return true;
   });
+
+  const totalPages = Math.max(1, Math.ceil(totalFiltered.length / PAGE_SIZE));
+  const filtered   = totalFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="db-layout">
@@ -621,7 +626,7 @@ export default function AccountsPage() {
                   return (
                     <button
                       key={t.id}
-                      onClick={() => setTab(t.id)}
+                      onClick={() => { setTab(t.id); setPage(1); }}
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 7,
                         padding: '9px 18px 10px',
@@ -676,7 +681,7 @@ export default function AccountsPage() {
                   </svg>
                   <input
                     value={search}
-                    onChange={e => setSearch(e.target.value)}
+                    onChange={e => { setSearch(e.target.value); setPage(1); }}
                     placeholder="Search by name, email, role…"
                     style={{
                       width: '100%', boxSizing: 'border-box',
@@ -689,7 +694,7 @@ export default function AccountsPage() {
                 </div>
 
                 <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto' }}>
-                  {filtered.length} account{filtered.length !== 1 ? 's' : ''}
+                  {totalFiltered.length} account{totalFiltered.length !== 1 ? 's' : ''}
                 </span>
 
                 {/* Refresh button */}
@@ -768,14 +773,64 @@ export default function AccountsPage() {
                   </table>
                 </div>
               )}
-            </div>
-
-            {/* Footer count */}
-            {!loading && (
-              <div style={{ marginTop: 10, fontSize: '0.72rem', color: '#b0b7c3', textAlign: 'right' }}>
-                Showing {filtered.length} of {combined.length} accounts
+            {/* Pagination */}
+              {!loading && totalPages > 1 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '12px 20px',
+                borderTop: '1px solid #f0f2f5',
+              }}>
+                <span style={{ fontSize: '0.78rem', color: '#9ca3af' }}>
+                  Page {page} of {totalPages} · {totalFiltered.length} account{totalFiltered.length !== 1 ? 's' : ''}
+                </span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '6px 14px', borderRadius: 8,
+                      border: '1px solid #e5e7eb',
+                      background: page === 1 ? '#f9fafb' : '#fff',
+                      color: page === 1 ? '#d1d5db' : '#374151',
+                      fontSize: '0.82rem', fontWeight: 600,
+                      cursor: page === 1 ? 'not-allowed' : 'pointer',
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => { if (page !== 1) e.currentTarget.style.background = '#f3f4f6'; }}
+                    onMouseLeave={e => { if (page !== 1) e.currentTarget.style.background = '#fff'; }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M13 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    Prev
+                  </button>
+                  <button
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '6px 14px', borderRadius: 8,
+                      border: '1px solid #e5e7eb',
+                      background: page === totalPages ? '#f9fafb' : '#fff',
+                      color: page === totalPages ? '#d1d5db' : '#374151',
+                      fontSize: '0.82rem', fontWeight: 600,
+                      cursor: page === totalPages ? 'not-allowed' : 'pointer',
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => { if (page !== totalPages) e.currentTarget.style.background = '#f3f4f6'; }}
+                    onMouseLeave={e => { if (page !== totalPages) e.currentTarget.style.background = '#fff'; }}
+                  >
+                    Next
+                    <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             )}
+            </div>
+
           </div>
         </div>
       </div>
