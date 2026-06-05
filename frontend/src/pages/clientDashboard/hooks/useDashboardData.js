@@ -2,6 +2,17 @@ import { useCallback, useRef, useState } from 'react';
 import { useAuth } from '../../AuthContext';
 import { useDashboard } from '../context/DashboardContext';
 import { fetchDashboard } from '../services/dashboardService';
+import safeStorage from '../../safeStorage';
+
+// ── Why safeStorage? ──────────────────────────────────────────────────────────
+// localStorage.getItem('hp_selected_property_id') was throwing a SecurityError
+// on go.hostops.online, so propertyDbId was always null/undefined. Combined
+// with DashboardContext also failing to read the stored property, this caused
+// the dashboard to behave as if no property was ever selected — resulting in
+// repeated API calls and the visible infinite-polling in the server logs
+// (20+ identical /api/clients/{id}/properties requests per session).
+// safeStorage.getItem never throws, returning null safely when no value exists.
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function useDashboardData() {
   const auth = useAuth();
@@ -9,15 +20,6 @@ export function useDashboardData() {
   const [banner, setBanner] = useState({ message: '', type: '' });
   const loadingRef = useRef(false);
 
-  // fromOverride / toOverride: pass explicit dates when calling right after
-  // updateDashState() so we don't read a stale closure value.
-  //
-  // apartmentIdOverride: pass an explicit apartmentId right after selectProperty()
-  // so we don't read a stale closure. Omit to use dashState.selectedPropertyId.
-  //
-  // propertyDbId: MongoDB _id of the selected property (from hp_selected_property_id
-  // in localStorage). Passed to the backend so it can look up the correct
-  // smoobuApiKey from user.properties[] for that specific property.
   const loadData = useCallback(async (fromOverride, toOverride, apartmentIdOverride) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
@@ -25,17 +27,10 @@ export function useDashboardData() {
     const from = fromOverride ?? dashState.from;
     const to   = toOverride   ?? dashState.to;
 
-    // FIX: Read from localStorage instead of sessionStorage.
-    // sessionStorage is cleared when the login app redirects to the dashboard
-    // app across origins — localStorage persists correctly.
-    // selectProperty() writes hp_selected_property_id synchronously to
-    // localStorage before the useEffect in index.jsx fires loadData(),
-    // so this is always current.
-    const propertyDbId = localStorage.getItem('hp_selected_property_id') || null;
+    // safeStorage.getItem never throws — returns null if key doesn't exist
+    // or if storage is blocked (falls back to in-memory Map).
+    const propertyDbId = safeStorage.getItem('hp_selected_property_id') || null;
 
-    // apartmentId is the Smoobu numeric ID for frontend-side filtering.
-    // When propertyDbId is set, the backend already scopes the API call to
-    // that property's smoobuApiKey — no extra apartmentId filter needed.
     const apartmentId = apartmentIdOverride !== undefined ? apartmentIdOverride : null;
 
     setBanner({ message: '⏳ Loading data…', type: 'loading' });
@@ -56,10 +51,6 @@ export function useDashboardData() {
 
       const data = await res.json();
 
-      // smoobuNotConnected: true means the user has no Smoobu API key configured
-      // yet. This is a normal state for new users — not an error.
-      // The banner switches to 'connect' type so index.jsx can show a prompt
-      // instead of an empty dashboard with no explanation.
       if (data.smoobuNotConnected) {
         updateDashState({ rawData: data });
         setBanner({ message: data.message || 'Connect your Smoobu account to see live data.', type: 'connect' });
