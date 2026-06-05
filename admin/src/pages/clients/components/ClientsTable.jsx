@@ -97,7 +97,7 @@ function isUnverified(client) {
   return client.mustChangePassword && client.mustChangePin;
 }
 
-export default function ClientsTable({ clients, loading, onRowClick }) {
+export default function ClientsTable({ clients, loading, onRowClick, search, onSearchChange, onAddClient, onRefresh }) {
   const [activeTab, setActiveTab] = useState('All');
   const [selected, setSelected] = useState([]);
 
@@ -156,7 +156,7 @@ export default function ClientsTable({ clients, loading, onRowClick }) {
                   background: isActive ? '#fff' : 'transparent',
                   marginBottom: '-1px',
                   cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
-                  color: isActive ? '#3b5fc0' : '#9ca3af',
+                  color: isActive ? '#10b981' : '#9ca3af',
                   transition: 'color 0.15s', whiteSpace: 'nowrap',
                   position: 'relative', zIndex: isActive ? 2 : 0,
                   boxShadow: 'none',
@@ -167,8 +167,8 @@ export default function ClientsTable({ clients, loading, onRowClick }) {
                 <span style={{
                   fontSize: '0.72rem', fontWeight: 700,
                   padding: '1px 7px', borderRadius: 999,
-                  background: isActive ? '#eef2ff' : 'transparent',
-                  color: isActive ? '#3b5fc0' : '#b0b7c3',
+                  background: isActive ? '#d1fae5' : 'transparent',
+                  color: isActive ? '#10b981' : '#b0b7c3',
                 }}>
                   {tab.count}
                 </span>
@@ -188,9 +188,59 @@ export default function ClientsTable({ clients, loading, onRowClick }) {
           display: 'flex', alignItems: 'center', gap: 10,
           padding: '12px 20px 14px', borderBottom: '1px solid #f0f2f5', flexWrap: 'wrap',
         }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 180, maxWidth: 280 }}>
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2"
+              style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+              <circle cx="9" cy="9" r="6"/><path d="M15 15l-3.5-3.5" strokeLinecap="round"/>
+            </svg>
+            <input
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Search by name or email…"
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '7px 12px 7px 32px',
+                borderRadius: 8, border: '1px solid #e5e7eb',
+                fontSize: '0.83rem', outline: 'none', background: '#fafafa',
+                color: '#1a202c',
+              }}
+            />
+          </div>
           <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto' }}>
             {tabFiltered.length} {tabFiltered.length === 1 ? 'Business' : 'Businesses'}
           </span>
+          <button
+            onClick={onRefresh}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '7px 14px', borderRadius: 8,
+              border: '1px solid #10b981', background: '#fff',
+              fontSize: '0.82rem', fontWeight: 600, color: '#10b981',
+              cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 4a8 8 0 0112.97 3M16 16a8 8 0 01-12.97-3" strokeLinecap="round" />
+              <path d="M4 8V4H0" strokeLinecap="round" strokeLinejoin="round" transform="translate(4 0)" />
+            </svg>
+            Refresh
+          </button>
+          <button
+            onClick={onAddClient}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '7px 16px', borderRadius: 999,
+              border: 'none', background: '#10b981',
+              color: '#fff', fontSize: '0.82rem', fontWeight: 700,
+              cursor: 'pointer', whiteSpace: 'nowrap',
+              boxShadow: '0 2px 8px rgba(59,95,192,0.18)',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#2d4faa'}
+            onMouseLeave={e => e.currentTarget.style.background = '#3b5fc0'}
+          >
+            + Add Business
+          </button>
         </div>
 
         {/* Table */}
@@ -261,7 +311,7 @@ export default function ClientsTable({ clients, loading, onRowClick }) {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <div style={{
                             width: 34, height: 34, borderRadius: 8, flexShrink: 0,
-                            background: '#eef2ff', color: '#3b5fc0',
+                            background: '#d1fae5', color: '#059669',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.03em',
                           }}>
