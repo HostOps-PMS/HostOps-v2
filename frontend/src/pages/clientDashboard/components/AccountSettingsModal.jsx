@@ -977,8 +977,10 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
         onClose={() => setShowSwitchModal(false)}
         onSwitch={(property) => {
         setShowSwitchModal(false);
+
         if (property) {
-          onClose(); 
+          onClose(); // close Account Settings
+
           setTimeout(() => {
             onPropertySwitch?.(property.id, property.name);
           }, 0);

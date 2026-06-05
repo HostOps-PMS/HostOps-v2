@@ -18,12 +18,16 @@ import { authFetch } from "../../apiService";
 // ─────────────────────────────────────────────────────────────────
 export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
   const auth = useAuth();
-  const user = auth.getUser();
+
+  // FIX 1: Read user fresh on every render — avoids stale null on first mount
+  // when the auth context hasn't fully hydrated yet.
+  const user = auth.getUser?.() ?? auth.user ?? null;
 
   // Properties fetched from the backend
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState(null);
+  const [fetchedBusinessName, setFetchedBusinessName] = useState("");
 
   // Read the currently active property _id from sessionStorage so we
   // can pre-select and badge it in the list on open.
@@ -37,8 +41,13 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
     }
   };
 
-  const [activeId]   = useState(getActiveId);           // what is currently "live"
-  const [selectedId, setSelectedId] = useState(getActiveId); // what the user has clicked in this session
+  // FIX 2: Derive activeId live on every render instead of freezing it in
+  // useState at mount time. On first login sessionStorage isn't populated yet
+  // when the component mounts, so useState(() => getActiveId()) would capture
+  // null and never update — causing the "Active" badge to never appear.
+  const activeId = getActiveId();
+
+  const [selectedId, setSelectedId] = useState(getActiveId);
 
   const overlayRef = useRef(null);
 
@@ -61,7 +70,18 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
           throw new Error(body.error || `Error ${res.status}`);
         }
         const data = await res.json();
-        setProperties(data.properties || []);
+        const fetched = data.properties || [];
+        setProperties(fetched);
+        if (data.businessName) setFetchedBusinessName(data.businessName);
+
+        // If no active property is stored yet (first login), auto-select and
+        // persist the first property so the "Active" badge appears immediately.
+        if (fetched.length > 0 && !getActiveId()) {
+          const first = fetched[0];
+          sessionStorage.setItem("hp_selected_property_id",   String(first._id));
+          sessionStorage.setItem("hp_selected_property_name", first.propertyName || "");
+          setSelectedId(String(first._id));
+        }
       })
       .catch((err) => {
         setFetchError(err.message);
@@ -115,14 +135,15 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
     user?.businessName?.charAt(0).toUpperCase() ||
     "U";
 
+  // displayName: always prefer businessName first, then full name, then email.
+  // We also try user.business_name (snake_case) in case the API returns that shape.
   const displayName =
     user?.businessName ||
-    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
-    user?.email ||
+    fetchedBusinessName ||
     "Your Account";
 
   // Helper: is this item currently the live active property?
-  const isCurrentlyActive = (id) => String(id) === String(activeId);
+  const isCurrentlyActive = (id) => !!activeId && String(id) === String(activeId);
   // Helper: is this item selected in this open session?
   const isSelected = (id) => String(id) === String(selectedId);
 
@@ -258,7 +279,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                   Switch Property
                 </h2>
                 <p style={{ fontSize: 12, color: "#9ab8a9", margin: "3px 0 0" }}>
-                  {displayName}
+                  Choose a different property
                 </p>
               </div>
             </div>
@@ -425,14 +446,18 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                         </span>
                       )}
                     </div>
+                    {/* Subtitle: show the business name as a secondary descriptor */}
                     <p
                       style={{
                         fontSize: 11,
                         color: "#9ab8a9",
                         margin: "2px 0 0",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
                       }}
                     >
-                      {property.propertyName}
+                      {property.businessName || property.business_name || displayName}
                     </p>
                   </div>
 
