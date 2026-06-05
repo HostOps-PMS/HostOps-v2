@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
 import { useDashboard } from "../context/DashboardContext";
 import { exportDashboardPDF } from "../services/pdfExportService";
@@ -446,12 +447,12 @@ export default function Navbar() {
       <>
         <nav style={{ ...t.navbar, position: "sticky" }}>
           <div style={t.inner}>
-            <a href="/" style={t.logoWrap}>
+            <Link to="/" style={t.logoWrap}>
               <div style={t.logoBox}>
                 <i className="ti ti-home" style={t.logoIcon} aria-hidden="true" />
               </div>
               <span style={t.logoText}>HostOps</span>
-            </a>
+            </Link>
 
             <div style={t.rightGroup}>
 
@@ -640,12 +641,12 @@ export default function Navbar() {
     <>
       <nav style={{ ...t.navbar, position: "sticky", top: 0 }}>
         <div style={t.inner}>
-          <a href="/" style={t.logoWrap}>
+          <Link to="/" style={t.logoWrap}>
             <div style={t.logoBox}>
               <i className="ti ti-home" style={t.logoIcon} aria-hidden="true" />
             </div>
             <span style={t.logoText}>HostOps</span>
-          </a>
+          </Link>
 
           <div style={t.rightGroup}>
             <div style={{ position: 'relative' }} ref={notifRef}>
@@ -740,9 +741,9 @@ export default function Navbar() {
               )}
             </div>
 
-            <a href="/inbox" style={{ ...t.iconBtn, textDecoration: 'none' }} aria-label="Inbox">
+            <Link to="/inbox" style={{ ...t.iconBtn, textDecoration: 'none' }} aria-label="Inbox">
               <i className="ti ti-inbox" style={t.iconBtnIcon} aria-hidden="true" />
-            </a>
+            </Link>
 
             {/* Export PDF — sits right after the bell */}
             {ExportButton}

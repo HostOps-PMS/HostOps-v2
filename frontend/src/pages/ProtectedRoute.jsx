@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { verifySession } from './apiService';
-
-const HP_LOGIN_URL = import.meta.env.VITE_LOGIN_URL || '/';
 
 /**
  * Wraps routes that require authentication.
@@ -13,14 +12,20 @@ export default function ProtectedRoute({ children }) {
   const [status, setStatus] = useState('checking'); // 'checking' | 'ok' | 'denied'
 
   useEffect(() => {
-    verifySession(auth).then((user) => {
-      if (user) {
-        setStatus('ok');
-      } else {
-        setStatus('denied');
-      }
-    });
-  }, [auth]);
+    // Small delay to ensure AuthContext useEffect has hydrated sessionStorage
+    // from cross-origin token handoff (?_t=...&_u=...) before we verify.
+    const timer = setTimeout(() => {
+      verifySession(auth).then((user) => {
+        if (user) {
+          setStatus('ok');
+        } else {
+          setStatus('denied');
+        }
+      });
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (status === 'checking') {
     return (
@@ -36,8 +41,7 @@ export default function ProtectedRoute({ children }) {
   }
 
   if (status === 'denied') {
-    window.location.href = HP_LOGIN_URL;
-    return null;
+    return <Navigate to="/" replace />;
   }
 
   return children;
