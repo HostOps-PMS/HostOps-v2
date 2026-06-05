@@ -280,9 +280,16 @@ export default function LoginPage() {
             />
           )}
 
-          <a href="https://hostops.online/" className="lp-back-home">
-            ← Back to homepage
-          </a>
+          {/* Hide "Back to homepage" on property-select and PIN screens — those
+              views have their own back navigation and the link looks cluttered. */}
+          {view !== VIEWS.PROPERTY_SELECT &&
+           view !== VIEWS.PIN_MODAL &&
+           view !== VIEWS.CLIENT_ACCOUNT_PROPERTY_SELECT &&
+           view !== VIEWS.CLIENT_ACCOUNT_PIN_MODAL && (
+            <a href="https://hostops.online/" className="lp-back-home">
+              ← Back to homepage
+            </a>
+          )}
         </div>
 
       </div>
