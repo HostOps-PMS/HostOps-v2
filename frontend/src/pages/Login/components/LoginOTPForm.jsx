@@ -20,6 +20,12 @@ export default function LoginOTPForm({ email, rememberMe, showMsg, hideMsg, onBa
         sessionStorage.removeItem('hp_must_change_password');
       }
 
+      if (data.user.mustChangePin) {
+        sessionStorage.setItem('hp_must_change_pin', 'true');
+      } else {
+        sessionStorage.removeItem('hp_must_change_pin');
+      }
+
       onAuthSuccess(data);
     },
     onError: (msg) => showMsg(msg),

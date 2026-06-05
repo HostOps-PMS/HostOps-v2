@@ -65,6 +65,25 @@ async function changePassword({ currentPassword, newPassword }, auth) {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// changePin — POST /auth/change-pin
+// ─────────────────────────────────────────────────────────────────
+async function changePin({ currentPin, newPin }, auth) {
+  const token = auth.getToken();
+  const res = await fetch(`${API_BASE}/auth/change-pin`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": import.meta.env.VITE_API_KEY,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ currentPin, newPin }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Failed to change PIN. Please try again.");
+  return data;
+}
+
+// ─────────────────────────────────────────────────────────────────
 // OTPInput — 6-box OTP input, same pattern as the reset page
 // ─────────────────────────────────────────────────────────────────
 function OTPInput({ length = 6, onComplete, isError, isLoading, version }) {
@@ -181,7 +200,9 @@ function OTPModal({ email, auth, onVerified, onCancel }) {
     setOtpError("");
     clearTimeout(errorTimerRef.current);
     try {
-      await verifyOtp(email, otp);
+      const userEmail = email || auth.getUser()?.email;
+      if (!userEmail) throw new Error("Could not find your email address. Please try logging in again.");
+      await verifyOtp(userEmail, otp);
       clearTimeout(errorTimerRef.current);
       onVerified(otp);
     } catch (err) {
@@ -478,9 +499,26 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
     confirm: false,
   });
 
+  // ── PIN form ─────────────────────────────────────────────────────
+  const [pinForm, setPinForm] = useState({
+    currentPin: "",
+    newPin: "",
+    confirmPin: "",
+  });
+  const [pinSaving, setPinSaving] = useState(false);
+  const [pinStatus, setPinStatus] = useState(null);
+  const [pinErrorMsg, setPinErrorMsg] = useState("");
+  const [showPin, setShowPin] = useState({
+    current: false,
+    next: false,
+    confirm: false,
+  });
+
   // ── OTP & success modal state ────────────────────────────────────
   const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpContext, setOtpContext] = useState(""); // 'password' or 'pin'
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   // ── Switch Account modal state ───────────────────────────────────
   const [showSwitchModal, setShowSwitchModal] = useState(false);
@@ -514,7 +552,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
     }
   }
 
-  // Reset password form whenever modal opens
+  // Reset forms whenever modal opens
   useEffect(() => {
     if (isOpen) {
       setActiveTab("profile");
@@ -522,6 +560,12 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       setPwStatus(null);
       setPwErrorMsg("");
       setShowPw({ current: false, next: false, confirm: false });
+      
+      setPinForm({ currentPin: "", newPin: "", confirmPin: "" });
+      setPinStatus(null);
+      setPinErrorMsg("");
+      setShowPin({ current: false, next: false, confirm: false });
+
       setShowOtpModal(false);
       setShowSuccessModal(false);
       setShowSwitchModal(false);
@@ -559,6 +603,13 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
     if (pwStatus) setPwStatus(null);
   }
 
+  function handlePinChange(e) {
+    const { name, value } = e.target;
+    const val = value.replace(/\D/g, '').slice(0, 6);
+    setPinForm((prev) => ({ ...prev, [name]: val }));
+    if (pinStatus) setPinStatus(null);
+  }
+
   // ── Save Changes: validates pw fields then sends OTP ───────────────
   async function handleSave() {
     const { currentPassword, newPassword, confirmPassword } = pwForm;
@@ -590,6 +641,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
     setPwErrorMsg("");
     try {
       await sendOtpForPasswordChange(auth);
+      setOtpContext("password");
       setShowOtpModal(true);
     } catch (err) {
       setPwErrorMsg(err.message);
@@ -599,27 +651,88 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
     }
   }
 
-  // ── Step 2: OTP verified — now actually change the password ──────
+  async function handleSavePin() {
+    const { currentPin, newPin, confirmPin } = pinForm;
+
+    if (!currentPin) {
+      setPinErrorMsg("Current PIN is required.");
+      setPinStatus("error");
+      return;
+    }
+    if (!newPin || newPin.length !== 6) {
+      setPinErrorMsg("New PIN must be exactly 6 digits.");
+      setPinStatus("error");
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setPinErrorMsg("PINs do not match.");
+      setPinStatus("error");
+      return;
+    }
+    if (newPin === currentPin) {
+      setPinErrorMsg("New PIN must be different from your current PIN.");
+      setPinStatus("error");
+      return;
+    }
+
+    setPinSaving(true);
+    setPinStatus(null);
+    setPinErrorMsg("");
+    try {
+      await sendOtpForPasswordChange(auth);
+      setOtpContext("pin");
+      setShowOtpModal(true);
+    } catch (err) {
+      setPinErrorMsg(err.message);
+      setPinStatus("error");
+    } finally {
+      setPinSaving(false);
+    }
+  }
+
+  // ── Step 2: OTP verified — now actually change the password or PIN ──────
   async function handleOtpVerified(otp) {
     verifiedTokenRef.current = otp;
     setShowOtpModal(false);
 
-    const { currentPassword, newPassword } = pwForm;
+    if (otpContext === "password") {
+      const { currentPassword, newPassword } = pwForm;
 
-    try {
-      const body = await changePassword({ currentPassword, newPassword }, auth);
-      if (body.user) setUser(body.user);
+      try {
+        const body = await changePassword({ currentPassword, newPassword }, auth);
+        if (body.user) setUser(body.user);
+        if (body.staff) setUser({ ...body.staff, isStaff: true, role: 'staff' });
 
-      // Reset password form
-      setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      setShowPw({ current: false, next: false, confirm: false });
-      verifiedTokenRef.current = null;
+        // Reset password form
+        setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+        setShowPw({ current: false, next: false, confirm: false });
+        verifiedTokenRef.current = null;
 
-      // Show success modal
-      setShowSuccessModal(true);
-    } catch (err) {
-      setPwErrorMsg(err.message);
-      setPwStatus("error");
+        // Show success modal
+        setShowSuccessModal(true);
+      } catch (err) {
+        setPwErrorMsg(err.message);
+        setPwStatus("error");
+      }
+    } else if (otpContext === "pin") {
+      const { currentPin, newPin } = pinForm;
+
+      try {
+        const body = await changePin({ currentPin, newPin }, auth);
+        if (body.user) setUser(body.user);
+        if (body.staff) setUser({ ...body.staff, isStaff: true, role: 'staff' });
+
+        // Reset PIN form
+        setPinForm({ currentPin: "", newPin: "", confirmPin: "" });
+        setShowPin({ current: false, next: false, confirm: false });
+        verifiedTokenRef.current = null;
+
+        // Show success modal
+        setShowSuccessModal(true);
+      } catch (err) {
+        setPinErrorMsg(err.message);
+        setPinStatus("error");
+      }
     }
   }
 
@@ -1053,13 +1166,15 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
 
           {/* ── Tabs ── */}
           <div style={{ display: "flex", borderBottom: "1px solid #eaf3ee", padding: "0 28px" }}>
-            {["profile", "password", "activity"].map((tab) => (
+            {["profile", "password", "pin", "activity"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => {
                   setActiveTab(tab);
                   setPwStatus(null);
                   setPwErrorMsg("");
+                  setPinStatus(null);
+                  setPinErrorMsg("");
                   if (tab === "activity") fetchActivityLog();
                 }}
                 style={{
@@ -1076,7 +1191,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                   transition: "color 0.15s",
                 }}
               >
-                {tab === "profile" ? "Profile" : tab === "password" ? "Change Password" : "Activity"}
+                {tab === "profile" ? "Profile" : tab === "password" ? "Change Password" : tab === "pin" ? "Change PIN" : "Activity"}
               </button>
             ))}
           </div>
@@ -1104,29 +1219,31 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                     </div>
                   </div>
                   <div style={{ ...styles.readOnlyRow, marginTop: 8 }}>
-                    <i className="ti ti-clock" style={styles.readOnlyIcon} aria-hidden="true" />
+                    <i className="ti ti-check" style={styles.readOnlyIcon} aria-hidden="true" />
                     <div style={styles.readOnlyContent}>
-                      <p style={styles.readOnlyKey}>Last Login</p>
-                      <p style={styles.readOnlyVal}>{formattedLastLogin}</p>
+                      <p style={styles.readOnlyKey}>Account Status</p>
+                      <p style={styles.readOnlyVal}>{user?.isVerified ? "Verified" : "Pending Verification"}</p>
                     </div>
                   </div>
                 </div>
-                <div style={styles.section}>
-                  <div style={styles.row2}>
-                    <div style={styles.readOnlyRow}>
-                      <div style={styles.readOnlyContent}>
-                        <p style={styles.readOnlyKey}>First Name</p>
-                        <p style={styles.readOnlyVal}>{user?.firstName || "—"}</p>
+                {user?.role === 'client' && (
+                  <div style={styles.section}>
+                    <div style={styles.row2}>
+                      <div style={styles.readOnlyRow}>
+                        <div style={styles.readOnlyContent}>
+                          <p style={styles.readOnlyKey}>First Name</p>
+                          <p style={styles.readOnlyVal}>{user?.firstName || "—"}</p>
+                        </div>
                       </div>
-                    </div>
-                    <div style={styles.readOnlyRow}>
-                      <div style={styles.readOnlyContent}>
-                        <p style={styles.readOnlyKey}>Last Name</p>
-                        <p style={styles.readOnlyVal}>{user?.lastName || "—"}</p>
+                      <div style={styles.readOnlyRow}>
+                        <div style={styles.readOnlyContent}>
+                          <p style={styles.readOnlyKey}>Last Name</p>
+                          <p style={styles.readOnlyVal}>{user?.lastName || "—"}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
               </>
             )}
 
@@ -1220,6 +1337,93 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, marginTop: 4 }}>
                       <i className="ti ti-alert-circle" style={{ color: "#c13515", fontSize: 15 }} aria-hidden="true" />
                       <span style={{ color: "#c13515" }}>{pwErrorMsg}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* ── PIN TAB ── */}
+            {activeTab === "pin" && (() => {
+              const pin = pinForm.newPin;
+              const hasLength = pin.length === 6;
+              const strength = hasLength ? 3 : (pin.length > 0 ? 1 : 0);
+              const strengthLabel = pin.length === 0 ? "" : strength < 3 ? "Too short" : "Looks good!";
+              const strengthColor = strength === 1 ? "#c13515" : "#1e8760";
+              const checks = [
+                { label: "Exactly 6 digits", ok: hasLength },
+              ];
+
+              return (
+                <div style={{ ...styles.section, marginBottom: 8 }}>
+                  {/* Current PIN */}
+                  <div style={styles.fieldGroup}>
+                    <label style={styles.label} htmlFor="acc-currentPin">
+                      Current PIN <span style={{ color: "#c13515" }}>*</span>
+                    </label>
+                    <div style={styles.pwInputWrap}>
+                      <input id="acc-currentPin" className="acc-pw-input" style={{ ...styles.pwInput, letterSpacing: showPin.current ? 'normal' : '0.2em' }} type={showPin.current ? "text" : "password"} inputMode="numeric" name="currentPin" value={pinForm.currentPin} onChange={handlePinChange} placeholder="Enter current PIN" />
+                      <button type="button" className="acc-eye-btn" style={styles.eyeBtn} onClick={() => setShowPin((p) => ({ ...p, current: !p.current }))} tabIndex={-1}>
+                        <i className={showPin.current ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* New PIN */}
+                  <div style={styles.fieldGroup}>
+                    <label style={styles.label} htmlFor="acc-newPin">
+                      New PIN <span style={{ color: "#c13515" }}>*</span>
+                    </label>
+                    <div style={styles.pwInputWrap}>
+                      <input id="acc-newPin" className="acc-pw-input" style={{ ...styles.pwInput, letterSpacing: showPin.next ? 'normal' : '0.2em' }} type={showPin.next ? "text" : "password"} inputMode="numeric" name="newPin" value={pinForm.newPin} onChange={handlePinChange} placeholder="6 digits" />
+                      <button type="button" className="acc-eye-btn" style={styles.eyeBtn} onClick={() => setShowPin((p) => ({ ...p, next: !p.next }))} tabIndex={-1}>
+                        <i className={showPin.next ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Confirm PIN */}
+                  <div style={{ ...styles.fieldGroup, marginBottom: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                      <label style={{ ...styles.label, marginBottom: 0 }} htmlFor="acc-confirmPin">
+                        Confirm New PIN <span style={{ color: "#c13515" }}>*</span>
+                      </label>
+                      {pinForm.confirmPin && (
+                        <button type="button" onClick={() => setPinForm(p => ({ ...p, confirmPin: "" }))} style={{ fontSize: 12, fontWeight: 600, color: "#9ab8a9", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Clear</button>
+                      )}
+                    </div>
+                    <div style={styles.pwInputWrap}>
+                      <input id="acc-confirmPin" className="acc-pw-input" style={{ ...styles.pwInput, letterSpacing: showPin.confirm ? 'normal' : '0.2em' }} type={showPin.confirm ? "text" : "password"} inputMode="numeric" name="confirmPin" value={pinForm.confirmPin} onChange={handlePinChange} placeholder="Re-enter new PIN" />
+                      <button type="button" className="acc-eye-btn" style={styles.eyeBtn} onClick={() => setShowPin((p) => ({ ...p, confirm: !p.confirm }))} tabIndex={-1}>
+                        <i className={showPin.confirm ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Strength bar */}
+                  {pin.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      {strengthLabel && (
+                        <p style={{ fontSize: 12, color: strengthColor, fontWeight: 600, margin: 0 }}>
+                          {strengthLabel}
+                        </p>
+                      )}
+                      <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+                        {checks.map((c) => (
+                          <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: c.ok ? "#1e8760" : "#9ab8a9" }}>
+                            <i className={c.ok ? "ti ti-circle-check-filled" : "ti ti-circle-x"} style={{ fontSize: 14 }} aria-hidden="true" />
+                            {c.label}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error */}
+                  {pinStatus === "error" && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, marginTop: 4 }}>
+                      <i className="ti ti-alert-circle" style={{ color: "#c13515", fontSize: 15 }} aria-hidden="true" />
+                      <span style={{ color: "#c13515" }}>{pinErrorMsg}</span>
                     </div>
                   )}
                 </div>
@@ -1344,12 +1548,27 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
           {/* ── Footer ── */}
           <div style={{ ...styles.footer, justifyContent: "flex-end" }}>
             <div style={styles.btnGroup}>
-              <button style={styles.cancelBtn} className="acc-cancel-btn" onClick={onClose} disabled={pwSaving}>
+              <button style={styles.cancelBtn} className="acc-cancel-btn" onClick={onClose} disabled={pwSaving || pinSaving}>
                 Discard
               </button>
               {activeTab === "password" && (
                 <button style={styles.saveBtn(pwSaving)} className="acc-save-btn" onClick={handleSave} disabled={pwSaving}>
                   {pwSaving ? (
+                    <>
+                      <i className="ti ti-loader-2" style={{ fontSize: 14, animation: "spin 0.8s linear infinite" }} aria-hidden="true" />
+                      Sending code…
+                    </>
+                  ) : (
+                    <>
+                      <i className="ti ti-check" style={{ fontSize: 14 }} aria-hidden="true" />
+                      Apply Changes
+                    </>
+                  )}
+                </button>
+              )}
+              {activeTab === "pin" && (
+                <button style={styles.saveBtn(pinSaving)} className="acc-save-btn" onClick={handleSavePin} disabled={pinSaving}>
+                  {pinSaving ? (
                     <>
                       <i className="ti ti-loader-2" style={{ fontSize: 14, animation: "spin 0.8s linear infinite" }} aria-hidden="true" />
                       Sending code…

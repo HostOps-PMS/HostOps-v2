@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { changePassword } from '../../Login/services/authservice';
+import safeStorage from '../../safeStorage';
 
 // Inline password validation — mirrors the rules in src/utils/validators.js
 function validateNewPassword(password) {
@@ -54,7 +55,7 @@ export default function FirstLoginModal({ onComplete }) {
 
       // Update stored user with the fresh user object returned by the backend
       if (data.user) {
-        sessionStorage.setItem('hp_user', JSON.stringify(data.user));
+        safeStorage.setItem('hp_user', JSON.stringify(data.user));
       }
       sessionStorage.removeItem('hp_must_change_password');
 
