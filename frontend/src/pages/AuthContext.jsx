@@ -58,8 +58,9 @@ export function AuthProvider({ children }) {
   }, []);
 
   const clear = useCallback(() => {
-    safeStorage.removeItem('hp_access_token');
-    safeStorage.removeItem('hp_user');
+    localStorage.removeItem('hp_access_token');
+    localStorage.removeItem('hp_user');
+    sessionStorage.clear();
   }, []);
 
   // Consume cross-origin handoff token from URL params (?_t=...&_u=...).

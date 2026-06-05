@@ -127,3 +127,20 @@ export async function sendLoginOtp() {
 
   return body;
 }
+
+export async function logoutUser() {
+  const token = sessionStorage.getItem('hp_access_token');
+  try {
+    await fetch(authUrl('/auth/logout'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': API_KEY,
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      credentials: 'include',
+    });
+  } catch (e) {
+    console.error('Logout failed to reach server:', e);
+  }
+}
