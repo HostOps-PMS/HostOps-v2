@@ -84,7 +84,7 @@ const STATIC_STATS = [
 ];
 
 function StatCard({ stat }) {
-  const sparkData  = SPARKLINES[stat.label] ?? [];
+  const sparkData  = SPARKLINES[stat.label] ?? SPARKLINES[(stat.label || '').toUpperCase()] ?? [];
   const sparkColor = SPARK_COLORS[stat.color] ?? '#1a9e6e';
 
   return (
@@ -165,9 +165,15 @@ export default function StatsRow({ stats, loading }) {
     );
   }
 
+  // Use live stats from /api/dashboard-overview when available; otherwise the
+  // static sample acts as a placeholder. The live array comes from useStats →
+  // buildStatsCards (Total Clients / Total Properties from user.js, Monthly
+  // Revenue from aggregated Smoobu data).
+  const liveStats = Array.isArray(stats) && stats.length > 0 ? stats : STATIC_STATS;
+
   return (
     <div className="db-stats">
-      {STATIC_STATS.map((stat) => <StatCard key={stat.label} stat={stat} />)}
+      {liveStats.map((stat) => <StatCard key={stat.label} stat={stat} />)}
     </div>
   );
 }
