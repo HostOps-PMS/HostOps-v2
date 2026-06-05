@@ -21,6 +21,8 @@ export default function Clients() {
 
   /* ── Search / filter ── */
   const [search,     setSearch]     = useState('');
+  const [page,       setPage]       = useState(1);
+  const PAGE_SIZE = 10;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -33,6 +35,15 @@ export default function Clients() {
       return matchesSearch && c.role === 'client';
     });
   }, [clients, search]);
+
+  const totalPages  = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated   = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Reset to page 1 when search changes
+  function handleSearchChange(val) {
+    setSearch(val);
+    setPage(1);
+  }
 
   /* ── Handle client updated from modal ── */
   function handleClientUpdated(updatedClient) {
@@ -92,13 +103,18 @@ export default function Clients() {
 
           {/* Table */}
           <ClientsTable
-            clients={filtered}
+            clients={paginated}
             loading={loading}
             onRowClick={openModal}
             search={search}
-            onSearchChange={setSearch}
+            onSearchChange={handleSearchChange}
             onAddClient={() => setShowAddClient(true)}
             onRefresh={refetch}
+            page={page}
+            totalPages={totalPages}
+            totalCount={filtered.length}
+            onPrev={() => setPage(p => Math.max(1, p - 1))}
+            onNext={() => setPage(p => Math.min(totalPages, p + 1))}
           />
         </div>
       </div>

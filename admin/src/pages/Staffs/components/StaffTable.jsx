@@ -17,6 +17,11 @@ export default function StaffTable({
   onDelete,
   onNew,
   onRowClick,
+  page,
+  totalPages,
+  totalCount,
+  onPrev,
+  onNext,
 }) {
   const clientMap = Object.fromEntries(clients.map((c) => [c._id, c]));
 
@@ -303,6 +308,63 @@ return (
           </table>
         </div>
       )}
+
+        {/* Pagination */}
+        {!loading && totalPages > 1 && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '12px 20px',
+            borderTop: '1px solid #f0f2f5',
+          }}>
+            <span style={{ fontSize: '0.78rem', color: '#9ca3af' }}>
+              Page {page} of {totalPages} · {totalCount} {totalCount === 1 ? 'Staff' : 'Staffs'}
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={onPrev}
+                disabled={page === 1}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '6px 14px', borderRadius: 8,
+                  border: '1px solid #e5e7eb',
+                  background: page === 1 ? '#f9fafb' : '#fff',
+                  color: page === 1 ? '#d1d5db' : '#374151',
+                  fontSize: '0.82rem', fontWeight: 600,
+                  cursor: page === 1 ? 'not-allowed' : 'pointer',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => { if (page !== 1) e.currentTarget.style.background = '#f3f4f6'; }}
+                onMouseLeave={e => { if (page !== 1) e.currentTarget.style.background = '#fff'; }}
+              >
+                <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M13 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Prev
+              </button>
+              <button
+                onClick={onNext}
+                disabled={page === totalPages}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '6px 14px', borderRadius: 8,
+                  border: '1px solid #e5e7eb',
+                  background: page === totalPages ? '#f9fafb' : '#fff',
+                  color: page === totalPages ? '#d1d5db' : '#374151',
+                  fontSize: '0.82rem', fontWeight: 600,
+                  cursor: page === totalPages ? 'not-allowed' : 'pointer',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => { if (page !== totalPages) e.currentTarget.style.background = '#f3f4f6'; }}
+                onMouseLeave={e => { if (page !== totalPages) e.currentTarget.style.background = '#fff'; }}
+              >
+                Next
+                <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
     </div>
     </div>
   );

@@ -8,6 +8,8 @@ import StaffTable from './components/StaffTable';
 export default function Staffs() {
   const [filterClient, setFilterClient] = useState('');
   const [search, setSearch]             = useState('');
+  const [page,   setPage]               = useState(1);
+  const PAGE_SIZE = 10;
   const [modal, setModal]               = useState(null); // null | { type: 'create'|'edit'|'delete', staff? }
 
   const { staffs, clients, loading, error, propertyMap, reload } = useStaffs(filterClient);
@@ -21,6 +23,14 @@ export default function Staffs() {
       s.email?.toLowerCase().includes(q)
     );
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  function handleSearchChange(val) {
+    setSearch(val);
+    setPage(1);
+  }
 
   function handleSaved() {
     setModal(null);
@@ -97,17 +107,22 @@ export default function Staffs() {
           <StaffTable
             staffs={staffs}
             clients={clients}
-            filtered={filtered}
+            filtered={paginated}
             loading={loading}
             error={error}
             search={search}
             filterClient={filterClient}
             propertyMap={propertyMap}
-            onSearchChange={setSearch}
-            onFilterClientChange={setFilterClient}
+            onSearchChange={handleSearchChange}
+            onFilterClientChange={(val) => { setFilterClient(val); setPage(1); }}
             onEdit={(s) => setModal({ type: 'edit', staff: s })}
             onDelete={(s) => setModal({ type: 'delete', staff: s })}
             onNew={() => setModal({ type: 'create' })}
+            page={page}
+            totalPages={totalPages}
+            totalCount={filtered.length}
+            onPrev={() => setPage(p => Math.max(1, p - 1))}
+            onNext={() => setPage(p => Math.min(totalPages, p + 1))}
           />
         </div>
       </div>
