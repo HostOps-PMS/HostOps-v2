@@ -193,6 +193,7 @@ router.post('/login', async (req, res, next) => {
         // The Staff schema has no 'role' field — we add it here explicitly.
         staff:              { ...staff.toJSON(), role: 'staff', isStaff: true },
         mustChangePassword: staff.mustChangePassword,
+        mustChangePin:      staff.mustChangePin,
         isStaff:            true,
       });
     }
@@ -357,6 +358,7 @@ router.post('/staff-login', async (req, res, next) => {
       // identify staff sessions from the stored hp_user object.
       staff: { ...staff.toJSON(), role: 'staff', isStaff: true },
       mustChangePassword: staff.mustChangePassword,
+      mustChangePin:      staff.mustChangePin,
     });
   } catch (err) {
     if (err.name === 'ZodError') {
@@ -800,6 +802,71 @@ router.post('/change-password', requireAuth, async (req, res, next) => {
     );
 
     res.json({ message: 'Password changed successfully.', user: user.toJSON() });
+  } catch (err) {
+    if (err.name === 'ZodError') {
+      return res.status(400).json({ error: 'Validation failed', details: err.errors });
+    }
+    next(err);
+  }
+});
+
+// POST /auth/change-pin
+// Used for changing PIN from Account Settings or on first login.
+router.post('/change-pin', requireAuth, async (req, res, next) => {
+  try {
+    const changePinSchema = z.object({
+      currentPin: z.string().min(1, "Current PIN is required"),
+      newPin:     z.string().regex(/^\d{6}$/, "New PIN must be exactly 6 digits"),
+    });
+
+    const { currentPin, newPin } = changePinSchema.parse(req.body);
+
+    // ── Staff change-pin ───────────────────────────────────────────
+    if (req.isStaff) {
+      const staff = await Staff.findById(req.staff._id).select('+pin');
+      if (!staff) return res.status(404).json({ error: 'Staff not found' });
+
+      // If they have no PIN yet but must change it, we still require the 'currentPin' they were given.
+      // Or if no pin is set, currentPin could fail. Usually, admin sets a temporary PIN.
+      const isMatch = await bcrypt.compare(String(currentPin), staff.pin || '');
+      if (!isMatch) return res.status(401).json({ error: 'Current PIN is incorrect' });
+
+      if (currentPin === newPin) {
+        return res.status(400).json({ error: 'New PIN must be different from the current one' });
+      }
+
+      staff.pin           = newPin;
+      staff.mustChangePin = false;
+      await staff.save();
+
+      return res.json({ message: 'PIN changed successfully.', staff: staff.toJSON() });
+    }
+
+    // ── Regular user change-pin ────────────────────────────────────
+    const user = await User.findById(req.user._id).select('+pin');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const isMatch = await bcrypt.compare(String(currentPin), user.pin || '');
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Current PIN is incorrect' });
+    }
+
+    if (currentPin === newPin) {
+      return res.status(400).json({ error: 'New PIN must be different from the current one' });
+    }
+
+    user.pin = newPin;
+
+    if (user.mustChangePin) {
+      user.mustChangePin = false;
+    }
+
+    user.activityLog = user.activityLog || [];
+    user.activityLog.push({ action: 'pin_changed', ipAddress: req.ip || '', userAgent: req.get('user-agent') || '' });
+    if (user.activityLog.length > 50) user.activityLog = user.activityLog.slice(-50);
+    await user.save();
+
+    res.json({ message: 'PIN changed successfully.', user: user.toJSON() });
   } catch (err) {
     if (err.name === 'ZodError') {
       return res.status(400).json({ error: 'Validation failed', details: err.errors });

@@ -1,3 +1,5 @@
+import safeStorage from '../../safeStorage';
+
 const API_BASE = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
 
 export async function loginUser({ email, password, deviceId }) {
@@ -75,7 +77,7 @@ export async function forgotPassword({ email }) {
 }
 
 export async function checkSession() {
-  let token = sessionStorage.getItem('hp_access_token');
+  let token = safeStorage.getItem('hp_access_token');
   
   // First try with existing access token
   if (token) {
@@ -95,7 +97,7 @@ export async function checkSession() {
     
     if (refreshRes.ok) {
       const data = await refreshRes.json();
-      sessionStorage.setItem('hp_access_token', data.accessToken);
+      safeStorage.setItem('hp_access_token', data.accessToken);
       return true;
     }
   } catch (error) {
@@ -110,7 +112,7 @@ export async function checkSession() {
 // client-side tokens so the user is fully signed out.
 export async function logoutUser() {
   try {
-    const token = sessionStorage.getItem('hp_access_token');
+    const token = safeStorage.getItem('hp_access_token');
     await fetch(`${API_BASE}/auth/logout`, {
       method: 'POST',
       credentials: 'include', // sends the HttpOnly 'rt' cookie so the server can revoke it
@@ -125,8 +127,9 @@ export async function logoutUser() {
     console.warn('Logout request failed:', err);
   } finally {
     // Clear all client-side auth state regardless of server response
-    sessionStorage.removeItem('hp_access_token');
+    safeStorage.removeItem('hp_access_token');
     sessionStorage.removeItem('hp_must_change_password');
+    sessionStorage.removeItem('hp_must_change_pin');
     sessionStorage.removeItem('hp_selected_property_id');
     localStorage.removeItem('hp_user');
     localStorage.removeItem('user');
@@ -140,7 +143,7 @@ export async function logoutUser() {
 // Called on first login when mustChangePassword is true.
 // On success the backend sets isVerified: true and mustChangePassword: false.
 export async function changePassword({ currentPassword, newPassword }) {
-  const token = sessionStorage.getItem('hp_access_token');
+  const token = safeStorage.getItem('hp_access_token');
   const res = await fetch(`${API_BASE}/auth/change-password`, {
     method: 'POST',
     headers: {
@@ -152,5 +155,23 @@ export async function changePassword({ currentPassword, newPassword }) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Password change failed');
+  return data;
+}
+
+// POST /auth/change-pin
+// Called on first login when mustChangePin is true, or from Account Settings.
+export async function changePin({ currentPin, newPin }) {
+  const token = safeStorage.getItem('hp_access_token');
+  const res = await fetch(`${API_BASE}/auth/change-pin`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': import.meta.env.VITE_API_KEY,
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ currentPin, newPin }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'PIN change failed');
   return data;
 }
