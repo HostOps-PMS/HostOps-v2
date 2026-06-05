@@ -48,15 +48,22 @@ app.use(
     },
     crossOriginEmbedderPolicy: true,
     crossOriginOpenerPolicy:   { policy: 'same-origin' },
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginResourcePolicy: { policy: 'same-origin' },
     referrerPolicy:            { policy: 'strict-origin-when-cross-origin' },
     hsts: {
       maxAge:            31536000,
       includeSubDomains: true,
       preload:           true,
     },
+    xFrameOptions: { action: 'sameorigin' },
   })
 );
+
+app.use((req, res, next) => {
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
 const isDev = process.env.NODE_ENV !== 'production';
