@@ -709,7 +709,7 @@ export default function AccountsPage() {
                         <AccountRow
                           key={`${a.accountType}-${a._id}`}
                           account={a}
-                          onUnlock={setUnlockTarget}
+                          onUnlock={setUnlockTarget} 
                           isLast={i === filtered.length - 1}
                         />
                       ))}

@@ -616,12 +616,6 @@ export default function ClientSmoobuView({ client, property, onClose }) {
               onPresetChange={handlePresetChange}
               onCustomApply={handleCustomApply}
             />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-              <CurrencyToggle currency={currency} onChange={setCurrency} phpRate={phpRate} />
-              <span style={{ fontSize: '.7rem', color: 'var(--color-muted, #7a8c8e)' }}>
-                1 USD = ₱{phpRate.toFixed(2)} <span style={{ opacity: .6 }}>({rateLabel})</span>
-              </span>
-            </div>
           </div>
 
           {/* Loading skeletons */}
