@@ -82,10 +82,12 @@ export async function verifySession(auth) {
     });
 
     if (res.ok) {
-      const user = await res.json();
-      // ✅ FIX: Persist the fresh user object so getUser() is never stale.
-      // Previously this returned the user but never stored it, so any
-      // component calling auth.getUser() would get null or an old snapshot.
+      const data = await res.json();
+      // /auth/me returns { user: { ...fields } } — unwrap so we store the
+      // actual user object, not the wrapper.  Without this, getUser()
+      // returned { user: { businessName, … } } and every component that
+      // checked user.businessName directly got undefined.
+      const user = data.user || data;
       auth.setUser(user);
       return user;
     }
@@ -102,8 +104,8 @@ export async function verifySession(auth) {
     });
 
     if (res2.ok) {
-      const user = await res2.json();
-      // ✅ FIX: Also persist after the post-refresh /me call.
+      const data = await res2.json();
+      const user = data.user || data;
       auth.setUser(user);
       return user;
     }
