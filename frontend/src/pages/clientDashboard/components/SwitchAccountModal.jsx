@@ -21,7 +21,12 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
 
   // FIX 1: Read user fresh on every render — avoids stale null on first mount
   // when the auth context hasn't fully hydrated yet.
-  const user = auth.getUser?.() ?? auth.user ?? null;
+  let user = auth.getUser?.() ?? auth.user ?? null;
+  // Guard against the { user: { …fields } } wrapper that verifySession
+  // previously persisted — unwrap so every field is at the top level.
+  if (user && user.user && !user.email && typeof user.user === 'object') {
+    user = user.user;
+  }
 
   // Properties fetched from the backend
   const [properties, setProperties] = useState([]);

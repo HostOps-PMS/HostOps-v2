@@ -7,10 +7,34 @@ import { exportDashboardPDF } from "../services/pdfExportService";
 import AccountSettingsModal from "./AccountSettingsModal";
 import { useActivityLog } from "../hooks/useActivityLog";
 
+function getUserData(auth) {
+  let fromStore = auth.getUser();
+  // Guard against the { user: { …fields } } wrapper that verifySession
+  // previously persisted — unwrap so every field is at the top level.
+  if (fromStore && fromStore.user && !fromStore.email && typeof fromStore.user === 'object') {
+    fromStore = fromStore.user;
+  }
+  if (fromStore && (fromStore.businessName || fromStore.firstName)) return fromStore;
+  try {
+    const token = auth.getToken();
+    if (!token) return fromStore || {};
+    const payload = token.split(".")[1];
+    if (!payload) return fromStore || {};
+    const normalized = payload
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(payload.length / 4) * 4, "=");
+    return { ...(fromStore || {}), ...JSON.parse(atob(normalized)) };
+  } catch {
+    return fromStore || {};
+  }
+}
+
 export default function Navbar() {
   const { getUser, clear } = useAuth();
   const { dashState, dark, setDark, selectProperty } = useDashboard();
-  const user = getUser();
+  const auth = useAuth();         
+  const user = getUserData(auth);
   const [dropOpen, setDropOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -25,6 +49,12 @@ export default function Navbar() {
   const audioCtxRef = useRef(null);
   const dropdownRef = useRef(null);
   const menuRef = useRef(null);
+  const isStaffUser = user?.isStaff || user?.role === "staff";
+  const personName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim();
+  const displayName = isStaffUser
+    ? personName || "Staff"
+    : user?.businessName || "Client";
+  const avatarInitial = displayName.charAt(0).toUpperCase();
 
   useEffect(() => {
     function handleResize() {
@@ -564,12 +594,12 @@ export default function Navbar() {
                   style={t.avatar}
                   onClick={() => setDropOpen((prev) => !prev)}
                 >
-                  {user?.firstName?.charAt(0).toUpperCase() || "U"}
+                  {avatarInitial || "U"}
                 </div>
                 <div style={t.dropdown}>
                   <div style={t.dropHeader}>
                     <p style={t.dropName}>
-                      {user?.firstName} {user?.lastName || ""}
+                      {displayName}
                     </p>
                     <p style={t.dropEmail}>{user?.email || ""}</p>
                   </div>
@@ -762,9 +792,9 @@ export default function Navbar() {
                 onClick={() => setDropOpen((prev) => !prev)}
               >
                 <div style={t.avatar}>
-                  {user?.firstName?.charAt(0).toUpperCase() || "U"}
+                  {avatarInitial || "U"}
                 </div>
-                <span style={t.userName}>{user?.firstName || "User"}</span>
+                <span style={t.userName}>{displayName}</span>
                 <i
                   className="ti ti-chevron-down"
                   style={t.chevron}
@@ -775,7 +805,7 @@ export default function Navbar() {
               <div style={t.dropdown}>
                 <div style={t.dropHeader}>
                   <p style={t.dropName}>
-                    {user?.firstName} {user?.lastName || ""}
+                    {displayName}
                   </p>
                   <p style={t.dropEmail}>{user?.email || ""}</p>
                 </div>

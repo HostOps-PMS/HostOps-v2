@@ -4,6 +4,45 @@ import SwitchAccountModal from "./SwitchAccountModal";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "https://hostpilot-smoobu.onrender.com";
 
+function getEmailFromToken(token) {
+  try {
+    if (!token) return "";
+    const payload = token.split(".")[1];
+    if (!payload) return "";
+    const normalized = payload
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(payload.length / 4) * 4, "=");
+    const decoded = JSON.parse(atob(normalized));
+    return decoded?.email || "";
+  } catch {
+    return "";
+  }
+}
+
+function getUserData(auth) {
+  let fromStore = auth.getUser();
+  // Guard against the { user: { …fields } } wrapper that verifySession
+  // previously persisted — unwrap so every field is at the top level.
+  if (fromStore && fromStore.user && !fromStore.email && typeof fromStore.user === 'object') {
+    fromStore = fromStore.user;
+  }
+  if (fromStore && (fromStore.businessName || fromStore.firstName)) return fromStore;
+  try {
+    const token = auth.getToken();
+    if (!token) return fromStore || {};
+    const payload = token.split(".")[1];
+    if (!payload) return fromStore || {};
+    const normalized = payload
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(payload.length / 4) * 4, "=");
+    return { ...(fromStore || {}), ...JSON.parse(atob(normalized)) };
+  } catch {
+    return fromStore || {};
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────
 // sendOtpForPasswordChange — POST /auth/send-change-password-otp
 // Authenticated endpoint — sends an OTP scoped specifically to the
@@ -200,7 +239,7 @@ function OTPModal({ email, auth, onVerified, onCancel }) {
     setOtpError("");
     clearTimeout(errorTimerRef.current);
     try {
-      const userEmail = email || auth.getUser()?.email;
+      const userEmail = email || auth.getUser()?.email || getEmailFromToken(auth.getToken());
       if (!userEmail) throw new Error("Could not find your email address. Please try logging in again.");
       await verifyOtp(userEmail, otp);
       clearTimeout(errorTimerRef.current);
@@ -370,7 +409,8 @@ function OTPModal({ email, auth, onVerified, onCancel }) {
 // ─────────────────────────────────────────────────────────────────
 // SuccessModal — shown after password is changed successfully
 // ─────────────────────────────────────────────────────────────────
-function SuccessModal({ onClose }) {
+function SuccessModal({ context, onDone }) {
+  const isPin = context === "pin";
   return (
     <div
       style={{
@@ -399,7 +439,7 @@ function SuccessModal({ onClose }) {
         }}
         role="dialog"
         aria-modal="true"
-        aria-label="Password Changed Successfully"
+        aria-label={isPin ? "PIN Changed Successfully" : "Password Changed Successfully"}
       >
         {/* Animated checkmark */}
         <div
@@ -432,7 +472,7 @@ function SuccessModal({ onClose }) {
             margin: "0 0 8px",
           }}
         >
-          Password Updated!
+          {isPin ? "PIN Updated!" : "Password Updated!"}
         </h3>
         <p
           style={{
@@ -442,12 +482,13 @@ function SuccessModal({ onClose }) {
             lineHeight: 1.6,
           }}
         >
-          Your password has been changed successfully.
-          <br />Keep it safe and don't share it with anyone.
+          {isPin
+            ? "Your PIN has been changed successfully.\nKeep it safe and don't share it with anyone."
+            : "Your password has been changed successfully.\nKeep it safe and don't share it with anyone."}
         </p>
 
         <button
-          onClick={onClose}
+          onClick={onDone}
           style={{
             width: "100%",
             padding: "11px 0",
@@ -481,7 +522,22 @@ function SuccessModal({ onClose }) {
 export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch }) {
   const { getUser, setUser } = useAuth();
   const auth = useAuth();
-  const user = getUser();
+  const user = getUserData(auth);  
+  const accountEmail = user?.email || auth.getUser()?.email || getEmailFromToken(auth.getToken());
+  const isStaffUser = user?.isStaff || user?.role === "staff";
+  const personName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim();
+  const displayName = isStaffUser
+    ? personName || "Staff"
+    : user?.businessName || "Client";
+  const roleLabel = isStaffUser
+    ? (user?.staffRole || "Staff")
+    : user?.role || "client";
+  const accountStatus =
+    user?.mustChangePin && user?.mustChangePassword
+      ? "Unverified"
+      : user?.mustChangePin || user?.mustChangePassword
+      ? "Partially Verified"
+      : "Verified";
 
   // ── Password form ────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("profile");
@@ -518,7 +574,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [otpContext, setOtpContext] = useState(""); // 'password' or 'pin'
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
+  const [successContext, setSuccessContext] = useState("");
 
   // ── Switch Account modal state ───────────────────────────────────
   const [showSwitchModal, setShowSwitchModal] = useState(false);
@@ -568,6 +624,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
 
       setShowOtpModal(false);
       setShowSuccessModal(false);
+      setSuccessContext("");
       setShowSwitchModal(false);
       verifiedTokenRef.current = null;
     }
@@ -709,6 +766,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
         verifiedTokenRef.current = null;
 
         // Show success modal
+        setSuccessContext("password");
         setShowSuccessModal(true);
       } catch (err) {
         setPwErrorMsg(err.message);
@@ -728,6 +786,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
         verifiedTokenRef.current = null;
 
         // Show success modal
+        setSuccessContext("pin");
         setShowSuccessModal(true);
       } catch (err) {
         setPinErrorMsg(err.message);
@@ -738,6 +797,12 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
 
   function handleSuccessClose() {
     setShowSuccessModal(false);
+    setActiveTab("profile");
+  }
+
+  function handleSuccessDone() {
+    setShowSuccessModal(false);
+    setActiveTab("profile");
   }
 
   if (!isOpen) return null;
@@ -1013,11 +1078,12 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
     },
   };
 
-  const initials =
-    [user?.firstName, user?.lastName]
+  const initials = isStaffUser
+    ? [user?.firstName, user?.lastName]
       .filter(Boolean)
       .map((n) => n.charAt(0).toUpperCase())
-      .join("") || "U";
+      .join("") || "U"
+    : (user?.businessName || "").charAt(0).toUpperCase() || "U";
 
   const formattedLastLogin = user?.lastLoginAt
     ? new Date(user.lastLoginAt).toLocaleString("en-PH", {
@@ -1072,16 +1138,16 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       {/* OTP modal layer */}
       {showOtpModal && (
         <OTPModal
-          email={user?.email}
+          email={accountEmail}
           auth={auth}
-        onVerified={handleOtpVerified}
+          onVerified={handleOtpVerified}
           onCancel={() => setShowOtpModal(false)}
         />
       )}
 
       {/* Success modal layer */}
       {showSuccessModal && (
-        <SuccessModal onClose={handleSuccessClose} />
+        <SuccessModal context={successContext} onDone={handleSuccessDone} />
       )}
 
       {/* Switch Account modal layer */}
@@ -1208,38 +1274,50 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                     <i className="ti ti-mail" style={styles.readOnlyIcon} aria-hidden="true" />
                     <div style={styles.readOnlyContent}>
                       <p style={styles.readOnlyKey}>Email</p>
-                      <p style={styles.readOnlyVal}>{user?.email || "—"}</p>
+                      <p style={styles.readOnlyVal}>{accountEmail || "—"}</p>
                     </div>
                   </div>
                   <div style={styles.readOnlyRow}>
                     <i className="ti ti-shield-check" style={styles.readOnlyIcon} aria-hidden="true" />
                     <div style={styles.readOnlyContent}>
                       <p style={styles.readOnlyKey}>Role</p>
-                      <p style={styles.readOnlyVal} className="capitalize">{user?.role || "client"}</p>
+                      <p style={styles.readOnlyVal} className="capitalize">{roleLabel}</p>
                     </div>
                   </div>
                   <div style={{ ...styles.readOnlyRow, marginTop: 8 }}>
                     <i className="ti ti-check" style={styles.readOnlyIcon} aria-hidden="true" />
                     <div style={styles.readOnlyContent}>
                       <p style={styles.readOnlyKey}>Account Status</p>
-                      <p style={styles.readOnlyVal}>{user?.isVerified ? "Verified" : "Pending Verification"}</p>
+                      <p style={styles.readOnlyVal}>{accountStatus}</p>
                     </div>
                   </div>
                 </div>
-                {user?.role === 'client' && (
+                {isStaffUser ? (
                   <div style={styles.section}>
                     <div style={styles.row2}>
                       <div style={styles.readOnlyRow}>
+                        <i className="ti ti-signature" style={styles.readOnlyIcon} aria-hidden="true" />
                         <div style={styles.readOnlyContent}>
                           <p style={styles.readOnlyKey}>First Name</p>
                           <p style={styles.readOnlyVal}>{user?.firstName || "—"}</p>
                         </div>
                       </div>
                       <div style={styles.readOnlyRow}>
+                        <i className="ti ti-signature" style={styles.readOnlyIcon} aria-hidden="true" />
                         <div style={styles.readOnlyContent}>
                           <p style={styles.readOnlyKey}>Last Name</p>
                           <p style={styles.readOnlyVal}>{user?.lastName || "—"}</p>
                         </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={styles.section}>
+                    <div style={styles.readOnlyRow}>
+                      <i className="ti ti-user" style={styles.readOnlyIcon} aria-hidden="true" />
+                      <div style={styles.readOnlyContent}>
+                        <p style={styles.readOnlyKey}>Business Name</p>
+                        <p style={styles.readOnlyVal}>{user?.businessName || "—"}</p>
                       </div>
                     </div>
                   </div>
@@ -1362,7 +1440,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                       Current PIN <span style={{ color: "#c13515" }}>*</span>
                     </label>
                     <div style={styles.pwInputWrap}>
-                      <input id="acc-currentPin" className="acc-pw-input" style={{ ...styles.pwInput, letterSpacing: showPin.current ? 'normal' : '0.2em' }} type={showPin.current ? "text" : "password"} inputMode="numeric" name="currentPin" value={pinForm.currentPin} onChange={handlePinChange} placeholder="Enter current PIN" />
+                      <input id="acc-currentPin" className="acc-pw-input" style={styles.pwInput} type={showPin.current ? "text" : "password"} inputMode="numeric" name="currentPin" value={pinForm.currentPin} onChange={handlePinChange} placeholder="Enter current PIN" />
                       <button type="button" className="acc-eye-btn" style={styles.eyeBtn} onClick={() => setShowPin((p) => ({ ...p, current: !p.current }))} tabIndex={-1}>
                         <i className={showPin.current ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
                       </button>
@@ -1375,7 +1453,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                       New PIN <span style={{ color: "#c13515" }}>*</span>
                     </label>
                     <div style={styles.pwInputWrap}>
-                      <input id="acc-newPin" className="acc-pw-input" style={{ ...styles.pwInput, letterSpacing: showPin.next ? 'normal' : '0.2em' }} type={showPin.next ? "text" : "password"} inputMode="numeric" name="newPin" value={pinForm.newPin} onChange={handlePinChange} placeholder="6 digits" />
+                      <input id="acc-newPin" className="acc-pw-input" style={styles.pwInput} type={showPin.next ? "text" : "password"} inputMode="numeric" name="newPin" value={pinForm.newPin} onChange={handlePinChange} placeholder="6 digits" />
                       <button type="button" className="acc-eye-btn" style={styles.eyeBtn} onClick={() => setShowPin((p) => ({ ...p, next: !p.next }))} tabIndex={-1}>
                         <i className={showPin.next ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
                       </button>
@@ -1393,7 +1471,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                       )}
                     </div>
                     <div style={styles.pwInputWrap}>
-                      <input id="acc-confirmPin" className="acc-pw-input" style={{ ...styles.pwInput, letterSpacing: showPin.confirm ? 'normal' : '0.2em' }} type={showPin.confirm ? "text" : "password"} inputMode="numeric" name="confirmPin" value={pinForm.confirmPin} onChange={handlePinChange} placeholder="Re-enter new PIN" />
+                      <input id="acc-confirmPin" className="acc-pw-input" style={styles.pwInput} type={showPin.confirm ? "text" : "password"} inputMode="numeric" name="confirmPin" value={pinForm.confirmPin} onChange={handlePinChange} placeholder="Re-enter new PIN" />
                       <button type="button" className="acc-eye-btn" style={styles.eyeBtn} onClick={() => setShowPin((p) => ({ ...p, confirm: !p.confirm }))} tabIndex={-1}>
                         <i className={showPin.confirm ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
                       </button>
@@ -1549,7 +1627,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
           <div style={{ ...styles.footer, justifyContent: "flex-end" }}>
             <div style={styles.btnGroup}>
               <button style={styles.cancelBtn} className="acc-cancel-btn" onClick={onClose} disabled={pwSaving || pinSaving}>
-                Discard
+                Cancel
               </button>
               {activeTab === "password" && (
                 <button style={styles.saveBtn(pwSaving)} className="acc-save-btn" onClick={handleSave} disabled={pwSaving}>
