@@ -532,12 +532,13 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
   const roleLabel = isStaffUser
     ? (user?.staffRole || "Staff")
     : user?.role || "client";
-  const accountStatus =
-    user?.mustChangePin && user?.mustChangePassword
-      ? "Unverified"
-      : user?.mustChangePin || user?.mustChangePassword
-      ? "Partially Verified"
-      : "Verified";
+  const accountStatus = isStaffUser
+    ? (user?.mustChangePin ? "Unverified" : "Verified")
+    : (user?.mustChangePin && user?.mustChangePassword
+        ? "Unverified"
+        : user?.mustChangePin || user?.mustChangePassword
+        ? "Partially Verified"
+        : "Verified");
 
   // ── Password form ────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("profile");
@@ -1232,7 +1233,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
 
           {/* ── Tabs ── */}
           <div style={{ display: "flex", borderBottom: "1px solid #eaf3ee", padding: "0 28px" }}>
-            {["profile", "password", "pin", "activity"].map((tab) => (
+            {["profile", ...(isStaffUser ? [] : ["password"]), "pin", "activity"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => {

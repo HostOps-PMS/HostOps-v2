@@ -396,9 +396,9 @@ router.post('/verify-login-otp', async (req, res, next) => {
       user.loginOtpExpiry = undefined;
 
       if (rememberMe) {
-        // const expiresIn = 14 * 24 * 60 * 60 * 1000; // 14 days
+        const expiresIn = 14 * 24 * 60 * 60 * 1000; // 14 days
         // const expiresIn = 60000; // 1 min.
-        const expiresIn = 60 * 60 * 1000; // 1 hour
+        // const expiresIn = 60 * 60 * 1000; // 1 hour
         const expiresAt = new Date(Date.now() + expiresIn);
 
         await TrustedDevice.findOneAndUpdate(
@@ -569,7 +569,10 @@ router.post('/refresh', async (req, res, next) => {
         path:     '/auth',
       });
 
-      return res.json({ accessToken: signStaffAccessToken(staff) });
+      return res.json({
+        accessToken: signStaffAccessToken(staff),
+        user: { ...staff.toJSON(), role: 'staff', isStaff: true, clientId: staff.clientId?.toString() },
+      });
     }
 
 
@@ -620,6 +623,20 @@ router.post('/logout', async (req, res, next) => {
 
 // GET /auth/me
 router.get('/me', requireAuth, (req, res) => {
+  // For staff sessions, return the staff member's own profile so the
+  // frontend displays the correct name, email, role, etc.
+  // req.user is always the parent client (for smoobuApiKey access),
+  // but the UI needs the staff's identity.
+  if (req.isStaff && req.staff) {
+    return res.json({
+      user: {
+        ...req.staff.toJSON(),
+        role:     'staff',
+        isStaff:  true,
+        clientId: req.staff.clientId?.toString(),
+      },
+    });
+  }
   res.json({ user: req.user.toJSON() });
 });
 
@@ -673,6 +690,19 @@ router.get('/activity-log', requireAuth, async (req, res, next) => {
 // is used. Used by PropertySelectForm to list user-defined properties
 // (propertyName + _id) instead of Smoobu apartments.
 // ─────────────────────────────────────────────────────────────────
+function staffCanAccessEmbeddedProperty(staff, property) {
+  if (!staff || !property) return false;
+
+  const assignedIds = new Set((staff.propertyIds || []).map(String));
+  if (assignedIds.size === 0) return false;
+
+  // Current staff assignments store the embedded user.properties[] _id.
+  if (assignedIds.has(String(property._id))) return true;
+
+  // Compatibility for older records that may have stored Smoobu apartment IDs.
+  return (property.subProperties || []).some((sub) => assignedIds.has(String(sub.smoobuId)));
+}
+
 router.get('/my-properties', requireAuth, (req, res) => {
   // req.user is always the parent client (carries the properties array)
   // regardless of whether the session is a direct client, clientAccount, or staff.
@@ -700,35 +730,20 @@ router.get('/my-properties', requireAuth, (req, res) => {
   // to returning ALL of the client's properties so staff are never locked out
   // on a fresh setup. The dashboard's MODE C filter (applyStaffPropertyFilter)
   // will still enforce Smoobu-level access correctly.
-  let list = (req.user.properties || []);
-
-  if (req.isStaff && req.staffPropertyIds?.length) {
-    const assignedSmoobuIds = new Set(req.staffPropertyIds.map(String));
-
-    const filtered = list.filter((p) => {
-      const subs = p.subProperties || [];
-      // Match if any sub-property's Smoobu ID is in the staff's assigned set
-      return subs.some((sub) => assignedSmoobuIds.has(String(sub.smoobuId)));
-    });
-
-    // Only use the filtered list if we actually found matches.
-    // If subProperties haven't been synced yet, fall back to all properties
-    // so staff aren't shown a blank screen on a fresh account.
-    if (filtered.length > 0) {
-      list = filtered;
-    }
-    // If filtered.length === 0 (no subProperties synced), keep full list —
-    // MODE C in dashboard.js will still enforce data access correctly.
-  }
+  const list = (req.user.properties || []);
 
   res.json({
     businessName: req.user.businessName || '',
-    properties: list.map((p) => ({
-      _id:           p._id,
-      propertyName:  p.propertyName,
-      propertyPicture: p.propertyPicture || '',
-      businessName:  req.user.businessName || '',
-    })),
+    properties: list.map((p) => {
+      const hasAccess = req.isStaff ? staffCanAccessEmbeddedProperty(req.staff, p) : true;
+      return {
+        _id:           p._id,
+        propertyName:  p.propertyName,
+        propertyPicture: p.propertyPicture || '',
+        businessName:  req.user.businessName || '',
+        hasAccess,
+      };
+    }),
   });
 });
 
@@ -1407,11 +1422,19 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
       }
 
       // ── PIN correct — verify property access ──────────────────────
-      const hasAccess = (staff.propertyIds || []).some(
-        (id) => String(id) === String(propertyId)
-      );
+      // IMPORTANT: propertyId is the MongoDB _id of the property, but
+      // staff.propertyIds contains Smoobu numeric apartment IDs.
+      // We must fetch the client user to check the property's subProperties.
+      const clientUser = await User.findById(staff.clientId).select('properties');
+      let hasAccess = false;
+
+      if (clientUser && clientUser.properties) {
+        const selectedProp = clientUser.properties.find(p => String(p._id) === String(propertyId));
+        hasAccess = staffCanAccessEmbeddedProperty(staff, selectedProp);
+      }
+
       if (!hasAccess) {
-        return res.status(403).json({ error: 'You do not have access to this property.' });
+        return res.status(403).json({ error: 'You do not have access to this property' });
       }
 
       // ── Reset lockout counters on success ─────────────────────────
@@ -1552,20 +1575,5 @@ router.get('/pin-status', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-
-// ─────────────────────────────────────────────────────────────────
-// GET /auth/debug-staff?email=xxx  ← TEMPORARY DEBUG — remove after fixing
-// ─────────────────────────────────────────────────────────────────
-router.get('/debug-staff', async (req, res, next) => {
-  try {
-    const { email } = req.query;
-    if (!email) return res.status(400).json({ error: 'email query param required' });
-    const exact = await Staff.findOne({ email: email.toLowerCase() }).lean();
-    const fuzzy = await Staff.find({
-      email: { $regex: new RegExp(email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }
-    }).select('email firstName lastName isActive clientId').lean();
-    res.json({ exact: !!exact, exactDoc: exact ? { email: exact.email, firstName: exact.firstName, isActive: exact.isActive } : null, fuzzyMatches: fuzzy });
-  } catch (err) { next(err); }
-});
 
 export default router;

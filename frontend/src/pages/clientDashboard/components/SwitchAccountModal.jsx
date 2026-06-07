@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../AuthContext";
 import { authFetch } from "../../apiService";
+import safeStorage from "../../safeStorage";
+
+const canAccessProperty = (property) => property?.hasAccess !== false;
+const PROP_ID_KEY = "hp_selected_property_id";
+const PROP_NAME_KEY = "hp_selected_property_name";
 
 // ─────────────────────────────────────────────────────────────────
 // SwitchAccountModal
@@ -40,7 +45,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
   // so the "Active" badge always reflects what the dashboard is actually showing.
   const getActiveId = () => {
     try {
-      return sessionStorage.getItem("hp_selected_property_id") || null;
+      return safeStorage.getItem(PROP_ID_KEY) || null;
     } catch {
       return null;
     }
@@ -79,13 +84,20 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
         setProperties(fetched);
         if (data.businessName) setFetchedBusinessName(data.businessName);
 
+        const currentActive = getActiveId();
+        const currentActiveProp = fetched.find((p) => String(p._id) === String(currentActive));
+        const firstAccessible = fetched.find(canAccessProperty);
+
         // If no active property is stored yet (first login), auto-select and
-        // persist the first property so the "Active" badge appears immediately.
-        if (fetched.length > 0 && !getActiveId()) {
-          const first = fetched[0];
-          sessionStorage.setItem("hp_selected_property_id",   String(first._id));
-          sessionStorage.setItem("hp_selected_property_name", first.propertyName || "");
+        // persist only an accessible property so disabled properties cannot
+        // become active by default.
+        if (fetched.length > 0 && !currentActive && firstAccessible) {
+          const first = firstAccessible;
+          safeStorage.setItem(PROP_ID_KEY, String(first._id));
+          safeStorage.setItem(PROP_NAME_KEY, first.propertyName || "");
           setSelectedId(String(first._id));
+        } else if (currentActive && currentActiveProp?.hasAccess === false) {
+          setSelectedId(firstAccessible ? String(firstAccessible._id) : null);
         }
       })
       .catch((err) => {
@@ -117,11 +129,12 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
 
     const chosen = properties.find((p) => String(p._id) === String(selectedId));
     if (!chosen) return;
+    if (!canAccessProperty(chosen)) return;
 
     // Write the same keys that DashboardContext reads so the "Active" badge
     // stays in sync with what the dashboard is actually displaying.
-    sessionStorage.setItem("hp_selected_property_id",   String(chosen._id));
-    sessionStorage.setItem("hp_selected_property_name", chosen.propertyName || "");
+    safeStorage.setItem(PROP_ID_KEY, String(chosen._id));
+    safeStorage.setItem(PROP_NAME_KEY, chosen.propertyName || "");
 
     // Pass { id, name } so Navbar can call selectProperty() on DashboardContext,
     // updating dashboard state immediately without a page reload.
@@ -151,6 +164,8 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
   const isCurrentlyActive = (id) => !!activeId && String(id) === String(activeId);
   // Helper: is this item selected in this open session?
   const isSelected = (id) => String(id) === String(selectedId);
+  const selectedProperty = properties.find((p) => String(p._id) === String(selectedId));
+  const canConfirm = !!selectedProperty && canAccessProperty(selectedProperty);
 
   return (
     <>
@@ -182,7 +197,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
           width: 100%;
           font-family: inherit;
         }
-        .sw-prop-item:hover:not(.sw-prop-selected) {
+        .sw-prop-item:hover:not(.sw-prop-selected):not(:disabled) {
           border-color: #9ab8a9;
           background: #f7faf8;
         }
@@ -385,13 +400,20 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
               const propId    = String(property._id);
               const selected  = isSelected(propId);
               const active    = isCurrentlyActive(propId);
+              const disabled  = !canAccessProperty(property);
 
               return (
                 <button
                   key={property._id}
                   className={`sw-prop-item${selected ? " sw-prop-selected" : ""}`}
-                  onClick={() => handleSelect(propId)}
-                  style={{ animationDelay: `${(index + 1) * 40}ms` }}
+                  onClick={() => !disabled && handleSelect(propId)}
+                  disabled={disabled}
+                  style={{
+                    animationDelay: `${(index + 1) * 40}ms`,
+                    opacity: disabled ? 0.5 : 1,
+                    cursor: disabled ? "not-allowed" : "pointer",
+                  }}
+                  title={disabled ? "You do not have access to this property" : ""}
                 >
                   {/* Property icon */}
                   <div
@@ -399,7 +421,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                       width: 36,
                       height: 36,
                       borderRadius: 10,
-                      background: selected ? "#1e8760" : "#eaf3ee",
+                      background: selected ? "#1e8760" : disabled ? "#f0f4f2" : "#eaf3ee",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -411,7 +433,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                       className="ti ti-home"
                       style={{
                         fontSize: 16,
-                        color: selected ? "#fff" : "#6a8b7c",
+                        color: selected ? "#fff" : disabled ? "#9ab8a9" : "#6a8b7c",
                       }}
                       aria-hidden="true"
                     />
@@ -424,7 +446,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                         style={{
                           fontSize: 13,
                           fontWeight: 700,
-                          color: "#0c1c14",
+                          color: disabled ? "#9ab8a9" : "#0c1c14",
                           margin: 0,
                           whiteSpace: "nowrap",
                           overflow: "hidden",
@@ -450,12 +472,28 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                           Active
                         </span>
                       )}
+                      {disabled && (
+                         <span
+                         style={{
+                           fontSize: 10,
+                           fontWeight: 700,
+                           color: "#c13515",
+                           background: "#ffeae5",
+                           borderRadius: 20,
+                           padding: "1px 7px",
+                           letterSpacing: "0.04em",
+                           flexShrink: 0,
+                         }}
+                       >
+                         No Access
+                       </span>
+                      )}
                     </div>
                     {/* Subtitle: show the business name as a secondary descriptor */}
                     <p
                       style={{
                         fontSize: 11,
-                        color: "#9ab8a9",
+                        color: disabled ? "#b8d4c4" : "#9ab8a9",
                         margin: "2px 0 0",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
@@ -470,6 +508,13 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                     <i
                       className="ti ti-circle-check-filled"
                       style={{ fontSize: 18, color: "#1e8760", flexShrink: 0 }}
+                      aria-hidden="true"
+                    />
+                  )}
+                  {disabled && (
+                    <i
+                      className="ti ti-lock"
+                      style={{ fontSize: 18, color: "#9ab8a9", flexShrink: 0 }}
                       aria-hidden="true"
                     />
                   )}
@@ -510,16 +555,16 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
               <button
                 className="sw-confirm-btn"
                 onClick={handleConfirm}
-                disabled={!selectedId}
+                disabled={!canConfirm}
                 style={{
                   padding: "9px 22px",
                   borderRadius: 10,
                   border: "none",
-                  background: selectedId ? "#0c1c14" : "#b8d4c4",
+                  background: canConfirm ? "#0c1c14" : "#b8d4c4",
                   fontSize: 13,
                   fontWeight: 700,
                   color: "#eaf5f0",
-                  cursor: selectedId ? "pointer" : "not-allowed",
+                  cursor: canConfirm ? "pointer" : "not-allowed",
                   display: "flex",
                   alignItems: "center",
                   gap: 7,
