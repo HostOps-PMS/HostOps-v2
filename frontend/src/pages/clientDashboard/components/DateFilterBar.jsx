@@ -31,17 +31,6 @@ function getRangeForPreset(preset) {
       const last  = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       return { from: toYMD(first), to: toYMD(last) };
     }
-    case '6months': {
-      const start = new Date(today);
-      start.setMonth(start.getMonth() - 5);
-      start.setDate(1);
-      const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      return { from: toYMD(start), to: toYMD(end) };
-    }
-    case 'ytd': {
-      const first = new Date(today.getFullYear(), 0, 1);
-      return { from: toYMD(first), to: toYMD(today) };
-    }
     case 'yearly': {
       const first = new Date(today.getFullYear(), 0, 1);
       const last  = new Date(today.getFullYear(), 11, 31);
@@ -64,7 +53,6 @@ const PRESETS = [
   { id: 'daily',   label: 'Daily' },
   { id: 'weekly',  label: 'Weekly' },
   { id: 'monthly', label: 'Monthly' },
-  { id: '6months', label: '6 Months' },
   { id: 'yearly',  label: 'Yearly' },
   { id: 'custom',  label: 'Custom' },
 ];

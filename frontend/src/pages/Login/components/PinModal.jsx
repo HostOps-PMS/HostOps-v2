@@ -258,6 +258,12 @@ export default function PinModal({
         // throws a SecurityError on go.hostops.online, safeStorage catches it
         // and falls back to an in-memory Map so the write always succeeds.
         safeStorage.setItem('hp_user', JSON.stringify(verifiedUser));
+        
+        if (verifiedUser.mustChangePin) {
+          sessionStorage.setItem('hp_must_change_pin', 'true');
+        } else {
+          sessionStorage.removeItem('hp_must_change_pin');
+        }
       }
 
       // Persist the selected property so the dashboard loads the right one.

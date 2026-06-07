@@ -1,5 +1,6 @@
 // src/routes/dashboard.js
 import express from 'express';
+import mongoose from 'mongoose';
 import User from '../models/user.js';
 import { requireAuth } from '../middleware/auth.js';
 import {
@@ -23,7 +24,13 @@ router.use(requireAuth);
 router.use(async (req, res, next) => {
   try {
     const userWithKey = await User.findById(req.user._id).select('+smoobuApiKey +properties.smoobuApiKey');
-    if (userWithKey) req.user = userWithKey;
+    if (userWithKey) {
+      // Preserve injected properties for team_leader from requireAuth
+      if (req.user.role === 'team_leader' && req.user.properties?.length) {
+        userWithKey.properties = req.user.properties;
+      }
+      req.user = userWithKey;
+    }
     next();
   } catch (err) {
     next(err);
@@ -81,24 +88,55 @@ function filterPropsByPrefix(allProperties = [], prefix = '') {
  * shows the correct "X nights affected" subtitle (was always 0 before).
  */
 function recalcStats(filteredBookings = [], filteredProps = [], period = {}) {
-  const active    = filteredBookings.filter((b) => b.type !== 'cancellation');
-  const cancelled = filteredBookings.filter((b) => b.type === 'cancellation');
+  const fromDate = period.from || '';
+  const toDate   = period.to   || '';
 
-  const nightCount = (b) =>
-    Math.max(0, Math.round((new Date(b.departure) - new Date(b.arrival)) / 864e5));
+  const statsBookings = (fromDate && toDate)
+    ? filteredBookings.filter((b) => {
+        if (b.type === 'cancellation') {
+          if (!b.arrival) return true;
+          const arrival = b.arrival.slice(0, 10);
+          return arrival >= fromDate && arrival <= toDate;
+        }
+        if (!b.arrival) return false;
+        const arrival = b.arrival.slice(0, 10);
+        return arrival >= fromDate && arrival <= toDate;
+      })
+    : filteredBookings;
 
-  const revenue         = active.reduce((s, b) => s + (Number(b.price) || 0), 0);
-  const nights          = active.reduce((s, b) => s + nightCount(b), 0);
-  // FIX: compute nights for cancelled bookings
-  const cancelledNights = cancelled.reduce((s, b) => s + nightCount(b), 0);
+  const nightCount = (b) => {
+    if (!b.arrival || !b.departure) return 0;
+    return Math.max(0, Math.round((new Date(b.departure) - new Date(b.arrival)) / 864e5));
+  };
+
+  let revenue = 0;
+  let bookings = 0;
+  let nights = 0;
+  let cancellations = 0;
+  let cancelledNights = 0;
 
   const byChannel = {};
-  active.forEach((b) => {
+  statsBookings.forEach((b) => {
+    const bookingNights = nightCount(b);
+
+    if (b.type === 'cancellation') {
+      cancellations += 1;
+      cancelledNights += bookingNights;
+      return;
+    }
+
+    bookings += 1;
+    nights += bookingNights;
+
+    if (b['is-blocked-booking']) return;
+
+    revenue += Number(b.price) || 0;
+
     const ch = b.channel?.name || 'Direct';
     if (!byChannel[ch]) byChannel[ch] = { revenue: 0, bookings: 0, nights: 0 };
     byChannel[ch].revenue  += Number(b.price) || 0;
     byChannel[ch].bookings += 1;
-    byChannel[ch].nights   += nightCount(b);
+    byChannel[ch].nights   += bookingNights;
   });
 
   let occupancy = 0;
@@ -111,8 +149,8 @@ function recalcStats(filteredBookings = [], filteredProps = [], period = {}) {
   return {
     stats: {
       revenue,
-      bookings:        active.length,
-      cancellations:   cancelled.length,
+      bookings,
+      cancellations,
       nights,
       cancelledNights,   // FIX: included in returned stats
       occupancy,
@@ -185,10 +223,30 @@ function applyPropertyFilter(data, apartmentId) {
 // staffPropertyIds: string[] — from req.staffPropertyIds (set by middleware).
 // Smoobu property IDs are numbers; we compare both string and number forms.
 // ─────────────────────────────────────────────────────────────────
-function applyStaffPropertyFilter(data, staffPropertyIds) {
-  if (!staffPropertyIds || staffPropertyIds.length === 0) return;
+function applyStaffPropertyFilter(data, staffPropertyIds, options = {}) {
+  const allowedStrIds = new Set((staffPropertyIds || []).map(String));
 
-  const allowedStrIds = new Set(staffPropertyIds.map(String));
+  if (allowedStrIds.size === 0) {
+    if (options.allowCurrentPropertyApiScope) {
+      const scopedIds = (data.properties || [])
+        .map((p) => p?.id)
+        .filter((id) => id !== undefined && id !== null)
+        .map(String);
+
+      if (scopedIds.length > 0) {
+        return applyStaffPropertyFilter(data, scopedIds);
+      }
+    }
+
+    data.properties = [];
+    data.bookings = [];
+    data.inbox = [];
+    const { stats, byChannel } = recalcStats(data.bookings, data.properties, data.period);
+    data.stats = stats;
+    data.byChannel = byChannel;
+    data.totalUnread = 0;
+    return;
+  }
 
   // Filter properties to only those the staff member is assigned
   data.properties = (data.properties || []).filter(
@@ -247,23 +305,30 @@ router.get('/dashboard', async (req, res, next) => {
     // applies unchanged (user.smoobuApiKey or env key fallback).
     let userForDashboard = req.user;
     const propertyDbId = req.query.propertyDbId;
+    let usingSelectedPropertyApiKey = false;
 
     if (propertyDbId) {
-      // ── Resolve the correct owner for the property lookup ──────────────────
-      // req.user is already the correct business account for staff (set by
-      // requireAuth: req.user = clientUser) and for clientAccount sessions.
-      //
-      // For team_leader: requireAuth injects the client's properties IN MEMORY
-      // onto req.user (user.properties = clientUser.properties). Combined with
-      // the router.use reload above (+properties.smoobuApiKey), req.user.properties[]
-      // already has all the data we need — no extra DB call required.
-      //
-      // For all roles: req.user.properties[] is fully loaded with smoobuApiKey
-      // (router.use selects +smoobuApiKey +properties.smoobuApiKey), so we can
-      // match the propertyDbId directly without another findById round-trip.
+      // ── Validate ObjectId format before touching the DB ──────────────────────
+      if (!mongoose.Types.ObjectId.isValid(propertyDbId)) {
+        return res.status(400).json({ error: 'Invalid property ID' });
+      }
+
+      // ── Validate ownership to prevent IDOR ───────────────────────────────────
       const matchedProp = (req.user.properties || []).find(
         (p) => String(p._id) === String(propertyDbId)
       );
+
+      // 1. Ensure the property belongs to the business account (req.user is the client)
+      if (!matchedProp) {
+        return res.status(403).json({ error: 'You do not own this property' });
+      }
+
+      // 2. If the user is staff, ensure they are assigned to this property
+      if (req.isStaff) {
+        if (!req.staffPropertyDbIds?.includes(String(propertyDbId))) {
+          return res.status(403).json({ error: 'You do not have access to this property' });
+        }
+      }
 
       if (matchedProp?.smoobuApiKey?.trim()) {
         // Spread req.user into a plain object and inject the matched property's
@@ -276,6 +341,7 @@ router.get('/dashboard', async (req, res, next) => {
           ...baseUser,
           smoobuApiKey: matchedProp.smoobuApiKey.trim(),
         };
+        usingSelectedPropertyApiKey = true;
       }
     }
 
@@ -288,7 +354,11 @@ router.get('/dashboard', async (req, res, next) => {
     if (hasOwnApiKey(userForDashboard)) {
       applyPropertyFilter(data, req.query.apartmentId);
       // MODE C: further narrow to staff's assigned properties if applicable
-      if (req.isStaff) applyStaffPropertyFilter(data, req.staffPropertyIds);
+      if (req.isStaff) {
+        applyStaffPropertyFilter(data, req.staffPropertyIds, {
+          allowCurrentPropertyApiScope: usingSelectedPropertyApiKey,
+        });
+      }
       return res.json(data);
     }
 
@@ -369,8 +439,8 @@ router.get('/properties', async (req, res, next) => {
     }
 
     // MODE C: staff only sees their assigned properties
-    if (req.isStaff && req.staffPropertyIds?.length) {
-      const allowedStrIds = new Set(req.staffPropertyIds.map(String));
+    if (req.isStaff) {
+      const allowedStrIds = new Set((req.staffPropertyIds || []).map(String));
       data.apartments = (data.apartments || []).filter(
         (p) => allowedStrIds.has(String(p.id))
       );
@@ -404,8 +474,8 @@ router.get('/bookings', async (req, res, next) => {
     }
 
     // MODE C: staff only sees bookings for their assigned properties
-    if (req.isStaff && req.staffPropertyIds?.length) {
-      const allowedStrIds = new Set(req.staffPropertyIds.map(String));
+    if (req.isStaff) {
+      const allowedStrIds = new Set((req.staffPropertyIds || []).map(String));
       const allowedNumIds = new Set([...allowedStrIds].map(Number));
       data.bookings = (data.bookings || []).filter(
         (b) => b.apartment && (
@@ -452,8 +522,8 @@ router.get('/rates', async (req, res, next) => {
     }
 
     // MODE C: staff can only request rates for their assigned properties
-    if (req.isStaff && req.staffPropertyIds?.length) {
-      const allowedStrIds = new Set(req.staffPropertyIds.map(String));
+    if (req.isStaff) {
+      const allowedStrIds = new Set((req.staffPropertyIds || []).map(String));
       requestedIds = requestedIds.filter((id) => allowedStrIds.has(String(id)));
       if (!requestedIds.length) {
         return res.status(403).json({ error: 'None of the requested apartments are assigned to you' });
@@ -590,135 +660,6 @@ router.get('/messages/:reservationId', async (req, res, next) => {
     if (err.status === 404 || err.message?.includes('not found')) {
       return res.status(404).json({ error: err.message });
     }
-    next(err);
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────
-// GET /api/debug-bookings?from=2025-01-01&to=2025-12-31
-// TEMPORARY — remove this route once you've captured the debug output.
-// Call it, copy the JSON response, share it so we can fix the stats logic.
-// ─────────────────────────────────────────────────────────────────
-router.get('/debug-bookings', async (req, res, next) => {
-  try {
-    const from = req.query.from || new Date().getFullYear() + '-01-01';
-    const to   = req.query.to   || new Date().toISOString().slice(0, 10);
-
-    const fmt = d => new Date(d).toISOString().slice(0, 10);
-
-    // Build 4 different fetch windows to find where the missing records are
-    const windows = [
-      {
-        label:     'A_exact_period',
-        fetchFrom: from,
-        fetchTo:   to,
-      },
-      {
-        label:     'B_plus2yr_ahead',
-        fetchFrom: from,
-        fetchTo:   fmt(new Date(new Date(to).setFullYear(new Date(to).getFullYear() + 2))),
-      },
-      {
-        label:     'C_minus1yr_plus2yr',
-        fetchFrom: fmt(new Date(new Date(from).setFullYear(new Date(from).getFullYear() - 1))),
-        fetchTo:   fmt(new Date(new Date(to).setFullYear(new Date(to).getFullYear() + 2))),
-      },
-      {
-        label:     'D_no_dates_fetch_all',
-        fetchFrom: null,
-        fetchTo:   null,
-      },
-    ];
-
-    const results = { selectedPeriod: { from, to }, windows: {} };
-
-    for (const w of windows) {
-      const data     = await getBookings(req.user, { from: w.fetchFrom, to: w.fetchTo, showCancellation: true });
-      const bookings = data.bookings || [];
-
-      const cancellations = bookings.filter(b => b.type === 'cancellation');
-      const blocked       = bookings.filter(b => b['is-blocked-booking'] && b.type !== 'cancellation');
-      const regular       = bookings.filter(b => b.type !== 'cancellation' && !b['is-blocked-booking']);
-
-      // arrival-in-period check
-      const inPeriod = b => {
-        if (!b.arrival) return true;
-        const arr = b.arrival.slice(0, 10);
-        return arr >= from && arr <= to;
-      };
-      // departure-overlap check (old logic)
-      const inPeriodOverlap = b => {
-        if (!b.arrival || !b.departure) return true;
-        return b.arrival.slice(0, 10) <= to && b.departure.slice(0, 10) > from;
-      };
-
-      results.windows[w.label] = {
-        fetchWindow: { from: w.fetchFrom, to: w.fetchTo },
-        raw: {
-          total: bookings.length,
-          cancellations: cancellations.length,
-          blocked: blocked.length,
-          regular: regular.length,
-        },
-        filteredByArrivalDate: {
-          cancellations: cancellations.filter(inPeriod).length,
-          blocked:       blocked.filter(inPeriod).length,
-          regular:       regular.filter(inPeriod).length,
-        },
-        filteredByDepartureOverlap: {
-          cancellations: cancellations.filter(inPeriodOverlap).length,
-          blocked:       blocked.filter(inPeriodOverlap).length,
-          regular:       regular.filter(inPeriodOverlap).length,
-        },
-        cancellationArrivalDates: cancellations
-          .map(b => b.arrival ? b.arrival.slice(0, 10) : 'NO_DATE')
-          .sort(),
-        sampleCancellations: cancellations.slice(0, 5).map(b => ({
-          id:                  b.id,
-          type:                b.type,
-          arrival:             b.arrival   || null,
-          departure:           b.departure || null,
-          'created-at':        b['created-at'] || null,
-          'is-blocked-booking': b['is-blocked-booking'] || false,
-        })),
-        sampleRegular: regular.slice(0, 3).map(b => ({
-          id:       b.id,
-          arrival:  b.arrival,
-          departure: b.departure,
-          price:    b.price,
-          channel:  b.channel?.name,
-          type:     b.type,
-        })),
-        sampleBlocked: blocked.slice(0, 3).map(b => ({
-          id:       b.id,
-          arrival:  b.arrival,
-          departure: b.departure,
-          type:     b.type,
-          'is-blocked-booking': b['is-blocked-booking'],
-        })),
-      };
-    }
-
-    // Property + occupancy info
-    const aptsData  = await getApartments(req.user);
-    const propCount = (aptsData.apartments || []).length;
-    const daysExact = Math.round((new Date(to) - new Date(from)) / 864e5);
-    const daysPlus1 = daysExact + 1;
-
-    results.occupancyDebug = {
-      propertyCount:          propCount,
-      daysInRange_exclusive:  daysExact,
-      daysInRange_inclusive:  daysPlus1,
-      totalNightsAvailable_exclusive: propCount * daysExact,
-      totalNightsAvailable_inclusive: propCount * daysPlus1,
-      note: 'occupancy = bookedNights / totalNightsAvailable * 100. Smoobu shows 4.83% for yearly 2025-2026 with 10 props. Check which denominator matches.',
-    };
-
-    // Log to server console
-    console.log('\n=== DEBUG-BOOKINGS ===\n', JSON.stringify(results, null, 2), '\n=== END DEBUG ===\n');
-
-    res.json(results);
-  } catch (err) {
     next(err);
   }
 });

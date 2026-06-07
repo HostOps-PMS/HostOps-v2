@@ -41,8 +41,8 @@ router.get('/properties', requireAuth, async (req, res, next) => {
     // Staff members may only select properties they are assigned to.
     // req.staffPropertyIds is set by auth middleware as String[] from staff.propertyIds.
     // We filter Smoobu apartments to only those matching the staff's assigned IDs.
-    if (req.isStaff && req.staffPropertyIds && req.staffPropertyIds.length > 0) {
-      const allowed = new Set(req.staffPropertyIds.map(String));
+    if (req.isStaff) {
+      const allowed = new Set((req.staffPropertyIds || []).map(String));
       apartments = apartments.filter((a) => allowed.has(String(a.id)));
     }
 

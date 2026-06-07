@@ -48,17 +48,22 @@ export default function FirstLoginPinModal({ onComplete }) {
     try {
       const data = await changePin({ currentPin, newPin });
 
-      // Update stored user with the fresh user object returned by the backend
+      // Construct the full updated user object
+      let updatedUser = null;
       if (data.user) {
-        safeStorage.setItem('hp_user', JSON.stringify(data.user));
+        updatedUser = data.user;
+      } else if (data.staff) {
+        updatedUser = { ...data.staff, isStaff: true, role: 'staff' };
       }
-      if (data.staff) {
-        safeStorage.setItem('hp_user', JSON.stringify({ ...data.staff, isStaff: true, role: 'staff' }));
+
+      // Update stored user with the fresh user object returned by the backend
+      if (updatedUser) {
+        safeStorage.setItem('hp_user', JSON.stringify(updatedUser));
       }
       sessionStorage.removeItem('hp_must_change_pin');
 
       setSuccess(true);
-      setTimeout(() => onComplete(data.user || data.staff), 1200);
+      setTimeout(() => onComplete(updatedUser), 1200);
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {

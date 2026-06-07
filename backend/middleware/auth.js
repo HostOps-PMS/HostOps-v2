@@ -39,7 +39,29 @@ export async function requireAuth(req, res, next) {
       // they identify which business-level property (and therefore which smoobuApiKey)
       // the staff member may use. dashboard.js uses these to validate propertyDbId
       // requests and to decide whether apartment-level filtering is applicable.
-      req.staffPropertyDbIds = (staff.propertyIds || []).map(String);
+      const assignedIds = new Set((staff.propertyIds || []).map(String));
+      const propertyDbIds = new Set();
+      const smoobuIds = new Set();
+
+      for (const prop of clientUser.properties || []) {
+        const propertyAssigned = assignedIds.has(String(prop._id));
+        let subPropertyAssigned = false;
+
+        for (const sub of prop.subProperties || []) {
+          const subId = String(sub.smoobuId);
+          if (assignedIds.has(subId)) {
+            subPropertyAssigned = true;
+            smoobuIds.add(subId);
+          }
+          if (propertyAssigned && sub.smoobuId) smoobuIds.add(subId);
+        }
+
+        if (propertyAssigned || subPropertyAssigned) {
+          propertyDbIds.add(String(prop._id));
+        }
+      }
+      req.staffPropertyDbIds = Array.from(propertyDbIds);
+      req.staffPropertyIds = Array.from(smoobuIds);
 
       return next();
     }

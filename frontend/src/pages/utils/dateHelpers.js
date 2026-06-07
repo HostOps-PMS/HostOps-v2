@@ -73,11 +73,31 @@ export function fmtMoney(n) {
  * Returns { from, to } ISO strings for common preset ranges.
  */
 export function getPresetRange(preset) {
-  const today = new Date();
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   let from;
   let to = new Date(today);
 
   switch (preset) {
+    case 'daily':
+      from = new Date(today);
+      break;
+    case 'weekly': {
+      const day = today.getDay();
+      from = new Date(today);
+      from.setDate(today.getDate() - ((day + 6) % 7));
+      to = new Date(from);
+      to.setDate(from.getDate() + 6);
+      break;
+    }
+    case 'monthly':
+      from = new Date(today.getFullYear(), today.getMonth(), 1);
+      to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      break;
+    case 'yearly':
+      from = new Date(today.getFullYear(), 0, 1);
+      to = new Date(today.getFullYear(), 11, 31);
+      break;
     case 'ytd':
       from = new Date(today.getFullYear(), 0, 1);
       break;
@@ -101,7 +121,8 @@ export function getPresetRange(preset) {
       to = new Date(today.getFullYear(), today.getMonth(), 0);
       break;
     default:
-      from = new Date(today.getFullYear(), 0, 1);
+      from = new Date(today.getFullYear(), today.getMonth(), 1);
+      to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
   }
 
   return { from: toISODate(from), to: toISODate(to) };
@@ -111,6 +132,10 @@ export function getPresetRange(preset) {
  * Preset labels map.
  */
 export const PRESET_LABELS = {
+  daily: 'Daily',
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+  yearly: 'Yearly',
   ytd: 'Year to date',
   mtd: 'Month to date',
   last30: 'Last 30 days',
@@ -120,10 +145,8 @@ export const PRESET_LABELS = {
 };
 
 export const ALL_PRESETS = [
-  { id: 'ytd', label: 'Year to date' },
-  { id: 'mtd', label: 'Month to date' },
-  { id: 'last30', label: 'Last 30 days' },
-  { id: 'last7', label: 'Last 7 days' },
-  { id: 'thismonth', label: 'This month' },
-  { id: 'lastmonth', label: 'Last month' },
+  { id: 'daily', label: 'Daily' },
+  { id: 'weekly', label: 'Weekly' },
+  { id: 'monthly', label: 'Monthly' },
+  { id: 'yearly', label: 'Yearly' },
 ];
