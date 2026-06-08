@@ -13,7 +13,7 @@ import safeStorage from '../../safeStorage';
 
 const DashboardContext = createContext(null);
 
-const defaultRange = getPresetRange('ytd');
+const defaultRange = getPresetRange('monthly');
 
 const PROP_ID_KEY   = 'hp_selected_property_id';
 const PROP_NAME_KEY = 'hp_selected_property_name';
@@ -31,7 +31,7 @@ export function DashboardProvider({ children }) {
   const [dashState, setDashState] = useState({
     from: defaultRange.from,
     to: defaultRange.to,
-    preset: 'ytd',
+    preset: 'monthly',
     channels: [],
     view: 'multi',
     rawData: null,

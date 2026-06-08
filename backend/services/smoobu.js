@@ -238,10 +238,10 @@ export async function getInbox(user, { limit = 250 } = {}) {
 // ─────────────────────────────────────────────────────────────────
 export async function getDashboard(user, { from, to } = {}) {
   const today = new Date();
-  const startOfYear = new Date(today.getFullYear(), 0, 1);
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   const fmt = d => d.toISOString().slice(0, 10);
 
-  const fromDate = from || fmt(startOfYear);
+  const fromDate = from || fmt(startOfMonth);
   const toDate   = to   || fmt(today);
 
   // FIX 1: Fetch a wide window to capture ALL bookings including cancellations.

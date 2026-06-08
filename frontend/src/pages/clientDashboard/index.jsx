@@ -14,6 +14,7 @@ import FirstLoginPinModal from "./components/FirstLoginPinModal";
 import { useDashboard } from "./context/DashboardContext";
 import { useDashboardData } from "./hooks/useDashboardData";
 import Footer from "./components/Footer";
+import safeStorage from "../safeStorage";
 import "./globals.css";
 
 export default function DashboardPage() {
@@ -31,7 +32,7 @@ export default function DashboardPage() {
   const handlePasswordChanged = (updatedUser) => {
     // Store the refreshed user object (now with isVerified: true)
     if (updatedUser) {
-      localStorage.setItem('hp_user', JSON.stringify(updatedUser));
+      safeStorage.setItem('hp_user', JSON.stringify(updatedUser));
     }
     setShowFirstLoginModal(false);
   };
@@ -42,7 +43,7 @@ export default function DashboardPage() {
 
   const handlePinChanged = (updatedUser) => {
     if (updatedUser) {
-      localStorage.setItem('hp_user', JSON.stringify(updatedUser));
+      safeStorage.setItem('hp_user', JSON.stringify(updatedUser));
     }
     setShowFirstLoginPinModal(false);
   };

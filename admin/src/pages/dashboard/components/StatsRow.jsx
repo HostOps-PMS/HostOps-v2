@@ -88,59 +88,45 @@ function StatCard({ stat }) {
   const sparkColor = SPARK_COLORS[stat.color] ?? '#1a9e6e';
 
   return (
-    <div className="db-stat-card" style={{ gap: 0 }}>
-      {/* Top row: label (with clock icon) + See Details button */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <div style={{
-            width: 26, height: 26, borderRadius: '50%',
-            border: '1.5px solid var(--color-border)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--color-muted)', flexShrink: 0,
-          }}>
-            <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="10" cy="10" r="8"/><path d="M10 6v4l2.5 2.5" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <span style={{ fontSize: '.8rem', fontWeight: 700, color: 'var(--color-text)' }}>
-            {stat.label}
-          </span>
+    <div className="db-stat-card" style={{ gap: 0, minHeight: 140, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      {/* Top row: clock icon + label */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+        <div style={{
+          width: 22, height: 22, borderRadius: '50%',
+          border: '1.5px solid var(--color-border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--color-muted)', flexShrink: 0,
+        }}>
+          <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="10" cy="10" r="8"/><path d="M10 6v4l2.5 2.5" strokeLinecap="round"/>
+          </svg>
         </div>
-        <button style={{
-          fontSize: '.72rem', fontWeight: 600,
-          color: 'var(--color-text)',
-          background: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 'var(--radius-pill)',
-          padding: '3px 10px',
-          cursor: 'pointer',
-          fontFamily: 'var(--font-body)',
-          flexShrink: 0,
+        <span style={{ 
+          fontSize: '.82rem', fontWeight: 600, color: 'var(--color-muted)',
+          textTransform: 'uppercase', letterSpacing: '.04em',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>
-          See Details
-        </button>
-      </div>
-
-      {/* Value + change inline */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 14 }}>
-        <div className="db-stat-card__value">{stat.value}</div>
-        <span style={{
-          fontSize: '.75rem', fontWeight: 600,
-          color: stat.trend === 'up' ? '#059669' : '#dc2626',
-        }}>
-          ↑ {stat.change}
+          {stat.label}
         </span>
       </div>
 
-      {/* Bottom: sparkline left, detail text right */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 10 }}>
-        <Sparkline data={sparkData} color={sparkColor} />
-        <p style={{
-          fontSize: '.72rem', color: 'var(--color-muted)',
-          textAlign: 'right', maxWidth: 130, lineHeight: 1.4, margin: 0,
-        }}>
-          {stat.detail}
-        </p>
+      {/* Value + sparkline side by side */}
+      <div className="stat-card__body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4 }}>
+        {/* Left: value + change */}
+        <div className="stat-card__left" style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+          <div className="db-stat-card__value" style={{ fontSize: '1.6rem' }}>{stat.value}</div>
+          <span style={{
+            fontSize: '.82rem', fontWeight: 600,
+            color: stat.trend === 'up' ? '#059669' : '#dc2626',
+            whiteSpace: 'nowrap',
+          }}>
+            ↑ {stat.change}
+          </span>
+        </div>
+        {/* Right: sparkline */}
+        <div className="stat-card__spark" style={{ flexShrink: 0 }}>
+          <Sparkline data={sparkData} color={sparkColor} />
+        </div>
       </div>
     </div>
   );
@@ -160,7 +146,7 @@ export default function StatsRow({ stats, loading }) {
   if (loading) {
     return (
       <div className="db-stats">
-        {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+        {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
       </div>
     );
   }

@@ -1,36 +1,38 @@
-import React, { createContext, useContext, useCallback, useEffect, useState } from 'react';
+// frontend/src/pages/AuthContext.jsx
+import React, {
+  createContext,
+  useContext,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import safeStorage from './safeStorage';
 
-// ─── Why safeStorage instead of localStorage directly? ───────────────────────
-//
-// On go.hostops.online (and any cross-origin iframe or hardened browser
-// context), accessing `localStorage` throws a SecurityError BEFORE you can
-// read or write it.  Every auth helper — getToken, getUser, setToken, setUser,
-// clear — was calling localStorage directly, so they all threw, getToken()
-// returned null, ProtectedRoute set status='denied', and the redirect loop
-// (ERR_TOO_MANY_REDIRECTS) began.
-//
-// safeStorage detects the failure once at module-load time and silently falls
-// back to an in-memory Map.  Auth state won't survive a hard reload in that
-// fallback mode, but the app will at least function correctly for the session
-// and the redirect loop is eliminated.
-// ─────────────────────────────────────────────────────────────────────────────
+const HP_API_BASE = import.meta.env.VITE_API_BASE || 'https://hostpilot-smoobu.onrender.com';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  // isReady signals that the AuthContext has finished its one-time hydration
-  // pass (consuming ?_t=...&_u=... from the URL, if present).
-  // ProtectedRoute waits for isReady=true before calling verifySession, which
-  // prevents the race condition where verifySession fires before the
-  // cross-origin token has been written to storage.
+  // ── Access token lives ONLY in memory ────────────────────────────
+  // Using a ref (not state) so reads/writes are synchronous and don't
+  // trigger re-renders. Components that need to react to auth changes
+  // should use isReady / getUser(), not the token directly.
+  const accessTokenRef = useRef(null);
+
+  // isReady: true once the AuthProvider has finished its one-time
+  // hydration pass (consuming URL params, attempting silent refresh).
+  // ProtectedRoute waits for this before calling verifySession.
   const [isReady, setIsReady] = useState(false);
 
-  const getToken = useCallback(
-    () => safeStorage.getItem('hp_access_token'),
-    []
-  );
+  // ── Token accessors ───────────────────────────────────────────────
+  const getToken = useCallback(() => accessTokenRef.current, []);
 
+  const setToken = useCallback((t) => {
+    accessTokenRef.current = t || null;
+  }, []);
+
+  // ── User accessors (display data only — not a secret) ────────────
   const getUser = useCallback(() => {
     try {
       return JSON.parse(safeStorage.getItem('hp_user') || 'null');
@@ -39,16 +41,6 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const setToken = useCallback((t) => {
-    if (t) {
-      safeStorage.setItem('hp_access_token', t);
-    } else {
-      safeStorage.removeItem('hp_access_token');
-    }
-  }, []);
-
-  // setUser persists the user object so getUser() is never stale after login,
-  // token refresh, or verifySession calls.
   const setUser = useCallback((u) => {
     if (u) {
       safeStorage.setItem('hp_user', JSON.stringify(u));
@@ -57,49 +49,86 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // ── Clear: wipe memory token + stored user ────────────────────────
   const clear = useCallback(() => {
-    localStorage.removeItem('hp_access_token');
-    localStorage.removeItem('hp_user');
-    sessionStorage.clear();
+    accessTokenRef.current = null;
+    safeStorage.removeItem('hp_user');
+    // Belt-and-suspenders: remove any legacy keys left from older versions
+    try { localStorage.removeItem('hp_access_token'); } catch { /* ignore */ }
+    try { localStorage.removeItem('hp_user'); } catch { /* ignore */ }
+    try { localStorage.removeItem('user'); } catch { /* ignore */ }
+    try { localStorage.removeItem('auth_user'); } catch { /* ignore */ }
+    try { localStorage.removeItem('currentUser'); } catch { /* ignore */ }
+    try { localStorage.removeItem('hostpilot_user'); } catch { /* ignore */ }
+    try { sessionStorage.removeItem('hp_must_change_password'); } catch { /* ignore */ }
+    try { sessionStorage.removeItem('hp_must_change_pin'); } catch { /* ignore */ }
+    try { sessionStorage.removeItem('hp_selected_property_id'); } catch { /* ignore */ }
   }, []);
 
-  // Consume cross-origin handoff token from URL params (?_t=...&_u=...).
-  // When the login app redirects here, store the token + user into safeStorage
-  // immediately, then clean the URL so the token is never visible in the
-  // address bar or browser history.
-  // isReady is set to true after this runs — whether or not params were
-  // present — so ProtectedRoute knows it's safe to call getToken().
+  // ── Silent refresh on mount ───────────────────────────────────────
+  // On hard reload the in-memory token is gone. Attempt a silent
+  // refresh using the HttpOnly 'rt' cookie. If the cookie is valid,
+  // the server returns a new encrypted access token and we store it
+  // in memory. If the cookie is missing/expired, we stay logged out.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token   = params.get('_t');
-    const userRaw = params.get('_u');
+    let cancelled = false;
 
-    if (token && userRaw) {
-      // safeStorage.setItem never throws — fallback is handled internally.
-      safeStorage.setItem('hp_access_token', token);
-      safeStorage.setItem('hp_user', userRaw);
+    async function hydrate() {
+      try {
+        const res = await fetch(`${HP_API_BASE}/auth/refresh`, {
+          method:      'POST',
+          credentials: 'include',
+          headers:     { 'x-api-key': import.meta.env.VITE_API_KEY },
+        });
 
-      // Remove _t and _u from the URL without a page reload.
-      const clean = new URL(window.location.href);
-      clean.searchParams.delete('_t');
-      clean.searchParams.delete('_u');
-      window.history.replaceState({}, '', clean.toString());
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          accessTokenRef.current = data.accessToken || null;
+          if (data.user) setUser(data.user);
+        } else if (!cancelled) {
+          // Cookie missing or revoked — ensure memory is clean
+          accessTokenRef.current = null;
+        }
+      } catch {
+        if (!cancelled) accessTokenRef.current = null;
+      } finally {
+        if (!cancelled) setIsReady(true);
+      }
     }
 
-    // Always mark ready after this effect.
-    setIsReady(true);
+    hydrate();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Tab-close beacon ──────────────────────────────────────────────
+  // When the user closes the tab or navigates away, send a beacon to
+  // /auth/revoke-token so the server marks the jti as revoked.
+  // sendBeacon is fire-and-forget and works even during page unload.
+  useEffect(() => {
+    function handleUnload() {
+      const token = accessTokenRef.current;
+      if (!token) return;
+
+      const blob = new Blob(
+        [JSON.stringify({ token })],
+        { type: 'application/json' }
+      );
+      navigator.sendBeacon(`${HP_API_BASE}/auth/revoke-token`, blob);
+    }
+
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
   }, []);
 
   return (
     <AuthContext.Provider
       value={{
         getToken,
-        getUser,
         setToken,
+        getUser,
         setUser,
         clear,
         isReady,
-        // Expose so components can warn users if storage won't persist.
         storageIsPersistent: safeStorage.isPersistent,
       }}
     >

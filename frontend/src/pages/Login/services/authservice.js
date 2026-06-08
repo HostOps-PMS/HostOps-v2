@@ -1,25 +1,35 @@
+// frontend/src/pages/Login/services/authservice.js
 import safeStorage from '../../safeStorage';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
 
+// ─────────────────────────────────────────────────────────────────
+// loginUser
+// Returns { accessToken, user | staff, requiresOtp?, isStaff? }
+// Caller is responsible for auth.setToken(data.accessToken).
+// ─────────────────────────────────────────────────────────────────
 export async function loginUser({ email, password, deviceId }) {
   const res = await fetch(`${API_BASE}/auth/login`, {
-    method: 'POST',
+    method:      'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
-    body: JSON.stringify({ email, password, deviceId }),
+    headers:     { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
+    body:        JSON.stringify({ email, password, deviceId }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Login failed');
   return data;
 }
 
+// ─────────────────────────────────────────────────────────────────
+// verifyLoginOtp
+// Returns { accessToken, user, isAdmin }
+// ─────────────────────────────────────────────────────────────────
 export async function verifyLoginOtp({ email, otp, deviceId, rememberMe }) {
   const res = await fetch(`${API_BASE}/auth/verify-login-otp`, {
-    method: 'POST',
+    method:      'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
-    body: JSON.stringify({ email, otp, deviceId, rememberMe }),
+    headers:     { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
+    body:        JSON.stringify({ email, otp, deviceId, rememberMe }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'OTP verification failed');
@@ -28,128 +38,135 @@ export async function verifyLoginOtp({ email, otp, deviceId, rememberMe }) {
 
 // ─────────────────────────────────────────────────────────────────
 // staffLogin
-//
-// Authenticates a staff member against POST /auth/staff-login.
-// Returns { accessToken, staff, mustChangePassword, isStaff: true }.
-// The caller (DomainLoginForm) is responsible for checking that
-// staff.propertyIds includes the property selected in PropertySelectForm
-// before proceeding to the dashboard.
+// Returns { accessToken, staff, mustChangePassword, mustChangePin }
 // ─────────────────────────────────────────────────────────────────
 export async function staffLogin({ email, password }) {
   const res = await fetch(`${API_BASE}/auth/staff-login`, {
-    method: 'POST',
+    method:      'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
-    body: JSON.stringify({ email, password }),
+    headers:     { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
+    body:        JSON.stringify({ email, password }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Staff login failed');
   return data;
 }
 
-export async function registerUser({
-  firstName,
-  lastName,
-  email,
-  password,
-  smoobuApiKey = '',
-  propertyTagPrefix = '',
-}) {
+// ─────────────────────────────────────────────────────────────────
+// registerUser
+// ─────────────────────────────────────────────────────────────────
+export async function registerUser({ firstName, lastName, email, password, smoobuApiKey = '', propertyTagPrefix = '' }) {
   const res = await fetch(`${API_BASE}/auth/register`, {
-    method: 'POST',
+    method:  'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
-    body: JSON.stringify({ firstName, lastName, email, password, smoobuApiKey, propertyTagPrefix }),
+    body:    JSON.stringify({ firstName, lastName, email, password, smoobuApiKey, propertyTagPrefix }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Registration failed');
   return data;
 }
 
+// ─────────────────────────────────────────────────────────────────
+// forgotPassword
+// ─────────────────────────────────────────────────────────────────
 export async function forgotPassword({ email }) {
   const res = await fetch(`${API_BASE}/auth/forgot-password`, {
-    method: 'POST',
+    method:  'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
-    body: JSON.stringify({ email }),
+    body:    JSON.stringify({ email }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Something went wrong');
   return data;
 }
 
-export async function checkSession() {
-  let token = safeStorage.getItem('hp_access_token');
-  
-  // First try with existing access token
-  if (token) {
+// ─────────────────────────────────────────────────────────────────
+// checkSession
+// Tries the in-memory token first (passed in), then falls back to
+// silent refresh via the HttpOnly cookie.
+// Returns true if session is valid.
+// ─────────────────────────────────────────────────────────────────
+export async function checkSession(currentToken) {
+  // If caller passes a current in-memory token, try it first
+  if (currentToken) {
     const res = await fetch(`${API_BASE}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}`, 'x-api-key': import.meta.env.VITE_API_KEY },
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${currentToken}`,
+        'x-api-key':   import.meta.env.VITE_API_KEY,
+      },
     });
     if (res.ok) return true;
   }
-  
-  // If access token is missing or expired, attempt silent refresh via HttpOnly cookie
+
+  // Attempt silent refresh via HttpOnly cookie
   try {
     const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include', // Crucial to send the HttpOnly 'rt' cookie
-      headers: { 'x-api-key': import.meta.env.VITE_API_KEY },
+      method:      'POST',
+      credentials: 'include',
+      headers:     { 'x-api-key': import.meta.env.VITE_API_KEY },
     });
-    
     if (refreshRes.ok) {
       const data = await refreshRes.json();
-      safeStorage.setItem('hp_access_token', data.accessToken);
-      return true;
+      // Return the new token so the caller can store it in memory
+      return data.accessToken || true;
     }
   } catch (error) {
     console.error('Silent refresh failed:', error);
   }
-  
+
   return false;
 }
 
-// POST /auth/logout
-// Invalidates the refresh token cookie on the server, then clears all
-// client-side tokens so the user is fully signed out.
-export async function logoutUser() {
+// ─────────────────────────────────────────────────────────────────
+// logoutUser
+// Sends the current access token in the Authorization header so
+// the server can revoke its jti. The HttpOnly 'rt' cookie is sent
+// automatically via credentials:'include' for refresh token revocation.
+// Clears all local state after server call (whether it succeeds or not).
+// ─────────────────────────────────────────────────────────────────
+export async function logoutUser(currentToken) {
   try {
-    const token = safeStorage.getItem('hp_access_token');
     await fetch(`${API_BASE}/auth/logout`, {
-      method: 'POST',
-      credentials: 'include', // sends the HttpOnly 'rt' cookie so the server can revoke it
+      method:      'POST',
+      credentials: 'include',   // sends 'rt' cookie for refresh token revocation
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': import.meta.env.VITE_API_KEY,
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        'x-api-key':    import.meta.env.VITE_API_KEY,
+        ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
       },
     });
   } catch (err) {
-    // Even if the server call fails, proceed with local cleanup
     console.warn('Logout request failed:', err);
   } finally {
-    // Clear all client-side auth state regardless of server response
-    safeStorage.removeItem('hp_access_token');
-    sessionStorage.removeItem('hp_must_change_password');
-    sessionStorage.removeItem('hp_must_change_pin');
-    sessionStorage.removeItem('hp_selected_property_id');
-    localStorage.removeItem('hp_user');
-    localStorage.removeItem('user');
-    localStorage.removeItem('auth_user');
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('hostpilot_user');
+    // Wipe all client-side auth state regardless of server response
+    safeStorage.removeItem('hp_user');
+
+    // Belt-and-suspenders: clean up any legacy keys
+    try { localStorage.removeItem('hp_access_token'); } catch { /* ignore */ }
+    try { localStorage.removeItem('hp_user'); } catch { /* ignore */ }
+    try { localStorage.removeItem('user'); } catch { /* ignore */ }
+    try { localStorage.removeItem('auth_user'); } catch { /* ignore */ }
+    try { localStorage.removeItem('currentUser'); } catch { /* ignore */ }
+    try { localStorage.removeItem('hostpilot_user'); } catch { /* ignore */ }
+    try { sessionStorage.removeItem('hp_must_change_password'); } catch { /* ignore */ }
+    try { sessionStorage.removeItem('hp_must_change_pin'); } catch { /* ignore */ }
+    try { sessionStorage.removeItem('hp_selected_property_id'); } catch { /* ignore */ }
   }
 }
 
-// POST /auth/change-password
-// Called on first login when mustChangePassword is true.
-// On success the backend sets isVerified: true and mustChangePassword: false.
-export async function changePassword({ currentPassword, newPassword }) {
-  const token = safeStorage.getItem('hp_access_token');
+// ─────────────────────────────────────────────────────────────────
+// changePassword
+// Requires the current in-memory token.
+// ─────────────────────────────────────────────────────────────────
+export async function changePassword({ currentPassword, newPassword }, currentToken) {
   const res = await fetch(`${API_BASE}/auth/change-password`, {
-    method: 'POST',
+    method:      'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': import.meta.env.VITE_API_KEY,
-      Authorization: `Bearer ${token}`,
+      'x-api-key':    import.meta.env.VITE_API_KEY,
+      ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
     },
     body: JSON.stringify({ currentPassword, newPassword }),
   });
@@ -158,16 +175,17 @@ export async function changePassword({ currentPassword, newPassword }) {
   return data;
 }
 
-// POST /auth/change-pin
-// Called on first login when mustChangePin is true, or from Account Settings.
-export async function changePin({ currentPin, newPin }) {
-  const token = safeStorage.getItem('hp_access_token');
+// ─────────────────────────────────────────────────────────────────
+// changePin
+// ─────────────────────────────────────────────────────────────────
+export async function changePin({ currentPin, newPin }, currentToken) {
   const res = await fetch(`${API_BASE}/auth/change-pin`, {
-    method: 'POST',
+    method:      'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': import.meta.env.VITE_API_KEY,
-      Authorization: `Bearer ${token}`,
+      'x-api-key':    import.meta.env.VITE_API_KEY,
+      ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
     },
     body: JSON.stringify({ currentPin, newPin }),
   });

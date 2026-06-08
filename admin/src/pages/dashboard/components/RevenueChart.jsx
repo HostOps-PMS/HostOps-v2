@@ -94,7 +94,7 @@ export default function RevenueChart({ smoobuChartData }) {
   }
 
   return (
-    <div className="db-table-card" style={{ width: '100%' }}>
+    <div className="db-table-card" style={{ width: '100%', minWidth: 0, flex: 1 }}>
       {/* Header */}
       <div className="db-table-card__head" style={{ flexWrap: 'wrap', gap: 6, padding: '10px 14px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -166,7 +166,7 @@ export default function RevenueChart({ smoobuChartData }) {
       </div>
 
       {/* Chart */}
-      <div style={{ padding: '0 8px 12px' }}>
+      <div style={{ padding: '0 8px 12px', width: '100%', minWidth: 0 }}>
         <ResponsiveContainer width="100%" height={300}>
           <ComposedChart data={data} margin={{ top: 4, right: 36, bottom: 0, left: 48 }}>
             <CartesianGrid stroke="rgba(0,0,0,0.06)" vertical={false} />

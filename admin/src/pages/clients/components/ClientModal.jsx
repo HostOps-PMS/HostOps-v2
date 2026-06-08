@@ -455,442 +455,37 @@ export default function ClientModal({ client, onClose, onUpdated }) {
               </div>
             )}
 
-            {false ? (
-              /* ── Edit form ── */
-              <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0 }} className="cl-modal-edit-form">
-                <div className="cl-modal-field">
-                  <label className="cl-modal-field__label" htmlFor="edit-businessName">Business Name</label>
-                  <input
-                    id="edit-businessName"
-                    name="businessName"
-                    type="text"
-                    className="cl-edit-input"
-                    placeholder="e.g. Acme Properties Inc."
-                    value={form.businessName}
-                    onChange={handleChange}
-                    maxLength={150}
-                  />
-                </div>
-                
-                <div className="cl-modal-field">
-                  <label className="cl-modal-field__label">Email</label>
-                  <input
-                    type="text"
-                    className="cl-edit-input"
-                    value={client.email}
-                    disabled
-                    style={{ cursor: 'not-allowed', opacity: 0.7 }}
-                  />
-                </div>
-                
-                <div className="cl-modal-field">
-                  <label className="cl-modal-field__label">New Password</label>
-                  <input
-                    name="password"
-                    type="password"
-                    className="cl-edit-input"
-                    placeholder="Leave blank to keep current password"
-                    value={form.password}
-                    onChange={handleChange}
-                    maxLength={128}
-                  />
-                </div>
-                
-                <div className="cl-modal-field">
-                  <label className="cl-modal-field__label">New 6-Digit PIN</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="\d{6}"
-                    maxLength={6}
-                    className="cl-edit-input"
-                    placeholder="Leave blank to keep current PIN"
-                    value={form.pin}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-                      setForm((f) => ({ ...f, pin: val }));
-                    }}
-                  />
-                </div>
 
-                <div className="cl-modal-field">
-                  <label className="cl-modal-field__label" htmlFor="edit-role">Role</label>
-                  <select
-                    id="edit-role"
-                    name="role"
-                    className="cl-edit-select"
-                    value={form.role}
-                    onChange={handleChange}
-                  >
-                    <option value="client">Client</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-
-                </div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Properties</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {form.properties.map((prop, index) => (
-                    <div
-                      key={prop._id || index}
-                      style={{
-                        border: '1px solid var(--color-border, #e5e9ec)',
-                        borderRadius: 'var(--radius-md, 10px)',
-                        padding: '14px 16px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 10,
-                        background: 'var(--color-surface-2, #f8faf9)',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{
-                          fontSize: '.75rem', fontWeight: 600,
-                          color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '.05em',
-                        }}>
-                          Property {index + 1}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeProperty(index)}
-                          style={{
-                            background: 'none', border: 'none',
-                            color: 'var(--color-danger, #b91c1c)', cursor: 'pointer',
-                            padding: '2px 6px', borderRadius: 'var(--radius-sm)',
-                            fontSize: '.75rem', fontWeight: 500,
-                            display: 'flex', alignItems: 'center', gap: 4,
-                          }}
-                        >
-                          <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M4 4l12 12M16 4L4 16" strokeLinecap="round" />
-                          </svg>
-                          Remove
-                        </button>
-                      </div>
-
-                      <div className="db-field" style={{ margin: 0 }}>
-                        <label>
-                          Property Name
-                          <span style={{ color: 'var(--color-danger)', marginLeft: 2 }}>*</span>
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Sunset Villas"
-                          value={prop.name}
-                          onChange={setProp(index, 'name')}
-                          maxLength={150}
-                          className="cl-edit-input"
-                        />
-                      </div>
-
-                      <div className="db-field" style={{ margin: 0 }}>
-                        <label>
-                          {prop.hasSmoobuKey ? "Update Smoobu API Key" : "Smoobu API Key"}
-                        </label>
-                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                          <input
-                            type="text"
-                            placeholder="Optional"
-                            value={prop.smoobuApiKey}
-                            onChange={setProp(index, 'smoobuApiKey')}
-                            maxLength={512}
-                            className="cl-edit-input"
-                            disabled={prop.hasSmoobuKey && !prop.isUnmasked}
-                            style={{ paddingRight: 40, width: '100%' }}
-                          />
-                          {prop.hasSmoobuKey && !prop.isUnmasked && (
-                            <button
-                              type="button"
-                              onClick={() => showApiKey(index, prop._id)}
-                              style={{
-                                position: 'absolute', right: 12, background: 'none', border: 'none',
-                                cursor: 'pointer', color: 'var(--color-muted)', display: 'flex', alignItems: 'center'
-                              }}
-                              title="Show API Key"
-                            >
-                              <i className="ti ti-eye" style={{ fontSize: 16 }} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="db-field" style={{ margin: 0 }}>
-                        <label>Property Picture</label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          style={{ display: 'none' }}
-                          id={`edit-picture-input-${index}`}
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files.length > 0) {
-                              const file = e.target.files[0];
-                              const url = URL.createObjectURL(file);
-                              setForm((prev) => ({
-                                ...prev,
-                                properties: prev.properties.map((p, i) =>
-                                  i === index ? { ...p, pictureFile: file, originalPictureUrl: url, cropDirty: true } : p
-                                ),
-                              }));
-                              setCropImageUrl(url);
-                              setInitialCropData(null);
-                              setCroppingIndex(index);
-                            }
-                            e.target.value = null;
-                          }}
-                        />
-                        <label
-                          htmlFor={`edit-picture-input-${index}`}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '100%',
-                            aspectRatio: '1',
-                            borderRadius: '12px',
-                            border: prop.pictureUrl ? 'none' : '2px dashed lightgray',
-                            background: prop.pictureUrl
-                              ? 'transparent'
-                              : 'linear-gradient(135deg, rgba(198, 221, 213, 0.3) 0%, rgba(38, 166, 118, 0.05) 100%)',
-                            overflow: 'hidden',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            position: 'relative',
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!prop.pictureUrl) {
-                              e.currentTarget.style.borderColor = 'var(--color-brand, #26a676)';
-                              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(198, 221, 213, 0.5) 0%, rgba(38, 166, 118, 0.12) 100%)';
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!prop.pictureUrl) {
-                              e.currentTarget.style.borderColor = 'lightgray';
-                              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(198, 221, 213, 0.3) 0%, rgba(38, 166, 118, 0.05) 100%)';
-                            }
-                          }}
-                        >
-                          {prop.pictureUrl ? (
-                            <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                              <img
-                                src={prop.pictureUrl}
-                                crossOrigin="anonymous"
-                                alt="Property preview"
-                                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px' }}
-                              />
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  top: '8px',
-                                  right: '8px',
-                                  background: 'rgba(255, 255, 255, 0.7)',
-                                  backdropFilter: 'blur(8px)',
-                                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                                  borderRadius: '10px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'flex-end',
-                                  gap: '6px',
-                                  padding: '6px 6px',
-                                }}
-                              >
-                                {/* Change button */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    document.getElementById(`edit-picture-input-${index}`).click();
-                                  }}
-                                  style={{
-                                    background: 'white', border: 'none', borderRadius: '6px',
-                                    padding: '6px 6px', color: 'var(--color-brand, #26a676)', cursor: 'pointer',
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    gap: '0px', minWidth: '32px', height: '32px',
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.minWidth = '80px';
-                                    e.currentTarget.style.gap = '6px';
-                                    e.currentTarget.style.paddingLeft = '8px';
-                                    e.currentTarget.style.paddingRight = '8px';
-                                    const label = e.currentTarget.querySelector('[data-label-change]');
-                                    if (label) { label.style.maxWidth = '60px'; label.style.opacity = '1'; }
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.minWidth = '32px';
-                                    e.currentTarget.style.gap = '0px';
-                                    e.currentTarget.style.paddingLeft = '6px';
-                                    e.currentTarget.style.paddingRight = '6px';
-                                    const label = e.currentTarget.querySelector('[data-label-change]');
-                                    if (label) { label.style.maxWidth = '0px'; label.style.opacity = '0'; }
-                                  }}
-                                  title="Change picture"
-                                >
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                    <circle cx="8.5" cy="8.5" r="1.5" />
-                                    <polyline points="21 15 16 10 5 21" />
-                                  </svg>
-                                  <span
-                                    data-label-change=""
-                                    style={{
-                                      maxWidth: '0px', overflow: 'hidden', whiteSpace: 'nowrap',
-                                      fontSize: '.65rem', fontWeight: 600, opacity: 0,
-                                      transition: 'max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    }}
-                                  >
-                                    Change
-                                  </span>
-                                </button>
-
-                                {/* Adjust button */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setCropImageUrl(prop.originalPictureUrl || prop.pictureUrl);
-                                    setInitialCropData(prop.cropData);
-                                    setCroppingIndex(index);
-                                  }}
-                                  style={{
-                                    background: 'white', border: 'none', borderRadius: '6px',
-                                    padding: '6px 6px', color: 'var(--color-brand, #26a676)', cursor: 'pointer',
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    gap: '0px', minWidth: '32px', height: '32px',
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.minWidth = '80px';
-                                    e.currentTarget.style.gap = '6px';
-                                    e.currentTarget.style.paddingLeft = '8px';
-                                    e.currentTarget.style.paddingRight = '8px';
-                                    const label = e.currentTarget.querySelector('[data-label-adjust]');
-                                    if (label) { label.style.maxWidth = '60px'; label.style.opacity = '1'; }
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.minWidth = '32px';
-                                    e.currentTarget.style.gap = '0px';
-                                    e.currentTarget.style.paddingLeft = '6px';
-                                    e.currentTarget.style.paddingRight = '6px';
-                                    const label = e.currentTarget.querySelector('[data-label-adjust]');
-                                    if (label) { label.style.maxWidth = '0px'; label.style.opacity = '0'; }
-                                  }}
-                                  title="Adjust picture"
-                                >
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                                    <line x1="4" y1="6" x2="20" y2="6" />
-                                    <line x1="4" y1="12" x2="20" y2="12" />
-                                    <line x1="4" y1="18" x2="20" y2="18" />
-                                    <circle cx="14" cy="6" r="2" fill="currentColor" stroke="none" />
-                                    <circle cx="8" cy="12" r="2" fill="currentColor" stroke="none" />
-                                    <circle cx="14" cy="18" r="2" fill="currentColor" stroke="none" />
-                                  </svg>
-                                  <span
-                                    data-label-adjust=""
-                                    style={{
-                                      maxWidth: '0px', overflow: 'hidden', whiteSpace: 'nowrap',
-                                      fontSize: '.65rem', fontWeight: 600, opacity: 0,
-                                      transition: 'max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    }}
-                                  >
-                                    Adjust
-                                  </span>
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 24 }}>
-                              <div style={{
-                                width: 48, height: 48, borderRadius: '10px',
-                                background: 'var(--color-brand, #26a676)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                color: 'white', boxShadow: '0 2px 8px rgba(38, 166, 118, 0.2)',
-                              }}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                  <circle cx="8.5" cy="8.5" r="1.5" />
-                                  <polyline points="21 15 16 10 5 21" />
-                                </svg>
-                              </div>
-                              <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontSize: '.8125rem', fontWeight: 600, color: 'var(--color-brand, #26a676)', marginBottom: 2 }}>
-                                  Upload Picture
-                                </div>
-                                <div style={{ fontSize: '.7rem', color: 'var(--color-muted, #666)', lineHeight: 1.3 }}>
-                                  Click to upload or drag and drop
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </label>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Add another property */}
-                <button
-                  type="button"
-                  onClick={addProperty}
-                  style={{
-                    width: '100%',
-                    marginTop: 4,
-                    padding: '9px 0',
-                    border: '1.5px dashed var(--color-border, #c8ddd5)',
-                    borderRadius: 'var(--radius-md, 10px)',
-                    background: 'transparent',
-                    color: 'var(--color-brand, #26a676)',
-                    fontSize: '.8125rem', fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    transition: 'background .15s',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-2, #f0f7f4)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                >
-                  <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M10 4v12M4 10h12" strokeLinecap="round" />
-                  </svg>
-                  Add Property
-                </button>
-                </div>
+            
+            <>
+              <div className="cl-modal-grid">
+                <Field label="Role" value={
+                  <span className={`db-badge ${client.role === 'admin' ? 'db-badge--info' : 'db-badge--neutral'}`}>
+                    {client.role}
+                  </span>
+                } />
+                <Field label="Status" value={statusBadge} />
+                <Field label="Last Login"           value={formatDate(client.lastLoginAt)} />
+                <Field label="Joined"               value={formatDate(client.createdAt)} />
+                <Field label="Updated At"           value={formatDate(client.updatedAt)} />
               </div>
-            ) : (
-              /* ── Read-only details ── */
-              <>
-                <div className="cl-modal-grid">
-                  <Field label="Role" value={
-                    <span className={`db-badge ${client.role === 'admin' ? 'db-badge--info' : 'db-badge--neutral'}`}>
-                      {client.role}
-                    </span>
-                  } />
-                  <Field label="Status" value={statusBadge} />
-                  <Field label="Last Login"           value={formatDate(client.lastLoginAt)} />
-                  <Field label="Joined"               value={formatDate(client.createdAt)} />
-                  <Field label="Updated At"           value={formatDate(client.updatedAt)} />
+              {/* Properties section */}
+              <div style={{ marginTop: 16 }}>
+                <div style={{
+                  fontSize: '.8125rem', fontWeight: 600,
+                  color: 'var(--color-muted)', textTransform: 'uppercase',
+                  letterSpacing: '.05em', marginBottom: 10,
+                }}>
+                  Properties
                 </div>
-
-                {/* Properties section */}
-                <div style={{ marginTop: 16 }}>
-                  <div style={{
-                    fontSize: '.8125rem', fontWeight: 600,
-                    color: 'var(--color-muted)', textTransform: 'uppercase',
-                    letterSpacing: '.05em', marginBottom: 10,
-                  }}>
-                    Properties
-                  </div>
-                  <PropertiesPanel
-                    properties={properties}
-                    loading={loadingProps}
-                    error={propsError}
-                    onViewSmoobu={(property) => setSmoobuProperty(property)}
-                  />
-                </div>
-              </>
-            )}
+                <PropertiesPanel
+                  properties={properties}
+                  loading={loadingProps}
+                  error={propsError}
+                  onViewSmoobu={(property) => setSmoobuProperty(property)}
+                />
+              </div>
+            </>
           </div>
 
           {/* Footer */}
@@ -976,7 +571,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
               <button onClick={() => { setSaveError(null); setIsEditing(false); }} style={{ background: '#f3f4f6', border: 'none', borderRadius: 10, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#6b7280', fontSize: '1rem', flexShrink: 0, marginTop: 2 }}>✕</button>
             </div>
             <div className="db-modal__body" style={{ overflowY: 'auto', flex: 1, padding: '20px 32px 8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 12, background: '#f8faf9', border: '1px solid #e5efe9', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 12, background: '#f8faf9', border: '1px solid #e5efe9' }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #26a676, #1d8a62)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '0.95rem', flexShrink: 0 }}>{initials(client.businessName)}</div>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0d1117' }}>{client.businessName}</div>
@@ -987,7 +582,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                 <div style={{ background: '#fee2e2', color: '#b91c1c', borderRadius: 'var(--radius-sm)', padding: '10px 14px', fontSize: '.8125rem', fontWeight: 500, marginBottom: 12 }}>⚠️ {saveError}</div>
               )}
               {/* Tabs */}
-              <div style={{ display: 'flex', borderBottom: '2px solid #e5e9ec', marginBottom: 20 }}>
+              <div style={{ display: 'flex', borderBottom: '2px solid #e5e9ec' }}>
                 <button type="button" onClick={() => setActiveTab('details')} style={{ padding: '8px 20px', fontSize: '.85rem', fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', color: activeTab === 'details' ? '#26a676' : '#9ca3af', borderBottom: activeTab === 'details' ? '2px solid #26a676' : '2px solid transparent', marginBottom: -2 }}>Details</button>
                 <button type="button" onClick={() => setActiveTab('properties')} style={{ padding: '8px 20px', fontSize: '.85rem', fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', color: activeTab === 'properties' ? '#26a676' : '#9ca3af', borderBottom: activeTab === 'properties' ? '2px solid #26a676' : '2px solid transparent', marginBottom: -2 }}>Properties</button>
               </div>
@@ -1009,17 +604,10 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                   <label className="cl-modal-field__label">New 6-Digit PIN</label>
                   <input type="text" inputMode="numeric" pattern="\d{6}" maxLength={6} className="cl-edit-input" placeholder="Leave blank to keep current PIN" value={form.pin} onChange={(e) => { const val = e.target.value.replace(/\D/g, '').slice(0, 6); setForm((f) => ({ ...f, pin: val })); }} />
                 </div>
-                <div className="cl-modal-field">
-                  <label className="cl-modal-field__label" htmlFor="edit-role">Role</label>
-                  <select id="edit-role" name="role" className="cl-edit-select" value={form.role} onChange={handleChange}>
-                    <option value="client">Client</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
                 </div>
               </div>
               <div style={{ display: activeTab === 'properties' ? 'flex' : 'none', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Properties</div>
+                  <div style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 2, marginTop: 10 }}>Properties</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
                   {form.properties.map((prop, index) => (
                     <div key={prop._id || index} style={{ border: '1px solid var(--color-border, #e5e9ec)', borderRadius: 'var(--radius-md, 10px)', padding: '10px', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--color-surface-2, #f8faf9)', cursor: 'pointer' }}>
@@ -1040,6 +628,42 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                       </div>
                       {/* Name input */}
                       <input type="text" placeholder="Property name *" value={prop.name} onChange={setProp(index, 'name')} maxLength={150} className="cl-edit-input" style={{ fontSize: '.8rem', textAlign: 'center' }} />
+                      
+                      {/* Smoobu API Key */}
+                      <div className="db-field" style={{ margin: 0, marginTop: 4 }}>
+                        <label style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--color-muted)', marginBottom: 4, display: 'block', textAlign: 'center' }}>
+                          {prop.hasSmoobuKey ? "Update Smoobu API Key" : "Smoobu API Key"}
+                        </label>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            placeholder="Optional API Key"
+                            value={prop.smoobuApiKey}
+                            onChange={setProp(index, 'smoobuApiKey')}
+                            maxLength={512}
+                            className="cl-edit-input"
+                            disabled={prop.hasSmoobuKey && !prop.isUnmasked}
+                            style={{ paddingRight: 40, width: '100%', fontSize: '.7rem' }}
+                          />
+                          {prop.hasSmoobuKey && !prop.isUnmasked && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                showApiKey(index, prop._id);
+                              }}
+                              style={{
+                                position: 'absolute', right: 12, background: 'none', border: 'none',
+                                cursor: 'pointer', color: 'var(--color-muted)', display: 'flex', alignItems: 'center'
+                              }}
+                              title="Show API Key"
+                            >
+                              <i className="ti ti-eye" style={{ fontSize: 16 }} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Actions row */}
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
                         {prop.pictureUrl && (
@@ -1049,11 +673,42 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                       </div>
                     </div>
                   ))}
+
+                  {/* Add Property card — sits inline in the grid */}
+                  <div
+                    onClick={addProperty}
+                    style={{
+                      border: '1.5px dashed lightgray',
+                      borderRadius: 'var(--radius-md, 10px)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 10,
+                      minHeight: 200,
+                      cursor: 'pointer',
+                      background: 'transparent',
+                      transition: 'background .15s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-2, #f0f7f4)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <div style={{
+                      width: 40, height: 40, borderRadius: 10,
+                      background: '#26a676',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: 'white',
+                    }}>
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M10 4v12M4 10h12" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '.8125rem', fontWeight: 600, color: '#26a676' }}>Add Property</div>
+                      <div style={{ fontSize: '.7rem', color: 'var(--color-muted)', marginTop: 2 }}>Click to add a new one</div>
+                    </div>
+                  </div>
                 </div>
-                <button type="button" onClick={addProperty} style={{ width: '100%', marginTop: 4, padding: '9px 0', border: '1.5px dashed var(--color-border, #c8ddd5)', borderRadius: 'var(--radius-md, 10px)', background: 'transparent', color: 'var(--color-brand, #26a676)', fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'background .15s' }} onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-2, #f0f7f4)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-                  <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10 4v12M4 10h12" strokeLinecap="round" /></svg>
-                  Add Property
-                </button>
                 </div>
             </div>
             <div style={{ padding: '16px 32px 24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid #f0f2f5', marginTop: 4 }}>

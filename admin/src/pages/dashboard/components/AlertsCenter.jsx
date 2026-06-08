@@ -94,7 +94,7 @@ export default function AlertsCenter({ alerts, loading }) {
       </div>
 
       {/* Alert rows */}
-      <div style={{ padding: '4px 16px 8px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '4px 16px 8px', display: 'flex', flexDirection: 'column', overflowY: 'auto', maxHeight: 400 }}>
         {displayAlerts.map((alert, i) => {
           const dot = ALERT_STYLES[alert.type]?.dot ?? '#9ca3af';
           return (

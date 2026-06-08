@@ -34,16 +34,11 @@ const staffSchema = new mongoose.Schema({
 
   staffRole: {
     type: String,
-    default: '',
+    default: 'staff',
     trim: true,
   },
 
   isActive: {
-    type: Boolean,
-    default: true,
-  },
-
-  mustChangePassword: {
     type: Boolean,
     default: true,
   },

@@ -88,9 +88,10 @@ export default function TopClients() {
           return (
             <div
               key={client.name}
+              className="top-clients-row"
               style={{
                 display: 'grid',
-                gridTemplateColumns: '24px 32px 1fr 75px 75px 55px',
+                gridTemplateColumns: 'var(--top-clients-cols, 24px 34px 1fr 75px 75px)',
                 alignItems: 'center',
                 gap: 12,
                 padding: '8px 8px',
@@ -122,7 +123,13 @@ export default function TopClients() {
                 <div style={{ fontSize: '.78rem', fontWeight: 600, color: 'var(--color-text)' }}>
                   {client.name}
                 </div>
-                <div style={{ fontSize: '.68rem', color: 'var(--color-muted)', marginTop: 1 }}>
+                <div style={{
+                  fontSize: '.68rem',
+                  marginTop: 1,
+                  color: sortBy === 'Active Bookings' ? '#1e40af' : 'var(--color-muted)',
+                  fontWeight: sortBy === 'Active Bookings' ? 700 : 400,
+                  transition: 'color .2s, font-weight .2s',
+                }}>
                   {client.bookings} bookings
                 </div>
               </div>
@@ -142,7 +149,7 @@ export default function TopClients() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <OccupancyBar pct={client.occupancy} />
                 <div style={{
-                  fontSize: '.72rem', color: 'var(--color-muted)', textAlign: 'right',
+                  fontSize: '.72rem', textAlign: 'right',
                   color: sortBy === 'Occupancy %' ? '#3b82f6' : 'var(--color-muted)',
                   fontWeight: sortBy === 'Occupancy %' ? 700 : 400,
                 }}>
@@ -150,20 +157,6 @@ export default function TopClients() {
                 </div>
               </div>
 
-              {/* Active bookings badge */}
-              <div style={{ textAlign: 'right' }}>
-                <span style={{
-                  display: 'inline-block',
-                  padding: '3px 10px',
-                  borderRadius: 99,
-                  background: sortBy === 'Active Bookings' ? '#dbeafe' : 'var(--color-surface-2)',
-                  color: sortBy === 'Active Bookings' ? '#3b82f6' : 'var(--color-muted)',
-                  fontSize: '.75rem',
-                  fontWeight: 700,
-                }}>
-                  {client.bookings}
-                </span>
-              </div>
             </div>
           );
         })}

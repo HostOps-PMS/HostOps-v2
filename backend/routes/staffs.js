@@ -90,7 +90,9 @@ router.get('/staffs/:id', requireAdminOrTeamLeader, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 // POST /api/staffs
 // Admin creates a new staff account linked to a client.
-// Staff member must change password on first login.
+// Staff accounts use PIN authentication (not password) for the
+// dashboard. mustChangePin is set to true so the staff member is
+// forced to set their own PIN on first login.
 // ─────────────────────────────────────────────────────────────────
 const createStaffSchema = z.object({
   clientId:    z.string().min(1),
@@ -176,8 +178,11 @@ router.patch('/staffs/:id', requireAdminOrTeamLeader, async (req, res, next) => 
     if (data.staffRole   !== undefined) staff.staffRole   = data.staffRole;
     if (data.isActive    !== undefined) staff.isActive    = data.isActive;
     if (data.pin         !== undefined) {
-      staff.pin                = data.pin;
-      staff.mustChangePin      = true;
+      staff.pin           = data.pin;
+      // Admin is resetting the PIN → force the staff member to change it on next login.
+      // mustChangePin is only set here (admin reset), never on a staff-initiated
+      // change-pin flow — that route clears it instead.
+      staff.mustChangePin = true;
     }
 
     await staff.save();

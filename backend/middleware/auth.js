@@ -1,78 +1,90 @@
 // src/middleware/auth.js
 import { verifyAccessToken } from '../utils/tokens.js';
-import User from '../models/user.js';
-import Staff from '../models/staff.js';
+import User         from '../models/user.js';
+import Staff        from '../models/staff.js';
+import RevokedToken from '../models/revokedToken.js';
 
 export async function requireAuth(req, res, next) {
   try {
+    // ── 1. Extract token ─────────────────────────────────────────
     const header = req.headers.authorization || '';
     const token  = header.startsWith('Bearer ') ? header.slice(7) : null;
     if (!token) return res.status(401).json({ error: 'Missing token' });
 
+    // ── 2 & 3. Decrypt → verify JWT ──────────────────────────────
+    // verifyAccessToken() does: decrypt(blob) → jwt.verify(raw)
+    // Throws TokenExpiredError or JsonWebTokenError on failure.
     const decoded = verifyAccessToken(token);
 
-    // ── STAFF LOGIN ────────────────────────────────────────────────
-    // Staff tokens carry role: 'staff' and clientId in the payload.
-    // We load the Staff record for auth checks, and the client's User
-    // record (with smoobuApiKey) so the Smoobu service can use the
-    // correct API key when fetching data on behalf of this staff member.
+    // ── 4. Check jti revocation ──────────────────────────────────
+    // If the token was explicitly revoked (logout, password change,
+    // tab-close beacon) its jti will exist in the RevokedToken collection.
+    if (decoded.jti) {
+      const isRevoked = await RevokedToken.exists({ jti: decoded.jti });
+      if (isRevoked) {
+        return res.status(401).json({ error: 'Token has been revoked' });
+      }
+    }
+
+    // ── 5a. STAFF LOGIN ──────────────────────────────────────────
     if (decoded.role === 'staff') {
       const staff = await Staff.findById(decoded.staffId || decoded.sub);
       if (!staff) return res.status(401).json({ error: 'Staff not found' });
       if (!staff.isActive) return res.status(403).json({ error: 'Staff account is inactive' });
 
-      // Load the client user WITH smoobuApiKey so dashboard routes can
-      // call the Smoobu API using the client's own key.
       const clientUser = await User.findById(staff.clientId).select('+properties.smoobuApiKey');
       if (!clientUser) return res.status(401).json({ error: 'Client account not found' });
 
-      // Attach both to req so downstream routes and services have access.
-      // req.user is set to clientUser so all existing Smoobu service calls
-      // (which use req.user for the API key) work without any changes.
-      // req.staff holds the staff record for property-level filtering.
-      req.user        = clientUser;
-      req.staff       = staff;
-      req.isStaff     = true;
+      req.user    = clientUser;
+      req.staff   = staff;
+      req.isStaff = true;
 
-      // staffPropertyDbIds: MongoDB _ids of the user.properties[] entries this
-      // staff member is authorised to access. These are NOT Smoobu apartment IDs —
-      // they identify which business-level property (and therefore which smoobuApiKey)
-      // the staff member may use. dashboard.js uses these to validate propertyDbId
-      // requests and to decide whether apartment-level filtering is applicable.
-      req.staffPropertyDbIds = (staff.propertyIds || []).map(String);
+      const assignedIds    = new Set((staff.propertyIds || []).map(String));
+      const propertyDbIds  = new Set();
+      const smoobuIds      = new Set();
 
+      for (const prop of clientUser.properties || []) {
+        const propertyAssigned   = assignedIds.has(String(prop._id));
+        let subPropertyAssigned  = false;
+
+        for (const sub of prop.subProperties || []) {
+          const subId = String(sub.smoobuId);
+          if (assignedIds.has(subId)) {
+            subPropertyAssigned = true;
+            smoobuIds.add(subId);
+          }
+          if (propertyAssigned && sub.smoobuId) smoobuIds.add(subId);
+        }
+
+        if (propertyAssigned || subPropertyAssigned) {
+          propertyDbIds.add(String(prop._id));
+        }
+      }
+
+      req.staffPropertyDbIds = Array.from(propertyDbIds);
+      req.staffPropertyIds   = Array.from(smoobuIds);
       return next();
     }
 
-    // ── REGULAR USER / ADMIN LOGIN ─────────────────────────────────
-    // Select +smoobuApiKey so the smoobu service can use the
-    // user's own Smoobu API key on every authenticated request.
-    // Without this, smoobuApiKey is always null (select: false in schema)
-    // and every request falls back to the global env key — which belongs
-    // to only one account, causing other users to see wrong/no data.
+    // ── 5b. REGULAR USER / ADMIN ─────────────────────────────────
     const user = await User.findById(decoded.sub).select('+properties.smoobuApiKey');
     if (!user) return res.status(401).json({ error: 'User not found' });
 
-    // For team leaders, dynamically inject their assigned client's (serverId) Smoobu API key in memory.
-    // This allows them to fetch properties and view dashboards without duplicating the key in the database.
+    // Team leaders: inject client's smoobu API key in memory
     if (user.role === 'team_leader' && user.serverId) {
       const clientUser = await User.findById(user.serverId).select('+properties.smoobuApiKey');
-      if (clientUser && clientUser.properties?.length) {
-        // Inject client's properties (with smoobuApiKey) into the team leader's
-        // user object so downstream Smoobu service calls can access the keys.
+      if (clientUser?.properties?.length) {
         user.properties = clientUser.properties;
       }
     }
 
-    // Allow through if the user must change their password (admin-created account).
-    // They are not yet verified, but the /auth/change-password endpoint
-    // needs to be accessible so they can complete the first-login flow.
+    // Block unverified self-registered accounts (admin-created must-change-password is allowed)
     if (!user.isVerified && !user.mustChangePassword) {
       return res.status(403).json({ error: 'Email not verified' });
     }
 
-    req.user            = user;
-    req.isStaff         = false;
+    req.user    = user;
+    req.isStaff = false;
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
@@ -85,8 +97,8 @@ export async function requireAuth(req, res, next) {
   }
 }
 
+// ── requireAdmin ─────────────────────────────────────────────────
 export function requireAdmin(req, res, next) {
-  // Staff members are never admins
   if (req.isStaff) {
     return res.status(403).json({ error: 'Admin access required' });
   }
@@ -96,6 +108,7 @@ export function requireAdmin(req, res, next) {
   next();
 }
 
+// ── requireAdminOrTeamLeader ──────────────────────────────────────
 export function requireAdminOrTeamLeader(req, res, next) {
   if (req.isStaff) {
     return res.status(403).json({ error: 'Access denied' });

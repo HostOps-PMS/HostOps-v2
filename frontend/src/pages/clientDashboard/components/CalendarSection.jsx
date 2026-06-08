@@ -23,7 +23,7 @@ export default function CalendarSection() {
   const [showFilterPop, setShowFilterPop] = useState(false);
   const [localFrom, setLocalFrom] = useState(dashState.from || '');
   const [localTo, setLocalTo] = useState(dashState.to || '');
-  const [selectedPreset, setSelectedPreset] = useState(dashState.preset || 'ytd');
+  const [selectedPreset, setSelectedPreset] = useState(dashState.preset || 'monthly');
   const [tempChannels, setTempChannels] = useState([...dashState.channels]);
   const { logActivity } = useActivityLog();
 
@@ -85,7 +85,7 @@ export default function CalendarSection() {
   }
 
   const dateLabel = selectedPreset !== 'custom'
-    ? ALL_PRESETS.find((p) => p.id === selectedPreset)?.label || 'Year to date'
+    ? ALL_PRESETS.find((p) => p.id === selectedPreset)?.label || 'Monthly'
     : `${fmtDateShort(localFrom)} – ${fmtDateShort(localTo)}`;
 
   const filterLabel = dashState.channels.length > 0

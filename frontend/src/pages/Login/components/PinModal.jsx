@@ -37,7 +37,7 @@ export default function PinModal({
   const auth = useAuth();
   const navigate = useNavigate();
 
-  const [email, setEmail]   = useState('');
+  const [email, setEmail] = useState(() => userData?.email || auth.getUser()?.email || '');
   const [digits, setDigits] = useState(Array(PIN_LENGTH).fill(''));
   const [loading, setLoading] = useState(false);
   const [shake, setShake]   = useState(false);
@@ -249,11 +249,21 @@ export default function PinModal({
         auth.setToken(data.accessToken);
       }
       if (data.user) {
-        auth.setUser(data.user);
+        const verifiedUser = {
+          ...data.user,
+          email: data.user.email || email.trim().toLowerCase(),
+        };
+        auth.setUser(verifiedUser);
         // FIX: Use safeStorage instead of localStorage directly — localStorage
         // throws a SecurityError on go.hostops.online, safeStorage catches it
         // and falls back to an in-memory Map so the write always succeeds.
-        safeStorage.setItem('hp_user', JSON.stringify(data.user));
+        safeStorage.setItem('hp_user', JSON.stringify(verifiedUser));
+        
+        if (verifiedUser.mustChangePin) {
+          sessionStorage.setItem('hp_must_change_pin', 'true');
+        } else {
+          sessionStorage.removeItem('hp_must_change_pin');
+        }
       }
 
       // Persist the selected property so the dashboard loads the right one.
