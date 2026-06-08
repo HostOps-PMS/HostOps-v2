@@ -19,13 +19,48 @@ import { useAccounts } from './hooks/useAccounts';
 
 export default function Dashboard() {
   const [modal, setModal] = useState({ open: false, type: null, data: null });
+  const getPresetRange = (preset) => {
+  const today = new Date();
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  if (preset === 'daily')   return { from: fmt(today), to: fmt(today) };
+  if (preset === 'weekly')  { const s = new Date(today); s.setDate(today.getDate() - 6); return { from: fmt(s), to: fmt(today) }; }
+  if (preset === 'monthly') return { from: fmt(new Date(today.getFullYear(), today.getMonth(), 1)), to: fmt(new Date(today.getFullYear(), today.getMonth() + 1, 0)) };
+  if (preset === 'yearly')  return { from: fmt(new Date(today.getFullYear(), 0, 1)), to: fmt(new Date(today.getFullYear(), 11, 31)) };
+        return { from: '', to: '' };
+      };
+
+      const [dateRange, setDateRange]     = useState(() => getPresetRange('monthly'));
+      const [appliedRange, setAppliedRange] = useState(() => getPresetRange('monthly'));
+      const [activePreset, setActivePreset] = useState('monthly');
+
+      const applyPreset = (preset) => {
+    const today = new Date();
+    const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    let from, to;
+    if (preset === 'daily') {
+      from = to = fmt(today);
+    } else if (preset === 'weekly') {
+      const start = new Date(today);
+      start.setDate(today.getDate() - 6);
+      from = fmt(start); to = fmt(today);
+    } else if (preset === 'monthly') {
+      from = fmt(new Date(today.getFullYear(), today.getMonth(), 1));
+      to   = fmt(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+    } else if (preset === 'yearly') {
+      from = fmt(new Date(today.getFullYear(), 0, 1));
+      to   = fmt(new Date(today.getFullYear(), 11, 31));
+    }
+    setActivePreset(preset);
+    setDateRange({ from, to });
+    setAppliedRange({ from, to });
+  };
   const openModal  = (type, data = null) => setModal({ open: true, type, data });
   const closeModal = ()                  => setModal({ open: false, type: null, data: null });
 
   // useStats now fetches the full /api/dashboard-overview payload.
   // `overview` contains everything: revenue chart, top clients,
   // occupancy breakdown, alerts, recent activities — all from Smoobu.
-  const { stats, overview, loading: statsLoading } = useStats();
+  const { stats, overview, loading: statsLoading } = useStats(appliedRange);
 
   // useAccounts still fetches clients + staffs from the DB (for DashboardCharts).
   const { accounts, loading: accountsLoading } = useAccounts();
@@ -46,29 +81,56 @@ export default function Dashboard() {
               <p className="db-content__sub">Welcome back, Admin</p>
             </div>
             {/* Period badge — shows what date range the KPIs cover */}
-            {overview?.period && (
-              <div style={{
-                fontSize: '.75rem',
-                color: 'var(--color-muted)',
-                background: 'var(--color-surface-2)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-pill)',
-                padding: '4px 12px',
-                alignSelf: 'center',
-              }}>
-                {overview.period.from} → {overview.period.to}
+            <div className="db-date-filter">
+        <div className="db-date-filter__presets-row">
+          {['daily','weekly','monthly','yearly'].map(p => (
+            <button
+              key={p}
+              className={`db-date-filter__preset${activePreset === p ? ' db-date-filter__preset--active' : ''}`}
+              onClick={() => applyPreset(p)}
+            >
+              {p.charAt(0).toUpperCase() + p.slice(1)}
+            </button>
+                ))}
               </div>
-            )}
+              <div className="db-date-filter__divider" />
+              <div className="db-date-filter__dates-row">
+                <label className="db-date-filter__label">From</label>
+                <input
+                  type="date"
+                  className="db-date-filter__input"
+                  value={dateRange.from}
+                  onChange={e => setDateRange(prev => ({ ...prev, from: e.target.value }))}
+                />
+                <span className="db-date-filter__arrow">→</span>
+                <label className="db-date-filter__label">To</label>
+                <input
+                  type="date"
+                  className="db-date-filter__input"
+                  value={dateRange.to}
+                  onChange={e => {
+                    setDateRange(prev => ({ ...prev, to: e.target.value }));
+                    setActivePreset('custom');
+                  }}
+                />
+              </div>
+              <button
+                className="db-date-filter__btn"
+                onClick={() => setAppliedRange({ ...dateRange })}
+              >
+                Apply
+              </button>
+            </div>
           </header>
 
           {/* ── Row 1+2: Stats + Chart | Top Clients ── */}
-          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="db-dashboard-row">
+            <div className="db-dashboard-row__main">
               <StatsRow stats={stats} loading={statsLoading} />
               {/* Pass real chart data from Smoobu; falls back to static mock if null */}
               <RevenueChart smoobuChartData={overview?.revenueChart ?? null} />
             </div>
-            <div style={{ width: 420, flexShrink: 0, alignSelf: 'stretch' }}>
+            <div className="db-dashboard-row__side">
               {/* TopClients receives live data ranked by Smoobu revenue */}
               <TopClients
                 topClients={overview?.topClients ?? null}
