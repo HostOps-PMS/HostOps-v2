@@ -141,69 +141,88 @@ function escHtml(s) {
 // Leaflet — the map then falls back to a normal L.layerGroup (no spiderfy)
 // so the dashboard never hard-crashes.
 let leafletPromise = null;
-function loadLeaflet() {
-  if (leafletPromise) return leafletPromise;
-  leafletPromise = new Promise((resolve, reject) => {
 
-    // Step 2: inject markercluster CSS + JS, then resolve with window.L
-    const injectMarkerCluster = () => {
-      // CSS — base + default theme
-      if (!document.querySelector('#leaflet-markercluster-css')) {
-        const c1 = document.createElement('link');
-        c1.id  = 'leaflet-markercluster-css';
-        c1.rel = 'stylesheet';
-        c1.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css';
-        document.head.appendChild(c1);
-      }
-      if (!document.querySelector('#leaflet-markercluster-default-css')) {
-        const c2 = document.createElement('link');
-        c2.id  = 'leaflet-markercluster-default-css';
-        c2.rel = 'stylesheet';
-        c2.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css';
-        document.head.appendChild(c2);
-      }
+// Inject a stylesheet once (id-guarded). CSS failing is non-fatal.
+function injectCssOnce(id, href) {
+  if (typeof document === 'undefined') return;
+  if (document.querySelector('#' + id)) return;
+  const link = document.createElement('link');
+  link.id = id;
+  link.rel = 'stylesheet';
+  link.href = href;
+  document.head.appendChild(link);
+}
 
-      // Plugin already present?
-      if (window.L && window.L.markerClusterGroup) { resolve(window.L); return; }
-
-      // Script already injected but not yet finished — poll for it
-      if (document.querySelector('#leaflet-markercluster-js')) {
-        const waitForPlugin = () => {
-          if (window.L && window.L.markerClusterGroup) resolve(window.L);
-          else setTimeout(waitForPlugin, 50);
-        };
-        waitForPlugin();
+// Load a script, resolving on first URL that succeeds. Tries each CDN in turn.
+function loadScriptFromCdns(urls) {
+  return new Promise((resolve, reject) => {
+    let i = 0;
+    const tryNext = () => {
+      if (i >= urls.length) {
+        reject(new Error('All CDNs failed: ' + urls.join(', ')));
         return;
       }
-
-      const mc = document.createElement('script');
-      mc.id  = 'leaflet-markercluster-js';
-      mc.src = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js';
-      mc.onload  = () => resolve(window.L);
-      // Fallback: resolve with core Leaflet so the map still works (plain markers)
-      mc.onerror = () => {
-        console.warn('[PropertyMap] markercluster failed to load — falling back to plain markers');
-        resolve(window.L);
+      const url = urls[i++];
+      const s = document.createElement('script');
+      s.src   = url;
+      s.async = true;
+      s.onload  = () => resolve(url);
+      s.onerror = () => {
+        console.warn('[PropertyMap] CDN failed, trying next:', url);
+        s.remove();
+        tryNext();
       };
-      document.head.appendChild(mc);
+      document.head.appendChild(s);
     };
-
-    // Step 1: ensure Leaflet core is loaded first
-    if (window.L) { injectMarkerCluster(); return; }
-
-    if (!document.querySelector('#leaflet-css')) {
-      const link = document.createElement('link');
-      link.id  = 'leaflet-css';
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-    }
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.onload  = () => injectMarkerCluster();
-    script.onerror = () => reject(new Error('Failed to load Leaflet'));
-    document.head.appendChild(script);
+    tryNext();
   });
+}
+
+// Loads Leaflet core (required) then markercluster (optional, for spiderfy).
+// Robust against a single CDN being down: falls through unpkg → jsdelivr →
+// cdnjs. On total failure the cached promise is cleared so a Retry can work.
+function loadLeaflet() {
+  if (leafletPromise) return leafletPromise;
+
+  leafletPromise = (async () => {
+    try {
+      // ── Leaflet core ──
+      injectCssOnce('leaflet-css', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+      if (!window.L) {
+        await loadScriptFromCdns([
+          'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+          'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js',
+          'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js',
+        ]);
+      }
+      if (!window.L) throw new Error('Leaflet global (window.L) missing after load');
+
+      // ── markercluster plugin (optional — enables spiderfy) ──
+      injectCssOnce('leaflet-markercluster-css',
+        'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css');
+      injectCssOnce('leaflet-markercluster-default-css',
+        'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css');
+      if (!window.L.markerClusterGroup) {
+        try {
+          await loadScriptFromCdns([
+            'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js',
+            'https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js',
+          ]);
+        } catch (mcErr) {
+          // Non-fatal: map still works with plain L.layerGroup (no spiderfy)
+          console.warn('[PropertyMap] markercluster unavailable — using plain markers:', mcErr.message);
+        }
+      }
+
+      return window.L;
+    } catch (err) {
+      // Clear the cache so a manual Retry can attempt a fresh load
+      leafletPromise = null;
+      throw err;
+    }
+  })();
+
   return leafletPromise;
 }
 
@@ -299,13 +318,24 @@ function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId) {
   // L.markerClusterGroup (spiderfy enabled) or a plain L.layerGroup fallback.
   const clusterRef = useRef(null);
   const [leafletReady, setLeafletReady] = useState(!!window.L);
+  const [leafletError, setLeafletError] = useState(null);
+
+  const tryLoadLeaflet = useCallback(() => {
+    if (window.L) { setLeafletReady(true); }
+    setLeafletError(null);
+    loadLeaflet()
+      .then(() => { setLeafletReady(true); setLeafletError(null); })
+      .catch((err) => {
+        console.error('[PropertyMap] Leaflet load failed:', err);
+        setLeafletError(err.message || 'Failed to load the map library.');
+      });
+  }, []);
 
   useEffect(() => {
-    if (window.L && window.L.markerClusterGroup) { setLeafletReady(true); return; }
-    loadLeaflet()
-      .then(() => setLeafletReady(true))
-      .catch((err) => console.error('[PropertyMap] Leaflet load failed:', err));
-  }, []);
+    if (window.L) setLeafletReady(true); // core present → map can init now
+    if (window.L && window.L.markerClusterGroup) return; // fully ready
+    tryLoadLeaflet();
+  }, [tryLoadLeaflet]);
 
   // Init / re-init map when DOM node becomes available
   useEffect(() => {
@@ -570,7 +600,7 @@ function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId) {
     }
   }, [focusedAptId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { leafletReady };
+  return { leafletReady, leafletError, retryLeaflet: tryLoadLeaflet };
 }
 
 // ── Main Component ────────────────────────────────────────────────
@@ -696,7 +726,8 @@ export default function PropertyMap({ mapLocations, loading }) {
 
   // ── Leaflet map ────────────────────────────────────────────────
   const mapContainerRef = useRef(null);
-  useLeafletMap(mapContainerRef, mapPoints, markerMapRef, focusedAptId);
+  const { leafletError, retryLeaflet } =
+    useLeafletMap(mapContainerRef, mapPoints, markerMapRef, focusedAptId);
 
   // ── Dropdown options ───────────────────────────────────────────
   const propertyOptions = useMemo(() => {
@@ -815,7 +846,36 @@ export default function PropertyMap({ mapLocations, loading }) {
             ref={mapContainerRef}
             style={{ flex: 1, minWidth: 0, zIndex: 0, overflow: 'hidden', position: 'relative' }}
           >
-            {!isMapLoading && locations.length > 0 && plottable.length === 0 && (
+            {/* Map library failed to load (e.g. CDN hiccup) — show Retry */}
+            {leafletError && (
+              <div style={{
+                position: 'absolute', inset: 0, zIndex: 1100,
+                display: 'flex', flexDirection: 'column', gap: 10,
+                alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(255,255,255,0.95)', textAlign: 'center', padding: 20,
+              }}>
+                <div style={{ color: 'var(--color-text)', fontSize: '.85rem', fontWeight: 600 }}>
+                  Map couldn’t load
+                </div>
+                <div style={{ color: 'var(--color-muted)', fontSize: '.76rem', maxWidth: 280 }}>
+                  The map library failed to download. Check your connection and try again.
+                </div>
+                <button
+                  onClick={retryLeaflet}
+                  style={{
+                    padding: '6px 16px',
+                    borderRadius: 'var(--radius-pill)',
+                    border: '1px solid var(--color-brand, #A10000)',
+                    background: 'var(--color-brand, #A10000)',
+                    color: '#fff', fontWeight: 600, fontSize: '.78rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            {!leafletError && !isMapLoading && locations.length > 0 && plottable.length === 0 && (
               <div style={{
                 position: 'absolute', inset: 0, zIndex: 1000,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
