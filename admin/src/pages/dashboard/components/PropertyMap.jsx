@@ -32,6 +32,7 @@ export default function PropertyMap({ mapLocations, loading }) {
   const [selected, setSelected] = useState('all'); // clientId or 'all'
 
   const locations = Array.isArray(mapLocations) ? mapLocations : [];
+  const isDataReady = mapLocations !== null && mapLocations !== undefined;
 
   // Dropdown options: one per business account
   const clients = useMemo(() => {
@@ -80,6 +81,8 @@ export default function PropertyMap({ mapLocations, loading }) {
           <p style={{ fontSize: '.74rem', color: 'var(--color-muted)', marginTop: 2 }}>
             {loading
               ? 'Loading property locations…'
+              : !isDataReady
+              ? 'Waiting for data…'
               : `${plottable.length} of ${filtered.length} mapped`}
           </p>
         </div>
@@ -100,7 +103,11 @@ export default function PropertyMap({ mapLocations, loading }) {
             maxWidth: 220,
           }}
         >
-          <option value="all">All business accounts ({clients.length})</option>
+          <option value="all">
+            {!isDataReady
+              ? 'Loading accounts…'
+              : `All business accounts (${clients.length})`}
+          </option>
           {clients.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
