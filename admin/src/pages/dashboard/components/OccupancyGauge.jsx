@@ -125,7 +125,7 @@ export default function OccupancyGauge({ occupancyBreakdown, overallOccupancy, l
         </div>
 
         {/* Per property breakdown */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8, maxHeight: 300, overflowY: 'auto' }}>
           {properties.map((p, i) => (
             <div key={p.name + i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS[i % COLORS.length], flexShrink: 0 }} />
