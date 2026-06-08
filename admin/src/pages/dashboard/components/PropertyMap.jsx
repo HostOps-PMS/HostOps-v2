@@ -52,6 +52,13 @@ function applyCoordJitter(points) {
 
 // ── Helpers ───────────────────────────────────────────────────────
 
+// On deployed environments the frontend and backend are on different
+// Render services, so relative paths (/api/...) return 401 or 404.
+// VITE_API_BASE_URL should be set to the backend origin in production,
+// e.g. "https://hostops-backend.onrender.com". In local dev it can be
+// left empty so relative paths still work via the Vite proxy.
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+
 function authHeaders() {
   const token = sessionStorage.getItem('hp_access_token') ?? '';
   return {
@@ -59,6 +66,10 @@ function authHeaders() {
     Authorization:  `Bearer ${token}`,
     'x-api-key':    import.meta.env.VITE_API_KEY ?? '',
   };
+}
+
+function apiUrl(path) {
+  return `${API_BASE}${path}`;
 }
 
 // Normalise a coordinate value that may be a string or number.
@@ -104,7 +115,7 @@ function useClientAccounts() {
     let cancelled = false;
     async function load() {
       try {
-        const res = await fetch('/api/accounts', {
+        const res = await fetch(apiUrl('/api/accounts'), {
           headers:     authHeaders(),
           credentials: 'include',
         });
@@ -150,7 +161,7 @@ function useSmoobuApartments(clientId, propertyIndex) {
       const qs = (propertyIndex !== null && propertyIndex !== undefined)
         ? `?propertyIndex=${propertyIndex}`
         : '';
-      const url = `/api/accounts/${clientId}/smoobu-apartments${qs}`;
+      const url = apiUrl(`/api/accounts/${clientId}/smoobu-apartments${qs}`);
       const res = await fetch(url, {
         headers:     authHeaders(),
         credentials: 'include',
@@ -365,11 +376,19 @@ export default function PropertyMap({ mapLocations, loading }) {
       return smoobuApts;
     }
 
-    // All accounts — merge DB + overview
-    const result = [];
+    // All accounts mode:
+    // Use overviewLocs (individual Smoobu apartments with real coords/addresses)
+    // as the primary source. Then add DB-only stubs for any client/property
+    // that has NO Smoobu entry at all, so they still appear in the legend.
+
+    // Build a set of clientIds that already have at least one overviewLocs entry
+    const clientsWithSmoobu = new Set(overviewLocs.map((l) => l.clientId));
+
+    const stubs = [];
     clients.forEach((client) => {
+      if (clientsWithSmoobu.has(client.id)) return; // already covered by Smoobu data
       if (client.properties.length === 0) {
-        result.push({
+        stubs.push({
           apartmentId:   `db:${client.id}`,
           apartmentName: '(no properties)',
           propertyName:  '(no properties)',
@@ -380,36 +399,21 @@ export default function PropertyMap({ mapLocations, loading }) {
         });
       } else {
         client.properties.forEach((prop, pi) => {
-          const smoobu = overviewLocs.find(
-            (s) => s.clientId === client.id &&
-                   (s.propertyName || '').toLowerCase() ===
-                   (prop.propertyName || '').toLowerCase()
-          );
-          result.push({
-            apartmentId:   smoobu?.apartmentId ?? `db:${client.id}:${pi}`,
-            apartmentName: smoobu?.apartmentName || prop.propertyName || 'Property',
+          stubs.push({
+            apartmentId:   `db:${client.id}:${pi}`,
+            apartmentName: prop.propertyName || 'Property',
             propertyName:  prop.propertyName || 'Property',
             clientId:      client.id,
             clientName:    client.name,
-            street:    smoobu?.street   || '',
-            zip:       smoobu?.zip      || '',
-            city:      smoobu?.city     || '',
-            country:   smoobu?.country  || '',
-            latitude:  smoobu?.latitude  ?? null,
-            longitude: smoobu?.longitude ?? null,
+            street: '', zip: '', city: '', country: '',
+            latitude: null, longitude: null,
           });
         });
       }
     });
-    overviewLocs.forEach((s) => {
-      const alreadyIn = result.some(
-        (r) => r.clientId === s.clientId &&
-               (r.propertyName || '').toLowerCase() ===
-               (s.propertyName || '').toLowerCase()
-      );
-      if (!alreadyIn) result.push(s);
-    });
-    return result;
+
+    // overviewLocs first (real Smoobu apartments with coords), then DB-only stubs
+    return [...overviewLocs, ...stubs];
   }, [smoobuClientId, selectedPropIndex, smoobuApts, aptLoading,
       clients, overviewLocs, activeClient]);
 
@@ -540,9 +544,11 @@ export default function PropertyMap({ mapLocations, loading }) {
               </div>
             ) : (
               locations.map((p, i) => {
-                const addr     = [p.city, p.country].filter(Boolean).join(', ');
+                const addrParts = [p.street, p.city, p.country].filter(Boolean);
+                const addr      = addrParts.join(', ');
                 const hasCoords = p.latitude !== null && p.longitude !== null;
-                const subtitle = p.type || addr || (hasCoords ? '' : 'No address in Smoobu');
+                // Priority: street+city+country → type → "No address in Smoobu"
+                const subtitle  = addr || p.type || (hasCoords ? '' : 'No address in Smoobu');
                 return (
                   <div key={String(p.apartmentId)}
                     style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
