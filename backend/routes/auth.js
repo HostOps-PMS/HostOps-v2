@@ -180,14 +180,23 @@ router.post('/login', async (req, res, next) => {
     const { email, password, deviceId } = data;
 
     // ── 1. Try Staff login first ──────────────────────────────────
-    const staff = await Staff.findOne({ email: email.toLowerCase() });
+    // IMPORTANT: must select +password so comparePassword has a hash to compare.
+    const staff = await Staff.findOne({ email: email.toLowerCase() }).select('+password');
     if (staff) {
       if (!staff.isActive) {
         return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
       }
 
-      const encAccessToken = encryptToken(signAccessToken(staff));
-      const refreshToken   = signRefreshToken(staff);
+      // Verify password before issuing any tokens
+      const staffPasswordMatch = await staff.comparePassword(password);
+      if (!staffPasswordMatch) {
+        return res.status(401).json({ error: 'Invalid email or password' });
+      }
+
+      // Use staff-specific token signers so the JWT carries role:'staff' + staffId
+      // claims that requireAuth middleware needs to identify this as a staff session.
+      const encAccessToken = encryptToken(signStaffAccessToken(staff));
+      const refreshToken   = signStaffRefreshToken(staff);
 
       await RefreshToken.create({
         userId:    staff._id,
@@ -1067,12 +1076,17 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
 
       if (!propertyId) return res.status(400).json({ error: 'Property selection is required.' });
 
+      // Verify PIN first — before checking property access.
+      // Reversing this order would let an unauthenticated caller probe whether
+      // a given propertyId is valid by observing which 400/403 comes back,
+      // without ever needing to supply a correct PIN.
       const pinMatch = await bcrypt.compare(String(pin), staff.pin || '');
       if (!pinMatch) {
         const failResult = await registerPinFailure(staff, now, 'manager');
         return res.status(failResult.status).json(failResult.body);
       }
 
+      // PIN is correct — now enforce property access
       const clientUser = await User.findById(staff.clientId).select('properties');
       let hasAccess = false;
       if (clientUser?.properties) {
@@ -1144,6 +1158,14 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.get('/pin-status', requireAuth, async (req, res, next) => {
   try {
+    // Staff accounts live in the Staff collection, not User.
+    // Querying User with a staff email returns null → 404.
+    if (req.isStaff) {
+      const staff = await Staff.findById(req.staff._id).select('+pin');
+      if (!staff) return res.status(404).json({ error: 'Staff not found' });
+      return res.json({ email: staff.email, role: 'staff', hasPin: !!staff.pin, pinLength: staff.pin ? staff.pin.length : 0 });
+    }
+
     const user = await User.findOne({ email: req.user.email }).select('+pin');
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({ email: user.email, role: user.role, hasPin: !!user.pin, pinLength: user.pin ? user.pin.length : 0 });
