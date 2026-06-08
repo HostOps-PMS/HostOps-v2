@@ -172,6 +172,10 @@ function escHtml(s) {
 }
 
 // ── Hook: client accounts ─────────────────────────────────────────
+// FIX: Was calling /api/accounts (does not exist → 401 / HTML response).
+// Correct endpoint is /api/clients which returns a plain array of users.
+// Also fixed response parsing: /api/clients returns an array directly,
+// not { users: [] }, so the old `data.users` always resolved to [].
 function useClientAccounts() {
   const [clients, setClients]     = useState([]);
   const [acctLoading, setLoading] = useState(true);
@@ -180,12 +184,13 @@ function useClientAccounts() {
     let cancelled = false;
     async function load() {
       try {
-        const res = await fetch(apiUrl('/api/accounts'), {
+        const res = await fetch(apiUrl('/api/clients'), {
           headers: authHeaders(), credentials: 'include',
         });
-        if (!res.ok) throw new Error(`accounts ${res.status}`);
+        if (!res.ok) throw new Error(`clients ${res.status}`);
         const data = await res.json();
-        const users = Array.isArray(data.users) ? data.users : [];
+        // /api/clients returns a plain array (not { users: [] })
+        const users = Array.isArray(data) ? data : (data.users ?? data.data ?? []);
         const mapped = users
           .filter((u) => u.role === 'client' || !u.role)
           .map((u) => ({
@@ -195,7 +200,7 @@ function useClientAccounts() {
           }));
         if (!cancelled) setClients(mapped);
       } catch (err) {
-        console.warn('[PropertyMap] accounts fetch failed:', err.message);
+        console.warn('[PropertyMap] clients fetch failed:', err.message);
       } finally {
         if (!cancelled) setLoading(false);
       }
