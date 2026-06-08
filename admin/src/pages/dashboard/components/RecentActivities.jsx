@@ -64,6 +64,7 @@ export default function RecentActivities({ activities, loading }) {
 
   return (
     <div className="db-table-card" style={{ flexShrink: 0, minHeight: 450 }}>
+      {/* Header */}
       <div className="db-table-card__head">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <h2 className="db-table-card__title">Recent Activities</h2>
@@ -81,10 +82,11 @@ export default function RecentActivities({ activities, loading }) {
         <button className="db-table-card__action">View all →</button>
       </div>
 
-      <div style={{ padding: '4px 16px 12px', display: 'flex', flexDirection: 'column', overflowY: 'auto', maxHeight: 400 }}>
+      {/* Activity list */}
+      <div style={{ padding: '4px 16px 20px', display: 'flex', flexDirection: 'column', overflowY: 'auto', maxHeight: 400 }}>
         {displayActivities.map((act, i) => {
-          const dot       = TYPE_DOT[act.type] ?? TYPE_DOT.booking;
-          const avatarBg  = hashColor(act.avatar || act.actor || 'G');
+          const dot      = TYPE_DOT[act.type] ?? TYPE_DOT.booking;
+          const avatarBg = hashColor(act.avatar || act.actor || 'G');
           return (
             <div key={act.id} style={{
               display: 'flex',
@@ -142,6 +144,22 @@ export default function RecentActivities({ activities, loading }) {
             No recent booking activity.
           </div>
         )}
+      </div>
+
+      {/* View all button — bottom */}
+      <div style={{ padding: '20px 20px 24px', textAlign: 'center' }}>
+        <button style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '8px 24px',
+          borderRadius: 'var(--radius-pill)',
+          background: 'var(--color-brand-light)',
+          color: 'var(--color-brand)',
+          fontWeight: 600, fontSize: '.8rem',
+          border: '1px solid #c6ead9',
+          cursor: 'pointer', fontFamily: 'var(--font-body)',
+        }}>
+          View all activities ↗
+        </button>
       </div>
     </div>
   );
