@@ -1,613 +1,320 @@
-// components/PropertyMap.jsx
+// src/pages/Dashboard/components/PropertyMap.jsx
 // ─────────────────────────────────────────────────────────────────
-// Leaflet.js map + real markers + side legend.
-//
-// Uses Leaflet loaded from CDN (no npm install needed) so markers
-// are actual map objects that pan/zoom with the map — not absolutely-
-// positioned overlays that drift away from the iframe.
-//
-// Flow:
-//   1. Dropdown 1 (Business Account) — populated from /api/accounts.
-//   2. Dropdown 2 (Property)         — shows DB properties of selected client.
-//      • "All properties" = fetch ALL Smoobu sub-apartments for that client via
-//        GET /api/accounts/:clientId/smoobu-apartments (no propertyIndex = all)
-//        OR use mapLocations from overview when "All accounts" is selected.
-//      • Specific property = GET /api/accounts/:clientId/smoobu-apartments?propertyIndex=N
-//   3. Leaflet map renders markers from whichever source is active.
+// Renders all client properties on a Leaflet map using the exact
+// coordinates stored in Smoobu (/apartments/:id → location.latitude
+// / location.longitude).
 //
 // Props:
-//   mapLocations : [{ apartmentId, apartmentName, propertyName, clientId,
-//                     clientName, street, zip, city, country,
-//                     latitude, longitude, type }]  — from overview, may be null
-//   loading      : boolean  — true while overview is still fetching
-// ─────────────────────────────────────────────────────────────────
-import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-
-const COLORS = ['#1a9e6e','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4',
-                '#ec4899','#14b8a6','#f97316','#a855f7'];
-
-// ── Jitter helper ─────────────────────────────────────────────────
-// When multiple apartments share the exact same lat/lng (common for
-// units inside one building), Leaflet stacks them so only the top
-// marker is clickable.  This function spreads duplicates in a small
-// circle (~20 m radius) so every marker is individually visible.
-function applyCoordJitter(points) {
-  const seen = {};
-  return points.map((p) => {
-    if (p.latitude === null || p.longitude === null) return p;
-    const key = `${p.latitude.toFixed(6)},${p.longitude.toFixed(6)}`;
-    const count = seen[key] ?? 0;
-    seen[key] = count + 1;
-    if (count === 0) return p; // first occurrence — no jitter
-    // Spread subsequent duplicates evenly around a ~0.00018° radius (~20 m)
-    const angle = (count * (2 * Math.PI)) / 8; // up to 8 unique positions
-    const r = 0.00018;
-    return {
-      ...p,
-      latitude:  p.latitude  + r * Math.sin(angle),
-      longitude: p.longitude + r * Math.cos(angle),
-    };
-  });
-}
-
-// ── Helpers ───────────────────────────────────────────────────────
-
-// On deployed environments the frontend and backend are on different
-// Render services, so relative paths (/api/...) return 401 or 404.
-// VITE_API_BASE_URL should be set to the backend origin in production,
-// e.g. "https://hostops-backend.onrender.com". In local dev it can be
-// left empty so relative paths still work via the Vite proxy.
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
-
-function authHeaders() {
-  const token = sessionStorage.getItem('hp_access_token') ?? '';
-  return {
-    'Content-Type': 'application/json',
-    Authorization:  `Bearer ${token}`,
-    'x-api-key':    import.meta.env.VITE_API_KEY ?? '',
-  };
-}
-
-function apiUrl(path) {
-  return `${API_BASE}${path}`;
-}
-
-// Normalise a coordinate value that may be a string or number.
-// Returns a finite number or null.
-function toCoord(val) {
-  const n = parseFloat(val);
-  return Number.isFinite(n) ? n : null;
-}
-
-// ── Leaflet loader ────────────────────────────────────────────────
-// Injects the Leaflet CSS + JS from CDN once, resolves when ready.
-let leafletPromise = null;
-function loadLeaflet() {
-  if (leafletPromise) return leafletPromise;
-  leafletPromise = new Promise((resolve, reject) => {
-    if (window.L) { resolve(window.L); return; }
-
-    // CSS
-    if (!document.querySelector('#leaflet-css')) {
-      const link = document.createElement('link');
-      link.id  = 'leaflet-css';
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-    }
-
-    // JS
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.onload  = () => resolve(window.L);
-    script.onerror = () => reject(new Error('Failed to load Leaflet'));
-    document.head.appendChild(script);
-  });
-  return leafletPromise;
-}
-
-// ── Hook: fetch all client accounts for the top dropdown ─────────
-function useClientAccounts() {
-  const [clients, setClients]     = useState([]);
-  const [acctLoading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const res = await fetch(apiUrl('/api/accounts'), {
-          headers:     authHeaders(),
-          credentials: 'include',
-        });
-        if (!res.ok) throw new Error(`accounts ${res.status}`);
-        const data = await res.json();
-        const users = Array.isArray(data.users) ? data.users : [];
-        const mapped = users
-          .filter((u) => u.role === 'client' || !u.role)
-          .map((u) => ({
-            id:         String(u._id || u.id),
-            name:       u.businessName || u.firstName || u.email || 'Unnamed',
-            properties: Array.isArray(u.properties) ? u.properties : [],
-          }));
-        if (!cancelled) setClients(mapped);
-      } catch (err) {
-        console.warn('[PropertyMap] accounts fetch failed:', err.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, []);
-
-  return { clients, acctLoading };
-}
-
-// ── Hook: fetch Smoobu apartments for one client ──────────────────
-function useSmoobuApartments(clientId, propertyIndex) {
-  const [apartments, setApartments] = useState([]);
-  const [aptLoading, setLoading]    = useState(false);
-  const [aptError, setError]        = useState(null);
-
-  const fetch_ = useCallback(async () => {
-    if (!clientId) {
-      setApartments([]);
-      setError(null);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const qs = (propertyIndex !== null && propertyIndex !== undefined)
-        ? `?propertyIndex=${propertyIndex}`
-        : '';
-      const url = apiUrl(`/api/accounts/${clientId}/smoobu-apartments${qs}`);
-      const res = await fetch(url, {
-        headers:     authHeaders(),
-        credentials: 'include',
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `smoobu-apartments ${res.status}`);
-      }
-      const data = await res.json();
-      // Normalise coords to numbers here so downstream never sees strings
-      const apts = (Array.isArray(data.allApartments) ? data.allApartments : []).map((a) => ({
-        ...a,
-        latitude:  toCoord(a.latitude),
-        longitude: toCoord(a.longitude),
-      }));
-      setApartments(apts);
-    } catch (err) {
-      console.warn('[PropertyMap] smoobu-apartments fetch failed:', err.message);
-      setError(err.message);
-      setApartments([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [clientId, propertyIndex]);
-
-  useEffect(() => { fetch_(); }, [fetch_]);
-
-  return { apartments, aptLoading, aptError, refetch: fetch_ };
-}
-
-// ── Leaflet map hook ──────────────────────────────────────────────
-// Initialises the map into `containerRef` every time the ref's DOM node
-// is (re)attached, then updates markers whenever `plottable` changes.
+//   mapLocations  — array from overview.mapLocations (may be null while loading)
+//   loading       — boolean
 //
-// Key design: the map is tied to the DOM node. When the parent switches
-// between the skeleton and the real map div (isMapLoading toggle), the
-// old DOM node is removed. The cleanup in the effect destroys the L.Map.
-// Next render mounts a fresh node, this effect fires again, and a new
-// map is created. We must NOT gate on "if (mapRef.current) return".
-function useLeafletMap(containerRef, plottable) {
-  const mapRef     = useRef(null);  // L.Map instance
-  const markersRef = useRef([]);    // current L.Marker[]
-  const [leafletReady, setLeafletReady] = useState(!!window.L);
+// Each mapLocation item:
+//   { id, name, propertyName, clientId, clientName,
+//     address, street, zip, city, country, lat, lng }
+//
+// Falls back to a "No location data" empty state if Smoobu returned
+// no coordinates for any apartment.
+// ─────────────────────────────────────────────────────────────────
 
-  // Load Leaflet once
-  useEffect(() => {
-    if (window.L) { setLeafletReady(true); return; }
-    loadLeaflet()
-      .then(() => setLeafletReady(true))
-      .catch((err) => console.error('[PropertyMap] Leaflet load failed:', err));
-  }, []);
+import { useEffect, useRef, useState } from 'react';
 
-  // Init (or re-init) map whenever the container node becomes available.
-  // containerRef.current is listed as a dep so React re-runs this whenever
-  // the DOM node is replaced (e.g. loading skeleton → real map).
-  useEffect(() => {
-    if (!leafletReady || !containerRef.current) return;
+// ── Leaflet is loaded via CDN in index.html ───────────────────────
+// Make sure your index.html includes:
+//   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+//   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-    // Destroy any stale map before creating a new one
-    if (mapRef.current) {
-      mapRef.current.remove();
-      mapRef.current    = null;
-      markersRef.current = [];
-    }
+const DEFAULT_CENTER = [12.8797, 121.7740]; // Philippines center
+const DEFAULT_ZOOM   = 6;
 
-    const L   = window.L;
-    const map = L.map(containerRef.current, {
-      center:          [14.5, 121.0], // default: Philippines
-      zoom:            6,
-      zoomControl:     true,
-      scrollWheelZoom: false,
-    });
+// Group color palette — one color per unique clientId
+const CLIENT_COLORS = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
+  '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16',
+  '#f97316', '#14b8a6',
+];
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-    }).addTo(map);
-
-    mapRef.current = map;
-
-    // Let the container fully paint before asking Leaflet to measure it
-    setTimeout(() => map.invalidateSize(), 150);
-
-    return () => {
-      map.remove();
-      mapRef.current    = null;
-      markersRef.current = [];
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leafletReady, containerRef.current]); // re-run when DOM node changes
-
-  // Update markers whenever plottable list changes
-  useEffect(() => {
-    const L   = window.L;
-    const map = mapRef.current;
-    if (!L || !map) return;
-
-    // Remove old markers
-    markersRef.current.forEach((m) => m.remove());
-    markersRef.current = [];
-
-    if (plottable.length === 0) return;
-
-    // Apply jitter so duplicate-coordinate markers (units in same building)
-    // are all visible instead of stacked on top of each other.
-    const jittered = applyCoordJitter(plottable);
-
-    const bounds = [];
-
-    jittered.forEach((p, i) => {
-      const color  = COLORS[i % COLORS.length];
-      const label  = p.apartmentName || p.propertyName || '';
-      const addr   = [p.street, p.city, p.country].filter(Boolean).join(', ');
-      const client = p.clientName || '';
-
-      // Coloured circle div-icon — moves correctly with pan/zoom
-      const icon = L.divIcon({
-        className: '',
-        html: `<div style="
-          width:14px;height:14px;border-radius:50%;
-          background:${color};border:2.5px solid #fff;
-          box-shadow:0 1px 4px rgba(0,0,0,0.35);
-          cursor:pointer;
-        "></div>`,
-        iconSize:   [14, 14],
-        iconAnchor: [7,  7],
-        popupAnchor:[0, -10],
-      });
-
-      const marker = L.marker([p.latitude, p.longitude], { icon });
-
-      const popupHtml = `
-        <div style="font-size:12px;line-height:1.5;min-width:140px;">
-          <div style="font-weight:700;margin-bottom:2px;">${label}</div>
-          ${client ? `<div style="color:#1a9e6e;font-weight:600;">${client}</div>` : ''}
-          ${addr    ? `<div style="color:#6b7280;">${addr}</div>` : ''}
-          ${p.type  ? `<div style="color:#6b7280;">${p.type}</div>` : ''}
-        </div>`;
-      marker.bindPopup(popupHtml);
-      marker.addTo(map);
-
-      markersRef.current.push(marker);
-      bounds.push([p.latitude, p.longitude]);
-    });
-
-    // Fit viewport to show all markers
-    if (bounds.length === 1) {
-      map.setView(bounds[0], 15);
-    } else if (bounds.length > 1) {
-      map.fitBounds(bounds, { padding: [40, 40] });
-    }
-  }, [plottable]);
-
-  return { leafletReady };
+function getClientColor(clientId, colorMap) {
+  if (!colorMap.has(clientId)) {
+    colorMap.set(clientId, CLIENT_COLORS[colorMap.size % CLIENT_COLORS.length]);
+  }
+  return colorMap.get(clientId);
 }
 
-// ── Main Component ────────────────────────────────────────────────
-export default function PropertyMap({ mapLocations, loading }) {
-  const [selectedClient,    setSelectedClient]    = useState('all');
-  const [selectedPropIndex, setSelectedPropIndex] = useState(null);
+function buildIcon(color) {
+  const L = window.L;
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="
+        width: 28px; height: 28px;
+        background: ${color};
+        border: 3px solid #fff;
+        border-radius: 50% 50% 50% 0;
+        transform: rotate(-45deg);
+        box-shadow: 0 2px 8px rgba(0,0,0,.35);
+      "></div>`,
+    iconSize:   [28, 28],
+    iconAnchor: [14, 28],
+    popupAnchor:[0, -30],
+  });
+}
 
-  const { clients, acctLoading } = useClientAccounts();
-
-  const activeClient = useMemo(
-    () => clients.find((c) => c.id === selectedClient) ?? null,
-    [clients, selectedClient]
-  );
-
-  function handleClientChange(clientId) {
-    setSelectedClient(clientId);
-    setSelectedPropIndex(null);
-  }
-
-  function handlePropChange(raw) {
-    setSelectedPropIndex(raw === '' || raw === null || raw === 'all' ? null : Number(raw));
-  }
-
-  // Fetch from Smoobu whenever a specific client is selected
-  const smoobuClientId = selectedClient !== 'all' ? selectedClient : null;
-
-  const { apartments: smoobuApts, aptLoading, aptError } =
-    useSmoobuApartments(smoobuClientId, selectedPropIndex);
-
-  // Normalise overview coords too (may also be strings)
-  const overviewLocs = useMemo(() =>
-    (Array.isArray(mapLocations) ? mapLocations : []).map((l) => ({
-      ...l,
-      latitude:  toCoord(l.latitude),
-      longitude: toCoord(l.longitude),
-    })),
-  [mapLocations]);
-
-  // ── Build full location list (for legend) ─────────────────────
-  const locations = useMemo(() => {
-    if (smoobuClientId) {
-      if (aptLoading && smoobuApts.length === 0) {
-        const client = clients.find((c) => c.id === smoobuClientId);
-        if (!client) return [];
-        const propsToShow = (selectedPropIndex !== null)
-          ? [client.properties[selectedPropIndex]].filter(Boolean)
-          : client.properties;
-        return propsToShow.map((prop, i) => ({
-          apartmentId:   `db:${smoobuClientId}:${i}`,
-          apartmentName: prop?.propertyName || 'Property',
-          propertyName:  prop?.propertyName || 'Property',
-          clientId:      smoobuClientId,
-          clientName:    activeClient?.name || '',
-          street: '', zip: '', city: '', country: '',
-          latitude: null, longitude: null,
-        }));
-      }
-      return smoobuApts;
-    }
-
-    // All accounts mode:
-    // Use overviewLocs (individual Smoobu apartments with real coords/addresses)
-    // as the primary source. Then add DB-only stubs for any client/property
-    // that has NO Smoobu entry at all, so they still appear in the legend.
-
-    // Build a set of clientIds that already have at least one overviewLocs entry
-    const clientsWithSmoobu = new Set(overviewLocs.map((l) => l.clientId));
-
-    const stubs = [];
-    clients.forEach((client) => {
-      if (clientsWithSmoobu.has(client.id)) return; // already covered by Smoobu data
-      if (client.properties.length === 0) {
-        stubs.push({
-          apartmentId:   `db:${client.id}`,
-          apartmentName: '(no properties)',
-          propertyName:  '(no properties)',
-          clientId:      client.id,
-          clientName:    client.name,
-          street: '', zip: '', city: '', country: '',
-          latitude: null, longitude: null,
-        });
-      } else {
-        client.properties.forEach((prop, pi) => {
-          stubs.push({
-            apartmentId:   `db:${client.id}:${pi}`,
-            apartmentName: prop.propertyName || 'Property',
-            propertyName:  prop.propertyName || 'Property',
-            clientId:      client.id,
-            clientName:    client.name,
-            street: '', zip: '', city: '', country: '',
-            latitude: null, longitude: null,
-          });
-        });
-      }
-    });
-
-    // overviewLocs first (real Smoobu apartments with coords), then DB-only stubs
-    return [...overviewLocs, ...stubs];
-  }, [smoobuClientId, selectedPropIndex, smoobuApts, aptLoading,
-      clients, overviewLocs, activeClient]);
-
-  // Only entries with valid numeric coords go on the map
-  const plottable = useMemo(() =>
-    locations.filter(
-      (l) => l.latitude !== null && l.longitude !== null &&
-             Number.isFinite(l.latitude) && Number.isFinite(l.longitude)
-    ),
-  [locations]);
-
-  // ── Leaflet map ────────────────────────────────────────────────
-  const mapContainerRef = useRef(null);
-  useLeafletMap(mapContainerRef, plottable);
-
-  // ── Dropdown options ───────────────────────────────────────────
-  const propertyOptions = useMemo(() => {
-    if (!activeClient) return [];
-    return activeClient.properties.map((p, i) => ({
-      index: i,
-      name:  p.propertyName || `Property ${i + 1}`,
-    }));
-  }, [activeClient]);
-
-  const isDropdownLoading = acctLoading;
-  const isMapLoading      = loading || aptLoading;
-
-  const statusText = useMemo(() => {
-    if (aptLoading)   return 'Fetching Smoobu sub-apartments…';
-    if (aptError)     return `Smoobu error: ${aptError}`;
-    if (isMapLoading) return 'Loading coordinates…';
-    const source = smoobuClientId ? '(live from Smoobu)' : '(from overview)';
-    return `${plottable.length} of ${locations.length} mapped ${source}`;
-  }, [aptLoading, aptError, isMapLoading, smoobuClientId,
-      plottable.length, locations.length]);
-
+// ── Skeleton loader ───────────────────────────────────────────────
+function MapSkeleton() {
   return (
-    <div className="db-table-card" style={{ flexShrink: 0, overflow: 'visible' }}>
-
-      {/* ── Header + dropdowns ── */}
-      <div className="db-table-card__head" style={{ flexWrap: 'wrap', gap: 8 }}>
-        <div>
-          <h2 className="db-table-card__title">Property Map</h2>
-          <p style={{ fontSize: '.74rem', color: 'var(--color-muted)', marginTop: 2 }}>
-            {statusText}
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <select
-            value={selectedClient}
-            onChange={(e) => handleClientChange(e.target.value)}
-            disabled={isDropdownLoading}
-            style={dropdownStyle(isDropdownLoading)}
-          >
-            <option value="all">
-              {isDropdownLoading ? 'Loading accounts…' : `All accounts (${clients.length})`}
-            </option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-
-          {selectedClient !== 'all' && (
-            <select
-              value={selectedPropIndex ?? ''}
-              onChange={(e) => handlePropChange(e.target.value)}
-              disabled={isDropdownLoading || propertyOptions.length === 0}
-              style={dropdownStyle(isDropdownLoading || propertyOptions.length === 0)}
-            >
-              <option value="">
-                {propertyOptions.length === 0
-                  ? 'No properties'
-                  : `All properties (${propertyOptions.length})`}
-              </option>
-              {propertyOptions.map((p) => (
-                <option key={p.index} value={p.index}>{p.name}</option>
-              ))}
-            </select>
-          )}
-        </div>
-      </div>
-
-      {/* ── Map + legend ── */}
-      {isMapLoading ? (
-        <div style={{ padding: 16 }}>
-          <div className="db-skeleton" style={{ height: 325, borderRadius: 12 }} />
-        </div>
-      ) : (
-        <div style={{ display: 'flex', height: 325, overflow: 'hidden', borderRadius: '0 0 var(--radius-card, 12px) var(--radius-card, 12px)' }}>
-
-          {/* Leaflet map container */}
-          <div
-            ref={mapContainerRef}
-            style={{ flex: 1, minWidth: 0, zIndex: 0, overflow: 'hidden' }}
-          >
-            {/* Overlay shown when no coords are available */}
-            {locations.length > 0 && plottable.length === 0 && (
-              <div style={{
-                position: 'absolute', inset: 0, zIndex: 1000,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(255,255,255,0.85)', textAlign: 'center', padding: 20,
-              }}>
-                <div style={{ color: 'var(--color-muted)', fontSize: '.82rem', maxWidth: 300 }}>
-                  {aptError
-                    ? `Could not load Smoobu data: ${aptError}`
-                    : "No map coordinates set for these properties yet. Add each apartment's address in Smoobu to plot them here."}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Legend */}
-          <div style={{
-            width: 170, flexShrink: 0,
-            padding: '12px 14px',
-            borderLeft: '1px solid var(--color-border)',
-            display: 'flex', flexDirection: 'column', gap: 10,
-            overflowY: 'auto',
-          }}>
-            {isDropdownLoading ? (
-              <div style={{ fontSize: '.72rem', color: 'var(--color-muted)' }}>
-                Loading properties…
-              </div>
-            ) : locations.length === 0 ? (
-              <div style={{ fontSize: '.72rem', color: 'var(--color-muted)' }}>
-                No properties to display.
-              </div>
-            ) : (
-              locations.map((p, i) => {
-                const addrParts = [p.street, p.city, p.country].filter(Boolean);
-                const addr      = addrParts.join(', ');
-                const hasCoords = p.latitude !== null && p.longitude !== null;
-                // Priority: street+city+country → type → "No address in Smoobu"
-                const subtitle  = addr || p.type || (hasCoords ? '' : 'No address in Smoobu');
-                return (
-                  <div key={String(p.apartmentId)}
-                    style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
-                    <div style={{
-                      width: 10, height: 10, borderRadius: '50%',
-                      background: hasCoords ? COLORS[i % COLORS.length] : '#d1d5db',
-                      flexShrink: 0, marginTop: 2,
-                    }} />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{
-                        fontSize: '.72rem', fontWeight: 600, color: 'var(--color-text)',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}>
-                        {p.apartmentName || p.propertyName}
-                      </div>
-                      {p.propertyName && p.apartmentName !== p.propertyName && (
-                        <div style={{
-                          fontSize: '.67rem', color: 'var(--color-muted)',
-                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                        }}>
-                          {p.propertyName}
-                        </div>
-                      )}
-                      <div style={{
-                        fontSize: '.68rem', color: 'var(--color-brand)', fontWeight: 600,
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}>
-                        {p.clientName}
-                      </div>
-                      <div style={{
-                        fontSize: '.68rem', color: 'var(--color-muted)',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}>
-                        {subtitle}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      )}
+    <div style={{
+      height: '100%',
+      background: 'var(--color-surface-2, #1e2530)',
+      borderRadius: 'var(--radius-md, 12px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'column',
+      gap: 12,
+      color: 'var(--color-muted, #6b7280)',
+      fontSize: '.85rem',
+    }}>
+      <div style={{
+        width: 40, height: 40,
+        border: '3px solid var(--color-border, #2d3748)',
+        borderTopColor: 'var(--color-primary, #3b82f6)',
+        borderRadius: '50%',
+        animation: 'spin 1s linear infinite',
+      }} />
+      <span>Loading map…</span>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }
 
-// ── Shared dropdown style helper ──────────────────────────────────
-function dropdownStyle(disabled) {
-  return {
-    padding: '6px 12px',
-    borderRadius: 'var(--radius-pill)',
-    border: '1px solid var(--color-border)',
-    background: 'var(--color-surface)',
-    color: disabled ? 'var(--color-muted)' : 'var(--color-text)',
-    fontWeight: 600,
-    fontSize: '.78rem',
-    fontFamily: 'var(--font-body)',
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    maxWidth: 220,
-  };
+// ── Empty state ───────────────────────────────────────────────────
+function EmptyMap() {
+  return (
+    <div style={{
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'column',
+      gap: 10,
+      color: 'var(--color-muted, #6b7280)',
+      fontSize: '.85rem',
+    }}>
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+        <circle cx="12" cy="9" r="2.5"/>
+      </svg>
+      <span>No map coordinates available yet.</span>
+      <span style={{ fontSize: '.75rem', opacity: .6 }}>
+        Add a location to your Smoobu properties to see them here.
+      </span>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────
+export default function PropertyMap({ mapLocations, loading }) {
+  const mapRef      = useRef(null);   // DOM node
+  const leafletRef  = useRef(null);   // L.Map instance
+  const markersRef  = useRef([]);
+  const colorMapRef = useRef(new Map());
+
+  const [ready, setReady] = useState(false);
+
+  // ── Init Leaflet once the DOM node is available ───────────────
+  useEffect(() => {
+    if (!mapRef.current || leafletRef.current) return;
+
+    const L = window.L;
+    if (!L) {
+      console.error('[PropertyMap] Leaflet not found. Make sure leaflet.js is loaded in index.html.');
+      return;
+    }
+
+    const map = L.map(mapRef.current, {
+      center:    DEFAULT_CENTER,
+      zoom:      DEFAULT_ZOOM,
+      zoomControl: true,
+      scrollWheelZoom: true,
+    });
+
+    // ── Tile layer: OpenStreetMap (free, no API key needed) ─────
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+    }).addTo(map);
+
+    leafletRef.current = map;
+    setReady(true);
+
+    return () => {
+      map.remove();
+      leafletRef.current = null;
+    };
+  }, []);
+
+  // ── Add / refresh markers whenever mapLocations changes ──────
+  useEffect(() => {
+    const L   = window.L;
+    const map = leafletRef.current;
+    if (!L || !map || !ready) return;
+
+    // Clear old markers
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current = [];
+
+    const locations = Array.isArray(mapLocations) ? mapLocations : [];
+    const valid     = locations.filter(loc => loc.lat !== null && loc.lng !== null);
+
+    if (valid.length === 0) return;
+
+    const bounds = [];
+
+    valid.forEach(loc => {
+      const color  = getClientColor(loc.clientId, colorMapRef.current);
+      const icon   = buildIcon(color);
+      const latlng = [loc.lat, loc.lng];
+
+      const popup = L.popup({ maxWidth: 260, className: 'pm-popup' }).setContent(`
+        <div style="font-family:system-ui,sans-serif;font-size:13px;line-height:1.5">
+          <div style="font-weight:700;font-size:14px;margin-bottom:4px">${loc.name}</div>
+          <div style="color:#6b7280;margin-bottom:6px">${loc.propertyName}</div>
+          ${loc.address
+            ? `<div style="display:flex;gap:6px;align-items:flex-start">
+                 <span style="margin-top:1px">📍</span>
+                 <span>${loc.address}</span>
+               </div>`
+            : ''}
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e5e7eb;
+                      color:#6b7280;font-size:11px">
+            Client: <strong style="color:#111">${loc.clientName}</strong>
+          </div>
+          <div style="margin-top:4px;color:#9ca3af;font-size:10px">
+            ${loc.lat.toFixed(6)}, ${loc.lng.toFixed(6)}
+          </div>
+        </div>
+      `);
+
+      const marker = L.marker(latlng, { icon }).addTo(map).bindPopup(popup);
+      markersRef.current.push(marker);
+      bounds.push(latlng);
+    });
+
+    // Fit map to all markers (with padding)
+    if (bounds.length === 1) {
+      map.setView(bounds[0], 14);
+    } else if (bounds.length > 1) {
+      map.fitBounds(L.latLngBounds(bounds), { padding: [40, 40], maxZoom: 14 });
+    }
+  }, [mapLocations, ready]);
+
+  // ── Legend: one row per unique client ────────────────────────
+  const legend = (() => {
+    const seen = new Map();
+    (Array.isArray(mapLocations) ? mapLocations : []).forEach(loc => {
+      if (!seen.has(loc.clientId)) {
+        seen.set(loc.clientId, {
+          clientName: loc.clientName,
+          color: getClientColor(loc.clientId, colorMapRef.current),
+          count: 0,
+        });
+      }
+      seen.get(loc.clientId).count += 1;
+    });
+    return [...seen.values()];
+  })();
+
+  const validCount = (Array.isArray(mapLocations) ? mapLocations : [])
+    .filter(l => l.lat !== null && l.lng !== null).length;
+
+  // ── Render ────────────────────────────────────────────────────
+  return (
+    <div style={{
+      background:   'var(--color-surface, #131920)',
+      border:       '1px solid var(--color-border, #2d3748)',
+      borderRadius: 'var(--radius-md, 12px)',
+      overflow:     'hidden',
+      display:      'flex',
+      flexDirection:'column',
+      height:       420,
+    }}>
+      {/* ── Header ─────────────────────────────────────────── */}
+      <div style={{
+        padding:    '14px 18px 10px',
+        borderBottom:'1px solid var(--color-border, #2d3748)',
+        display:    'flex',
+        alignItems: 'center',
+        justifyContent:'space-between',
+        flexShrink: 0,
+      }}>
+        <div>
+          <h3 style={{ margin:0, fontSize:'.95rem', fontWeight:600,
+                       color:'var(--color-text, #f1f5f9)' }}>
+            Property Map
+          </h3>
+          <p style={{ margin:0, fontSize:'.72rem',
+                      color:'var(--color-muted, #6b7280)', marginTop:2 }}>
+            {loading
+              ? 'Fetching coordinates from Smoobu…'
+              : validCount > 0
+                ? `${validCount} propert${validCount === 1 ? 'y' : 'ies'} plotted from Smoobu location data`
+                : 'No Smoobu coordinates found'}
+          </p>
+        </div>
+
+        {/* Source badge */}
+        {!loading && validCount > 0 && (
+          <div style={{
+            fontSize:'.68rem', fontWeight:600, letterSpacing:'.04em',
+            color:'#10b981', background:'rgba(16,185,129,.12)',
+            border:'1px solid rgba(16,185,129,.3)',
+            borderRadius:20, padding:'3px 10px',
+          }}>
+            SMOOBU GPS
+          </div>
+        )}
+      </div>
+
+      {/* ── Map area ───────────────────────────────────────── */}
+      <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+        {loading ? (
+          <MapSkeleton />
+        ) : validCount === 0 ? (
+          <EmptyMap />
+        ) : (
+          <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+        )}
+      </div>
+
+      {/* ── Legend ─────────────────────────────────────────── */}
+      {!loading && legend.length > 0 && (
+        <div style={{
+          padding:    '10px 18px',
+          borderTop:  '1px solid var(--color-border, #2d3748)',
+          display:    'flex',
+          flexWrap:   'wrap',
+          gap:        '8px 16px',
+          flexShrink: 0,
+          background: 'var(--color-surface-2, #1a2232)',
+        }}>
+          {legend.map(entry => (
+            <div key={entry.clientName} style={{
+              display:    'flex',
+              alignItems: 'center',
+              gap:        6,
+              fontSize:   '.72rem',
+              color:      'var(--color-muted, #9ca3af)',
+            }}>
+              <div style={{
+                width: 10, height: 10, borderRadius: '50%',
+                background: entry.color, flexShrink: 0,
+              }} />
+              <span>{entry.clientName}</span>
+              <span style={{ opacity: .5 }}>({entry.count})</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
