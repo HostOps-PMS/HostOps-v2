@@ -102,7 +102,11 @@ function applyCoordJitter(points) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+const API_BASE = (
+  import.meta.env.VITE_API_BASE_URL ??
+  import.meta.env.VITE_API_URL ??
+  'https://hostpilot-smoobu.onrender.com'
+).replace(/\/$/, '');
 
 function authHeaders() {
   const token = sessionStorage.getItem('hp_access_token') ?? '';
