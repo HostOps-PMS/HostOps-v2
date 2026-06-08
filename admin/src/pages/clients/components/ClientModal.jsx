@@ -456,7 +456,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
             )}
 
 
-            /* ── Read-only details ── */
+            
             <>
               <div className="cl-modal-grid">
                 <Field label="Role" value={
