@@ -111,7 +111,7 @@ app.use(mongoSanitize());
 // ── Rate Limiting ─────────────────────────────────────────────────────────────
 const globalLimiter = rateLimit({
   windowMs:         15 * 60 * 1000,
-  max:              100,
+  max:              10,
   standardHeaders:  true,
   legacyHeaders:    false,
   message: { error: 'Too many requests, please try again later.' },
@@ -119,7 +119,7 @@ const globalLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs:        15 * 60 * 1000,
-  max:             100,
+  max:             10,
   standardHeaders: true,
   legacyHeaders:   false,
   message: { error: 'Too many authentication attempts, please try again later.' },
@@ -153,6 +153,7 @@ app.use('/api',  staffsRoutes);
 app.use('/api',  accountsRoutes);         // GET /api/accounts (admin)
 app.use('/api',  dashboardOverviewRoute); // GET /api/dashboard-overview (admin)
 app.use('/api',  adminRecoveryRouter);    // GET|PATCH /api/recovery-requests (admin)
+app.use('/api', keyDiagnosticRoute);
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
