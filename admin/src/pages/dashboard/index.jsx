@@ -79,7 +79,10 @@ export default function Dashboard() {
 
           {/* ── Row 3: Property Map + Occupancy Gauge ── */}
           <div className="db-grid-2">
-            <PropertyMap />
+            <PropertyMap
+              mapLocations={overview?.mapLocations ?? null}
+              loading={statsLoading}
+            />
             {/* OccupancyGauge receives live per-property occupancy from Smoobu */}
             <OccupancyGauge
               occupancyBreakdown={overview?.occupancyBreakdown ?? null}
