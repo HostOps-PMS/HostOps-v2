@@ -18,6 +18,7 @@ import dashboardOverviewRoute    from './routes/dashboardOverviewRoute.js';
 import { publicRecoveryRouter, adminRecoveryRouter } from './routes/recoveryRequests.js';
 import { requireApiKey } from './middleware/apiKeyAuth.js';
 import keyDiagnosticRoute from './routes/keyDiagnosticRoute.js';
+import smoobuApartmentsRoute   from './routes/smoobuApartments.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -151,6 +152,7 @@ app.use('/api',  clientsRoutes);
 app.use('/api',  propertiesRoutes);
 app.use('/api',  staffsRoutes);
 app.use('/api',  accountsRoutes);         // GET /api/accounts (admin)
+app.use('/api/accounts', smoobuApartmentsRoute); // GET /api/accounts/:clientId/smoobu-apartments
 app.use('/api',  dashboardOverviewRoute); // GET /api/dashboard-overview (admin)
 app.use('/api',  adminRecoveryRouter);    // GET|PATCH /api/recovery-requests (admin)
 app.use('/api', keyDiagnosticRoute);
