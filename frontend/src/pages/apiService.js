@@ -1,8 +1,9 @@
+// frontend/src/pages/apiService.js
 const HP_API_BASE = import.meta.env.VITE_API_BASE || 'https://hostpilot-smoobu.onrender.com';
 
 /**
- * Authenticated fetch wrapper. Automatically attaches Bearer token and
- * retries once after a silent token refresh on 401.
+ * Authenticated fetch wrapper. Reads token from memory (AuthContext),
+ * retries once after silent refresh on 401.
  *
  * @param {string} path    - API path, e.g. "/api/dashboard"
  * @param {object} options - Standard fetch options
@@ -15,20 +16,22 @@ export async function authFetch(path, options = {}, auth) {
 
   const opts = {
     ...options,
+    credentials: 'include',   // always send cookies (refresh token)
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': import.meta.env.VITE_API_KEY,
+      'x-api-key':    import.meta.env.VITE_API_KEY,
       ...(options.headers || {}),
-      Authorization: `Bearer ${token}`,
+      Authorization:  `Bearer ${token}`,
     },
-    credentials: 'include',
   };
 
   let res = await fetch(`${HP_API_BASE}${path}`, opts);
 
+  // ── Silent refresh on 401 ────────────────────────────────────────
   if (res.status === 401) {
     const refreshed = await tryRefresh(auth);
     if (refreshed) {
+      // Retry with the new token
       opts.headers.Authorization = `Bearer ${auth.getToken()}`;
       res = await fetch(`${HP_API_BASE}${path}`, opts);
     } else {
@@ -42,26 +45,22 @@ export async function authFetch(path, options = {}, auth) {
 
 /**
  * Attempts a silent token refresh using the HttpOnly refresh cookie.
+ * Stores the new encrypted access token in memory via auth.setToken().
  * Also updates the stored user if the refresh response includes it.
  */
 export async function tryRefresh(auth) {
   try {
     const res = await fetch(`${HP_API_BASE}/auth/refresh`, {
-      method: 'POST',
+      method:      'POST',
       credentials: 'include',
-      headers: { 'x-api-key': import.meta.env.VITE_API_KEY },
+      headers:     { 'x-api-key': import.meta.env.VITE_API_KEY },
     });
     if (!res.ok) return false;
 
     const data = await res.json();
     auth.setToken(data.accessToken);
 
-    // ✅ FIX: If the refresh endpoint also returns a user object, persist it.
-    // Prevents stale user data after token rotation.
-    if (data.user) {
-      auth.setUser(data.user);
-    }
-
+    if (data.user) auth.setUser(data.user);
     return true;
   } catch {
     return false;
@@ -78,29 +77,30 @@ export async function verifySession(auth) {
 
   try {
     const res = await fetch(`${HP_API_BASE}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}`, 'x-api-key': import.meta.env.VITE_API_KEY },
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'x-api-key':   import.meta.env.VITE_API_KEY,
+      },
     });
 
     if (res.ok) {
       const data = await res.json();
-      // /auth/me returns { user: { ...fields } } — unwrap so we store the
-      // actual user object, not the wrapper.  Without this, getUser()
-      // returned { user: { businessName, … } } and every component that
-      // checked user.businessName directly got undefined.
       const user = data.user || data;
       auth.setUser(user);
       return user;
     }
 
-    // Access token expired — try a silent refresh then re-validate.
+    // Access token expired — try a silent refresh then re-validate
     const refreshed = await tryRefresh(auth);
-    if (!refreshed) {
-      auth.clear();
-      return null;
-    }
+    if (!refreshed) { auth.clear(); return null; }
 
     const res2 = await fetch(`${HP_API_BASE}/auth/me`, {
-      headers: { Authorization: `Bearer ${auth.getToken()}`, 'x-api-key': import.meta.env.VITE_API_KEY },
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${auth.getToken()}`,
+        'x-api-key':   import.meta.env.VITE_API_KEY,
+      },
     });
 
     if (res2.ok) {
@@ -118,24 +118,13 @@ export async function verifySession(auth) {
 
 /**
  * Fetches dashboard data for a given date range and optional property filter.
- *
- * @param {object} opts
- * @param {string}      [opts.from]           - Date range start YYYY-MM-DD
- * @param {string}      [opts.to]             - Date range end YYYY-MM-DD
- * @param {string|null} [opts.apartmentId]    - When set, backend scopes response
- *                                              to that single Smoobu apartment ID.
- *                                              null / undefined = All Properties.
- * @param {string|null} [opts.propertyDbId]   - MongoDB _id of the selected property
- *                                              from user.properties[]. The backend
- *                                              uses this to inject the correct
- *                                              smoobuApiKey for per-property API calls.
  */
 export async function fetchDashboard({ from, to, apartmentId, propertyDbId }, auth) {
   const params = new URLSearchParams();
-  if (from)          params.set('from', from);
-  if (to)            params.set('to',   to);
-  if (apartmentId)   params.set('apartmentId', String(apartmentId));
-  if (propertyDbId)  params.set('propertyDbId', String(propertyDbId));
+  if (from)         params.set('from', from);
+  if (to)           params.set('to', to);
+  if (apartmentId)  params.set('apartmentId', String(apartmentId));
+  if (propertyDbId) params.set('propertyDbId', String(propertyDbId));
 
   const query = params.toString() ? `?${params.toString()}` : '';
   return authFetch(`/api/dashboard${query}`, {}, auth);
@@ -154,17 +143,16 @@ export async function fetchMessages(reservationId, auth) {
 export async function sendReply({ reservationId, subject, messageBody }, auth) {
   return authFetch('/api/messages/reply', {
     method: 'POST',
-    body: JSON.stringify({ reservationId, subject, messageBody }),
+    body:   JSON.stringify({ reservationId, subject, messageBody }),
   }, auth);
 }
 
 /**
  * Updates the current user's profile (firstName, lastName, propertyTagPrefix).
- * Returns the Response object; caller should check res.ok and parse res.json().
  */
 export async function updateProfile({ firstName, lastName, propertyTagPrefix }, auth) {
   return authFetch('/auth/profile', {
     method: 'PATCH',
-    body: JSON.stringify({ firstName, lastName, propertyTagPrefix }),
+    body:   JSON.stringify({ firstName, lastName, propertyTagPrefix }),
   }, auth);
 }
