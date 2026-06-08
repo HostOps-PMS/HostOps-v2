@@ -437,7 +437,13 @@ function buildRecentActivities(propertyResults, limit = 20) {
  * @param {{ from?: string, to?: string }} opts  — optional date range override
  * @returns {Promise<DashboardOverviewPayload>}
  */
+// Bump this string whenever you change this file, so you can confirm in the
+// API response / logs which version Render is actually running.
+const OVERVIEW_VERSION = 'overview-v5-maplocations+logs';
+
 export async function getDashboardOverview(opts = {}) {
+  console.log(`[overview] START version=${OVERVIEW_VERSION}`);
+
   // ── 1. Load all clients + their embedded properties (with smoobuApiKey) ──
   // smoobuApiKey is default-selected on the schema (no `.select('+...')`, which
   // would re-trigger the "Path collision" error on an array sub-schema field).
@@ -459,6 +465,8 @@ export async function getDashboardOverview(opts = {}) {
     (sum, c) => sum + (Array.isArray(c.properties) ? c.properties.length : 0),
     0
   );
+
+  console.log(`[overview] usersAllRoles=${allClients.length} totalClients=${totalClients} totalProperties=${totalProperties}`);
 
   // ── 2. Determine date ranges ──────────────────────────────────────────────
   const { from: monthFrom, to: monthTo } = getCurrentMonthRange();
@@ -533,6 +541,8 @@ export async function getDashboardOverview(opts = {}) {
       });
     });
   });
+
+  console.log(`[overview] dbProperties=${dbProperties.length} (all DB props for map) | smoobuTasks=${propertyTasks.length} (props w/ decryptable key)`);
 
   // ── 4. Fetch data from Smoobu for all properties (concurrency limited) ────
   const statsTasks  = propertyTasks.map(({ propName, clientId, clientName, propertyCtx }) =>
@@ -741,6 +751,9 @@ export async function getDashboardOverview(opts = {}) {
 
   const mapLocations = Array.from(mergedById.values());
 
+  const mappable = mapLocations.filter((l) => typeof l.latitude === 'number' && typeof l.longitude === 'number').length;
+  console.log(`[overview] mapLocations=${mapLocations.length} (withCoords=${mappable}) smoobuLocs=${smoobuLocs.length}`);
+
   // ── 13. Return assembled payload ─────────────────────────────────────────
   return {
     // KPI counters (from DB)
@@ -781,5 +794,6 @@ export async function getDashboardOverview(opts = {}) {
     // Metadata
     fetchedAt: new Date().toISOString(),
     connectedProperties: propertyTasks.length,
+    _version: OVERVIEW_VERSION, // ← confirm in browser which code Render runs
   };
 }
