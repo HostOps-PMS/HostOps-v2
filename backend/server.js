@@ -17,6 +17,7 @@ import accountsRoutes            from './routes/accounts.js';
 import dashboardOverviewRoute    from './routes/dashboardOverviewRoute.js';
 import { publicRecoveryRouter, adminRecoveryRouter } from './routes/recoveryRequests.js';
 import { requireApiKey } from './middleware/apiKeyAuth.js';
+import keyDiagnosticRoute from './routes/keyDiagnosticRoute.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
