@@ -34,13 +34,6 @@ function buildStatsCards(data) {
       color:  'blue',
     },
     {
-      label:  'Active Bookings',
-      value:  (data.totalBookings ?? 0).toLocaleString(),
-      change: `${data.totalCancellations ?? 0} cancellations`,
-      trend:  data.totalBookings > 0 ? 'up' : 'neutral',
-      color:  'yellow',
-    },
-    {
       label:  'Monthly Revenue',
       value:  formatRevenue(data.monthlyRevenue ?? 0),
       change: `${data.overallOccupancy ?? 0}% avg occupancy`,
