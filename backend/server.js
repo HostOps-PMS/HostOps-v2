@@ -42,8 +42,17 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc:  ["'self'"],
         styleSrc:   ["'self'", "'unsafe-inline'"],
-        imgSrc:     ["'self'", 'data:', 'blob:', CLOUDINARY_HOSTNAME],
-        connectSrc: ["'self'", CLOUDINARY_HOSTNAME],
+        imgSrc:     ["'self'", 'data:', 'blob:', CLOUDINARY_HOSTNAME,
+          // Leaflet loads marker icon PNGs — with npm bundling these come from
+          // blob: / data: URLs already covered above, but added for safety.
+          'https://*.tile.openstreetmap.org',
+        ],
+        connectSrc: ["'self'", CLOUDINARY_HOSTNAME,
+          // Leaflet (npm-bundled) fetches OpenStreetMap tiles via XHR/fetch.
+          // Without these entries the browser blocks all tile requests.
+          'https://*.tile.openstreetmap.org',
+          'https://tile.openstreetmap.org',
+        ],
         fontSrc:    ["'self'"],
         objectSrc:  ["'none'"],
         frameSrc:   ["'none'"],
