@@ -63,7 +63,7 @@ export default function RecentActivities({ activities, loading }) {
   }
 
   return (
-    <div className="db-table-card" style={{ flexShrink: 0 }}>
+    <div className="db-table-card" style={{ flexShrink: 0, minHeight: 450 }}>
       <div className="db-table-card__head">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <h2 className="db-table-card__title">Recent Activities</h2>
@@ -81,7 +81,7 @@ export default function RecentActivities({ activities, loading }) {
         <button className="db-table-card__action">View all →</button>
       </div>
 
-      <div style={{ padding: '4px 16px 12px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '4px 16px 12px', display: 'flex', flexDirection: 'column', overflowY: 'auto', maxHeight: 400 }}>
         {displayActivities.map((act, i) => {
           const dot       = TYPE_DOT[act.type] ?? TYPE_DOT.booking;
           const avatarBg  = hashColor(act.avatar || act.actor || 'G');
