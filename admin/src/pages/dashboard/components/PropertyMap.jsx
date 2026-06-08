@@ -5,7 +5,9 @@
 // Flow:
 //   1. Dropdown 1 (Business Account) — populated from /api/accounts immediately.
 //   2. Dropdown 2 (Property)         — shows DB properties of selected client.
-//      • "All properties" = use mapLocations from overview (existing behavior).
+//      • "All properties" = fetch ALL Smoobu sub-apartments for that client via
+//        GET /api/accounts/:clientId/smoobu-apartments (no propertyIndex = all props)
+//        OR use mapLocations from overview when "All accounts" is selected.
 //      • Specific property = fetch Smoobu sub-apartments via
 //        GET /api/accounts/:clientId/smoobu-apartments?propertyIndex=N
 //        and display THOSE on the map instead.
@@ -85,25 +87,31 @@ function useClientAccounts() {
   return { clients, acctLoading };
 }
 
-// ── Hook: fetch Smoobu apartments for one DB property entry ───────
+// ── Hook: fetch Smoobu apartments for one client (one or all properties) ──
 //
-// Called when the admin selects a specific property in dropdown 2.
+// When propertyIndex is a number → fetch sub-apartments for that specific
+//   property only  (GET /api/accounts/:clientId/smoobu-apartments?propertyIndex=N)
+//
+// When propertyIndex is null AND clientId is set → fetch ALL sub-apartments
+//   across every property of that client
+//   (GET /api/accounts/:clientId/smoobu-apartments  — no propertyIndex param)
+//
+// When clientId is null → hook does nothing, returns empty list
+//   (caller falls back to overview mapLocations)
 //
 // Returns:
 //   { apartments, aptLoading, aptError }
 //
 // apartments: [{apartmentId, apartmentName, propertyName, clientId,
 //               clientName, street, zip, city, country, latitude, longitude, ...}]
-//
-// When clientId or propertyIndex is null the hook does nothing and
-// returns an empty list (caller uses mapLocations from overview instead).
 function useSmoobuApartments(clientId, propertyIndex) {
   const [apartments, setApartments] = useState([]);
   const [aptLoading, setLoading]    = useState(false);
   const [aptError, setError]        = useState(null);
 
   const fetch_ = useCallback(async () => {
-    if (!clientId || propertyIndex === null || propertyIndex === undefined) {
+    // Only skip when no client is selected at all
+    if (!clientId) {
       setApartments([]);
       setError(null);
       return;
@@ -112,7 +120,12 @@ function useSmoobuApartments(clientId, propertyIndex) {
     setLoading(true);
     setError(null);
     try {
-      const url = `/api/accounts/${clientId}/smoobu-apartments?propertyIndex=${propertyIndex}`;
+      // If propertyIndex is a number → scope to that property only
+      // If null → fetch all properties for this client (no param)
+      const qs = (propertyIndex !== null && propertyIndex !== undefined)
+        ? `?propertyIndex=${propertyIndex}`
+        : '';
+      const url = `/api/accounts/${clientId}/smoobu-apartments${qs}`;
       const res = await fetch(url, {
         headers:     authHeaders(),
         credentials: 'include',
@@ -141,7 +154,7 @@ function useSmoobuApartments(clientId, propertyIndex) {
 export default function PropertyMap({ mapLocations, loading }) {
   // Dropdown 1: selected business account
   const [selectedClient, setSelectedClient] = useState('all');
-  // Dropdown 2: selected DB property (null = "All properties")
+  // Dropdown 2: selected DB property index (null = "All properties" for that client)
   const [selectedPropIndex, setSelectedPropIndex] = useState(null);
 
   const { clients, acctLoading } = useClientAccounts();
@@ -167,12 +180,10 @@ export default function PropertyMap({ mapLocations, loading }) {
     }
   }
 
-  // ── Smoobu apartments for the selected property ──────────────────
-  // Only fetches when a specific property (not "All") is selected AND
-  // a specific client is selected.
-  const smoobuClientId = (selectedClient !== 'all' && selectedPropIndex !== null)
-    ? selectedClient
-    : null;
+  // ── Smoobu apartments fetch ──────────────────────────────────────
+  // Fetch whenever a specific client is selected (any property or all).
+  // When "All accounts" is selected, we fall back to overview mapLocations.
+  const smoobuClientId = selectedClient !== 'all' ? selectedClient : null;
 
   const { apartments: smoobuApts, aptLoading, aptError } =
     useSmoobuApartments(smoobuClientId, selectedPropIndex);
@@ -182,28 +193,40 @@ export default function PropertyMap({ mapLocations, loading }) {
 
   // ── Build the location list shown on the map ──────────────────
   //
-  // MODE A: Specific client + specific property selected
-  //   → use freshly fetched smoobuApts (live from that property's API key)
+  // MODE A: Specific client selected (any property or all)
+  //   → use freshly fetched smoobuApts (live from that client's Smoobu API keys)
+  //   → propertyIndex scopes to one property; null fetches all properties
   //
-  // MODE B: Specific client, no property selected (show "All properties")
-  //   → start from DB properties, overlay overview mapLocations for that client
-  //
-  // MODE C: "All business accounts"
+  // MODE B: "All business accounts"
   //   → original behavior: DB properties + overview mapLocations merged
   const locations = useMemo(() => {
-    // MODE A: live fetch active
-    if (smoobuClientId && selectedPropIndex !== null) {
+    // MODE A: a specific client is selected — use live Smoobu data
+    if (smoobuClientId) {
+      // While loading, show DB stubs so the legend isn't empty
+      if (aptLoading && smoobuApts.length === 0) {
+        // Build stubs from DB properties for this client
+        const client = clients.find((c) => c.id === smoobuClientId);
+        if (!client) return [];
+        const propsToShow = (selectedPropIndex !== null)
+          ? [client.properties[selectedPropIndex]].filter(Boolean)
+          : client.properties;
+        return propsToShow.map((prop, i) => ({
+          apartmentId:   `db:${smoobuClientId}:${i}`,
+          apartmentName: prop?.propertyName || 'Property',
+          propertyName:  prop?.propertyName || 'Property',
+          clientId:      smoobuClientId,
+          clientName:    client.name,
+          street: '', zip: '', city: '', country: '',
+          latitude: null, longitude: null,
+        }));
+      }
       return smoobuApts;
     }
 
-    // Shared logic for MODE B & C: build from DB + overlay overview coords
+    // MODE B: Shared logic for "All accounts": build from DB + overlay overview coords
     const result = [];
 
-    const clientsToShow = selectedClient === 'all'
-      ? clients
-      : clients.filter((c) => c.id === selectedClient);
-
-    clientsToShow.forEach((client) => {
+    clients.forEach((client) => {
       if (client.properties.length === 0) {
         result.push({
           apartmentId:   `db:${client.id}`,
@@ -239,19 +262,17 @@ export default function PropertyMap({ mapLocations, loading }) {
     });
 
     // Also include any Smoobu overview apartments that didn't match a DB entry
-    if (selectedClient === 'all') {
-      overviewLocs.forEach((s) => {
-        const alreadyIn = result.some(
-          (r) => r.clientId === s.clientId &&
-                 (r.propertyName || '').toLowerCase() ===
-                 (s.propertyName || '').toLowerCase()
-        );
-        if (!alreadyIn) result.push(s);
-      });
-    }
+    overviewLocs.forEach((s) => {
+      const alreadyIn = result.some(
+        (r) => r.clientId === s.clientId &&
+               (r.propertyName || '').toLowerCase() ===
+               (s.propertyName || '').toLowerCase()
+      );
+      if (!alreadyIn) result.push(s);
+    });
 
     return result;
-  }, [smoobuClientId, selectedPropIndex, smoobuApts, clients, selectedClient, overviewLocs]);
+  }, [smoobuClientId, selectedPropIndex, smoobuApts, aptLoading, clients, overviewLocs]);
 
   // Only properties with valid coordinates can be pinned
   const plottable = useMemo(() => locations.filter(
@@ -290,15 +311,15 @@ export default function PropertyMap({ mapLocations, loading }) {
 
   // Status text under the "Property Map" title
   const statusText = useMemo(() => {
-    if (aptLoading) return 'Fetching Smoobu apartments…';
+    if (aptLoading) return 'Fetching Smoobu sub-apartments…';
     if (aptError)   return `Smoobu error: ${aptError}`;
     if (isMapLoading) return 'Loading coordinates…';
     // Show context: is this live-fetched or overview data?
-    const source = (smoobuClientId && selectedPropIndex !== null)
+    const source = smoobuClientId
       ? '(live from Smoobu)'
       : '(from overview)';
     return `${plottable.length} of ${locations.length} mapped ${source}`;
-  }, [aptLoading, aptError, isMapLoading, smoobuClientId, selectedPropIndex,
+  }, [aptLoading, aptError, isMapLoading, smoobuClientId,
       plottable.length, locations.length]);
 
   return (
