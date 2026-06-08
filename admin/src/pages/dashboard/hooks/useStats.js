@@ -84,6 +84,12 @@ export function useStats({ from, to } = {}) {
 
       const data = await res.json();
 
+      // Debug: log what the overview payload contains so we can verify
+      // mapLocations is being returned by the backend.
+      console.log('[useStats] overview keys:', Object.keys(data));
+      console.log('[useStats] mapLocations count:', Array.isArray(data.mapLocations) ? data.mapLocations.length : 'MISSING');
+      console.log('[useStats] _version:', data._version ?? 'n/a');
+
       setOverview(data);
       setStats(buildStatsCards(data));
     } catch (err) {

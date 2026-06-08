@@ -1,19 +1,21 @@
 // components/PropertyMap.jsx
 // ─────────────────────────────────────────────────────────────────
-// Same visual style as before (OpenStreetMap iframe + pin overlay +
-// side legend), but now driven by the live `mapLocations` array from
-// /api/dashboard-overview, with a dropdown to filter by business account.
+// OpenStreetMap iframe + pin overlay + side legend.
 //
-// The bounding box auto-fits to whatever properties are currently shown,
-// so pins line up no matter where in the world the apartments are.
+// Business-account dropdown is populated by a DIRECT fetch to
+// /api/accounts so it appears immediately, without waiting for the
+// slow /api/dashboard-overview Smoobu aggregation.
+//
+// mapLocations (from overview) overlays Smoobu apartment coordinates
+// on top of the DB accounts — used for the map pins.
 //
 // Props:
 //   mapLocations : [{ apartmentId, apartmentName, propertyName, clientId,
 //                     clientName, street, zip, city, country,
-//                     latitude, longitude, type }]
-//   loading      : boolean
+//                     latitude, longitude, type }]  — from overview, may be null
+//   loading      : boolean  — true while overview is still fetching
 // ─────────────────────────────────────────────────────────────────
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 
 const COLORS = ['#1a9e6e','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4',
                 '#ec4899','#14b8a6','#f97316','#a855f7'];
@@ -21,33 +23,140 @@ const COLORS = ['#1a9e6e','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4',
 // Pad a [min,max] range so pins aren't glued to the map edges
 function padded(min, max, ratio = 0.15) {
   if (min === max) {
-    const d = 0.05; // single point — open a small window around it
+    const d = 0.05;
     return [min - d, max + d];
   }
   const pad = (max - min) * ratio;
   return [min - pad, max + pad];
 }
 
+// ── Fetch accounts directly for the dropdown ──────────────────────
+function useClientAccounts() {
+  const [clients, setClients]   = useState([]);   // [{ id, name, properties[] }]
+  const [acctLoading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const token = sessionStorage.getItem('hp_access_token') ?? '';
+        const res = await fetch('/api/accounts', {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization:  `Bearer ${token}`,
+            'x-api-key':    import.meta.env.VITE_API_KEY ?? '',
+          },
+          credentials: 'include',
+        });
+
+        if (!res.ok) throw new Error(`accounts ${res.status}`);
+        const data = await res.json();
+
+        // data = { users: [...], staffs: [...] }
+        // Only business accounts (role: 'client') go in the dropdown.
+        const users = Array.isArray(data.users) ? data.users : [];
+        const mapped = users
+          .filter((u) => u.role === 'client' || !u.role)
+          .map((u) => ({
+            id:         String(u._id || u.id),
+            name:       u.businessName || u.firstName || u.email || 'Unnamed',
+            properties: Array.isArray(u.properties) ? u.properties : [],
+          }));
+
+        if (!cancelled) setClients(mapped);
+      } catch (err) {
+        console.warn('[PropertyMap] accounts fetch failed:', err.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  return { clients, acctLoading };
+}
+
 export default function PropertyMap({ mapLocations, loading }) {
   const [selected, setSelected] = useState('all'); // clientId or 'all'
 
-  const locations = Array.isArray(mapLocations) ? mapLocations : [];
-  const isDataReady = mapLocations !== null && mapLocations !== undefined;
+  // Accounts from /api/accounts — populates the dropdown immediately
+  const { clients, acctLoading } = useClientAccounts();
 
-  // Dropdown options: one per business account
-  const clients = useMemo(() => {
-    const map = new Map();
-    locations.forEach((l) => {
-      if (l.clientId && !map.has(l.clientId)) {
-        map.set(l.clientId, l.clientName || 'Unnamed business');
+  // Smoobu locations from overview — used only for pin coordinates
+  const smoobuLocs = Array.isArray(mapLocations) ? mapLocations : [];
+
+  // Build the full location list:
+  //   - Start from every DB property (ensures all accounts show in legend)
+  //   - Overlay Smoobu lat/lng where available
+  const locations = useMemo(() => {
+    const result = [];
+
+    clients.forEach((client, ci) => {
+      if (client.properties.length === 0) {
+        // Business account with no properties — still show in legend
+        result.push({
+          apartmentId:   `db:${client.id}`,
+          apartmentName: '(no properties)',
+          propertyName:  '(no properties)',
+          clientId:      client.id,
+          clientName:    client.name,
+          street: '', zip: '', city: '', country: '',
+          latitude: null, longitude: null,
+        });
+      } else {
+        client.properties.forEach((prop, pi) => {
+          // Try to find a matching Smoobu location for coordinates
+          const smoobu = smoobuLocs.find(
+            (s) => s.clientId === client.id &&
+                   (s.propertyName || '').toLowerCase() ===
+                   (prop.propertyName || '').toLowerCase()
+          );
+          result.push({
+            apartmentId:   smoobu?.apartmentId ?? `db:${client.id}:${pi}`,
+            apartmentName: smoobu?.apartmentName || prop.propertyName || 'Property',
+            propertyName:  prop.propertyName || 'Property',
+            clientId:      client.id,
+            clientName:    client.name,
+            street:    smoobu?.street   || '',
+            zip:       smoobu?.zip      || '',
+            city:      smoobu?.city     || '',
+            country:   smoobu?.country  || '',
+            latitude:  smoobu?.latitude  ?? null,
+            longitude: smoobu?.longitude ?? null,
+          });
+        });
       }
     });
-    return Array.from(map, ([id, name]) => ({ id, name }));
-  }, [locations]);
+
+    // Also include any Smoobu apartments that didn't match a DB client
+    smoobuLocs.forEach((s) => {
+      const alreadyIn = result.some(
+        (r) => r.clientId === s.clientId &&
+               (r.propertyName || '').toLowerCase() ===
+               (s.propertyName || '').toLowerCase()
+      );
+      if (!alreadyIn) result.push(s);
+    });
+
+    return result;
+  }, [clients, smoobuLocs]);
+
+  // Unique client list for the dropdown (from DB accounts, not Smoobu)
+  const dropdownClients = useMemo(() => {
+    const seen = new Set();
+    return clients.filter((c) => {
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+  }, [clients]);
 
   // Filter by selected business account
   const filtered = useMemo(() => (
-    selected === 'all' ? locations : locations.filter((l) => l.clientId === selected)
+    selected === 'all'
+      ? locations
+      : locations.filter((l) => l.clientId === selected)
   ), [locations, selected]);
 
   // Only properties with valid coordinates can be pinned
@@ -58,7 +167,7 @@ export default function PropertyMap({ mapLocations, loading }) {
   // Auto-fit bounding box around the plottable set
   const bbox = useMemo(() => {
     if (plottable.length === 0) {
-      return { west: -20, south: -10, east: 60, north: 60 }; // default view
+      return { west: -20, south: -10, east: 60, north: 60 };
     }
     const lats = plottable.map((l) => l.latitude);
     const lngs = plottable.map((l) => l.longitude);
@@ -72,6 +181,9 @@ export default function PropertyMap({ mapLocations, loading }) {
     `?bbox=${bbox.west}%2C${bbox.south}%2C${bbox.east}%2C${bbox.north}` +
     '&layer=mapnik';
 
+  const isDropdownLoading = acctLoading;
+  const isMapLoading      = loading;
+
   return (
     <div className="db-table-card" style={{ flexShrink: 0, overflow: 'hidden' }}>
       {/* Header + dropdown */}
@@ -79,10 +191,8 @@ export default function PropertyMap({ mapLocations, loading }) {
         <div>
           <h2 className="db-table-card__title">Property Map</h2>
           <p style={{ fontSize: '.74rem', color: 'var(--color-muted)', marginTop: 2 }}>
-            {loading
-              ? 'Loading property locations…'
-              : !isDataReady
-              ? 'Waiting for data…'
+            {isMapLoading
+              ? 'Loading coordinates…'
               : `${plottable.length} of ${filtered.length} mapped`}
           </p>
         </div>
@@ -90,31 +200,32 @@ export default function PropertyMap({ mapLocations, loading }) {
         <select
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
+          disabled={isDropdownLoading}
           style={{
             padding: '6px 12px',
             borderRadius: 'var(--radius-pill)',
             border: '1px solid var(--color-border)',
             background: 'var(--color-surface)',
-            color: 'var(--color-text)',
+            color: isDropdownLoading ? 'var(--color-muted)' : 'var(--color-text)',
             fontWeight: 600,
             fontSize: '.78rem',
             fontFamily: 'var(--font-body)',
-            cursor: 'pointer',
+            cursor: isDropdownLoading ? 'not-allowed' : 'pointer',
             maxWidth: 220,
           }}
         >
           <option value="all">
-            {!isDataReady
+            {isDropdownLoading
               ? 'Loading accounts…'
-              : `All business accounts (${clients.length})`}
+              : `All business accounts (${dropdownClients.length})`}
           </option>
-          {clients.map((c) => (
+          {dropdownClients.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
       </div>
 
-      {loading ? (
+      {isMapLoading ? (
         <div style={{ padding: 16 }}>
           <div className="db-skeleton" style={{ height: 325, borderRadius: 12 }} />
         </div>
@@ -181,7 +292,11 @@ export default function PropertyMap({ mapLocations, loading }) {
             gap: 10,
             overflowY: 'auto',
           }}>
-            {filtered.length === 0 ? (
+            {isDropdownLoading ? (
+              <div style={{ fontSize: '.72rem', color: 'var(--color-muted)' }}>
+                Loading properties…
+              </div>
+            ) : filtered.length === 0 ? (
               <div style={{ fontSize: '.72rem', color: 'var(--color-muted)' }}>
                 No properties to display.
               </div>
@@ -204,7 +319,7 @@ export default function PropertyMap({ mapLocations, loading }) {
                         {p.clientName}
                       </div>
                       <div style={{ fontSize: '.68rem', color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {addr || 'No address'}
+                        {addr || (hasCoords ? '' : 'No address in Smoobu')}
                       </div>
                     </div>
                   </div>
