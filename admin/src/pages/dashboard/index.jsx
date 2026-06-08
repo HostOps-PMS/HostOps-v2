@@ -17,7 +17,6 @@ import Modal                from './components/Modal';
 import { useStats }    from './hooks/useStats';
 import { useAccounts } from './hooks/useAccounts';
 
-
 export default function Dashboard() {
   const [modal, setModal] = useState({ open: false, type: null, data: null });
   const openModal  = (type, data = null) => setModal({ open: true, type, data });

@@ -10,19 +10,39 @@
 //                               Omit to fetch ALL properties for this client.
 //
 // Each property has its own smoobuApiKey stored encrypted in the DB.
-// For each key we call GET /apartments (Smoobu) then GET /apartments/:id
-// for the location/lat/lng of every sub-apartment.
+// For each key we call GET /apartments (Smoobu) to list all sub-apartments,
+// then GET /apartments/:id for each one to fetch the full detail JSON:
 //
-// Response shape:
-// {
-//   allApartments: [{
-//     apartmentId, apartmentName, propertyName, clientId, clientName,
-//     street, zip, city, country, latitude, longitude,
-//     timeZone, currency, maxOccupancy, bedrooms, bathrooms, type
-//   }],
-//   propertyCount: number,   // how many DB properties were queried
-//   totalFound:   number,    // total sub-apartments returned by Smoobu
-// }
+//   {
+//     "location": {
+//       "street":    "3 Tourism Rd, Brgy. Poblacion 3,",
+//       "zip":       "8419",
+//       "city":      "General Luna",
+//       "country":   "Philippines",
+//       "latitude":  "9.7925...",    ← string from Smoobu, we parseFloat
+//       "longitude": "126.1614..."   ← string from Smoobu, we parseFloat
+//     },
+//     "timeZone": "Asia/Manila",
+//     "rooms": {
+//       "maxOccupancy": 4,
+//       "bedrooms":     4,
+//       "bathrooms":    2,
+//       ...
+//     },
+//     "currency": "PHP",
+//     "type": { "id": 2, "name": "Holiday rental" }
+//   }
+//
+//   Response shape:
+//   {
+//     allApartments: [{
+//       apartmentId, apartmentName, propertyName, clientId, clientName,
+//       street, zip, city, country, latitude, longitude,
+//       timeZone, currency, maxOccupancy, bedrooms, bathrooms, type
+//     }],
+//     propertyCount: number,   // how many DB properties were queried
+//     totalFound:   number,    // total sub-apartments returned by Smoobu
+//   }
 // ─────────────────────────────────────────────────────────────────
 
 import { Router }    from 'express';
@@ -32,40 +52,61 @@ import { getApartments, getApartmentDetail } from '../services/smoobu.js';
 
 const router = Router();
 
+// ── Helper: parse a coordinate value that Smoobu returns as a string ──────────
+// Smoobu returns lat/lng as strings like "9.7925080000000" — we must parseFloat.
+// Returns a finite number or null.
+function toCoord(val) {
+  if (val === null || val === undefined || val === '') return null;
+  const n = parseFloat(val);
+  return Number.isFinite(n) ? n : null;
+}
+
 // ── Helper: fetch all sub-apartments for one Smoobu API key ───────
 async function fetchApartmentsForKey(propertyCtx, propertyName, clientId, clientName) {
   const { apartments } = await getApartments(propertyCtx);
+
+  console.log(`[smoobuApartments] property="${propertyName}" client=${clientId} → ${apartments.length} apartments from Smoobu`);
 
   const results = await Promise.all(
     apartments.map(async (apt) => {
       const aptId = apt.id ?? apt;
       try {
+        // GET /apartments/{id} — returns full detail including location with lat/lng
         const detail = await getApartmentDetail(propertyCtx, aptId);
+
+        // Smoobu returns location.latitude and location.longitude as STRINGS,
+        // e.g. "9.7925080000000" — always parseFloat before storing.
         const loc = detail?.location || {};
-        const lat = parseFloat(loc.latitude);
-        const lng = parseFloat(loc.longitude);
+        const lat = toCoord(loc.latitude);
+        const lng = toCoord(loc.longitude);
+
+        console.log(`[smoobuApartments]   apt ${aptId} "${apt.name || detail?.name}" → lat=${lat} lng=${lng} city="${loc.city || ''}"`);
+
         return {
           apartmentId:   aptId,
           apartmentName: apt.name || detail?.name || `Apartment ${aptId}`,
           propertyName,
           clientId,
           clientName,
+          // Address fields from Smoobu location object
           street:    loc.street  || '',
           zip:       loc.zip     || '',
           city:      loc.city    || '',
           country:   loc.country || '',
-          latitude:  Number.isFinite(lat) ? lat : null,
-          longitude: Number.isFinite(lng) ? lng : null,
+          // Coordinates — parsed from strings
+          latitude:  lat,
+          longitude: lng,
+          // Extra detail fields
           timeZone:     detail?.timeZone || null,
           currency:     detail?.currency || null,
           maxOccupancy: detail?.rooms?.maxOccupancy ?? null,
-          bedrooms:     detail?.rooms?.bedrooms ?? null,
-          bathrooms:    detail?.rooms?.bathrooms ?? null,
-          type:         detail?.type?.name || null,
+          bedrooms:     detail?.rooms?.bedrooms     ?? null,
+          bathrooms:    detail?.rooms?.bathrooms    ?? null,
+          type:         detail?.type?.name          || null,
         };
       } catch (detailErr) {
         // Detail failed — return stub so counts stay consistent
-        console.warn(`[smoobuApartments] detail fetch failed for apt ${aptId}:`, detailErr.message);
+        console.warn(`[smoobuApartments] detail fetch failed for apt ${aptId} in "${propertyName}":`, detailErr.message);
         return {
           apartmentId:   aptId,
           apartmentName: apt.name || `Apartment ${aptId}`,
@@ -73,9 +114,11 @@ async function fetchApartmentsForKey(propertyCtx, propertyName, clientId, client
           clientId,
           clientName,
           street: '', zip: '', city: '', country: '',
-          latitude: null, longitude: null,
+          latitude:  null,
+          longitude: null,
           timeZone: null, currency: null,
           maxOccupancy: null, bedrooms: null, bathrooms: null, type: null,
+          fetchError: detailErr.message,
         };
       }
     })
@@ -167,7 +210,8 @@ router.get('/:clientId/smoobu-apartments', async (req, res) => {
             clientId:      String(clientId),
             clientName,
             street: '', zip: '', city: '', country: '',
-            latitude: null, longitude: null,
+            latitude:  null,
+            longitude: null,
             timeZone: null, currency: null,
             maxOccupancy: null, bedrooms: null, bathrooms: null, type: null,
             fetchError: fetchErr.message,
@@ -176,7 +220,8 @@ router.get('/:clientId/smoobu-apartments', async (req, res) => {
       })
     );
 
-    console.log(`[smoobuApartments] client=${clientId} propertyIndex=${propertyIndex ?? 'all'} → ${allApartments.length} apartments`);
+    const withCoords = allApartments.filter(a => a.latitude !== null && a.longitude !== null).length;
+    console.log(`[smoobuApartments] client=${clientId} propertyIndex=${propertyIndex ?? 'all'} → ${allApartments.length} apartments (${withCoords} with coords)`);
 
     return res.json({
       allApartments,

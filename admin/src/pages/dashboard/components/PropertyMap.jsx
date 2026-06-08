@@ -1,320 +1,944 @@
-// src/pages/Dashboard/components/PropertyMap.jsx
+// components/PropertyMap.jsx
 // ─────────────────────────────────────────────────────────────────
-// Renders all client properties on a Leaflet map using the exact
-// coordinates stored in Smoobu (/apartments/:id → location.latitude
-// / location.longitude).
+// Leaflet.js map + real markers + side legend.
 //
-// Props:
-//   mapLocations  — array from overview.mapLocations (may be null while loading)
-//   loading       — boolean
+// Flow:
+//   1. Dropdown 1 — Business Account  (from /api/accounts)
+//   2. Dropdown 2 — Property          (DB properties of selected client)
+//   3. Dropdown 3 — Room / Apartment  (from Smoobu sub-apartments; only
+//                                      visible when a specific property
+//                                      is selected)
+//      Selecting a room highlights it in the legend and flies the map
+//      to that marker, opening its popup automatically.
 //
-// Each mapLocation item:
-//   { id, name, propertyName, clientId, clientName,
-//     address, street, zip, city, country, lat, lng }
+// Colour consistency:
+//   Marker colour is derived from a stable hash of apartmentId — NOT
+//   the array index.  This means legend dot colour always matches the
+//   map marker colour even when some apartments have no coordinates
+//   (those are excluded from the map but still shown in the legend).
 //
-// Falls back to a "No location data" empty state if Smoobu returned
-// no coordinates for any apartment.
+// Coordinate handling:
+//   Smoobu returns latitude/longitude as STRINGS ("9.7925080000000").
+//   toCoord() calls parseFloat() and rejects non-finite values.
 // ─────────────────────────────────────────────────────────────────
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 
-import { useEffect, useRef, useState } from 'react';
+const COLORS = ['#1a9e6e','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4',
+                '#ec4899','#14b8a6','#f97316','#a855f7'];
 
-// ── Leaflet is loaded via CDN in index.html ───────────────────────
-// Make sure your index.html includes:
-//   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-//   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-const DEFAULT_CENTER = [12.8797, 121.7740]; // Philippines center
-const DEFAULT_ZOOM   = 6;
-
-// Group color palette — one color per unique clientId
-const CLIENT_COLORS = [
-  '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
-  '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16',
-  '#f97316', '#14b8a6',
-];
-
-function getClientColor(clientId, colorMap) {
-  if (!colorMap.has(clientId)) {
-    colorMap.set(clientId, CLIENT_COLORS[colorMap.size % CLIENT_COLORS.length]);
+// ── Stable colour from apartmentId ───────────────────────────────
+// Uses a simple hash so the same apartment always gets the same colour
+// regardless of its position in the sorted array.
+function colorForId(id) {
+  let h = 0;
+  const s = String(id ?? '');
+  for (let i = 0; i < s.length; i++) {
+    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
   }
-  return colorMap.get(clientId);
+  return COLORS[Math.abs(h) % COLORS.length];
 }
 
-function buildIcon(color) {
-  const L = window.L;
-  return L.divIcon({
-    className: '',
-    html: `
-      <div style="
-        width: 28px; height: 28px;
-        background: ${color};
-        border: 3px solid #fff;
-        border-radius: 50% 50% 50% 0;
-        transform: rotate(-45deg);
-        box-shadow: 0 2px 8px rgba(0,0,0,.35);
-      "></div>`,
-    iconSize:   [28, 28],
-    iconAnchor: [14, 28],
-    popupAnchor:[0, -30],
+// ── Jitter helper ─────────────────────────────────────────────────
+// NOTE: No longer used by the map. We previously nudged overlapping
+// markers apart by ~20m, which made rooms of the SAME building look
+// scattered around the neighborhood (the "unrealistic positioning").
+// That job is now handled properly by Leaflet.markercluster spiderfy:
+// overlapping markers stay on their TRUE coordinates and fan out only
+// when clicked. Helper is kept here for backward compatibility / reuse.
+function applyCoordJitter(points) {
+  const seen = {};
+  return points.map((p) => {
+    if (p.latitude === null || p.longitude === null) return p;
+    const key = `${p.latitude.toFixed(6)},${p.longitude.toFixed(6)}`;
+    const count = seen[key] ?? 0;
+    seen[key] = count + 1;
+    if (count === 0) return p;
+    const angle = (count * (2 * Math.PI)) / 8;
+    const r = 0.00018;
+    return {
+      ...p,
+      latitude:  p.latitude  + r * Math.sin(angle),
+      longitude: p.longitude + r * Math.cos(angle),
+    };
   });
 }
 
-// ── Skeleton loader ───────────────────────────────────────────────
-function MapSkeleton() {
-  return (
-    <div style={{
-      height: '100%',
-      background: 'var(--color-surface-2, #1e2530)',
-      borderRadius: 'var(--radius-md, 12px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexDirection: 'column',
-      gap: 12,
-      color: 'var(--color-muted, #6b7280)',
-      fontSize: '.85rem',
-    }}>
-      <div style={{
-        width: 40, height: 40,
-        border: '3px solid var(--color-border, #2d3748)',
-        borderTopColor: 'var(--color-primary, #3b82f6)',
-        borderRadius: '50%',
-        animation: 'spin 1s linear infinite',
-      }} />
-      <span>Loading map…</span>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
+// ── Helpers ───────────────────────────────────────────────────────
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+
+function authHeaders() {
+  const token = sessionStorage.getItem('hp_access_token') ?? '';
+  return {
+    'Content-Type': 'application/json',
+    Authorization:  `Bearer ${token}`,
+    'x-api-key':    import.meta.env.VITE_API_KEY ?? '',
+  };
 }
 
-// ── Empty state ───────────────────────────────────────────────────
-function EmptyMap() {
-  return (
-    <div style={{
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexDirection: 'column',
-      gap: 10,
-      color: 'var(--color-muted, #6b7280)',
-      fontSize: '.85rem',
-    }}>
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
-        <circle cx="12" cy="9" r="2.5"/>
-      </svg>
-      <span>No map coordinates available yet.</span>
-      <span style={{ fontSize: '.75rem', opacity: .6 }}>
-        Add a location to your Smoobu properties to see them here.
-      </span>
-    </div>
-  );
+function apiUrl(path) { return `${API_BASE}${path}`; }
+
+// Smoobu returns lat/lng as strings like "9.7925080000000" — parseFloat them.
+function toCoord(val) {
+  if (val === null || val === undefined || val === '') return null;
+  const n = parseFloat(val);
+  return Number.isFinite(n) ? n : null;
 }
 
-// ── Main component ────────────────────────────────────────────────
-export default function PropertyMap({ mapLocations, loading }) {
-  const mapRef      = useRef(null);   // DOM node
-  const leafletRef  = useRef(null);   // L.Map instance
-  const markersRef  = useRef([]);
-  const colorMapRef = useRef(new Map());
-
-  const [ready, setReady] = useState(false);
-
-  // ── Init Leaflet once the DOM node is available ───────────────
-  useEffect(() => {
-    if (!mapRef.current || leafletRef.current) return;
-
-    const L = window.L;
-    if (!L) {
-      console.error('[PropertyMap] Leaflet not found. Make sure leaflet.js is loaded in index.html.');
-      return;
+// ── Inject styles for permanent marker name labels ───────────────
+// Each map marker shows its room name beside the dot (permanent Leaflet
+// tooltip). When markers are collapsed inside a cluster, their labels are
+// hidden automatically; they appear on spiderfy / when shown individually.
+function ensurePmStyles() {
+  if (typeof document === 'undefined') return;
+  if (document.querySelector('#pm-map-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'pm-map-styles';
+  style.textContent = `
+    .pm-marker-label{
+      background:#fff;
+      border:1px solid rgba(0,0,0,.12);
+      border-radius:6px;
+      box-shadow:0 1px 4px rgba(0,0,0,.18);
+      padding:2px 7px;
+      font-size:11px;
+      font-weight:600;
+      line-height:1.2;
+      color:#1f2937;
+      white-space:nowrap;
+      font-family:var(--font-body, system-ui, sans-serif);
     }
+    .pm-marker-label::before{ display:none !important; }
 
-    const map = L.map(mapRef.current, {
-      center:    DEFAULT_CENTER,
-      zoom:      DEFAULT_ZOOM,
-      zoomControl: true,
-      scrollWheelZoom: true,
-    });
+    /* Compact hover popup — replaces the big auto-opened popup */
+    .pm-popup .leaflet-popup-content-wrapper{
+      border-radius:10px;
+      box-shadow:0 6px 20px rgba(0,0,0,.18);
+      border:1px solid rgba(0,0,0,.06);
+    }
+    .pm-popup .leaflet-popup-content{
+      margin:9px 11px;
+      font-family:var(--font-body, system-ui, sans-serif);
+    }
+    .pm-popup .leaflet-popup-tip{
+      box-shadow:0 6px 20px rgba(0,0,0,.12);
+    }
+  `;
+  document.head.appendChild(style);
+}
 
-    // ── Tile layer: OpenStreetMap (free, no API key needed) ─────
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-    }).addTo(map);
+// ── Tiny HTML escape (for values injected into marker/cluster HTML) ──
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
 
-    leafletRef.current = map;
-    setReady(true);
+// ── Leaflet loader ────────────────────────────────────────────────
+// Loads Leaflet core, then the Leaflet.markercluster plugin on top.
+// The plugin gives us real clustering + spiderfy for overlapping markers
+// (e.g. multiple rooms of the same building that share one lat/lng).
+// If the plugin script ever fails to load, we still resolve with plain
+// Leaflet — the map then falls back to a normal L.layerGroup (no spiderfy)
+// so the dashboard never hard-crashes.
+let leafletPromise = null;
+function loadLeaflet() {
+  if (leafletPromise) return leafletPromise;
+  leafletPromise = new Promise((resolve, reject) => {
 
-    return () => {
-      map.remove();
-      leafletRef.current = null;
+    // Step 2: inject markercluster CSS + JS, then resolve with window.L
+    const injectMarkerCluster = () => {
+      // CSS — base + default theme
+      if (!document.querySelector('#leaflet-markercluster-css')) {
+        const c1 = document.createElement('link');
+        c1.id  = 'leaflet-markercluster-css';
+        c1.rel = 'stylesheet';
+        c1.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css';
+        document.head.appendChild(c1);
+      }
+      if (!document.querySelector('#leaflet-markercluster-default-css')) {
+        const c2 = document.createElement('link');
+        c2.id  = 'leaflet-markercluster-default-css';
+        c2.rel = 'stylesheet';
+        c2.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css';
+        document.head.appendChild(c2);
+      }
+
+      // Plugin already present?
+      if (window.L && window.L.markerClusterGroup) { resolve(window.L); return; }
+
+      // Script already injected but not yet finished — poll for it
+      if (document.querySelector('#leaflet-markercluster-js')) {
+        const waitForPlugin = () => {
+          if (window.L && window.L.markerClusterGroup) resolve(window.L);
+          else setTimeout(waitForPlugin, 50);
+        };
+        waitForPlugin();
+        return;
+      }
+
+      const mc = document.createElement('script');
+      mc.id  = 'leaflet-markercluster-js';
+      mc.src = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js';
+      mc.onload  = () => resolve(window.L);
+      // Fallback: resolve with core Leaflet so the map still works (plain markers)
+      mc.onerror = () => {
+        console.warn('[PropertyMap] markercluster failed to load — falling back to plain markers');
+        resolve(window.L);
+      };
+      document.head.appendChild(mc);
     };
+
+    // Step 1: ensure Leaflet core is loaded first
+    if (window.L) { injectMarkerCluster(); return; }
+
+    if (!document.querySelector('#leaflet-css')) {
+      const link = document.createElement('link');
+      link.id  = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload  = () => injectMarkerCluster();
+    script.onerror = () => reject(new Error('Failed to load Leaflet'));
+    document.head.appendChild(script);
+  });
+  return leafletPromise;
+}
+
+// ── Hook: client accounts ─────────────────────────────────────────
+function useClientAccounts() {
+  const [clients, setClients]     = useState([]);
+  const [acctLoading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await fetch(apiUrl('/api/accounts'), {
+          headers: authHeaders(), credentials: 'include',
+        });
+        if (!res.ok) throw new Error(`accounts ${res.status}`);
+        const data = await res.json();
+        const users = Array.isArray(data.users) ? data.users : [];
+        const mapped = users
+          .filter((u) => u.role === 'client' || !u.role)
+          .map((u) => ({
+            id:         String(u._id || u.id),
+            name:       u.businessName || u.firstName || u.email || 'Unnamed',
+            properties: Array.isArray(u.properties) ? u.properties : [],
+          }));
+        if (!cancelled) setClients(mapped);
+      } catch (err) {
+        console.warn('[PropertyMap] accounts fetch failed:', err.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
   }, []);
 
-  // ── Add / refresh markers whenever mapLocations changes ──────
+  return { clients, acctLoading };
+}
+
+// ── Hook: fetch Smoobu apartments for one client/property ─────────
+// Calls GET /api/accounts/:clientId/smoobu-apartments[?propertyIndex=N]
+// Backend hits Smoobu GET /apartments then GET /apartments/{id} for each
+// one, returning location JSON with lat/lng as strings — toCoord() casts them.
+function useSmoobuApartments(clientId, propertyIndex) {
+  const [apartments, setApartments] = useState([]);
+  const [aptLoading, setLoading]    = useState(false);
+  const [aptError, setError]        = useState(null);
+
+  const fetch_ = useCallback(async () => {
+    if (!clientId) { setApartments([]); setError(null); return; }
+    setLoading(true);
+    setError(null);
+    try {
+      const qs = (propertyIndex !== null && propertyIndex !== undefined)
+        ? `?propertyIndex=${propertyIndex}` : '';
+      const url = apiUrl(`/api/accounts/${clientId}/smoobu-apartments${qs}`);
+      const res = await fetch(url, { headers: authHeaders(), credentials: 'include' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `smoobu-apartments ${res.status}`);
+      }
+      const data = await res.json();
+      // Always parseFloat coords — Smoobu returns them as strings
+      const apts = (Array.isArray(data.allApartments) ? data.allApartments : []).map((a) => ({
+        ...a,
+        latitude:  toCoord(a.latitude),
+        longitude: toCoord(a.longitude),
+      }));
+      const withCoords = apts.filter(a => a.latitude !== null && a.longitude !== null).length;
+      console.log(`[PropertyMap] smoobu-apartments client=${clientId} propIdx=${propertyIndex ?? 'all'} → ${apts.length} apts (${withCoords} with coords)`);
+      setApartments(apts);
+    } catch (err) {
+      console.warn('[PropertyMap] smoobu-apartments fetch failed:', err.message);
+      setError(err.message);
+      setApartments([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [clientId, propertyIndex]);
+
+  useEffect(() => { fetch_(); }, [fetch_]);
+
+  return { apartments, aptLoading, aptError, refetch: fetch_ };
+}
+
+// ── Leaflet map hook ──────────────────────────────────────────────
+// markerMapRef: exposed ref to { apartmentId → L.Marker } so the
+// component can fly-to and open a specific marker from the room dropdown.
+function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId) {
+  const mapRef     = useRef(null);
+  const markersRef = useRef([]);
+  // clusterRef holds the active layer that contains all markers — either a
+  // L.markerClusterGroup (spiderfy enabled) or a plain L.layerGroup fallback.
+  const clusterRef = useRef(null);
+  const [leafletReady, setLeafletReady] = useState(!!window.L);
+
+  useEffect(() => {
+    if (window.L && window.L.markerClusterGroup) { setLeafletReady(true); return; }
+    loadLeaflet()
+      .then(() => setLeafletReady(true))
+      .catch((err) => console.error('[PropertyMap] Leaflet load failed:', err));
+  }, []);
+
+  // Init / re-init map when DOM node becomes available
+  useEffect(() => {
+    if (!leafletReady || !containerRef.current) return;
+    ensurePmStyles();
+    if (mapRef.current) {
+      mapRef.current.remove();
+      mapRef.current = null;
+      markersRef.current = [];
+      clusterRef.current = null;
+      if (markerMapRef) markerMapRef.current = {};
+    }
+    const L   = window.L;
+    const map = L.map(containerRef.current, {
+      center: [14.5, 121.0], zoom: 6,
+      zoomControl: true, scrollWheelZoom: false,
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+    }).addTo(map);
+    mapRef.current = map;
+
+    // Robust sizing: the map often initialises while its container is still
+    // settling (or was behind a skeleton), which leaves half-loaded tiles.
+    // Fire invalidateSize a few times AND watch the container for resizes.
+    [60, 200, 450].forEach((ms) => setTimeout(() => {
+      if (mapRef.current) mapRef.current.invalidateSize();
+    }, ms));
+
+    let ro = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => {
+        if (mapRef.current) mapRef.current.invalidateSize();
+      });
+      ro.observe(containerRef.current);
+    }
+
+    return () => {
+      if (ro) { try { ro.disconnect(); } catch { /* noop */ } }
+      map.remove();
+      mapRef.current = null;
+      markersRef.current = [];
+      clusterRef.current = null;
+      if (markerMapRef) markerMapRef.current = {};
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leafletReady, containerRef.current]);
+
+  // Update markers whenever plottable list changes
   useEffect(() => {
     const L   = window.L;
-    const map = leafletRef.current;
-    if (!L || !map || !ready) return;
+    const map = mapRef.current;
+    if (!L || !map) return;
 
-    // Clear old markers
-    markersRef.current.forEach(m => m.remove());
+    // Tear down the previous layer (cluster group or layer group) + markers
+    if (clusterRef.current) {
+      try { map.removeLayer(clusterRef.current); } catch { /* noop */ }
+      clusterRef.current = null;
+    }
+    markersRef.current.forEach((m) => { try { m.remove(); } catch { /* noop */ } });
     markersRef.current = [];
+    if (markerMapRef) markerMapRef.current = {};
 
-    const locations = Array.isArray(mapLocations) ? mapLocations : [];
-    const valid     = locations.filter(loc => loc.lat !== null && loc.lng !== null);
+    if (plottable.length === 0) return;
 
-    if (valid.length === 0) return;
+    // ── Build the container layer ─────────────────────────────────
+    // Prefer markercluster (real spiderfy for overlapping markers).
+    // If the plugin didn't load, fall back to a plain layer group so the
+    // map still renders every marker (just without clustering/spiderfy).
+    const canCluster = typeof L.markerClusterGroup === 'function';
+    const layer = canCluster
+      ? L.markerClusterGroup({
+          showCoverageOnHover:        false,  // don't draw the polygon hull
+          zoomToBoundsOnClick:        true,   // zoom in on cluster click…
+          spiderfyOnMaxZoom:          true,   // …and spiderfy when zoom can't split them
+          spiderfyDistanceMultiplier: 1.6,    // how far the legs fan out
+          maxClusterRadius:           45,     // px radius that groups markers
+          removeOutsideVisibleBounds: false,
+          // Pretty cluster pill: shows the PROPERTY NAME (e.g. "Haido Ville")
+          // instead of a bare number. A small chip on the right keeps the
+          // count. If a cluster spans multiple properties (only possible in
+          // "All accounts" view), we show "N properties" instead.
+          iconCreateFunction: (cluster) => {
+            const children = cluster.getAllChildMarkers();
+            const count    = cluster.getChildCount();
+
+            const names = [...new Set(
+              children.map((m) => m.pmMeta?.propertyName).filter(Boolean)
+            )];
+
+            let labelText;
+            if (names.length === 1)      labelText = names[0];
+            else if (names.length > 1)   labelText = `${names.length} properties`;
+            else                         labelText = 'Properties';
+
+            // Stable dot colour per property (brand red when mixed)
+            const dotColor = names.length === 1 ? colorForId(names[0]) : '#A10000';
+
+            // Rough width so markercluster can centre the pill correctly
+            const w = Math.min(232, Math.max(86, labelText.length * 7 + 74));
+
+            return L.divIcon({
+              className: '',
+              html: `<div style="
+                display:flex;align-items:center;gap:7px;
+                height:30px;padding:0 6px 0 10px;
+                background:#fff;border:1px solid rgba(0,0,0,.10);
+                border-radius:999px;
+                box-shadow:0 2px 10px rgba(0,0,0,.22);
+                font-family:var(--font-body, system-ui, sans-serif);
+                white-space:nowrap;cursor:pointer;
+              ">
+                <span style="width:10px;height:10px;border-radius:50%;background:${dotColor};
+                  box-shadow:0 0 0 3px ${dotColor}26;flex:none;"></span>
+                <span style="font-size:12px;font-weight:700;color:#1f2937;
+                  max-width:150px;overflow:hidden;text-overflow:ellipsis;">
+                  ${escHtml(labelText)}
+                </span>
+                <span style="display:inline-flex;align-items:center;justify-content:center;
+                  min-width:20px;height:20px;padding:0 5px;border-radius:999px;
+                  background:linear-gradient(135deg,#c81e1e,#A10000);
+                  color:#fff;font-size:11px;font-weight:700;line-height:1;flex:none;">
+                  ${count}
+                </span>
+              </div>`,
+              iconSize:   [w, 30],
+              iconAnchor: [w / 2, 15],
+            });
+          },
+        })
+      : L.layerGroup();
 
     const bounds = [];
 
-    valid.forEach(loc => {
-      const color  = getClientColor(loc.clientId, colorMapRef.current);
-      const icon   = buildIcon(color);
-      const latlng = [loc.lat, loc.lng];
+    // IMPORTANT: markers now use their TRUE Smoobu coordinates (no jitter).
+    // Overlapping rooms of the same building are collapsed into one cluster
+    // bubble and fan out (spiderfy) only when clicked — realistic positioning.
+    plottable.forEach((p) => {
+      // Use stable colour derived from apartmentId — not array index
+      const color  = colorForId(p.apartmentId);
+      const label  = p.apartmentName || p.propertyName || '';
+      const addr   = [p.street, p.city, p.country].filter(Boolean).join(', ');
+      const client = p.clientName || '';
 
-      const popup = L.popup({ maxWidth: 260, className: 'pm-popup' }).setContent(`
-        <div style="font-family:system-ui,sans-serif;font-size:13px;line-height:1.5">
-          <div style="font-weight:700;font-size:14px;margin-bottom:4px">${loc.name}</div>
-          <div style="color:#6b7280;margin-bottom:6px">${loc.propertyName}</div>
-          ${loc.address
-            ? `<div style="display:flex;gap:6px;align-items:flex-start">
-                 <span style="margin-top:1px">📍</span>
-                 <span>${loc.address}</span>
-               </div>`
-            : ''}
-          <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e5e7eb;
-                      color:#6b7280;font-size:11px">
-            Client: <strong style="color:#111">${loc.clientName}</strong>
-          </div>
-          <div style="margin-top:4px;color:#9ca3af;font-size:10px">
-            ${loc.lat.toFixed(6)}, ${loc.lng.toFixed(6)}
-          </div>
-        </div>
-      `);
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="
+          width:14px;height:14px;border-radius:50%;
+          background:${color};border:2.5px solid #fff;
+          box-shadow:0 1px 4px rgba(0,0,0,0.35);
+          cursor:pointer;
+        "></div>`,
+        iconSize:   [14, 14],
+        iconAnchor: [7,  7],
+        popupAnchor:[0, -10],
+      });
 
-      const marker = L.marker(latlng, { icon }).addTo(map).bindPopup(popup);
-      markersRef.current.push(marker);
-      bounds.push(latlng);
-    });
+      const marker = L.marker([p.latitude, p.longitude], { icon });
 
-    // Fit map to all markers (with padding)
-    if (bounds.length === 1) {
-      map.setView(bounds[0], 14);
-    } else if (bounds.length > 1) {
-      map.fitBounds(L.latLngBounds(bounds), { padding: [40, 40], maxZoom: 14 });
-    }
-  }, [mapLocations, ready]);
+      // Stash metadata so the cluster bubble can show the property name
+      marker.pmMeta = {
+        propertyName:  p.propertyName || '',
+        apartmentName: label,
+        clientName:    client,
+        color,
+      };
 
-  // ── Legend: one row per unique client ────────────────────────
-  const legend = (() => {
-    const seen = new Map();
-    (Array.isArray(mapLocations) ? mapLocations : []).forEach(loc => {
-      if (!seen.has(loc.clientId)) {
-        seen.set(loc.clientId, {
-          clientName: loc.clientName,
-          color: getClientColor(loc.clientId, colorMapRef.current),
-          count: 0,
+      const popupHtml = `
+        <div style="font-size:11.5px;line-height:1.45;min-width:150px;max-width:220px;">
+          <div style="font-weight:700;font-size:12.5px;margin-bottom:2px;color:#111827;">${escHtml(label)}</div>
+          ${client ? `<div style="color:#1a9e6e;font-weight:600;">${escHtml(client)}</div>` : ''}
+          ${addr    ? `<div style="color:#6b7280;">${escHtml(addr)}</div>` : ''}
+          ${p.type  ? `<div style="color:#6b7280;">${escHtml(p.type)}</div>` : ''}
+          ${p.maxOccupancy != null ? `<div style="color:#6b7280;">Max occupancy: ${p.maxOccupancy}</div>` : ''}
+          ${p.bedrooms != null ? `<div style="color:#6b7280;">Bedrooms: ${p.bedrooms}${p.bathrooms != null ? ` · Bathrooms: ${p.bathrooms}` : ''}</div>` : ''}
+        </div>`;
+      // Compact popup — no close button, no auto-pan; shown on HOVER only.
+      marker.bindPopup(popupHtml, {
+        closeButton: false,
+        autoPan:     false,
+        offset:      [0, -4],
+        className:   'pm-popup',
+        minWidth:    150,
+        maxWidth:    230,
+      });
+
+      // ── Hover-to-show details (with small anti-flicker delay) ─────
+      // Opens the compact popup on hover and keeps it open while the
+      // cursor is over either the marker OR the popup itself.
+      let hideTimer = null;
+      const openDetails = () => {
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        marker.openPopup();
+      };
+      const closeDetailsSoon = () => {
+        if (hideTimer) clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => marker.closePopup(), 120);
+      };
+      marker.on('mouseover', openDetails);
+      marker.on('mouseout',  closeDetailsSoon);
+      marker.on('popupopen', (e) => {
+        const el = e.popup.getElement();
+        if (el) {
+          el.addEventListener('mouseenter', openDetails);
+          el.addEventListener('mouseleave', closeDetailsSoon);
+        }
+      });
+
+      // Permanent name label beside the dot — "not dot lang".
+      // Hidden automatically while collapsed inside a cluster; shows on
+      // spiderfy and when the marker is displayed on its own.
+      if (label) {
+        marker.bindTooltip(label, {
+          permanent: true,
+          direction: 'right',
+          offset:    [10, 0],
+          className: 'pm-marker-label',
+          opacity:   1,
         });
       }
-      seen.get(loc.clientId).count += 1;
+
+      // Add to the cluster/layer group instead of straight onto the map
+      layer.addLayer(marker);
+
+      markersRef.current.push(marker);
+      if (markerMapRef) markerMapRef.current[String(p.apartmentId)] = marker;
+      bounds.push([p.latitude, p.longitude]);
     });
-    return [...seen.values()];
-  })();
 
-  const validCount = (Array.isArray(mapLocations) ? mapLocations : [])
-    .filter(l => l.lat !== null && l.lng !== null).length;
+    layer.addTo(map);
+    clusterRef.current = layer;
 
-  // ── Render ────────────────────────────────────────────────────
+    // Zoom straight in to the location (street level). For a single point we
+    // jump to FOCUS_ZOOM; for several we fit them but still allow a deep zoom.
+    const FOCUS_ZOOM = 18;
+    if (bounds.length === 1)      map.setView(bounds[0], FOCUS_ZOOM);
+    else if (bounds.length > 1)   map.fitBounds(bounds, { padding: [40, 40], maxZoom: FOCUS_ZOOM });
+  }, [plottable]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Focus a single apartment when a room is picked (dropdown OR legend click).
+  // With clustering, the target marker may be hidden inside a cluster, so we
+  // use zoomToShowLayer() — it zooms/spiderfies until the marker is exposed,
+  // then we centre on it. Details are shown on HOVER now, so we no longer
+  // auto-open the (formerly oversized) popup.
+  useEffect(() => {
+    if (!focusedAptId || !markerMapRef?.current) return;
+    const marker  = markerMapRef.current[String(focusedAptId)];
+    const map     = mapRef.current;
+    const cluster = clusterRef.current;
+    if (!marker || !map) return;
+
+    if (cluster && typeof cluster.zoomToShowLayer === 'function') {
+      // markercluster path — un-cluster / spiderfy, then max-zoom + centre
+      cluster.zoomToShowLayer(marker, () => {
+        const m = mapRef.current;
+        if (m) m.setView(marker.getLatLng(), 18, { animate: true });
+      });
+    } else {
+      // plain-marker fallback path
+      map.flyTo(marker.getLatLng(), 18, { animate: true, duration: 0.8 });
+    }
+  }, [focusedAptId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { leafletReady };
+}
+
+// ── Main Component ────────────────────────────────────────────────
+export default function PropertyMap({ mapLocations, loading }) {
+  const [selectedClient,    setSelectedClient]    = useState('all');
+  const [selectedPropIndex, setSelectedPropIndex] = useState(null);
+  // Third dropdown: selected room/apartment id (string)
+  const [selectedAptId,     setSelectedAptId]     = useState('');
+
+  // markerMapRef holds { apartmentId → L.Marker } for fly-to
+  const markerMapRef = useRef({});
+
+  const { clients, acctLoading } = useClientAccounts();
+
+  const activeClient = useMemo(
+    () => clients.find((c) => c.id === selectedClient) ?? null,
+    [clients, selectedClient]
+  );
+
+  function handleClientChange(clientId) {
+    setSelectedClient(clientId);
+    setSelectedPropIndex(null);
+    setSelectedAptId('');
+  }
+
+  function handlePropChange(raw) {
+    setSelectedPropIndex(raw === '' || raw === null || raw === 'all' ? null : Number(raw));
+    setSelectedAptId('');
+  }
+
+  function handleAptChange(aptId) {
+    setSelectedAptId(aptId);
+  }
+
+  // Fetch from Smoobu whenever a specific client is selected
+  const smoobuClientId = selectedClient !== 'all' ? selectedClient : null;
+
+  const { apartments: smoobuApts, aptLoading, aptError } =
+    useSmoobuApartments(smoobuClientId, selectedPropIndex);
+
+  // Normalise overview coords (may also be strings)
+  const overviewLocs = useMemo(() =>
+    (Array.isArray(mapLocations) ? mapLocations : []).map((l) => ({
+      ...l,
+      latitude:  toCoord(l.latitude),
+      longitude: toCoord(l.longitude),
+    })),
+  [mapLocations]);
+
+  // ── Build full location list (legend + map source) ─────────────
+  const locations = useMemo(() => {
+    if (smoobuClientId) {
+      // While loading, show DB property names as placeholders
+      if (aptLoading && smoobuApts.length === 0) {
+        const client = clients.find((c) => c.id === smoobuClientId);
+        if (!client) return [];
+        const propsToShow = (selectedPropIndex !== null)
+          ? [client.properties[selectedPropIndex]].filter(Boolean)
+          : client.properties;
+        return propsToShow.map((prop, i) => ({
+          apartmentId:   `db:${smoobuClientId}:${i}`,
+          apartmentName: prop?.propertyName || 'Property',
+          propertyName:  prop?.propertyName || 'Property',
+          clientId:      smoobuClientId,
+          clientName:    activeClient?.name || '',
+          street: '', zip: '', city: '', country: '',
+          latitude: null, longitude: null,
+        }));
+      }
+      return smoobuApts;
+    }
+
+    // All accounts mode — overviewLocs first, then DB-only stubs for
+    // any client that has no Smoobu entry yet
+    const clientsWithSmoobu = new Set(overviewLocs.map((l) => l.clientId));
+    const stubs = [];
+    clients.forEach((client) => {
+      if (clientsWithSmoobu.has(client.id)) return;
+      if (client.properties.length === 0) {
+        stubs.push({
+          apartmentId: `db:${client.id}`, apartmentName: '(no properties)',
+          propertyName: '(no properties)', clientId: client.id, clientName: client.name,
+          street: '', zip: '', city: '', country: '', latitude: null, longitude: null,
+        });
+      } else {
+        client.properties.forEach((prop, pi) => {
+          stubs.push({
+            apartmentId: `db:${client.id}:${pi}`, apartmentName: prop.propertyName || 'Property',
+            propertyName: prop.propertyName || 'Property', clientId: client.id, clientName: client.name,
+            street: '', zip: '', city: '', country: '', latitude: null, longitude: null,
+          });
+        });
+      }
+    });
+    return [...overviewLocs, ...stubs];
+  }, [smoobuClientId, selectedPropIndex, smoobuApts, aptLoading,
+      clients, overviewLocs, activeClient]);
+
+  // Only entries with valid numeric coords go on the map
+  const plottable = useMemo(() =>
+    locations.filter(
+      (l) => l.latitude !== null && l.longitude !== null &&
+             Number.isFinite(l.latitude) && Number.isFinite(l.longitude)
+    ),
+  [locations]);
+
+  // The focusedAptId drives the fly-to effect in useLeafletMap
+  const focusedAptId = selectedAptId || null;
+
+  // ── What actually gets plotted on the map ──────────────────────
+  // When a single room is selected (focusedAptId), we isolate it so it
+  // shows ALONE on the map (no surrounding markers/clusters) — this is the
+  // "makita sya mag-isa" behaviour. The side legend still lists everything,
+  // so the user can pick a different room any time.
+  // When nothing is focused, we plot all coords (clustered + spiderfy).
+  const mapPoints = useMemo(() => {
+    if (focusedAptId) {
+      const one = plottable.find((p) => String(p.apartmentId) === focusedAptId);
+      if (one) return [one];
+    }
+    return plottable;
+  }, [plottable, focusedAptId]);
+
+  // ── Leaflet map ────────────────────────────────────────────────
+  const mapContainerRef = useRef(null);
+  useLeafletMap(mapContainerRef, mapPoints, markerMapRef, focusedAptId);
+
+  // ── Dropdown options ───────────────────────────────────────────
+  const propertyOptions = useMemo(() => {
+    if (!activeClient) return [];
+    return activeClient.properties.map((p, i) => ({
+      index: i,
+      name:  p.propertyName || `Property ${i + 1}`,
+    }));
+  }, [activeClient]);
+
+  // Room dropdown options — only apartments that have coords (can be shown on map)
+  // If no coords exist yet, still show all so the user knows what was fetched.
+  const roomOptions = useMemo(() => {
+    if (!smoobuClientId || selectedPropIndex === null) return [];
+    if (smoobuApts.length === 0) return [];
+    return smoobuApts.map((a) => ({
+      id:       String(a.apartmentId),
+      name:     a.apartmentName || a.propertyName || `Apt ${a.apartmentId}`,
+      hasCoord: a.latitude !== null && a.longitude !== null,
+    }));
+  }, [smoobuClientId, selectedPropIndex, smoobuApts]);
+
+  const isDropdownLoading = acctLoading;
+  const isMapLoading      = loading || aptLoading;
+
+  const statusText = useMemo(() => {
+    if (aptLoading)   return 'Fetching Smoobu sub-apartments…';
+    if (aptError)     return `Smoobu error: ${aptError}`;
+    if (isMapLoading) return 'Loading coordinates…';
+    if (focusedAptId) {
+      const apt = smoobuApts.find(a => String(a.apartmentId) === focusedAptId);
+      if (apt) return `Showing: ${apt.apartmentName || apt.propertyName}`;
+    }
+    const source = smoobuClientId ? '(live from Smoobu)' : '(from overview)';
+    return `${plottable.length} of ${locations.length} mapped ${source}`;
+  }, [aptLoading, aptError, isMapLoading, smoobuClientId, focusedAptId,
+      smoobuApts, plottable.length, locations.length]);
+
   return (
-    <div style={{
-      background:   'var(--color-surface, #131920)',
-      border:       '1px solid var(--color-border, #2d3748)',
-      borderRadius: 'var(--radius-md, 12px)',
-      overflow:     'hidden',
-      display:      'flex',
-      flexDirection:'column',
-      height:       420,
-    }}>
-      {/* ── Header ─────────────────────────────────────────── */}
-      <div style={{
-        padding:    '14px 18px 10px',
-        borderBottom:'1px solid var(--color-border, #2d3748)',
-        display:    'flex',
-        alignItems: 'center',
-        justifyContent:'space-between',
-        flexShrink: 0,
-      }}>
+    <div className="db-table-card" style={{ flexShrink: 0, overflow: 'visible' }}>
+
+      {/* ── Header + dropdowns ── */}
+      <div className="db-table-card__head" style={{ flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <h3 style={{ margin:0, fontSize:'.95rem', fontWeight:600,
-                       color:'var(--color-text, #f1f5f9)' }}>
-            Property Map
-          </h3>
-          <p style={{ margin:0, fontSize:'.72rem',
-                      color:'var(--color-muted, #6b7280)', marginTop:2 }}>
-            {loading
-              ? 'Fetching coordinates from Smoobu…'
-              : validCount > 0
-                ? `${validCount} propert${validCount === 1 ? 'y' : 'ies'} plotted from Smoobu location data`
-                : 'No Smoobu coordinates found'}
+          <h2 className="db-table-card__title">Property Map</h2>
+          <p style={{ fontSize: '.74rem', color: 'var(--color-muted)', marginTop: 2 }}>
+            {statusText}
           </p>
         </div>
 
-        {/* Source badge */}
-        {!loading && validCount > 0 && (
-          <div style={{
-            fontSize:'.68rem', fontWeight:600, letterSpacing:'.04em',
-            color:'#10b981', background:'rgba(16,185,129,.12)',
-            border:'1px solid rgba(16,185,129,.3)',
-            borderRadius:20, padding:'3px 10px',
-          }}>
-            SMOOBU GPS
-          </div>
-        )}
-      </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
 
-      {/* ── Map area ───────────────────────────────────────── */}
-      <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
-        {loading ? (
-          <MapSkeleton />
-        ) : validCount === 0 ? (
-          <EmptyMap />
-        ) : (
-          <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
-        )}
-      </div>
+          {/* Dropdown 1 — Business Account */}
+          <select
+            value={selectedClient}
+            onChange={(e) => handleClientChange(e.target.value)}
+            disabled={isDropdownLoading}
+            style={dropdownStyle(isDropdownLoading)}
+          >
+            <option value="all">
+              {isDropdownLoading ? 'Loading accounts…' : `All accounts (${clients.length})`}
+            </option>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
 
-      {/* ── Legend ─────────────────────────────────────────── */}
-      {!loading && legend.length > 0 && (
-        <div style={{
-          padding:    '10px 18px',
-          borderTop:  '1px solid var(--color-border, #2d3748)',
-          display:    'flex',
-          flexWrap:   'wrap',
-          gap:        '8px 16px',
-          flexShrink: 0,
-          background: 'var(--color-surface-2, #1a2232)',
-        }}>
-          {legend.map(entry => (
-            <div key={entry.clientName} style={{
-              display:    'flex',
-              alignItems: 'center',
-              gap:        6,
-              fontSize:   '.72rem',
-              color:      'var(--color-muted, #9ca3af)',
-            }}>
-              <div style={{
-                width: 10, height: 10, borderRadius: '50%',
-                background: entry.color, flexShrink: 0,
-              }} />
-              <span>{entry.clientName}</span>
-              <span style={{ opacity: .5 }}>({entry.count})</span>
-            </div>
-          ))}
+          {/* Dropdown 2 — Property (only when a client is selected) */}
+          {selectedClient !== 'all' && (
+            <select
+              value={selectedPropIndex ?? ''}
+              onChange={(e) => handlePropChange(e.target.value)}
+              disabled={isDropdownLoading || propertyOptions.length === 0}
+              style={dropdownStyle(isDropdownLoading || propertyOptions.length === 0)}
+            >
+              <option value="">
+                {propertyOptions.length === 0
+                  ? 'No properties'
+                  : `All properties (${propertyOptions.length})`}
+              </option>
+              {propertyOptions.map((p) => (
+                <option key={p.index} value={p.index}>{p.name}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Dropdown 3 — Room / Apartment (only when a specific property is selected
+                          AND Smoobu returned at least one apartment) */}
+          {selectedClient !== 'all' && selectedPropIndex !== null && roomOptions.length > 0 && (
+            <select
+              value={selectedAptId}
+              onChange={(e) => handleAptChange(e.target.value)}
+              disabled={aptLoading}
+              style={dropdownStyle(aptLoading)}
+            >
+              <option value="">All rooms ({roomOptions.length})</option>
+              {roomOptions.map((r) => (
+                <option key={r.id} value={r.id} disabled={!r.hasCoord}>
+                  {r.name}{!r.hasCoord ? ' (no coords)' : ''}
+                </option>
+              ))}
+            </select>
+          )}
+
         </div>
-      )}
+      </div>
+
+      {/* ── Map + legend ──
+          The map container is ALWAYS mounted (Leaflet inits once and keeps
+          its size). While loading we lay a skeleton OVER it instead of
+          unmounting it — this fixes the half-rendered / broken-tiles look. */}
+      <div style={{ position: 'relative', display: 'flex', height: 325, overflow: 'hidden', borderRadius: '0 0 var(--radius-card, 12px) var(--radius-card, 12px)' }}>
+
+          {/* Leaflet map container */}
+          <div
+            ref={mapContainerRef}
+            style={{ flex: 1, minWidth: 0, zIndex: 0, overflow: 'hidden', position: 'relative' }}
+          >
+            {!isMapLoading && locations.length > 0 && plottable.length === 0 && (
+              <div style={{
+                position: 'absolute', inset: 0, zIndex: 1000,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(255,255,255,0.85)', textAlign: 'center', padding: 20,
+              }}>
+                <div style={{ color: 'var(--color-muted)', fontSize: '.82rem', maxWidth: 300 }}>
+                  {aptError
+                    ? `Could not load Smoobu data: ${aptError}`
+                    : "No map coordinates set for these properties yet. Add each apartment's address in Smoobu to plot them here."}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Legend — colour derived from apartmentId hash, not array index */}
+          <div style={{
+            width: 175, flexShrink: 0,
+            padding: '8px 10px',
+            borderLeft: '1px solid var(--color-border)',
+            display: 'flex', flexDirection: 'column', gap: 4,
+            overflowY: 'auto',
+          }}>
+            {isDropdownLoading ? (
+              <div style={{ fontSize: '.72rem', color: 'var(--color-muted)' }}>Loading properties…</div>
+            ) : locations.length === 0 ? (
+              <div style={{ fontSize: '.72rem', color: 'var(--color-muted)' }}>No properties to display.</div>
+            ) : (
+              locations.map((p) => {
+                const addrParts = [p.street, p.city, p.country].filter(Boolean);
+                const addr      = addrParts.join(', ');
+                const hasCoords = p.latitude !== null && p.longitude !== null &&
+                                  Number.isFinite(p.latitude) && Number.isFinite(p.longitude);
+                // Stable colour from id — matches the map marker
+                const dotColor  = hasCoords ? colorForId(p.apartmentId) : '#d1d5db';
+                const subtitle  = addr || p.type || (hasCoords ? '' : 'No address in Smoobu');
+                // Highlight the focused apartment in the legend
+                const isFocused = focusedAptId && String(p.apartmentId) === focusedAptId;
+                return (
+                  <div
+                    key={String(p.apartmentId)}
+                    onClick={() => {
+                      if (!hasCoords) return;
+                      handleAptChange(
+                        String(p.apartmentId) === focusedAptId ? '' : String(p.apartmentId)
+                      );
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 6,
+                      cursor: hasCoords ? 'pointer' : 'default',
+                      background: isFocused ? 'var(--color-surface-2, #f0faf5)' : 'transparent',
+                      borderRadius: 6,
+                      padding: '2px 4px',
+                      transition: 'background 0.15s',
+                    }}
+                  >
+                    <div style={{
+                      width: 8, height: 8, borderRadius: '50%',
+                      background: dotColor,
+                      flexShrink: 0, marginTop: 3,
+                      boxShadow: isFocused ? `0 0 0 2px ${dotColor}55` : 'none',
+                    }} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{
+                        fontSize: '.7rem', fontWeight: isFocused ? 700 : 600, lineHeight: 1.25,
+                        color: isFocused ? 'var(--color-brand)' : 'var(--color-text)',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>
+                        {p.apartmentName || p.propertyName}
+                      </div>
+                      {p.propertyName && p.apartmentName !== p.propertyName && (
+                        <div style={{
+                          fontSize: '.63rem', color: 'var(--color-muted)', lineHeight: 1.2,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                          {p.propertyName}
+                        </div>
+                      )}
+                      <div style={{
+                        fontSize: '.63rem', color: 'var(--color-brand)', fontWeight: 600, lineHeight: 1.2,
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>
+                        {p.clientName}
+                      </div>
+                      <div style={{
+                        fontSize: '.61rem', color: 'var(--color-muted)', lineHeight: 1.2,
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>
+                        {subtitle}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Loading overlay — sits ON TOP of the (still-mounted) map */}
+          {isMapLoading && (
+            <div style={{
+              position: 'absolute', inset: 0, zIndex: 1300,
+              background: 'var(--color-surface, #fff)',
+              padding: 16,
+            }}>
+              <div className="db-skeleton" style={{ width: '100%', height: '100%', borderRadius: 12 }} />
+            </div>
+          )}
+        </div>
     </div>
   );
+}
+
+// ── Shared dropdown style helper ──────────────────────────────────
+function dropdownStyle(disabled) {
+  return {
+    padding: '6px 12px',
+    borderRadius: 'var(--radius-pill)',
+    border: '1px solid var(--color-border)',
+    background: 'var(--color-surface)',
+    color: disabled ? 'var(--color-muted)' : 'var(--color-text)',
+    fontWeight: 600,
+    fontSize: '.78rem',
+    fontFamily: 'var(--font-body)',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    maxWidth: 220,
+  };
 }
