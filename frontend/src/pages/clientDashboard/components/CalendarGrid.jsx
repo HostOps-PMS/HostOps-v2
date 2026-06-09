@@ -69,6 +69,7 @@ function PropertyRow({ prop, allBookings, dateRange, ymdRange, todayISO }) {
   const propBookings = allBookings.filter((b) => {
     if (!b.apartment || b.apartment.id !== prop.id) return false;
     if (!b["guest-name"] && b["is-blocked-booking"]) return false;
+    if (b.type === 'cancellation' || (b.type && b.type.toLowerCase().includes('cancel'))) return false;
     const arrYMD = toYMD(b.arrival);
     const depYMD = toYMD(b.departure);
     return arrYMD <= rangeEndYMD && depYMD > rangeStartYMD;
@@ -250,6 +251,7 @@ function SingleCalendarView({ prop, allBookings, dark }) {
     if (!b.apartment) return false;
     if (String(b.apartment.id) !== String(prop.id)) return false;
     if (!b['guest-name'] && b['is-blocked-booking']) return false;
+    if (b.type === 'cancellation' || (b.type && b.type.toLowerCase().includes('cancel'))) return false;
     return true;
   });
 
@@ -641,13 +643,18 @@ const { dark } = useDashboard();
   const dateRange = buildDateRange(calBaseDate, calMonthsCount);
   const ymdRange = dateRange.map(toYMD);
 
+  // Filter out cancelled bookings so they never appear on the calendar
+  const nonCancelledBookings = bookings.filter(
+    (b) => !(b.type === 'cancellation' || (b.type && b.type.toLowerCase().includes('cancel')))
+  );
+
   const filteredBookings =
     channels.length > 0
-      ? bookings.filter((b) => {
+      ? nonCancelledBookings.filter((b) => {
           const ch = (b.channel && b.channel.name) || "Direct";
           return channels.includes(ch);
         })
-      : bookings;
+      : nonCancelledBookings;
 
   const singleProp = view === "single"
     ? (properties.find(p => String(p.id) === String(singlePropId))
