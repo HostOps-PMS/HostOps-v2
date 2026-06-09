@@ -5,6 +5,7 @@ import { logoutUser } from '../../Login/services/authservice';
 import { useDashboard } from "../context/DashboardContext";
 import { exportDashboardPDF } from "../services/pdfExportService";
 import AccountSettingsModal from "./AccountSettingsModal";
+import SwitchAccountModal from "./SwitchAccountModal";
 import { useActivityLog } from "../hooks/useActivityLog";
 
 function getUserData(auth) {
@@ -39,6 +40,7 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [switchAccountOpen, setSwitchAccountOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -209,6 +211,12 @@ export default function Navbar() {
     setMenuOpen(false);
     setAccountSettingsOpen(true);
     logActivity('opened_account_settings');
+  }
+
+  function openSwitchAccount() {
+    setDropOpen(false);
+    setMenuOpen(false);
+    setSwitchAccountOpen(true);
   }
 
   async function handleExportPDF() {
@@ -631,6 +639,20 @@ export default function Navbar() {
                       />
                       Account settings
                     </button>
+                    <button
+                      style={{
+                        ...t.dropBtn,
+                        color: dark ? "#eaf5f0" : "#0c1c14",
+                      }}
+                      onClick={openSwitchAccount}
+                    >
+                      <i
+                        className="ti ti-arrows-exchange"
+                        style={{ fontSize: "15px", color: "#1e8760" }}
+                        aria-hidden="true"
+                      />
+                      Switch account
+                    </button>
                     <div style={t.mobileDivider} />
                     <button
                       style={{ ...t.dropBtn, color: "#c13515" }}
@@ -654,6 +676,11 @@ export default function Navbar() {
           isOpen={accountSettingsOpen}
           onClose={() => setAccountSettingsOpen(false)}
           onPropertySwitch={selectProperty}
+        />
+        <SwitchAccountModal
+          isOpen={switchAccountOpen}
+          onClose={() => setSwitchAccountOpen(false)}
+          onSwitch={({ id, name }) => { selectProperty(id, name); setSwitchAccountOpen(false); }}
         />
       </>
     );
@@ -822,6 +849,17 @@ export default function Navbar() {
                     Account settings
                   </button>
                   <button
+                    style={{ ...t.dropBtn, color: dark ? "#eaf5f0" : "#0c1c14" }}
+                    onClick={openSwitchAccount}
+                  >
+                    <i
+                      className="ti ti-arrows-exchange"
+                      style={{ fontSize: "15px", color: "#1e8760" }}
+                      aria-hidden="true"
+                    />
+                    Switch account
+                  </button>
+                  <button
                     style={{ ...t.dropBtn, color: "#c13515" }}
                     onClick={handleLogout}
                   >
@@ -843,6 +881,11 @@ export default function Navbar() {
         isOpen={accountSettingsOpen}
         onClose={() => setAccountSettingsOpen(false)}
         onPropertySwitch={selectProperty}
+      />
+      <SwitchAccountModal
+        isOpen={switchAccountOpen}
+        onClose={() => setSwitchAccountOpen(false)}
+        onSwitch={({ id, name }) => { selectProperty(id, name); setSwitchAccountOpen(false); }}
       />
     </>
   );

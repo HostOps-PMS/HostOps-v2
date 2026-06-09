@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../AuthContext";
-import SwitchAccountModal from "./SwitchAccountModal";
-
 const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "https://hostpilot-smoobu.onrender.com";
 
 function getEmailFromToken(token) {
@@ -577,8 +575,6 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successContext, setSuccessContext] = useState("");
 
-  // ── Switch Account modal state ───────────────────────────────────
-  const [showSwitchModal, setShowSwitchModal] = useState(false);
   // Stores the verified OTP token temporarily so we can use it after OTP step
   const verifiedTokenRef = useRef(null);
 
@@ -626,7 +622,6 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       setShowOtpModal(false);
       setShowSuccessModal(false);
       setSuccessContext("");
-      setShowSwitchModal(false);
       verifiedTokenRef.current = null;
     }
   }, [isOpen]);
@@ -635,11 +630,11 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
   useEffect(() => {
     if (!isOpen) return;
     function handleKey(e) {
-      if (e.key === "Escape" && !showOtpModal && !showSuccessModal && !showSwitchModal) onClose();
+      if (e.key === "Escape" && !showOtpModal && !showSuccessModal) onClose();
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [isOpen, onClose, showOtpModal, showSuccessModal, showSwitchModal]);
+  }, [isOpen, onClose, showOtpModal, showSuccessModal]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -652,7 +647,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
   }, [isOpen]);
 
   function handleOverlayClick(e) {
-    if (e.target === overlayRef.current && !showOtpModal && !showSuccessModal && !showSwitchModal) onClose();
+    if (e.target === overlayRef.current && !showOtpModal && !showSuccessModal) onClose();
   }
 
   function handlePwChange(e) {
@@ -1131,7 +1126,6 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
         .acc-cancel-btn:hover { background: #f0f8f4!important; }
         .acc-save-btn:hover:not(:disabled) { background: #1a3325!important; }
         .acc-eye-btn:hover { color: #0c1c14!important; }
-        .acc-switch-btn:hover { border-color: #1e8760!important; background: #eaf8f1!important; box-shadow: 0 2px 8px rgba(30,135,96,0.08)!important; }
         .acc-modal-scroll::-webkit-scrollbar { display: none; }
         .acc-modal-scroll { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
@@ -1150,23 +1144,6 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       {showSuccessModal && (
         <SuccessModal context={successContext} onDone={handleSuccessDone} />
       )}
-
-      {/* Switch Account modal layer */}
-      <SwitchAccountModal
-        isOpen={showSwitchModal}
-        onClose={() => setShowSwitchModal(false)}
-        onSwitch={(property) => {
-        setShowSwitchModal(false);
-
-        if (property) {
-          onClose(); // close Account Settings
-
-          setTimeout(() => {
-            onPropertySwitch?.(property.id, property.name);
-          }, 0);
-        }
-      }}
-      />
 
       <div style={styles.overlay} ref={overlayRef} onClick={handleOverlayClick}>
         <div style={styles.modal} className="acc-modal-scroll" role="dialog" aria-modal="true" aria-label="Account Settings">
@@ -1187,47 +1164,6 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
               aria-label="Close"
             >
               <i className="ti ti-x" aria-hidden="true" />
-            </button>
-          </div>
-
-          {/* ── Switch Account Button ── */}
-          <div style={{ padding: "16px 28px 0" }}>
-            <button
-              onClick={() => setShowSwitchModal(true)}
-              style={{
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "12px 16px",
-                borderRadius: 12,
-                border: "1.5px solid #eaf3ee",
-                background: "#f7faf8",
-                cursor: "pointer",
-                transition: "all 0.18s ease",
-                fontFamily: "inherit",
-              }}
-              className="acc-switch-btn"
-            >
-              <div
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  background: "linear-gradient(135deg, #eaf8f1 0%, #d1f0e3 100%)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <i className="ti ti-arrows-exchange" style={{ fontSize: 17, color: "#1e8760" }} aria-hidden="true" />
-              </div>
-              <div style={{ flex: 1, textAlign: "left" }}>
-                <p style={{ fontSize: 13, fontWeight: 700, color: "#0c1c14", margin: 0 }}>Switch Property</p>
-                <p style={{ fontSize: 11, color: "#9ab8a9", margin: "2px 0 0" }}>Change active properties</p>
-              </div>
-              <i className="ti ti-chevron-right" style={{ fontSize: 16, color: "#9ab8a9" }} aria-hidden="true" />
             </button>
           </div>
 
