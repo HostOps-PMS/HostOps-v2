@@ -602,19 +602,36 @@ export default function ClientSmoobuView({ client, property, onClose }) {
         </div>
 
         {/* ── Scrollable body ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'row-reverse', minHeight: 0, overflow: 'auto', flexWrap: 'wrap-reverse' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div className="smoobu-datebar-wrap" style={{
+          display: 'none',
+          padding: '10px 16px',
+          background: 'var(--color-surface, #fff)',
+          borderBottom: '1px solid var(--color-border, #e5e9ec)',
+          boxShadow: '0 2px 8px rgba(0,0,0,.06)',
+          flexShrink: 0,
+          zIndex: 10,
+        }}>
+          <DatePresetBar
+            activePreset={activePreset}
+            dateRange={dateRange}
+            onPresetChange={handlePresetChange}
+            onCustomApply={handleCustomApply}
+          />
+        </div>
+        <div className="smoobu-body" style={{ flex: 1, display: 'flex', flexDirection: 'row-reverse', minHeight: 0, overflow: 'auto', flexWrap: 'wrap-reverse' }}>
 
           {/* ── LEFT: main scrollable content ── */}
-          <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16, background: 'var(--color-bg, #f6f8f7)' }}>
+          <div className="smoobu-main" style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16, background: 'var(--color-bg, #f6f8f7)' }}>
 
           {/* Date filter + Currency — sticky top */}
-          <div style={{
-            position: 'sticky', top: 0, zIndex: 10,
+          <div className="smoobu-datebar" style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8,
             background: 'var(--color-surface, #fff)',
             borderRadius: 12, padding: '10px 16px',
             border: '1px solid var(--color-border, #e5e9ec)',
             boxShadow: '0 2px 8px rgba(0,0,0,.06)',
+            flexShrink: 0,
           }}>
             <DatePresetBar
               activePreset={activePreset}
@@ -941,8 +958,8 @@ export default function ClientSmoobuView({ client, property, onClose }) {
         </div>{/* end LEFT */}
 
           {/* ── RIGHT: fixed sidebar — no scroll ── */}
-          <div style={{
-            width: 'clamp(280px, 30%, 400px)', flexShrink: 0,
+          <div className="smoobu-sidebar" style={{
+            width: 'clamp(280px, 30%, 400px)', flexShrink: 0, alignSelf: 'flex-start',
             borderLeft: '1px solid var(--color-border, #e5e9ec)',
             overflowY: 'auto',
             display: 'flex', flexDirection: 'column',
@@ -1121,6 +1138,37 @@ export default function ClientSmoobuView({ client, property, onClose }) {
 
           </div>{/* end RIGHT sidebar */}
         </div>{/* end body row */}
+        </div>{/* end body wrapper */}
+
+        {/* ── Mobile responsive styles ── */}
+        <style>{`
+          @media (max-width: 768px) {
+            .smoobu-body {
+              flex-direction: column-reverse !important;
+              flex-wrap: nowrap !important;
+              overflow-y: auto !important;
+              overflow-x: hidden !important;
+            }
+            .smoobu-main {
+              overflow-y: visible !important;
+              min-width: 0 !important;
+              width: 100% !important;
+              padding-top: 0 !important;
+            }
+            .smoobu-sidebar {
+              width: 100% !important;
+              min-height: unset !important;
+              border-left: none !important;
+              border-bottom: 1px solid var(--color-border, #e5e9ec);
+            }
+            .smoobu-datebar-wrap {
+              display: flex !important;
+            }
+            .smoobu-datebar {
+              display: none !important;
+            }
+          }
+        `}</style>
 
         {/* ── Footer ── */}
         <div className="db-modal__foot" style={{ padding: '14px 24px', borderTop: '1px solid var(--color-border, #e5e9ec)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
