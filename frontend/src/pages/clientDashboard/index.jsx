@@ -138,7 +138,7 @@ export default function DashboardPage() {
   const ownerName = dashState.selectedPropertyName || data.ownerName || 'Dashboard';
 
   return (
-    <div style={{ background: "#f4f6f5", minHeight: "100vh" }}>
+    <div style={{ background: "#f4f6f5", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       {/* First-login modal: blocking overlay shown until password is set */}
       {showFirstLoginModal && (
         <FirstLoginModal onComplete={handlePasswordChanged} />
@@ -171,12 +171,82 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div style={{ background: dark ? "#0c1c14" : "#f7faf8", transition: "background 0.2s" }}>
+      <style>{`
+        @media (max-width: 768px) {
+          .db-container {
+            padding-left: 12px !important;
+            padding-right: 12px !important;
+          }
+          .db-page-header {
+            flex-direction: column !important;
+            gap: 10px !important;
+            margin-bottom: 16px !important;
+          }
+          .db-page-header h1 {
+            font-size: 1.35rem !important;
+          }
+          .db-page-header p {
+            font-size: .78rem !important;
+          }
+          .db-date-filter {
+            width: 100% !important;
+            padding-top: 0 !important;
+          }
+          .db-date-filter > * {
+            width: 100% !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .db-container {
+            padding-left: 8px !important;
+            padding-right: 8px !important;
+          }
+          .db-page-header h1 {
+            font-size: 1.2rem !important;
+          }
+        }
+
+        /* ── DateFilterBar: force full width + wrap on mobile ── */
+        @media (max-width: 768px) {
+          .db-date-filter {
+            width: 100% !important;
+          }
+          /* pill button group */
+          .db-date-filter > div,
+          .db-date-filter form,
+          .db-date-filter nav {
+            width: 100% !important;
+            flex-wrap: wrap !important;
+            gap: 6px !important;
+          }
+          /* each pill button */
+          .db-date-filter button {
+            flex: 1 !important;
+            min-width: 60px !important;
+            font-size: .72rem !important;
+            padding: 6px 8px !important;
+            text-align: center !important;
+            justify-content: center !important;
+          }
+          /* custom date popover: full width */
+          .db-date-filter [style*="position: absolute"],
+          .db-date-filter [style*="position:absolute"] {
+            position: fixed !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            width: 90vw !important;
+            max-width: 320px !important;
+            z-index: 9999 !important;
+          }
+        }
+      `}</style>
+      <div style={{ background: dark ? "#0c1c14" : "#f7faf8", transition: "background 0.2s", flex: 1 }}>
         {/* ── Normal dashboard — always rendered regardless of Smoobu connection state ── */}
         <>
           <div className="db-container">
             {/* ── Page header: title LEFT, date filter RIGHT ── */}
-            <div style={{
+            <div className="db-page-header" style={{
               display: 'flex',
               alignItems: 'flex-start',
               justifyContent: 'space-between',
@@ -206,7 +276,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Date filter toggle — placed top-right as circled in screenshot */}
-              <div style={{ paddingTop: 4 }}>
+              <div className="db-date-filter" style={{ paddingTop: 4 }}>
                 <DateFilterBar />
               </div>
             </div>
@@ -217,11 +287,10 @@ export default function DashboardPage() {
               {/* Availability Calendar */}
               <CalendarSection />
             </div>
- 
-            <Footer />
           </>
-        
       </div>
+
+      <Footer />
 
       <MessageModal
         isOpen={modalOpen}

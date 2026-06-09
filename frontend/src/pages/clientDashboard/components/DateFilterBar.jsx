@@ -115,162 +115,229 @@ export default function DateFilterBar() {
   })();
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-      {/* Pill group */}
-      <div style={{
-        display: 'flex',
-        background: '#f0f5f2',
-        borderRadius: 12,
-        padding: 4,
-        gap: 2,
-      }}>
-        {PRESETS.map(({ id, label }) => {
-          const on = activePreset === id;
-          return (
-            <div
-              key={id}
-              style={{ position: id === 'custom' ? 'relative' : undefined }}
-              ref={id === 'custom' ? popRef : undefined}
-            >
-              <button
-                onClick={() => handlePreset(id)}
-                style={{
-                  padding: '7px 14px',
-                  borderRadius: 9,
-                  fontSize: '.78rem',
-                  fontWeight: 700,
-                  fontFamily: "'DM Sans', sans-serif",
-                  color: on ? '#0c1c14' : '#6a8b7c',
-                  background: on ? '#fff' : 'transparent',
-                  border: on ? '1.5px solid #d6ebe0' : '1.5px solid transparent',
-                  cursor: 'pointer',
-                  transition: 'all .15s',
-                  boxShadow: on ? '0 1px 4px rgba(0,0,0,.07)' : 'none',
-                  whiteSpace: 'nowrap',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: id === 'custom' ? 5 : 0,
-                }}
-              >
-                {id === 'custom' && (
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2"/>
-                    <line x1="16" y1="2" x2="16" y2="6"/>
-                    <line x1="8" y1="2" x2="8" y2="6"/>
-                    <line x1="3" y1="10" x2="21" y2="10"/>
-                  </svg>
-                )}
-                {label}
-                {id === 'custom' && on && dashState.from && dashState.to && (
-                  <span style={{
-                    fontSize: '.72rem',
-                    fontWeight: 600,
-                    color: '#26a676',
-                    marginLeft: 2,
-                    maxWidth: 160,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
+    <>
+      <style>{`
+        @media (max-width: 768px) {
+          .dfb-outer {
+            display: flex !important;
+            flex-direction: column !important;
+            width: 100% !important;
+            gap: 6px !important;
+          }
+          .dfb-presets-row {
+            display: flex !important;
+            width: 100% !important;
+            background: #f0f5f2 !important;
+            border-radius: 12px !important;
+            padding: 4px !important;
+            gap: 2px !important;
+          }
+          .dfb-presets-row > div {
+            flex: 1 !important;
+          }
+          .dfb-presets-row button {
+            width: 100% !important;
+            justify-content: center !important;
+            padding: 7px 2px !important;
+            font-size: .7rem !important;
+          }
+          .dfb-custom-row {
+            width: 100% !important;
+            position: relative !important;
+          }
+          .dfb-custom-row button {
+            width: 100% !important;
+            justify-content: center !important;
+            background: #f0f5f2 !important;
+            border-radius: 12px !important;
+            padding: 8px 14px !important;
+            font-size: .78rem !important;
+          }
+          .dfb-custom-pop {
+            position: absolute !important;
+            top: calc(100% + 8px) !important;
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            min-width: unset !important;
+            box-sizing: border-box !important;
+            z-index: 9999 !important;
+          }
+          .dfb-pop-overlay {
+            display: block !important;
+          }
+        }
+      `}</style>
+
+      <div className="dfb-outer" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+
+        {/* Row 1: Daily / Weekly / Monthly / Yearly */}
+        <div className="dfb-presets-row" style={{
+          display: 'flex',
+          background: '#f0f5f2',
+          borderRadius: 12,
+          padding: 4,
+          gap: 2,
+        }}>
+          {PRESETS.filter(p => p.id !== 'custom').map(({ id, label }) => {
+            const on = activePreset === id;
+            return (
+              <div key={id}>
+                <button
+                  onClick={() => handlePreset(id)}
+                  style={{
+                    padding: '7px 14px',
+                    borderRadius: 9,
+                    fontSize: '.78rem',
+                    fontWeight: 700,
+                    fontFamily: "'DM Sans', sans-serif",
+                    color: on ? '#0c1c14' : '#6a8b7c',
+                    background: on ? '#fff' : 'transparent',
+                    border: on ? '1.5px solid #d6ebe0' : '1.5px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all .15s',
+                    boxShadow: on ? '0 1px 4px rgba(0,0,0,.07)' : 'none',
                     whiteSpace: 'nowrap',
-                  }}>
-                    {fmtShort(dashState.from)} – {fmtShort(dashState.to)}
-                  </span>
-                )}
-              </button>
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  {label}
+                </button>
+              </div>
+            );
+          })}
+        </div>
 
-              {/* Custom date popover */}
-              {id === 'custom' && showCustomPop && (
+        {/* Row 2: Custom */}
+        <div className="dfb-custom-row" ref={popRef} style={{ position: 'relative' }}>
+          <button
+            onClick={() => handlePreset('custom')}
+            style={{
+              padding: '7px 14px',
+              borderRadius: 9,
+              fontSize: '.78rem',
+              fontWeight: 700,
+              fontFamily: "'DM Sans', sans-serif",
+              color: activePreset === 'custom' ? '#0c1c14' : '#6a8b7c',
+              background: activePreset === 'custom' ? '#fff' : '#f0f5f2',
+              border: activePreset === 'custom' ? '1.5px solid #d6ebe0' : '1.5px solid transparent',
+              cursor: 'pointer',
+              transition: 'all .15s',
+              boxShadow: activePreset === 'custom' ? '0 1px 4px rgba(0,0,0,.07)' : 'none',
+              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+            }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <rect x="3" y="4" width="18" height="18" rx="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            Custom
+            {activePreset === 'custom' && dashState.from && dashState.to && (
+              <span style={{
+                fontSize: '.72rem', fontWeight: 600, color: '#26a676',
+                marginLeft: 2, maxWidth: 160,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {fmtShort(dashState.from)} – {fmtShort(dashState.to)}
+              </span>
+            )}
+          </button>
+
+          {/* Blurred overlay — mobile only */}
+          {showCustomPop && (
+            <div
+              className="dfb-pop-overlay"
+              onClick={() => setShowCustomPop(false)}
+              style={{
+                display: 'none',
+                position: 'fixed', inset: 0,
+                background: 'rgba(0,0,0,0.25)',
+                backdropFilter: 'blur(4px)',
+                WebkitBackdropFilter: 'blur(4px)',
+                zIndex: 9998,
+              }}
+            />
+          )}
+
+          {/* Popover */}
+          {showCustomPop && (
+            <div className="dfb-custom-pop" style={{
+              position: 'absolute',
+              top: 'calc(100% + 8px)',
+              right: 0,
+              background: '#fff',
+              border: '1.5px solid #e3ede8',
+              borderRadius: 14,
+              boxShadow: '0 8px 32px rgba(0,0,0,.12)',
+              padding: '16px',
+              zIndex: 1000,
+              minWidth: 280,
+            }}>
+              {/* Header with X button */}
+              <div style={{
+                display: 'flex', alignItems: 'center',
+                justifyContent: 'space-between', marginBottom: 10,
+              }}>
                 <div style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 8px)',
-                  right: 0,
-                  background: '#fff',
-                  border: '1.5px solid #e3ede8',
-                  borderRadius: 14,
-                  boxShadow: '0 8px 32px rgba(0,0,0,.12)',
-                  padding: '16px',
-                  zIndex: 1000,
-                  minWidth: 280,
+                  fontSize: '.7rem', fontWeight: 700, color: '#9ab8a9',
+                  letterSpacing: '.5px', textTransform: 'uppercase',
                 }}>
-                  <div style={{
-                    fontSize: '.7rem', fontWeight: 700,
-                    color: '#9ab8a9', letterSpacing: '.5px',
-                    textTransform: 'uppercase', marginBottom: 10,
-                  }}>
-                    Custom date range
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-                    <label style={{ fontSize: '.75rem', color: '#6a8b7c', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>
-                      From
-                    </label>
-                    <input
-                      type="date"
-                      value={customFrom}
-                      onChange={e => setCustomFrom(e.target.value)}
-                      style={{
-                        padding: '9px 12px',
-                        border: '1.5px solid #e3ede8',
-                        borderRadius: 9,
-                        fontFamily: 'inherit',
-                        fontSize: '.82rem',
-                        color: '#0c1c14',
-                        outline: 'none',
-                        width: '100%',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                    <label style={{ fontSize: '.75rem', color: '#6a8b7c', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>
-                      To
-                    </label>
-                    <input
-                      type="date"
-                      value={customTo}
-                      onChange={e => setCustomTo(e.target.value)}
-                      style={{
-                        padding: '9px 12px',
-                        border: '1.5px solid #e3ede8',
-                        borderRadius: 9,
-                        fontFamily: 'inherit',
-                        fontSize: '.82rem',
-                        color: '#0c1c14',
-                        outline: 'none',
-                        width: '100%',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      onClick={() => setShowCustomPop(false)}
-                      style={{
-                        flex: 1, padding: '9px', background: '#f0f5f2',
-                        color: '#2a4e3c', border: 'none', borderRadius: 9,
-                        fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={applyCustom}
-                      style={{
-                        flex: 1, padding: '9px', background: '#26a676',
-                        color: '#fff', border: 'none', borderRadius: 9,
-                        fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 700,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Apply
-                    </button>
-                  </div>
+                  Custom date range
                 </div>
-              )}
+                <button
+                  onClick={() => setShowCustomPop(false)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    color: '#9ab8a9',
+                    fontSize: '.75rem',
+                    lineHeight: 1,
+                    padding: 0,
+                    margin: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 18,
+                    height: 18,
+                    flexShrink: 0,
+                    outline: 'none',
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                  }}
+                >✕</button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                <label style={{ fontSize: '.75rem', color: '#6a8b7c', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>From</label>
+                <input
+                  type="date" value={customFrom}
+                  onChange={e => setCustomFrom(e.target.value)}
+                  style={{ padding: '9px 12px', border: '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                />
+                <label style={{ fontSize: '.75rem', color: '#6a8b7c', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>To</label>
+                <input
+                  type="date" value={customTo}
+                  onChange={e => setCustomTo(e.target.value)}
+                  style={{ padding: '9px 12px', border: '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setShowCustomPop(false)} style={{ flex: 1, padding: '9px', background: '#f0f5f2', color: '#2a4e3c', border: 'none', borderRadius: 9, fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+                <button onClick={applyCustom} style={{ flex: 1, padding: '9px', background: '#26a676', color: '#fff', border: 'none', borderRadius: 9, fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 700, cursor: 'pointer' }}>Apply</button>
+              </div>
             </div>
-          );
-        })}
+          )}
+        </div>
+
       </div>
-    </div>
+    </>
   );
 }

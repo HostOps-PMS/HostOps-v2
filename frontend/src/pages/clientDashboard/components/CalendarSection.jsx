@@ -109,11 +109,25 @@ export default function CalendarSection() {
         .cal-nav-label { font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 800; color: #0c1c14; padding: 0 6px; flex: 1; }
         .cal-nav-today { padding: 6px 14px; border: 1px solid #b7e4cf; background: #eaf8f1; color: #1e8760; border-radius: 100px; font-family: 'DM Sans', sans-serif; font-size: .75rem; font-weight: 700; cursor: pointer; margin-left: auto; }
         .cal-nav-today:hover { background: #d4f0e4; }
+
+        @media (max-width: 768px) {
+          .cal-header-responsive { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; padding: 14px 16px 12px !important; }
+          .cal-controls-responsive { width: 100% !important; flex-wrap: wrap !important; gap: 6px !important; }
+          .cal-controls-responsive .cal-btn { font-size: .7rem !important; padding: 5px 10px !important; }
+          .cal-controls-responsive .cal-btn-group button { font-size: .7rem !important; padding: 4px 10px !important; }
+          .cal-nav { padding: 10px 16px !important; }
+          .cal-nav-label { font-size: .88rem !important; }
+        }
+
+        @media (max-width: 480px) {
+          .cal-controls-responsive { gap: 5px !important; }
+          .cal-controls-responsive .cal-btn { font-size: .68rem !important; padding: 5px 8px !important; }
+        }
       `}</style>
       {/* Toolbar */}
-      <div className="cal-header" style={{ borderBottom: dark ? '1px solid #1e3a2a' : '1px solid #f0f5f2' }}>
+      <div className="cal-header cal-header-responsive" style={{ borderBottom: dark ? '1px solid #1e3a2a' : '1px solid #f0f5f2' }}>
         <div className="cal-title" style={{ color: dark ? '#eaf5f0' : '#0c1c14' }}>Availability Calendar</div>
-        <div className="cal-controls" style={{ position: 'relative' }}>
+        <div className="cal-controls cal-controls-responsive" style={{ position: 'relative' }}>
           {/* Date range button */}
           <div style={{ position: 'relative' }} ref={datePopRef}>
            <button className="cal-btn" style={{ background: dark ? '#1a3d28' : '#fff', borderColor: dark ? '#2a5c3c' : '#e3ede8', color: dark ? '#a8d4bc' : '#0c1c14' }} onClick={() => { setShowDatePop((v) => !v); setShowFilterPop(false); }}>

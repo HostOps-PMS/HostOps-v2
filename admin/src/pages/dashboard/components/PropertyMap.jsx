@@ -1137,11 +1137,12 @@ export default function PropertyMap({ mapLocations, loading }) {
           The map container is ALWAYS mounted (Leaflet inits once and keeps
           its size). While loading we lay a skeleton OVER it instead of
           unmounting it — this fixes the half-rendered / broken-tiles look. */}
-      <div style={{ position: 'relative', display: 'flex', height: 410, overflow: 'hidden', borderRadius: '0 0 var(--radius-card, 12px) var(--radius-card, 12px)' }}>
+      <div className="pm-map-wrapper" style={{ position: 'relative', display: 'flex', height: 410, overflow: 'hidden', borderRadius: '0 0 var(--radius-card, 12px) var(--radius-card, 12px)' }}>
 
           {/* Leaflet map container */}
           <div
             ref={mapContainerRef}
+            className="pm-map-container"
             style={{ flex: 1, minWidth: 0, zIndex: 0, overflow: 'hidden', position: 'relative' }}
           >
             {/* Map style switcher */}
@@ -1185,7 +1186,7 @@ export default function PropertyMap({ mapLocations, loading }) {
           </div>
 
           {/* Legend — colour derived from apartmentId hash, not array index */}
-          <div style={{
+          <div className="pm-legend-container" style={{
             width: 175, flexShrink: 0,
             padding: '8px 10px',
             borderLeft: '1px solid var(--color-border)',
@@ -1281,6 +1282,7 @@ export default function PropertyMap({ mapLocations, loading }) {
       {isModalOpen && (
         <div
           onClick={(e) => { if (e.target === e.currentTarget) setIsModalOpen(false); }}
+          className="pm-modal-overlay"
           style={{
             position: 'fixed', inset: 0, zIndex: 9999,
             background: 'rgba(0,0,0,0.55)',
@@ -1288,7 +1290,7 @@ export default function PropertyMap({ mapLocations, loading }) {
             padding: 24,
           }}
         >
-          <div style={{
+          <div className="pm-modal-inner" style={{
             background: 'var(--color-surface, #fff)',
             borderRadius: 16,
             width: '95vw', maxWidth: 1300,
@@ -1298,7 +1300,7 @@ export default function PropertyMap({ mapLocations, loading }) {
             boxShadow: '0 32px 80px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.06)',
           }}>
             {/* Modal header with ALL dropdowns */}
-            <div style={{
+            <div className="pm-modal-head" style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '12px 20px',
               borderBottom: '1px solid var(--color-border)',
@@ -1390,9 +1392,10 @@ export default function PropertyMap({ mapLocations, loading }) {
             </div>
 
             {/* Modal map + legend + detail */}
-            <div style={{ position: 'relative', display: 'flex', flex: 1, overflow: 'hidden', minWidth: 0 }}>
+            <div className="pm-modal-body" style={{ position: 'relative', display: 'flex', flex: 1, overflow: 'hidden', minWidth: 0 }}>
               <div
                 ref={modalMapContainerRef}
+                className="pm-modal-map"
                 style={{ flex: 1, minWidth: 0, zIndex: 0, overflow: 'hidden', position: 'relative' }}
               >
                 {!isMapLoading && locations.length > 0 && plottable.length === 0 && (
@@ -1435,7 +1438,7 @@ export default function PropertyMap({ mapLocations, loading }) {
               </div>
 
               {/* Legend + Detail — tabbed */}
-              <div style={{
+              <div className="pm-modal-panel" style={{
                 width: 300, flexShrink: 0,
                 borderLeft: '1px solid var(--color-border)',
                 display: 'flex', flexDirection: 'column',
@@ -1677,6 +1680,122 @@ export default function PropertyMap({ mapLocations, loading }) {
           </div>
         </div>
       )}
+    <style>{`
+        @media (max-width: 768px) {
+
+          .db-table-card__head {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            padding: 12px 14px !important;
+            gap: 10px !important;
+          }
+          .db-table-card__head > div:last-child {
+            width: 100% !important;
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 6px !important;
+          }
+          .db-table-card__head > div:last-child select,
+          .db-table-card__head > div:last-child button {
+            flex: 1 !important;
+            min-width: 120px !important;
+            max-width: 100% !important;
+            font-size: .72rem !important;
+          }
+
+          .pm-map-wrapper {
+            flex-direction: column !important;
+            height: auto !important;
+            border-radius: 0 0 12px 12px !important;
+          }
+          .pm-map-container {
+            height: 320px !important;
+            min-height: 320px !important;
+            width: 100% !important;
+            flex: none !important;
+          }
+          .pm-legend-container {
+            width: 100% !important;
+            max-height: 260px !important;
+            border-left: none !important;
+            border-top: 1px solid var(--color-border) !important;
+            padding: 10px 12px !important;
+          }
+
+          .pm-modal-overlay {
+            padding: 0 !important;
+            align-items: flex-end !important;
+          }
+          .pm-modal-inner {
+            width: 100vw !important;
+            height: 92dvh !important;
+            max-width: 100vw !important;
+            border-radius: 16px 16px 0 0 !important;
+            margin: 0 !important;
+          }
+            width: 100vw !important;
+            height: 100dvh !important;
+            max-width: 100vw !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+          }
+          .pm-modal-head {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            padding: 10px 14px !important;
+            gap: 8px !important;
+          }
+          .pm-modal-head > div:last-child {
+            width: 100% !important;
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 6px !important;
+          }
+          .pm-modal-head > div:last-child select,
+          .pm-modal-head > div:last-child button {
+            flex: 1 !important;
+            min-width: 100px !important;
+            max-width: 100% !important;
+            font-size: .72rem !important;
+          }
+          .pm-modal-body {
+            flex-direction: column !important;
+            overflow-y: auto !important;
+          }
+          .pm-modal-map {
+            height: 300px !important;
+            min-height: 300px !important;
+            flex: none !important;
+            width: 100% !important;
+          }
+          .pm-modal-panel {
+            width: 100% !important;
+            border-left: none !important;
+            border-top: 1px solid var(--color-border) !important;
+            min-height: 300px !important;
+            flex: 1 !important;
+          }
+
+          /* ── Card: add side breathing room ── */
+          .db-table-card {
+            margin: 0 12px !important;
+            border-radius: 16px !important;
+          }
+
+          /* ── Modal overlay: side padding so it doesn't touch edges ── */
+          .pm-modal-overlay {
+            padding: 0 !important;
+            align-items: flex-end !important;
+          }
+          .pm-modal-inner {
+            width: calc(100vw - 24px) !important;
+            height: 92dvh !important;
+            max-width: calc(100vw - 24px) !important;
+            border-radius: 16px 16px 0 0 !important;
+            margin: 0 12px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

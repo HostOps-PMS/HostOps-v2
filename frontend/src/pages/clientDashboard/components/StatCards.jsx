@@ -66,7 +66,7 @@ function RevenueCard({ revenue, bookings }) {
         transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
         transition: 'all .25s ease',
         cursor: 'default',
-        minHeight: 190,
+        minHeight: 'clamp(140px, 20vw, 190px)',
       }}
     >
       {/* decorative shapes */}
@@ -113,7 +113,7 @@ function RevenueCard({ revenue, bookings }) {
       </div>
 
       {/* amount */}
-      <div style={{
+      <div className="stat-revenue-amount" style={{
         fontFamily: T.fontSora, fontSize: '1.85rem', fontWeight: 800,
         color: '#fff', letterSpacing: '-1.5px', lineHeight: 1.1, marginTop: 10,
       }}>
@@ -159,7 +159,7 @@ function SplitCard({ label, value, sub, color, accentBg, icon, dark }) {
         cursor: 'default',
         display: 'flex',
         flexDirection: 'column',
-        minHeight: 190,
+        minHeight: 'clamp(130px, 18vw, 190px)',
       }}
     >
       {/* colored top strip */}
@@ -179,7 +179,7 @@ function SplitCard({ label, value, sub, color, accentBg, icon, dark }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: 1 }}>
           {/* left: big number */}
           <div>
-            <div style={{
+            <div className="stat-split-value" style={{
               fontFamily: T.fontSora, fontSize: '2.2rem', fontWeight: 800,
               color: color, letterSpacing: '-1.5px', lineHeight: 1,
             }}>
@@ -198,7 +198,7 @@ function SplitCard({ label, value, sub, color, accentBg, icon, dark }) {
             <CircleIcon color={color} bg={accentBg}>
               {icon}
             </CircleIcon>
-            <SparkBars color={color} />
+            <div className="stat-sparkbars"><SparkBars color={color} /></div>
           </div>
         </div>
       </div>
@@ -219,7 +219,7 @@ export default function StatCards({ stats = {} }) {
   const cancelledNights = stats.cancelledNights ?? 0;
 
   return (
-    <div style={{
+    <div className="stat-cards-grid" style={{
       display: 'grid',
       gridTemplateColumns: '1.15fr 1fr 1fr 1fr',
       gap: 16,
@@ -275,6 +275,60 @@ export default function StatCards({ stats = {} }) {
           </svg>
         }
       />
+    
+        <style>{`
+        @media (max-width: 1024px) {
+          .stat-cards-grid {
+            grid-template-columns: 1.15fr 1fr !important;
+          }
+        }
+        @media (max-width: 768px) {
+          .stat-cards-grid {
+            grid-template-columns: 1fr 1fr !important;
+            gap: 10px !important;
+            margin-bottom: 16px !important;
+          }
+          .stat-cards-grid > div {
+            min-height: unset !important;
+            border-radius: 14px !important;
+            overflow: hidden !important;
+          }
+          /* Revenue card: shrink amount font */
+          .stat-revenue-amount {
+            font-size: 1.25rem !important;
+            letter-spacing: -0.5px !important;
+          }
+          /* SplitCard: shrink big number */
+          .stat-split-value {
+            font-size: 1.6rem !important;
+            letter-spacing: -1px !important;
+          }
+          /* SplitCard: shrink sub text */
+          .stat-split-sub {
+            font-size: .6rem !important;
+          }
+          /* SplitCard: shrink label */
+          .stat-split-label {
+            font-size: .58rem !important;
+            margin-bottom: 6px !important;
+          }
+          /* SplitCard: reduce icon size */
+          .stat-split-icon {
+            width: 38px !important;
+            height: 38px !important;
+          }
+          /* Hide sparkbars on very small cards */
+          .stat-sparkbars {
+            display: none !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .stat-cards-grid {
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

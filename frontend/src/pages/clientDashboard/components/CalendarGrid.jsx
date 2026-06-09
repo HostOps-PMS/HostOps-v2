@@ -385,7 +385,7 @@ function SingleCalendarView({ prop, allBookings, dark }) {
   return (
     <div style={{ width: '100%', fontFamily: "'DM Sans', sans-serif" }}>
       {/* Stats strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', borderBottom: `1px solid ${borderCol}` }}>
+      <div className="single-cal-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', borderBottom: `1px solid ${borderCol}` }}>
         {[
           { label: 'Bookings this month', value: navMonthBookings.length, green: true },
           { label: 'Occupancy', value: `${navOccupancy}%`, green: true },
@@ -400,7 +400,7 @@ function SingleCalendarView({ prop, allBookings, dark }) {
       </div>
 
       {/* Two-column layout: calendar left, upcoming bookings right */}
-      <div style={{ display: 'flex', gap: 0, alignItems: 'flex-start' }}>
+      <div className="single-cal-layout" style={{ display: 'flex', gap: 0, alignItems: 'flex-start' }}>
 
       {/* LEFT: Calendar */}
       <div style={{ flex: 1, minWidth: 0, borderRight: `1px solid ${borderCol}` }}>
@@ -537,7 +537,7 @@ function SingleCalendarView({ prop, allBookings, dark }) {
       </div> {/* end LEFT calendar column */}
 
       {/* RIGHT: Upcoming bookings */}
-      <div style={{ width: 335, minWidth: 295, flexShrink: 0, background: surfaceBg, borderLeft: `1px solid ${borderCol}`, display: 'flex', flexDirection: 'column', alignSelf: 'stretch' }}>
+      <div className="single-cal-sidebar" style={{ width: 335, minWidth: 295, flexShrink: 0, background: surfaceBg, borderLeft: `1px solid ${borderCol}`, display: 'flex', flexDirection: 'column', alignSelf: 'stretch' }}>
         <div style={{ padding: '13px 20px', borderBottom: `1px solid ${borderCol}`, background: cardBg }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: textSecondary, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Upcoming bookings</div>
         </div>
@@ -621,6 +621,9 @@ const { dark } = useDashboard();
     function handler(e) {
       if (filterPopRef.current && !filterPopRef.current.contains(e.target)) {
         setShowPropFilter(false);
+      }
+      if (!e.target.closest('.cal-sidebar')) {
+        document.querySelectorAll('.prop-name-tooltip').forEach(t => t.style.display = 'none');
       }
     }
     document.addEventListener("mousedown", handler);
@@ -884,7 +887,7 @@ const { dark } = useDashboard();
           .cal-prop-col { position: sticky; left: 0; z-index: 20; text-align: left; width: 200px; min-width: 200px; max-width: 200px; padding: 0; font-size: .78rem; font-weight: 600; color: #e8f5ee; border-right: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; background: #0f2d1f; }
           .cal-month-row .cal-prop-col { background: #0a1f15; z-index: 21; font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: #4d9e7a; padding: 8px 16px 8px 20px; border-bottom: 1px solid #1a3d28; border-right: 3px solid #1e8760; }
           .cal-day-row .cal-prop-col { background: #0d2619; z-index: 21; overflow: visible; border-bottom: 1px solid #1a3d28; border-right: 3px solid #1e8760; }
-          .cal-table tbody .cal-prop-col { background: #0f2d1f; z-index: 20; border-right: 3px solid #1e8760; border-bottom: 1px solid #1a3d28; }
+          .cal-table tbody .cal-prop-col { background: #0f2d1f; z-index: 20; border-right: 3px solid #1e8760; border-bottom: 1px solid #1a3d28; height: 48px; }
           .cal-table tbody tr:hover .cal-prop-col { background: #163d28; }
 
           /* ── Pills ── */
@@ -902,10 +905,40 @@ const { dark } = useDashboard();
           .cal-pill-ic { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff; flex-shrink: 0; }
           .pill-text { overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
           .pill-meta { opacity: .55; font-size: 9.5px; flex-shrink: 0; margin-left: 1px; }
+
+          /* ── Responsive ── */
+          @media (max-width: 768px) {
+            /* Multi view: shrink sticky sidebar */
+            .cal-sidebar { width: 180px !important; min-width: 180px !important; }
+            .cal-sidebar span { font-size: .75rem !important; }
+            .cal-table td { min-width: 44px !important; max-width: 44px !important; width: 44px !important; height: 44px !important; }
+            .cal-table th { min-width: 44px !important; max-width: 44px !important; width: 44px !important; padding: 6px 2px !important; font-size: .6rem !important; }
+            .cal-table tbody tr { height: 48px !important; }
+            .cal-table tbody td { height: 48px !important; }
+            .cal-pill-ic { width: 15px !important; height: 15px !important; font-size: 7px !important; }
+            .pill-meta { display: none !important; }
+
+            /* Single view: stack vertically */
+            .single-cal-layout { flex-direction: column !important; }
+            .single-cal-sidebar { width: 100% !important; min-width: unset !important; border-left: none !important; border-top: 1px solid #e3ede8 !important; }
+
+            /* Single view: stats 2-col */
+            .single-cal-stats { grid-template-columns: repeat(2, 1fr) !important; }
+            .single-cal-stats > div:nth-child(2) { border-right: none !important; }
+            .single-cal-stats > div:nth-child(3) { border-top: 1px solid #e3ede8; }
+            .single-cal-stats > div:nth-child(4) { border-top: 1px solid #e3ede8; border-right: none !important; }
+          }
+
+          @media (max-width: 480px) {
+            .cal-sidebar { width: 160px !important; min-width: 160px !important; }
+            .cal-sidebar span { font-size: .72rem !important; }
+            .cal-table td { min-width: 40px !important; max-width: 40px !important; width: 40px !important; height: 40px !important; }
+            .cal-table th { min-width: 40px !important; max-width: 40px !important; width: 40px !important; }
+          }
         `}</style>
 
       {/* FIXED SIDEBAR */}
-      <div style={{ width: 240, minWidth: 240, background: dark ? "#0f2d1f" : "#eaf5ee", flexShrink: 0, borderRight: dark ? "1px solid #1e3a2a" : "1px solid #c8e6d6", overflow: "visible", display: "flex", flexDirection: "column" }}>
+      <div className="cal-sidebar" style={{ width: 240, minWidth: 240, background: dark ? "#0f2d1f" : "#eaf5ee", flexShrink: 0, borderRight: dark ? "1px solid #1e3a2a" : "1px solid #c8e6d6", overflow: "visible", display: "flex", flexDirection: "column" }}>
         <div style={{ background: dark ? "#0a1f15" : "#d6ede0", height: 36, display: "flex", alignItems: "center", padding: "0 16px 0 20px", borderBottom: dark ? "1px solid #1a3d28" : "1px solid #e3ede8", fontSize: ".62rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".8px", color: dark ? "#4d9e7a" : "#5a8a70", flexShrink: 0 }}>
           Properties
         </div>
@@ -959,14 +992,32 @@ const { dark } = useDashboard();
           )}
         </div>
         {displayedProps.map((prop) => (
-          <div key={prop.id} style={{ height: 48, display: "flex", alignItems: "center", padding: "0 16px 0 20px", gap: 8, borderBottom: dark ? "1px solid #1a3d28" : "1px solid #d6ede0", background: dark ? "#0f2d1f" : "#eaf5ee" }}
+          <div key={prop.id} style={{ height: 48, minHeight: 48, maxHeight: 48, boxSizing: 'border-box', display: "flex", alignItems: "center", padding: "0 16px 0 20px", gap: 8, borderBottom: dark ? "1px solid #1a3d28" : "1px solid #d6ede0", background: dark ? "#0f2d1f" : "#eaf5ee", position: "relative" }}
             onMouseEnter={e => e.currentTarget.style.background = dark ? "#163d28" : "#d4ecde"}
             onMouseLeave={e => e.currentTarget.style.background = dark ? "#0f2d1f" : "#eaf5ee"}
+            onClick={e => {
+              const tooltip = e.currentTarget.querySelector('.prop-name-tooltip');
+              if (!tooltip) return;
+              const isVisible = tooltip.style.display === 'block';
+              document.querySelectorAll('.prop-name-tooltip').forEach(t => t.style.display = 'none');
+              tooltip.style.display = isVisible ? 'none' : 'block';
+              e.stopPropagation();
+            }}
           >
             <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#26a676", flexShrink: 0, opacity: 0.7 }} />
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, fontSize: ".78rem", fontWeight: 600, color: dark ? "#c8e6d6" : "#1a3d28", letterSpacing: "-0.01em" }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0, fontSize: ".78rem", fontWeight: 600, color: dark ? "#c8e6d6" : "#1a3d28", letterSpacing: "-0.01em" }}>
               {prop.name}
             </span>
+            <div className="prop-name-tooltip" style={{
+              display: 'none', position: 'absolute', left: '100%', top: '50%',
+              transform: 'translateY(-50%)', marginLeft: 8, background: dark ? '#0a1f15' : '#fff',
+              border: dark ? '1px solid #2a5c3c' : '1px solid #e3ede8',
+              borderRadius: 8, padding: '6px 12px', fontSize: '.78rem', fontWeight: 600,
+              color: dark ? '#c8e6d6' : '#1a3d28', whiteSpace: 'nowrap',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.12)', zIndex: 100,
+            }}>
+              {prop.name}
+            </div>
           </div>
         ))}
       </div>
