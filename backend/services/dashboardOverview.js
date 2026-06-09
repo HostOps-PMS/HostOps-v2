@@ -81,6 +81,31 @@ async function runWithConcurrency(tasks, limit = 5) {
   return results;
 }
 
+// ── Image extractor — mirrors the logic in smoobuApartments.js ────
+// Smoobu's list endpoint puts images directly on each apartment object.
+// Field names vary across API versions: images / pictures / photos.
+// Each entry may be a plain URL string, or an object with .url / .image.
+function extractImages(obj) {
+  if (!obj) return [];
+  const raw = Array.isArray(obj.images)   ? obj.images
+            : Array.isArray(obj.pictures) ? obj.pictures
+            : Array.isArray(obj.photos)   ? obj.photos
+            : null;
+  if (!raw) return [];
+  return raw
+    .filter((img) => img != null)
+    .map((img) => {
+      if (typeof img === 'string' && img.trim())
+        return { id: null, url: img.trim() };
+      if (img && typeof img.url === 'string' && img.url.trim())
+        return { id: img.id ?? null, url: img.url.trim() };
+      if (img && typeof img.image === 'string' && img.image.trim())
+        return { id: img.id ?? null, url: img.image.trim() };
+      return null;
+    })
+    .filter(Boolean);
+}
+
 // ── Per-property Smoobu fetcher ───────────────────────────────────
 
 /**
@@ -119,14 +144,26 @@ async function fetchPropertyData(propertyCtx, dateRange, clientId, clientName, p
   // Each apartment in this Smoobu account gets its address + lat/lng so the
   // dashboard PropertyMap can plot it. Failures per apartment are swallowed so
   // one bad apartment id never breaks the whole property's data.
+  //
+  // Images come from TWO sources:
+  //   1. The list endpoint (GET /apartments) — `apt.images` on each item.
+  //      This is the most reliable source and already in memory.
+  //   2. The detail endpoint (GET /apartments/{id}) — may have extra photos.
+  //      We merge both, preferring the list images when available.
   const apartmentLocations = await Promise.all(
     apartments.map(async (apt) => {
       const aptId = apt.id ?? apt;
+      // Images from the list response — extract before the detail call
+      const listImages = extractImages(apt);
       try {
         const detail = await getApartmentDetail(propertyCtx, aptId);
         const loc = detail?.location || {};
         const lat = parseFloat(loc.latitude);
         const lng = parseFloat(loc.longitude);
+        // Also extract images from the detail response as a fallback
+        const detailImages = extractImages(detail);
+        // Prefer list images (richer); fall back to detail images
+        const images = listImages.length > 0 ? listImages : detailImages;
         return {
           apartmentId:  aptId,
           apartmentName: apt.name || detail?.name || `Apartment ${aptId}`,
@@ -145,9 +182,12 @@ async function fetchPropertyData(propertyCtx, dateRange, clientId, clientName, p
           bedrooms:     detail?.rooms?.bedrooms ?? null,
           bathrooms:    detail?.rooms?.bathrooms ?? null,
           type:         detail?.type?.name || null,
+          images,
         };
       } catch {
         // Detail fetch failed — still return a stub so counts stay consistent.
+        // We still carry list-level images so the map popup can show photos
+        // even when the detail endpoint is unavailable.
         return {
           apartmentId:  aptId,
           apartmentName: apt.name || `Apartment ${aptId}`,
@@ -158,6 +198,7 @@ async function fetchPropertyData(propertyCtx, dateRange, clientId, clientName, p
           latitude: null, longitude: null,
           timeZone: null, currency: null,
           maxOccupancy: null, bedrooms: null, bathrooms: null, type: null,
+          images: listImages,
         };
       }
     })
@@ -708,17 +749,26 @@ export async function getDashboardOverview(opts = {}) {
     .forEach((r) => { smoobuLocs.push(...r.apartmentLocations); });
 
   // Index Smoobu locations by clientId|propertyName for quick overlay.
-  const smoobuByProp = new Map();
+  // A property can have MULTIPLE apartments — we keep them all.
+  // For the DB-property merge (1 DB entry → 1 or more Smoobu apts) we pick the
+  // entry with coords as the representative; the extras go in as additional map pins.
+  const smoobuByProp = new Map();           // key → first apt with coords (for DB merge)
+  const smoobuAllByProp = new Map();        // key → all apts (for extra pins)
   smoobuLocs.forEach((loc) => {
     const k = `${loc.clientId}|${(loc.propertyName || '').toLowerCase()}`;
-    // Prefer an entry that actually has coordinates.
+    // Prefer an entry that actually has coordinates for the representative slot.
     const existing = smoobuByProp.get(k);
     if (!existing || (loc.latitude != null && loc.longitude != null)) {
       smoobuByProp.set(k, loc);
     }
+    // Collect all for the extra-pins list
+    if (!smoobuAllByProp.has(k)) smoobuAllByProp.set(k, []);
+    smoobuAllByProp.get(k).push(loc);
   });
 
   // Merge: DB property is the base; Smoobu fields win when present.
+  // Images from Smoobu (s.images) are always carried through — the DB stub
+  // never has images, so any non-empty array from Smoobu is kept as-is.
   const mergedById = new Map();
   dbProperties.forEach((dbp) => {
     const k = `${dbp.clientId}|${(dbp.propertyName || '').toLowerCase()}`;
@@ -737,16 +787,38 @@ export async function getDashboardOverview(opts = {}) {
           timeZone: s.timeZone ?? dbp.timeZone,
           currency: s.currency ?? dbp.currency,
           type:     s.type     ?? dbp.type,
+          // Carry Smoobu images forward — DB stubs have none
+          images:   Array.isArray(s.images) && s.images.length > 0 ? s.images : [],
         }
-      : dbp;
+      : { ...dbp, images: [] };
     mergedById.set(String(merged.apartmentId), merged);
+
+    // If this DB property maps to MULTIPLE Smoobu apartments (sibling units),
+    // add those extras as additional map pins so every room appears on the map.
+    const siblings = smoobuAllByProp.get(k) || [];
+    siblings.forEach((sib) => {
+      const sibId = String(sib.apartmentId);
+      if (sibId === String(merged.apartmentId)) return; // already added above
+      if (!mergedById.has(sibId)) {
+        mergedById.set(sibId, {
+          ...sib,
+          images: Array.isArray(sib.images) ? sib.images : [],
+        });
+      }
+    });
   });
 
   // Also include any Smoobu apartments that didn't match a DB property name
   // (e.g. a Smoobu account with more apartments than DB property entries).
+  // Make sure images is always an array even for these unmatched entries.
   smoobuLocs.forEach((loc) => {
     const id = String(loc.apartmentId);
-    if (!mergedById.has(id)) mergedById.set(id, loc);
+    if (!mergedById.has(id)) {
+      mergedById.set(id, {
+        ...loc,
+        images: Array.isArray(loc.images) ? loc.images : [],
+      });
+    }
   });
 
   const mapLocations = Array.from(mergedById.values());
@@ -782,7 +854,7 @@ export async function getDashboardOverview(opts = {}) {
     recentCancellations,// [{reservationId, guestName, channel, arrival, nights, propertyName, clientName}]
 
     // Map
-    mapLocations,       // [{apartmentId, apartmentName, propertyName, clientName, street, zip, city, country, latitude, longitude, type, ...}]
+    mapLocations,       // [{apartmentId, apartmentName, propertyName, clientName, street, zip, city, country, latitude, longitude, type, images[], ...}]
 
     // Feeds
     alerts,             // [{id, type, title, desc, time, unread, avatar, avatarBg, clientId, clientName}]
