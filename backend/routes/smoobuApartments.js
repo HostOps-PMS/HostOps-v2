@@ -80,6 +80,8 @@ function extractImages(obj) {
             : Array.isArray(target.media)       ? target.media
             : Array.isArray(target.gallery)     ? target.gallery
             : Array.isArray(target.attachments) ? target.attachments
+            : Array.isArray(target.data)        ? target.data
+            : Array.isArray(obj)                ? obj              // bare array response
             : null;
 
   if (!raw) return [];
@@ -102,9 +104,61 @@ function extractImages(obj) {
       // Object with .link
       if (img && typeof img.link === 'string' && img.link.trim())
         return { id: img.id ?? null, url: img.link.trim() };
+      // Object with .picture
+      if (img && typeof img.picture === 'string' && img.picture.trim())
+        return { id: img.id ?? null, url: img.picture.trim() };
       return null;
     })
     .filter(Boolean);
+}
+
+// ── Step 3: dedicated pictures endpoint ──────────────────────────
+// Smoobu stores photos on a SEPARATE endpoint that is NOT the list or
+// detail response.  We try three known paths in order and return the
+// first non-empty result.  Full raw response logged for diagnostics.
+async function fetchApartmentPictures(apiKey, propId, aptId) {
+  const paths = [
+    `/apartments/${aptId}/pictures`,
+    `/apartments/${aptId}/photos`,
+    `/apartments/${aptId}/images`,
+  ];
+
+  for (const path of paths) {
+    try {
+      const data = await smoobuGet(path, apiKey, `${propId}:${path}`);
+
+      // Diagnostic logging — log ONCE so we can see the raw shape
+      console.log(`[smoobuApartments] pictures apt=${aptId} path=${path} → keys:`, Object.keys(data || {}));
+      const arrayKeys = Object.keys(data || {}).filter((k) => Array.isArray(data[k]));
+      console.log(`[smoobuApartments] pictures apt=${aptId} array-keys:`, arrayKeys);
+      if (arrayKeys.length > 0) {
+        arrayKeys.forEach((k) => {
+          console.log(`[smoobuApartments]   data.${k}[0]:`, JSON.stringify((data[k] || [])[0]).slice(0, 200));
+        });
+      }
+      // Also log if response is a bare array
+      if (Array.isArray(data)) {
+        console.log(`[smoobuApartments] pictures apt=${aptId} → bare array length=${data.length}, [0]:`, JSON.stringify(data[0]).slice(0, 200));
+      }
+
+      const imgs = extractImages(data);
+      if (imgs.length > 0) {
+        console.log(`[smoobuApartments] pictures apt=${aptId} → ${imgs.length} images found via ${path}`);
+        return imgs;
+      }
+      console.log(`[smoobuApartments] pictures apt=${aptId} path=${path} → empty, trying next`);
+    } catch (err) {
+      if (err.status === 404 || err.status === 405) {
+        console.log(`[smoobuApartments] pictures apt=${aptId} path=${path} → ${err.status}, trying next`);
+        continue;
+      }
+      console.warn(`[smoobuApartments] pictures apt=${aptId} path=${path} → error:`, err.message);
+      return [];
+    }
+  }
+
+  console.log(`[smoobuApartments] pictures apt=${aptId} → all paths exhausted`);
+  return [];
 }
 
 // ── Main fetch: list + detail per apartment ───────────────────────
@@ -159,7 +213,18 @@ async function fetchApartmentsForKey(apiKey, propId, propertyName, clientId, cli
         const detailImages = extractImages(detail);
 
         // Prefer list images if present; otherwise use detail images
-        const images = listImages.length > 0 ? listImages : detailImages;
+        let images = listImages.length > 0 ? listImages : detailImages;
+
+        // ── Step 3 — GET /apartments/{id}/pictures ─────────────────
+        // Smoobu stores photos on a dedicated sub-resource that is NOT
+        // included in either the list or the detail response.  Only call
+        // this when steps 1 and 2 both returned nothing so we avoid
+        // unnecessary extra round-trips for accounts where the detail
+        // endpoint already carries the images.
+        if (images.length === 0) {
+          const picImages = await fetchApartmentPictures(apiKey, propId, aptId);
+          if (picImages.length > 0) images = picImages;
+        }
 
         console.log(`[smoobuApartments]   apt ${aptId} "${apt.name || detail?.name}" → listImgs=${listImages.length} detailImgs=${detailImages.length} using=${images.length}`);
 
