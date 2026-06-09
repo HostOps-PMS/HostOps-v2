@@ -3,13 +3,15 @@
 // Fetches the admin dashboard overview from GET /api/dashboard-overview
 // and shapes the response into the stat-card format expected by StatsRow.
 //
-// TOTAL CLIENTS and TOTAL PROPERTIES come from the User collection
-// (returned by the backend as totalClients / totalProperties).
-//
-// MONTHLY REVENUE, ACTIVE BOOKINGS are aggregated from all Smoobu
-// API keys across all client properties.
+// IMPORTANT: Uses getDashboardOverview() from dashboardService so that
+// all auth headers, base-URL, and credentials config stay in ONE place.
+// This fixes the "no data in production" bug where useStats was doing
+// its own inline fetch() with a hard-coded relative URL — which worked
+// on localhost (same origin, no CORS) but silently failed on deployed
+// environments where VITE_API_BASE_URL is required.
 // ─────────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from 'react';
+import { getDashboardOverview } from '../services/dashboardService';
 
 function formatRevenue(value) {
   if (value >= 1_000_000) return '₱' + (value / 1_000_000).toFixed(1) + 'M';
@@ -44,48 +46,33 @@ function buildStatsCards(data) {
 }
 
 export function useStats({ from, to } = {}) {
-  const [stats,       setStats]       = useState([]);
-  const [overview,    setOverview]    = useState(null); // full payload for other hooks
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState(null);
+  const [stats,    setStats]    = useState([]);
+  const [overview, setOverview] = useState(null);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(null);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const token = sessionStorage.getItem('hp_access_token') ?? '';
-      const params = new URLSearchParams();
-      if (from) params.set('from', from);
-      if (to)   params.set('to', to);
+      // ── Use the shared service so auth headers + base URL are consistent ──
+      // getDashboardOverview() reads VITE_API_BASE_URL and hp_access_token from
+      // the same place every other service call does — no more "works on
+      // localhost but not in prod" from a stale inline fetch().
+      const data = await getDashboardOverview({ from, to });
 
-      const url = `/api/dashboard-overview${params.toString() ? '?' + params.toString() : ''}`;
-
-      const res = await fetch(url, {
-        headers: {
-          'Content-Type':  'application/json',
-          Authorization:   `Bearer ${token}`,
-          'x-api-key':     import.meta.env.VITE_API_KEY ?? '',
-        },
-        credentials: 'include',
-      });
-
-      if (!res.ok) {
-        const msg = await res.text().catch(() => res.statusText);
-        throw new Error(`API ${res.status}: ${msg}`);
-      }
-
-      const data = await res.json();
-
-      // Debug: log what the overview payload contains so we can verify
-      // mapLocations is being returned by the backend.
+      // Debug: confirm overview shape in production logs
       console.log('[useStats] overview keys:', Object.keys(data));
+      console.log('[useStats] alerts count:', Array.isArray(data.alerts) ? data.alerts.length : 'MISSING');
+      console.log('[useStats] recentActivities count:', Array.isArray(data.recentActivities) ? data.recentActivities.length : 'MISSING');
       console.log('[useStats] mapLocations count:', Array.isArray(data.mapLocations) ? data.mapLocations.length : 'MISSING');
       console.log('[useStats] _version:', data._version ?? 'n/a');
 
       setOverview(data);
       setStats(buildStatsCards(data));
     } catch (err) {
+      console.error('[useStats] fetch failed:', err);
       setError(err.message || 'Failed to fetch dashboard stats');
     } finally {
       setLoading(false);
