@@ -221,6 +221,42 @@ function useSmoobuApartments(clientId, propertyIndex) {
   return { apartments, aptLoading, aptError, refetch: fetch_ };
 }
 
+// ── Hook: fetch images for a single apartment on demand ──────────
+// Used in "all accounts" mode where the overview data has no images.
+// Fires only when a legend item is clicked — not on initial load.
+function useApartmentImages(clientId, apartmentId) {
+  const [images, setImages]   = useState(null); // null = not fetched yet
+  const [imgLoading, setLoad] = useState(false);
+
+  const fetch_ = useCallback(async () => {
+    if (!clientId || !apartmentId) { setImages(null); return; }
+    // Skip stubs (db: / stub: prefixed ids have no Smoobu detail)
+    if (String(apartmentId).startsWith('db:') || String(apartmentId).startsWith('stub:')) {
+      setImages([]);
+      return;
+    }
+    setLoad(true);
+    try {
+      const url = apiUrl(`/api/accounts/${clientId}/smoobu-apartments`);
+      const res = await fetch(url, { headers: authHeaders(), credentials: 'include' });
+      if (!res.ok) throw new Error(`smoobu-apartments ${res.status}`);
+      const data = await res.json();
+      const match = (data.allApartments || []).find(
+        (a) => String(a.apartmentId) === String(apartmentId)
+      );
+      setImages(Array.isArray(match?.images) ? match.images : []);
+    } catch (err) {
+      console.warn('[PropertyMap] image fetch failed:', err.message);
+      setImages([]);
+    } finally {
+      setLoad(false);
+    }
+  }, [clientId, apartmentId]);
+
+  useEffect(() => { fetch_(); }, [fetch_]);
+  return { images, imgLoading };
+}
+
 // ── Leaflet map hook ──────────────────────────────────────────────
 // markerMapRef: exposed ref to { apartmentId → L.Marker } so the
 // component can fly-to and open a specific marker from the room dropdown.
@@ -646,6 +682,8 @@ export default function PropertyMap({ mapLocations, loading }) {
   const [isModalOpen,       setIsModalOpen]        = useState(false);
   const [mapStyle,          setMapStyle]            = useState('standard');
   const [selectedLegendApt, setSelectedLegendApt]   = useState(null);
+  const [legendSearch,       setLegendSearch]        = useState('');
+  const [activeTab,          setActiveTab]           = useState('properties'); // 'properties' | 'detail'
   const modalMapContainerRef = useRef(null);
   const modalMarkerMapRef    = useRef({});
 
@@ -664,12 +702,16 @@ export default function PropertyMap({ mapLocations, loading }) {
     setSelectedPropIndex(null);
     setSelectedAptId('');
     setSelectedLegendApt(null);
+    setLegendSearch('');
+    setActiveTab('properties');
   }
 
   function handlePropChange(raw) {
     setSelectedPropIndex(raw === '' || raw === null || raw === 'all' ? null : Number(raw));
     setSelectedAptId('');
     setSelectedLegendApt(null);
+    setLegendSearch('');
+    setActiveTab('properties');
   }
 
   function handleAptChange(aptId) {
@@ -682,12 +724,33 @@ export default function PropertyMap({ mapLocations, loading }) {
   const { apartments: smoobuApts, aptLoading, aptError } =
     useSmoobuApartments(smoobuClientId, selectedPropIndex);
 
+  // On-demand image fetch for "all accounts" mode (overview locs have no images).
+  // clientId comes from the clicked apartment's clientId field.
+  const legendImgClientId = selectedLegendApt?.clientId ?? null;
+  const legendImgAptId    = selectedLegendApt?.apartmentId ?? null;
+  // Only trigger when the apt genuinely has no images (avoid redundant calls
+  // when images were already fetched via useSmoobuApartments above).
+  const needsImgFetch = selectedLegendApt != null &&
+    (!Array.isArray(selectedLegendApt.images) || selectedLegendApt.images.length === 0) &&
+    !String(legendImgAptId ?? '').startsWith('db:') &&
+    !String(legendImgAptId ?? '').startsWith('stub:');
+  const { images: fetchedImages, imgLoading } = useApartmentImages(
+    needsImgFetch ? legendImgClientId : null,
+    needsImgFetch ? legendImgAptId    : null
+  );
+  // Merge: prefer already-attached images, fall back to on-demand fetched ones
+  const detailImages = (Array.isArray(selectedLegendApt?.images) && selectedLegendApt.images.length > 0)
+    ? selectedLegendApt.images
+    : (fetchedImages ?? []);
+
   // Normalise overview coords (may also be strings)
   const overviewLocs = useMemo(() =>
     (Array.isArray(mapLocations) ? mapLocations : []).map((l) => ({
       ...l,
       latitude:  toCoord(l.latitude),
       longitude: toCoord(l.longitude),
+      // Ensure images is always an array — overview data may not include it
+      images: Array.isArray(l.images) ? l.images : [],
     })),
   [mapLocations]);
 
@@ -1214,27 +1277,27 @@ export default function PropertyMap({ mapLocations, loading }) {
                 {/* Tab bar */}
                 <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
                   <button
-                    onClick={() => setSelectedLegendApt(null)}
+                    onClick={() => setActiveTab('properties')}
                     style={{
                       flex: 1, padding: '9px 4px', fontSize: '.72rem', fontWeight: 600,
                       fontFamily: 'var(--font-body)', border: 'none', cursor: 'pointer',
                       background: 'transparent',
-                      color: !selectedLegendApt ? 'var(--color-brand, #1a9e6e)' : 'var(--color-muted)',
-                      borderBottom: !selectedLegendApt ? '2px solid var(--color-brand, #1a9e6e)' : '2px solid transparent',
+                      color: activeTab === 'properties' ? 'var(--color-brand, #1a9e6e)' : 'var(--color-muted)',
+                      borderBottom: activeTab === 'properties' ? '2px solid var(--color-brand, #1a9e6e)' : '2px solid transparent',
                       transition: 'color 0.15s',
                     }}
                   >
                     Properties <span style={{ fontSize: '.65rem', background: 'var(--color-surface-2,#f3f4f6)', borderRadius: 20, padding: '1px 6px', marginLeft: 4 }}>{locations.length}</span>
                   </button>
                   <button
-                    onClick={() => {}}
+                    onClick={() => { if (selectedLegendApt) setActiveTab('detail'); }}
                     disabled={!selectedLegendApt}
                     style={{
                       flex: 1, padding: '9px 4px', fontSize: '.72rem', fontWeight: 600,
                       fontFamily: 'var(--font-body)', border: 'none', cursor: selectedLegendApt ? 'pointer' : 'default',
                       background: 'transparent',
-                      color: selectedLegendApt ? 'var(--color-brand, #1a9e6e)' : 'var(--color-muted)',
-                      borderBottom: selectedLegendApt ? '2px solid var(--color-brand, #1a9e6e)' : '2px solid transparent',
+                      color: activeTab === 'detail' && selectedLegendApt ? 'var(--color-brand, #1a9e6e)' : 'var(--color-muted)',
+                      borderBottom: activeTab === 'detail' && selectedLegendApt ? '2px solid var(--color-brand, #1a9e6e)' : '2px solid transparent',
                       opacity: selectedLegendApt ? 1 : 0.45,
                       transition: 'color 0.15s',
                     }}
@@ -1244,10 +1307,12 @@ export default function PropertyMap({ mapLocations, loading }) {
                 </div>
 
                 {/* Properties tab */}
-                {!selectedLegendApt && (
+                {activeTab === 'properties' && (
                   <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', padding: '10px 8px' }}>
                     <input
                       placeholder="Search…"
+                      value={legendSearch}
+                      onChange={e => setLegendSearch(e.target.value)}
                       style={{
                         width: '100%', padding: '5px 9px', marginBottom: 6,
                         border: '1px solid var(--color-border)',
@@ -1259,7 +1324,18 @@ export default function PropertyMap({ mapLocations, loading }) {
                       }}
                     />
                     <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      {locations.map((p) => {
+                      {locations
+                        .filter(p => {
+                          if (!legendSearch.trim()) return true;
+                          const q = legendSearch.toLowerCase();
+                          return (
+                            (p.apartmentName || '').toLowerCase().includes(q) ||
+                            (p.propertyName  || '').toLowerCase().includes(q) ||
+                            (p.clientName    || '').toLowerCase().includes(q) ||
+                            (p.city          || '').toLowerCase().includes(q)
+                          );
+                        })
+                        .map((p) => {
                         const addrParts = [p.street, p.city, p.country].filter(Boolean);
                         const addr      = addrParts.join(', ');
                         const hasCoords = p.latitude !== null && p.longitude !== null &&
@@ -1274,6 +1350,7 @@ export default function PropertyMap({ mapLocations, loading }) {
                               if (!hasCoords) return;
                               handleAptChange(String(p.apartmentId) === focusedAptId ? '' : String(p.apartmentId));
                               setSelectedLegendApt(prev => prev?.apartmentId === p.apartmentId ? null : p);
+                              setActiveTab('detail');
                             }}
                             style={{
                               display: 'flex', alignItems: 'flex-start', gap: 6,
@@ -1323,12 +1400,21 @@ export default function PropertyMap({ mapLocations, loading }) {
                 )}
 
                 {/* Detail tab */}
-                {selectedLegendApt && (
+                {activeTab === 'detail' && selectedLegendApt && (
                   <div style={{ width: '100%', overflowY: 'auto', flex: 1 }}>
-                    <PhotoCarousel
-                      images={selectedLegendApt.images ?? []}
-                      altText={selectedLegendApt.apartmentName || selectedLegendApt.propertyName || ''}
-                    />
+                    {imgLoading ? (
+                      <div style={{
+                        height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'var(--color-surface-2, #f3f4f6)', flexShrink: 0,
+                      }}>
+                        <span style={{ fontSize: '.75rem', color: 'var(--color-muted)' }}>Loading photos…</span>
+                      </div>
+                    ) : (
+                      <PhotoCarousel
+                        images={detailImages}
+                        altText={selectedLegendApt.apartmentName || selectedLegendApt.propertyName || ''}
+                      />
+                    )}
                     <div style={{ padding: '14px' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
                         <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
@@ -1344,7 +1430,7 @@ export default function PropertyMap({ mapLocations, loading }) {
                             {selectedLegendApt.clientName}
                           </div>
                         </div>
-                        <button onClick={() => setSelectedLegendApt(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-muted)', fontSize: '1rem', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>✕</button>
+                        <button onClick={() => { setSelectedLegendApt(null); setActiveTab('properties'); }} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-muted)', fontSize: '1rem', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>✕</button>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--color-surface-2, #f9fafb)', borderRadius: 8, marginBottom: 12 }}>
