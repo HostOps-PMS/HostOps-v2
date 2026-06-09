@@ -25,6 +25,7 @@
 import User  from '../models/user.js';
 import { getApartments, getBookings, getApiKeyForUser, getApartmentDetail } from './smoobu.js';
 import { decrypt } from '../utils/encryption.js';
+import { getStoredApartmentImages } from './apartmentPhotos.js';
 
 // ── Helpers ───────────────────────────────────────────────────────
 
@@ -241,16 +242,20 @@ async function fetchPropertyData(propertyCtx, dateRange, clientId, clientName, p
   const apartments   = apartmentsData.apartments || [];
   const allBookings  = bookingsData.bookings     || [];
 
-  // ── Fetch per-apartment detail (coords/rooms) + scrape images in parallel ──
-  // Smoobu's REST API has no images endpoint — we scrape the public page
-  // https://login.smoobu.com/en/website-external/apartment/{id} for photos.
+  // ── Fetch per-apartment detail (coords/rooms) + self-hosted photos ──
+  // Smoobu has no image API and its public page is login-walled, so photos
+  // are uploaded by admins and read from the ApartmentPhoto collection.
   const apartmentLocations = await Promise.all(
     apartments.map(async (apt) => {
       const aptId = apt.id ?? apt;
 
+      // ── Fetch per-apartment detail (coords/rooms) + self-hosted photos ──
+      // (The HTML scrape was removed from the call path — the Smoobu public
+      //  page redirects to a login wall, so it always returned 0 photos and
+      //  added ~10s latency. Photos now come from the ApartmentPhoto model.)
       const [detailResult, imagesResult] = await Promise.allSettled([
         getApartmentDetail(propertyCtx, aptId),
-        scrapeApartmentImages(aptId),
+        getStoredApartmentImages(aptId),
       ]);
 
       const detail = detailResult.status === 'fulfilled' ? detailResult.value : null;
