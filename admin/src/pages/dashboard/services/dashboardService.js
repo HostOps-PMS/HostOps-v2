@@ -5,15 +5,31 @@
  *
  * Base URL is read from .env:
  *   VITE_API_BASE_URL=https://api.example.com
+ *
+ * FIX: Added retry + token-refresh-aware logic so a stale token on first
+ * render (common in deployed environments where sessionStorage hydrates
+ * slightly after the component mounts) doesn't permanently break the fetch.
  */
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? '';
 
 function getToken() {
-  return sessionStorage.getItem('hp_access_token') ?? '';
+  // Try sessionStorage first (runtime token after login),
+  // then localStorage as a fallback (some auth flows persist there).
+  return (
+    sessionStorage.getItem('hp_access_token') ??
+    localStorage.getItem('hp_access_token') ??
+    ''
+  );
 }
 
-async function request(path, options = {}) {
+/**
+ * Core request helper.
+ * Retries once after a short delay on 401 — covers the race where
+ * sessionStorage hasn't been written yet on the very first render
+ * in a deployed environment.
+ */
+async function request(path, options = {}, _retried = false) {
   const res = await fetch(`${BASE}${path}`, {
     headers: {
       'Content-Type': 'application/json',
@@ -24,6 +40,13 @@ async function request(path, options = {}) {
     credentials: 'include',
     ...options,
   });
+
+  // On 401 in production, wait 300 ms and retry once — the token may have
+  // just been written to sessionStorage by the auth flow.
+  if (res.status === 401 && !_retried) {
+    await new Promise(r => setTimeout(r, 300));
+    return request(path, options, true);
+  }
 
   if (!res.ok) {
     const msg = await res.text().catch(() => res.statusText);
@@ -52,7 +75,7 @@ export async function getStats() {
  * Includes: totalClients, totalProperties, monthlyRevenue, totalBookings,
  * totalCancellations, overallOccupancy, revenueChart, topClients,
  * occupancyBreakdown, recentBookings, recentCancellations, alerts,
- * recentActivities, byChannel.
+ * recentActivities, byChannel, mapLocations.
  *
  * @param {{ from?: string, to?: string }} opts  — optional YYYY-MM-DD date range
  * @returns {Promise<DashboardOverviewPayload>}

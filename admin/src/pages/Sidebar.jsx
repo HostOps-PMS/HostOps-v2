@@ -499,7 +499,7 @@ export default function Sidebar() {
               sessionStorage.removeItem('hp_access_token');
               sessionStorage.removeItem('hp_user');
               sessionStorage.removeItem('hp_authorized');
-              window.location.href = 'http://localhost:5173/login';
+              window.location.href = 'https://go.hostops.online/';
             }}
           />
 

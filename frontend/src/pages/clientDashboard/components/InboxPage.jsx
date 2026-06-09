@@ -126,6 +126,7 @@ export default function InboxPage() {
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
+  const [propertyFilter, setPropertyFilter] = useState("all");
   const [selected, setSelected] = useState(null);
   const [messages, setMessages] = useState([]);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
@@ -230,6 +231,11 @@ export default function InboxPage() {
     }
   }
 
+  // Derive unique property names from the inbox for the filter dropdown
+  const propertyOptions = Array.from(
+    new Set(inbox.map((t) => t.property).filter(Boolean))
+  ).sort();
+
   const filtered = inbox.filter((t) => {
     const q = search.toLowerCase();
     const matchSearch = !q ||
@@ -238,7 +244,8 @@ export default function InboxPage() {
       (t.channel || "").toLowerCase().includes(q);
     const fromGuest = t.latestMessage?.fromGuest;
     const matchFilter = filter === "all" || (filter === "unread" && fromGuest) || (filter === "replied" && !fromGuest);
-    return matchSearch && matchFilter;
+    const matchProperty = propertyFilter === "all" || (t.property || "") === propertyFilter;
+    return matchSearch && matchFilter && matchProperty;
   });
 
   const grouped = groupByDate(filtered);
@@ -323,6 +330,50 @@ export default function InboxPage() {
               </div>
             )}
             <div style={{ position: "relative", marginBottom: "10px" }}>
+              {/* Property filter dropdown */}
+              {propertyOptions.length > 1 && (
+                <div style={{ marginBottom: "8px" }}>
+                  <div style={{ position: "relative" }}>
+                    <svg
+                      style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+                      width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={textSub} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                    >
+                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                      <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                    <select
+                      value={propertyFilter}
+                      onChange={(e) => setPropertyFilter(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "7px 10px 7px 28px",
+                        borderRadius: "8px",
+                        border: `1px solid ${propertyFilter !== "all" ? "#26a676" : border}`,
+                        background: propertyFilter !== "all" ? (dark ? "#0f2d1f" : "#eaf7f0") : inputBg,
+                        color: propertyFilter !== "all" ? "#26a676" : textMain,
+                        fontSize: "12px",
+                        fontWeight: propertyFilter !== "all" ? 700 : 500,
+                        outline: "none",
+                        cursor: "pointer",
+                        appearance: "none",
+                        WebkitAppearance: "none",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      <option value="all">All Properties</option>
+                      {propertyOptions.map((name) => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
+                    <svg
+                      style={{ position: "absolute", right: 9, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+                      width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={textSub} strokeWidth="2.5" strokeLinecap="round"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </div>
+                </div>
+              )}
               <svg style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: textSub, pointerEvents: "none" }}
                 width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
