@@ -19,21 +19,22 @@ import { useAccounts } from './hooks/useAccounts';
 
 export default function Dashboard() {
   const [modal, setModal] = useState({ open: false, type: null, data: null });
+
   const getPresetRange = (preset) => {
-  const today = new Date();
-  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  if (preset === 'daily')   return { from: fmt(today), to: fmt(today) };
-  if (preset === 'weekly')  { const s = new Date(today); s.setDate(today.getDate() - 6); return { from: fmt(s), to: fmt(today) }; }
-  if (preset === 'monthly') return { from: fmt(new Date(today.getFullYear(), today.getMonth(), 1)), to: fmt(new Date(today.getFullYear(), today.getMonth() + 1, 0)) };
-  if (preset === 'yearly')  return { from: fmt(new Date(today.getFullYear(), 0, 1)), to: fmt(new Date(today.getFullYear(), 11, 31)) };
-        return { from: '', to: '' };
-      };
+    const today = new Date();
+    const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if (preset === 'daily')   return { from: fmt(today), to: fmt(today) };
+    if (preset === 'weekly')  { const s = new Date(today); s.setDate(today.getDate() - 6); return { from: fmt(s), to: fmt(today) }; }
+    if (preset === 'monthly') return { from: fmt(new Date(today.getFullYear(), today.getMonth(), 1)), to: fmt(new Date(today.getFullYear(), today.getMonth() + 1, 0)) };
+    if (preset === 'yearly')  return { from: fmt(new Date(today.getFullYear(), 0, 1)), to: fmt(new Date(today.getFullYear(), 11, 31)) };
+    return { from: '', to: '' };
+  };
 
-      const [dateRange, setDateRange]     = useState(() => getPresetRange('monthly'));
-      const [appliedRange, setAppliedRange] = useState(() => getPresetRange('monthly'));
-      const [activePreset, setActivePreset] = useState('monthly');
+  const [dateRange,     setDateRange]     = useState(() => getPresetRange('monthly'));
+  const [appliedRange,  setAppliedRange]  = useState(() => getPresetRange('monthly'));
+  const [activePreset,  setActivePreset]  = useState('monthly');
 
-      const applyPreset = (preset) => {
+  const applyPreset = (preset) => {
     const today = new Date();
     const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     let from, to;
@@ -54,15 +55,14 @@ export default function Dashboard() {
     setDateRange({ from, to });
     setAppliedRange({ from, to });
   };
+
   const openModal  = (type, data = null) => setModal({ open: true, type, data });
   const closeModal = ()                  => setModal({ open: false, type: null, data: null });
 
-  // useStats now fetches the full /api/dashboard-overview payload.
-  // `overview` contains everything: revenue chart, top clients,
-  // occupancy breakdown, alerts, recent activities — all from Smoobu.
+  // useStats fetches the full /api/dashboard-overview payload.
   const { stats, overview, loading: statsLoading } = useStats(appliedRange);
 
-  // useAccounts still fetches clients + staffs from the DB (for DashboardCharts).
+  // useAccounts fetches clients + staffs from the DB.
   const { accounts, loading: accountsLoading } = useAccounts();
 
   return (
@@ -70,7 +70,18 @@ export default function Dashboard() {
       <Sidebar />
 
       <div className="db-main">
-        <TopBar onAction={() => openModal('create')} />
+        {/*
+          Pass alerts + recentActivities from the overview payload so the
+          notification bell in the TopBar can display them in the dropdown.
+          `notifLoading` mirrors the same loading state so the dropdown
+          can show a spinner while data is being fetched.
+        */}
+        <TopBar
+          onAction={() => openModal('create')}
+          alerts={overview?.alerts ?? []}
+          activities={overview?.recentActivities ?? []}
+          notifLoading={statsLoading}
+        />
 
         <div className="db-content">
 
@@ -80,17 +91,18 @@ export default function Dashboard() {
               <h1 className="db-content__title">Overview</h1>
               <p className="db-content__sub">Welcome back, Admin</p>
             </div>
-            {/* Period badge — shows what date range the KPIs cover */}
+
+            {/* Date range filter */}
             <div className="db-date-filter">
-        <div className="db-date-filter__presets-row">
-          {['daily','weekly','monthly','yearly'].map(p => (
-            <button
-              key={p}
-              className={`db-date-filter__preset${activePreset === p ? ' db-date-filter__preset--active' : ''}`}
-              onClick={() => applyPreset(p)}
-            >
-              {p.charAt(0).toUpperCase() + p.slice(1)}
-            </button>
+              <div className="db-date-filter__presets-row">
+                {['daily','weekly','monthly','yearly'].map(p => (
+                  <button
+                    key={p}
+                    className={`db-date-filter__preset${activePreset === p ? ' db-date-filter__preset--active' : ''}`}
+                    onClick={() => applyPreset(p)}
+                  >
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </button>
                 ))}
               </div>
               <div className="db-date-filter__divider" />
@@ -127,11 +139,9 @@ export default function Dashboard() {
           <div className="db-dashboard-row">
             <div className="db-dashboard-row__main">
               <StatsRow stats={stats} loading={statsLoading} />
-              {/* Pass real chart data from Smoobu; falls back to static mock if null */}
               <RevenueChart smoobuChartData={overview?.revenueChart ?? null} />
             </div>
             <div className="db-dashboard-row__side">
-              {/* TopClients receives live data ranked by Smoobu revenue */}
               <TopClients
                 topClients={overview?.topClients ?? null}
                 loading={statsLoading}
@@ -145,7 +155,6 @@ export default function Dashboard() {
               mapLocations={overview?.mapLocations ?? null}
               loading={statsLoading}
             />
-            {/* OccupancyGauge receives live per-property occupancy from Smoobu */}
             <OccupancyGauge
               occupancyBreakdown={overview?.occupancyBreakdown ?? null}
               overallOccupancy={overview?.overallOccupancy ?? null}
@@ -155,12 +164,10 @@ export default function Dashboard() {
 
           {/* ── Row 4: Alerts Center + Recent Activities ── */}
           <div className="db-grid-2">
-            {/* AlertsCenter receives auto-generated alerts from Smoobu data */}
             <AlertsCenter
               alerts={overview?.alerts ?? null}
               loading={statsLoading}
             />
-            {/* RecentActivities receives real booking/cancellation activity */}
             <RecentActivities
               activities={overview?.recentActivities ?? null}
               loading={statsLoading}

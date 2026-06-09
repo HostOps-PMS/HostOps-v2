@@ -32,7 +32,7 @@ import User        from '../models/user.js';
 import { decrypt } from '../utils/encryption.js';
 import { requireAuth } from '../middleware/auth.js';
 import ApartmentPhoto from '../models/apartmentPhoto.js';
-import { getStoredApartmentImages } from '../services/apartmentPhotos.js';
+import { getStoredApartmentImages, getStoredApartmentImagesBulk } from '../services/apartmentPhotos.js';
 
 const router = Router();
 
@@ -371,6 +371,25 @@ router.get('/:clientId/smoobu-apartments', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────
 // PHOTO ROUTES (self-hosted apartment photos via Cloudinary)
 // ─────────────────────────────────────────────────────────────────
+
+// POST /apartment-photos/bulk   body: { apartmentIds: [...] }
+// Returns { photos: { [apartmentId]: [{ id, url }] } } for ids that have
+// stored photos. ONE DB query. Lets the map show photos on every marker /
+// legend entry directly from the photo store — independent of whether the
+// Smoobu apartment-list merge ran, so filtering never hides uploaded photos.
+router.post('/apartment-photos/bulk', requireAuth, async (req, res) => {
+  try {
+    if (!isAdminOrTeamLeader(req)) return res.status(403).json({ error: 'Forbidden' });
+    const ids = Array.isArray(req.body?.apartmentIds) ? req.body.apartmentIds : [];
+    const map = await getStoredApartmentImagesBulk(ids);
+    const photos = {};
+    map.forEach((imgs, id) => { photos[id] = imgs; });
+    return res.json({ photos });
+  } catch (err) {
+    console.error('[apartment-photos bulk] error:', err.message || err);
+    return res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});
 
 // GET /:clientId/smoobu-apartments/:apartmentId/photos
 // Returns the stored photos for one apartment.
