@@ -23,7 +23,7 @@
 // ─────────────────────────────────────────────────────────────────
 
 import User  from '../models/user.js';
-import { getApartments, getBookings, getApiKeyForUser, getApartmentDetail } from './smoobu.js';
+import { getApartments, getBookings, getApiKeyForUser, getApartmentDetail, getApartmentPictures } from './smoobu.js';
 import { decrypt } from '../utils/encryption.js';
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -82,14 +82,21 @@ async function runWithConcurrency(tasks, limit = 5) {
 }
 
 // ── Image extractor — mirrors the logic in smoobuApartments.js ────
-// Smoobu's list endpoint puts images directly on each apartment object.
-// Field names vary across API versions: images / pictures / photos.
-// Each entry may be a plain URL string, or an object with .url / .image.
+// Smoobu's detail endpoint returns images on the apartment object.
+// Field names vary across API versions: images / pictures / photos / media / gallery.
+// Some versions nest the data under obj.apartment — we unwrap that too.
 function extractImages(obj) {
   if (!obj) return [];
-  const raw = Array.isArray(obj.images)   ? obj.images
-            : Array.isArray(obj.pictures) ? obj.pictures
-            : Array.isArray(obj.photos)   ? obj.photos
+
+  // Unwrap nested shapes — some Smoobu API versions nest under obj.apartment
+  const target = obj.apartment ?? obj;
+
+  const raw = Array.isArray(target.images)      ? target.images
+            : Array.isArray(target.pictures)    ? target.pictures
+            : Array.isArray(target.photos)      ? target.photos
+            : Array.isArray(target.media)       ? target.media
+            : Array.isArray(target.gallery)     ? target.gallery
+            : Array.isArray(target.attachments) ? target.attachments
             : null;
   if (!raw) return [];
   return raw
@@ -101,6 +108,10 @@ function extractImages(obj) {
         return { id: img.id ?? null, url: img.url.trim() };
       if (img && typeof img.image === 'string' && img.image.trim())
         return { id: img.id ?? null, url: img.image.trim() };
+      if (img && typeof img.src === 'string' && img.src.trim())
+        return { id: img.id ?? null, url: img.src.trim() };
+      if (img && typeof img.link === 'string' && img.link.trim())
+        return { id: img.id ?? null, url: img.link.trim() };
       return null;
     })
     .filter(Boolean);
@@ -160,10 +171,37 @@ async function fetchPropertyData(propertyCtx, dateRange, clientId, clientName, p
         const loc = detail?.location || {};
         const lat = parseFloat(loc.latitude);
         const lng = parseFloat(loc.longitude);
+
+        // ── Diagnostic: log ALL detail keys once so we can confirm the image field name ──
+        if (apartments.indexOf(apt) === 0) { // only log for first apt to avoid spam
+          console.log(`[overview] detail apt ${aptId} ALL keys:`, Object.keys(detail || {}));
+          const detailArrayKeys = Object.keys(detail || {}).filter(k => Array.isArray(detail[k]));
+          console.log(`[overview] detail apt ${aptId} array-keys:`, detailArrayKeys);
+          if (detail?.apartment) {
+            console.log(`[overview] detail.apartment keys:`, Object.keys(detail.apartment));
+          }
+        }
+
         // Also extract images from the detail response as a fallback
         const detailImages = extractImages(detail);
         // Prefer list images (richer); fall back to detail images
-        const images = listImages.length > 0 ? listImages : detailImages;
+        let images = listImages.length > 0 ? listImages : detailImages;
+
+        // ── Step 3: dedicated pictures endpoint ─────────────────────────────
+        // If neither the list nor the detail returned any images, hit the
+        // separate GET /apartments/{id}/pictures endpoint.  Smoobu stores
+        // photos there on most account configurations and does NOT include
+        // them in the list or detail responses.
+        if (images.length === 0) {
+          try {
+            const picImages = await getApartmentPictures(propertyCtx, aptId);
+            if (picImages.length > 0) images = picImages;
+          } catch (picErr) {
+            console.warn(`[overview] pictures endpoint failed apt ${aptId}:`, picErr.message);
+          }
+        }
+
+        console.log(`[overview] apt ${aptId} "${apt.name}" listImgs=${listImages.length} detailImgs=${detailImages.length} using=${images.length}`);
         return {
           apartmentId:  aptId,
           apartmentName: apt.name || detail?.name || `Apartment ${aptId}`,
@@ -203,6 +241,9 @@ async function fetchPropertyData(propertyCtx, dateRange, clientId, clientName, p
       }
     })
   );
+
+  const withImgs = apartmentLocations.filter(a => a.images && a.images.length > 0).length;
+  console.log(`[overview] "${propertyName}" → ${apartmentLocations.length} apts, ${withImgs} with images`);
 
   // Filter bookings to the requested date range (arrival-based, matching Smoobu)
   const statsBookings = allBookings.filter((b) => {

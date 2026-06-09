@@ -64,15 +64,24 @@ function toCoord(val) {
 }
 
 // ── Helper: extract images from ANY Smoobu response shape ─────────
-// Smoobu returns images on BOTH the list endpoint (per apt object)
-// and the detail endpoint. Field names vary by API version.
+// Smoobu returns images on the detail endpoint. Field names vary by API version.
+// We try every known path exhaustively and log what we find.
 function extractImages(obj) {
   if (!obj) return [];
 
-  // Try every known field name
-  const raw = Array.isArray(obj.images)   ? obj.images
-            : Array.isArray(obj.pictures) ? obj.pictures
-            : Array.isArray(obj.photos)   ? obj.photos
+  // ── Unwrap nested shapes ──────────────────────────────────────────
+  // Some Smoobu API versions nest the apartment inside obj.apartment
+  const target = obj.apartment ?? obj;
+
+  // ── Try every known field name ────────────────────────────────────
+  const raw = Array.isArray(target.images)      ? target.images
+            : Array.isArray(target.pictures)    ? target.pictures
+            : Array.isArray(target.photos)      ? target.photos
+            : Array.isArray(target.media)       ? target.media
+            : Array.isArray(target.gallery)     ? target.gallery
+            : Array.isArray(target.attachments) ? target.attachments
+            : Array.isArray(target.data)        ? target.data
+            : Array.isArray(obj)                ? obj              // bare array response
             : null;
 
   if (!raw) return [];
@@ -80,27 +89,93 @@ function extractImages(obj) {
   return raw
     .filter((img) => img != null)
     .map((img) => {
+      // Plain URL string
       if (typeof img === 'string' && img.trim())
         return { id: null, url: img.trim() };
+      // Object with .url
       if (img && typeof img.url === 'string' && img.url.trim())
         return { id: img.id ?? null, url: img.url.trim() };
+      // Object with .image
       if (img && typeof img.image === 'string' && img.image.trim())
         return { id: img.id ?? null, url: img.image.trim() };
+      // Object with .src
+      if (img && typeof img.src === 'string' && img.src.trim())
+        return { id: img.id ?? null, url: img.src.trim() };
+      // Object with .link
+      if (img && typeof img.link === 'string' && img.link.trim())
+        return { id: img.id ?? null, url: img.link.trim() };
+      // Object with .picture
+      if (img && typeof img.picture === 'string' && img.picture.trim())
+        return { id: img.id ?? null, url: img.picture.trim() };
       return null;
     })
     .filter(Boolean);
 }
 
+// ── Step 3: dedicated pictures endpoint ──────────────────────────
+// Smoobu stores photos on a SEPARATE endpoint that is NOT the list or
+// detail response.  We try three known paths in order and return the
+// first non-empty result.  Full raw response logged for diagnostics.
+async function fetchApartmentPictures(apiKey, propId, aptId) {
+  const paths = [
+    `/apartments/${aptId}/pictures`,
+    `/apartments/${aptId}/photos`,
+    `/apartments/${aptId}/images`,
+  ];
+
+  for (const path of paths) {
+    try {
+      const data = await smoobuGet(path, apiKey, `${propId}:${path}`);
+
+      // Diagnostic logging — log ONCE so we can see the raw shape
+      console.log(`[smoobuApartments] pictures apt=${aptId} path=${path} → keys:`, Object.keys(data || {}));
+      const arrayKeys = Object.keys(data || {}).filter((k) => Array.isArray(data[k]));
+      console.log(`[smoobuApartments] pictures apt=${aptId} array-keys:`, arrayKeys);
+      if (arrayKeys.length > 0) {
+        arrayKeys.forEach((k) => {
+          console.log(`[smoobuApartments]   data.${k}[0]:`, JSON.stringify((data[k] || [])[0]).slice(0, 200));
+        });
+      }
+      // Also log if response is a bare array
+      if (Array.isArray(data)) {
+        console.log(`[smoobuApartments] pictures apt=${aptId} → bare array length=${data.length}, [0]:`, JSON.stringify(data[0]).slice(0, 200));
+      }
+
+      const imgs = extractImages(data);
+      if (imgs.length > 0) {
+        console.log(`[smoobuApartments] pictures apt=${aptId} → ${imgs.length} images found via ${path}`);
+        return imgs;
+      }
+      console.log(`[smoobuApartments] pictures apt=${aptId} path=${path} → empty, trying next`);
+    } catch (err) {
+      if (err.status === 404 || err.status === 405) {
+        console.log(`[smoobuApartments] pictures apt=${aptId} path=${path} → ${err.status}, trying next`);
+        continue;
+      }
+      console.warn(`[smoobuApartments] pictures apt=${aptId} path=${path} → error:`, err.message);
+      return [];
+    }
+  }
+
+  console.log(`[smoobuApartments] pictures apt=${aptId} → all paths exhausted`);
+  return [];
+}
+
 // ── Main fetch: list + detail per apartment ───────────────────────
 async function fetchApartmentsForKey(apiKey, propId, propertyName, clientId, clientName) {
-  // Step 1 — GET /apartments (list): has name, id, AND images[] per item
+  // Step 1 — GET /apartments (list)
   const listData = await smoobuGet('/apartments', apiKey, `${propId}:/apartments`);
 
-  // Log the raw list to see its shape
+  // Log the FULL raw shape of the first apartment in the list
   const firstApt = (listData?.apartments ?? [])[0];
   if (firstApt) {
-    console.log(`[smoobuApartments] LIST apt keys:`, Object.keys(firstApt));
-    console.log(`[smoobuApartments] LIST apt.images raw:`, JSON.stringify(firstApt.images ?? firstApt.pictures ?? 'MISSING').slice(0, 400));
+    console.log(`[smoobuApartments] LIST apt ALL keys:`, Object.keys(firstApt));
+    // Log every array-valued key so we can spot the images field no matter its name
+    const arrayKeys = Object.keys(firstApt).filter(k => Array.isArray(firstApt[k]));
+    console.log(`[smoobuApartments] LIST apt array-keys:`, arrayKeys);
+    arrayKeys.forEach(k => {
+      console.log(`[smoobuApartments]   LIST apt.${k}[0]:`, JSON.stringify(firstApt[k][0]).slice(0, 200));
+    });
   }
 
   const aptList = listData?.apartments ?? [];
@@ -110,23 +185,46 @@ async function fetchApartmentsForKey(apiKey, propId, propertyName, clientId, cli
     aptList.map(async (apt) => {
       const aptId = apt.id ?? apt;
 
-      // Images from the LIST endpoint — this is the reliable source
+      // Images from the LIST endpoint (usually absent, but check anyway)
       const listImages = extractImages(apt);
 
       try {
-        // Step 2 — GET /apartments/{id}: adds location, rooms, type
+        // Step 2 — GET /apartments/{id}: adds location, rooms, type, AND images
         const detail = await smoobuGet(
           `/apartments/${aptId}`,
           apiKey,
           `${propId}:/apartments/${aptId}`
         );
 
-        // Log detail shape once
-        console.log(`[smoobuApartments]   detail apt ${aptId} keys:`, Object.keys(detail || {}));
+        // Log the FULL raw shape of the detail response — ONCE per apartment type
+        console.log(`[smoobuApartments]   detail apt ${aptId} ALL keys:`, Object.keys(detail || {}));
+        const detailArrayKeys = Object.keys(detail || {}).filter(k => Array.isArray(detail[k]));
+        console.log(`[smoobuApartments]   detail apt ${aptId} array-keys:`, detailArrayKeys);
+        detailArrayKeys.forEach(k => {
+          console.log(`[smoobuApartments]   detail apt.${k}[0]:`, JSON.stringify((detail[k] || [])[0]).slice(0, 200));
+        });
+        // Also check if there's a nested .apartment sub-object
+        if (detail?.apartment) {
+          console.log(`[smoobuApartments]   detail.apartment keys:`, Object.keys(detail.apartment));
+          const nestedArrayKeys = Object.keys(detail.apartment).filter(k => Array.isArray(detail.apartment[k]));
+          console.log(`[smoobuApartments]   detail.apartment array-keys:`, nestedArrayKeys);
+        }
+
         const detailImages = extractImages(detail);
 
-        // Prefer list images (usually has more), fall back to detail images
-        const images = listImages.length > 0 ? listImages : detailImages;
+        // Prefer list images if present; otherwise use detail images
+        let images = listImages.length > 0 ? listImages : detailImages;
+
+        // ── Step 3 — GET /apartments/{id}/pictures ─────────────────
+        // Smoobu stores photos on a dedicated sub-resource that is NOT
+        // included in either the list or the detail response.  Only call
+        // this when steps 1 and 2 both returned nothing so we avoid
+        // unnecessary extra round-trips for accounts where the detail
+        // endpoint already carries the images.
+        if (images.length === 0) {
+          const picImages = await fetchApartmentPictures(apiKey, propId, aptId);
+          if (picImages.length > 0) images = picImages;
+        }
 
         console.log(`[smoobuApartments]   apt ${aptId} "${apt.name || detail?.name}" → listImgs=${listImages.length} detailImgs=${detailImages.length} using=${images.length}`);
 
@@ -154,8 +252,6 @@ async function fetchApartmentsForKey(apiKey, propId, propertyName, clientId, cli
         };
       } catch (detailErr) {
         console.warn(`[smoobuApartments] detail failed apt ${aptId}:`, detailErr.message);
-        // Still return what we have from the list — coords will be null
-        // but at least images from the list can show in the UI
         return {
           apartmentId:   aptId,
           apartmentName: apt.name || `Apartment ${aptId}`,
