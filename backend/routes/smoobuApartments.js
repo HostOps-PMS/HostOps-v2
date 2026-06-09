@@ -67,65 +67,108 @@ function toCoord(val) {
 
 // ── Step 3: scrape images from Smoobu's public apartment page ─────
 //
-// The page at https://login.smoobu.com/en/website-external/apartment/{id}
-// renders all uploaded photos as <img src="/upload/images/.../thumb_xxx.jpg">.
-// We fetch the HTML, extract every unique /upload/images/ path, strip the
-// "thumb_" prefix to get the full-resolution URL, and return the array.
-// Cached per apartment for 10 minutes — images rarely change.
+// IMPORTANT (confirmed against docs.smoobu.com, 2026): Smoobu's REST API has
+// NO images/photos/pictures endpoint — not on GET /apartments and not on
+// GET /apartments/{id}. The ONLY place photos exist is the public page:
+//   https://login.smoobu.com/{locale}/website-external/apartment/{id}
+// …and ONLY when that apartment is published on a Smoobu booking website.
+//
+// The old scraper matched only  src="/upload/images/..."  which missed
+// lazy-loaded (data-src), responsive (srcset), CSS background-image, absolute
+// CDN URLs, and JSON-embedded URLs — the most likely reason every apt was 0.
+// This version extracts from all of those, tries multiple locale URLs, and
+// logs a DIAGNOSTIC when it still finds nothing so the real cause is visible
+// in the logs. Cached per apartment for 10 minutes — images rarely change.
+
+// Broadly extract every plausible Smoobu photo URL from a page's HTML.
+function extractSmoobuImageUrls(html, baseHost = SMOOBU_WEB_BASE) {
+  const found = new Set();
+
+  const pushUrl = (raw) => {
+    if (!raw) return;
+    let u = String(raw).trim().replace(/&amp;/g, '&');
+    if (!u || u.startsWith('data:')) return;
+    u = u.replace(/\\\//g, '/'); // unescape JSON slashes
+    if (u.startsWith('//'))      u = 'https:' + u;
+    else if (u.startsWith('/'))  u = baseHost + u;
+    else if (!/^https?:\/\//i.test(u)) u = `${baseHost}/${u.replace(/^\.?\//, '')}`;
+
+    if (!/\.(jpe?g|png|webp)(\?|$)/i.test(u)) return;
+    if (/(sprite|logo|icon|placeholder|spinner|blank|flag)/i.test(u)) return;
+
+    const isSmoobuPhoto = /\/upload\/images\//i.test(u) || /smoobu/i.test(u);
+    if (!isSmoobuPhoto) return;
+
+    u = u.replace(/\/thumb_([^/]+)$/i, '/$1'); // full-resolution
+    found.add(u);
+  };
+
+  let m;
+  const attrRe = /(?:src|data-src|data-original|data-lazy|data-lazy-src|data-image)\s*=\s*["']([^"']+)["']/gi;
+  while ((m = attrRe.exec(html)) !== null) pushUrl(m[1]);
+
+  const srcsetRe = /srcset\s*=\s*["']([^"']+)["']/gi;
+  while ((m = srcsetRe.exec(html)) !== null) {
+    m[1].split(',').forEach((cand) => pushUrl(cand.trim().split(/\s+/)[0]));
+  }
+
+  const bgRe = /background-image\s*:\s*url\(\s*["']?([^"')]+)["']?\s*\)/gi;
+  while ((m = bgRe.exec(html)) !== null) pushUrl(m[1]);
+
+  const jsonRe = /https?:\\?\/\\?\/[^"'\\) ]*\/upload\/images\/[^"'\\) ]+/gi;
+  while ((m = jsonRe.exec(html)) !== null) pushUrl(m[0]);
+
+  return Array.from(found).map((url) => ({ id: null, url }));
+}
+
 async function scrapeApartmentImages(aptId) {
   const cacheKey = `scrape:apt:${aptId}`;
   const cached = _getCache(cacheKey);
   if (cached) return cached;
 
-  const url = `${SMOOBU_WEB_BASE}/en/website-external/apartment/${aptId}`;
-  try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; HostPilot/1.0)',
-        'Accept':     'text/html,application/xhtml+xml',
-      },
-    });
-    if (!res.ok) {
-      console.warn(`[smoobuApartments] scrape apt ${aptId} → HTTP ${res.status}`);
-      _setCache(cacheKey, [], 10 * 60_000);
-      return [];
-    }
+  const candidateUrls = [
+    `${SMOOBU_WEB_BASE}/en/website-external/apartment/${aptId}`,
+    `${SMOOBU_WEB_BASE}/de/website-external/apartment/${aptId}`,
+  ];
 
-    const html = await res.text();
-
-    // Match all src="/upload/images/..." (single or double quotes)
-    const srcRegex = /src=["'](\/?upload\/images\/[^"']+)["']/gi;
-    const seen   = new Set();
-    const images = [];
-    let match;
-
-    while ((match = srcRegex.exec(html)) !== null) {
-      let path = match[1];
-
-      // Ensure absolute URL
-      if (!path.startsWith('http')) {
-        path = `${SMOOBU_WEB_BASE}/${path.replace(/^\//, '')}`;
+  for (const url of candidateUrls) {
+    try {
+      const res = await fetch(url, {
+        redirect: 'follow',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; HostPilot/1.0)',
+          'Accept':     'text/html,application/xhtml+xml',
+        },
+      });
+      if (!res.ok) {
+        console.warn(`[smoobuApartments] scrape apt ${aptId} ${url} → HTTP ${res.status}`);
+        continue;
       }
 
-      // Strip "thumb_" prefix → full-resolution file.
-      // Smoobu stores: /upload/images/.../thumb_<hash>.jpg  (thumbnail shown in UI)
-      //                /upload/images/.../<hash>.jpg         (full-res)
-      const fullPath = path.replace(/\/thumb_([^/]+)$/, '/$1');
+      const html   = await res.text();
+      const images = extractSmoobuImageUrls(html);
 
-      if (!seen.has(fullPath)) {
-        seen.add(fullPath);
-        images.push({ id: null, url: fullPath });
+      if (images.length > 0) {
+        console.log(`[smoobuApartments] scrape apt ${aptId} → ${images.length} images found (${url})`);
+        _setCache(cacheKey, images, 10 * 60_000);
+        return images;
       }
-    }
 
-    console.log(`[smoobuApartments] scrape apt ${aptId} → ${images.length} images found`);
-    _setCache(cacheKey, images, 10 * 60_000);
-    return images;
-  } catch (err) {
-    console.warn(`[smoobuApartments] scrape apt ${aptId} failed:`, err.message);
-    _setCache(cacheKey, [], 10 * 60_000);
-    return [];
+      // DIAGNOSTIC — zero images: describe the page so we can see WHY.
+      console.warn(
+        `[smoobuApartments] scrape apt ${aptId} → 0 images. ` +
+        `url=${url} finalUrl=${res.url} htmlLen=${html.length} ` +
+        `hasImgTag=${/<img/i.test(html)} hasUpload=${html.includes('/upload/images/')} ` +
+        `hasSmoobuCdn=${/smoobu[^"']*\.(jpe?g|png|webp)/i.test(html)} ` +
+        `looksLikeLogin=${/login|sign in|anmelden/i.test(html.slice(0, 4000))}`
+      );
+    } catch (err) {
+      console.warn(`[smoobuApartments] scrape apt ${aptId} ${url} failed:`, err.message);
+    }
   }
+
+  _setCache(cacheKey, [], 10 * 60_000);
+  return [];
 }
 
 // ── Main fetch: list + detail + image scrape per apartment ────────
