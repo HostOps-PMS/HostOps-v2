@@ -97,19 +97,29 @@ export default function Staffs() {
           )}
 
           {/* Page Header */}
-          <header className="db-content__header">
+          <header className="cl-content__header">
             <div>
-              <h1 className="db-content__title">Staffs</h1>
-              <p className="db-content__sub">Manage staff accounts and their property access</p>
+              <h1 className="cl-content__title">Staffs</h1>
+              <p className="cl-content__sub">Manage staff accounts and their property access</p>
             </div>
           </header>
+
+          {error && (
+            <div style={{
+              background: '#fee2e2', color: '#b91c1c',
+              borderRadius: 'var(--radius-sm)', padding: '12px 16px',
+              fontSize: '.875rem', fontWeight: 500,
+            }}>
+              ⚠️ {error}
+            </div>
+          )}
 
           <StaffTable
             staffs={staffs}
             clients={clients}
             filtered={paginated}
             loading={loading}
-            error={error}
+            error={null}
             search={search}
             filterClient={filterClient}
             propertyMap={propertyMap}

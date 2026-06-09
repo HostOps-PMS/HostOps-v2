@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Badge from './Badge';
 import PropertyPills from './PropertyPills';
 
@@ -27,6 +27,32 @@ export default function StaffTable({
 
   const [selected, setSelected] = useState([]);
   const [activeTab, setActiveTab] = useState('All');
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [clientSearch, setClientSearch] = useState('');
+  const tabScrollRef = useRef(null);
+  const clientDropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(e.target)) {
+        setShowClientDropdown(false);
+        setClientSearch('');
+      }
+    }
+    if (showClientDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showClientDropdown]);
+  const [tabScrollLeft, setTabScrollLeft] = useState(0);
+  const [tabScrollable, setTabScrollable] = useState(false);
+
+  function handleTabScroll() {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    setTabScrollLeft(el.scrollLeft);
+    setTabScrollable(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  }
 
 const TAB_ICONS = {
     All: (
@@ -53,6 +79,12 @@ const TAB_ICONS = {
     { label: 'Inactive', count: staffs.filter(s => !s.isActive).length },
   ];
 
+  useEffect(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    setTabScrollable(el.scrollWidth > el.clientWidth);
+  }, [tabs.length]);
+
   const tabFiltered = activeTab === 'All' ? filtered
     : activeTab === 'Active' ? filtered.filter(s => s.isActive)
     : filtered.filter(s => !s.isActive);
@@ -74,13 +106,43 @@ return (
       {/* Top header: tab bar + New Staff button */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 0, flexWrap: 'wrap', gap: 10, paddingBottom: 0,
+        marginBottom: 0, flexWrap: 'nowrap', gap: 10, paddingBottom: 0,
+        overflow: 'hidden', position: 'relative',
       }}>
-        <div style={{
-          display: 'inline-flex', alignItems: 'flex-end', gap: 0,
-          background: 'transparent',
-          padding: '0 0 0 0', marginBottom: '-1px',
-        }}>
+        {tabScrollLeft > 0 && (
+          <div style={{
+            position: 'absolute', left: 0, top: 0, bottom: 0, zIndex: 10,
+            display: 'flex', alignItems: 'center',
+            background: 'linear-gradient(to right, #f0f4f0 60%, transparent)',
+            paddingRight: 8, paddingLeft: 2, pointerEvents: 'none',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5">
+              <path d="M13 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        )}
+        {tabScrollable && (
+          <div style={{
+            position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 10,
+            display: 'flex', alignItems: 'center',
+            background: 'linear-gradient(to left, #f0f4f0 60%, transparent)',
+            paddingLeft: 8, paddingRight: 2, pointerEvents: 'none',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5">
+              <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        )}
+        <div
+          ref={tabScrollRef}
+          onScroll={handleTabScroll}
+          style={{
+            display: 'flex', alignItems: 'flex-end', gap: 0,
+            background: 'transparent',
+            padding: '0 0 0 0', marginBottom: '-1px',
+            overflowX: 'auto', WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none', msOverflowStyle: 'none',
+          }}>
           {tabs.map(tab => {
             const isActive = activeTab === tab.label;
             return (
@@ -123,8 +185,8 @@ return (
 
       {/* Filter bar + table */}
       <div style={{ background: '#fff', borderRadius: '0 12px 12px 12px', border: '1px solid #e8ecf0', overflow: 'visible', paddingBottom: 4, position: 'relative' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 20px 14px', borderBottom: '1px solid #f0f2f5', flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 180, maxWidth: 280 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px 14px', borderBottom: '1px solid #f0f2f5', flexWrap: 'wrap', rowGap: 8 }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 120, maxWidth: 280 }}>
           <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2"
             style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
             <circle cx="9" cy="9" r="6"/><path d="M15 15l-3.5-3.5" strokeLinecap="round"/>
@@ -142,23 +204,129 @@ return (
             }}
           />
         </div>
-        <select
-          value={filterClient}
-          onChange={(e) => onFilterClientChange(e.target.value)}
-          style={{
-            padding: '7px 14px', borderRadius: 8,
-            border: '1px solid #e5e7eb', fontSize: '0.83rem',
-            outline: 'none', background: '#fafafa', cursor: 'pointer', color: '#4a5568',
-          }}
-        >
-          <option value="">All Businesses</option>
-          {clients.map((c) => (
-            <option key={c._id} value={c._id}>{c.businessName}</option>
-          ))}
-        </select>
-        <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto' }}>
+        <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto', whiteSpace: 'nowrap', flexShrink: 0 }}>
           {tabFiltered.length} staff{tabFiltered.length !== 1 ? 's' : ''}
         </span>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+        <div ref={clientDropdownRef} style={{ position: 'relative', flexShrink: 0 }}>
+          <div
+            onClick={() => setShowClientDropdown(v => !v)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '7px 10px 7px 12px',
+              borderRadius: 8, border: '1px solid #e5e7eb',
+              background: filterClient ? '#f0fdf4' : '#fff',
+              cursor: 'pointer', fontSize: '0.83rem',
+              color: filterClient ? '#059669' : '#374151',
+              fontWeight: filterClient ? 600 : 500,
+              userSelect: 'none', whiteSpace: 'nowrap',
+              maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis',
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="2" y="3" width="16" height="14" rx="2"/>
+              <path d="M2 7h16" strokeLinecap="round"/>
+            </svg>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {filterClient
+                ? (clients.find(c => c._id === filterClient)?.businessName || 'Business')
+                : 'All Businesses'}
+            </span>
+            <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+              <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+
+          {showClientDropdown && (
+            <div
+              style={{
+                position: 'absolute', top: 'calc(100% + 4px)', left: 0,
+                zIndex: 300, background: '#fff',
+                border: '1.5px solid #e2e8f0', borderRadius: 10,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                minWidth: 200, overflow: 'hidden',
+                display: 'flex', flexDirection: 'column',
+                maxHeight: 280,
+              }}
+            >
+              {/* Search */}
+              <div style={{ padding: '8px 10px', borderBottom: '1px solid #f0f0f0' }}>
+                <input
+                  autoFocus
+                  value={clientSearch}
+                  onChange={e => setClientSearch(e.target.value)}
+                  placeholder="Search business…"
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    padding: '6px 10px', borderRadius: 6,
+                    border: '1.5px solid #e2e8f0', fontSize: '0.83rem',
+                    outline: 'none', background: '#fafafa',
+                  }}
+                  onClick={e => e.stopPropagation()}
+                />
+              </div>
+              {/* List */}
+              <div style={{ maxHeight: 180, overflowY: 'auto', overflowX: 'hidden', flex: 1 }}>
+                {/* All option */}
+                <div
+                  onClick={() => { onFilterClientChange(''); setShowClientDropdown(false); setClientSearch(''); }}
+                  style={{
+                    padding: '9px 14px', cursor: 'pointer', fontSize: '0.875rem',
+                    background: !filterClient ? '#f0fdf4' : 'transparent',
+                    color: !filterClient ? '#059669' : '#374151',
+                    fontWeight: !filterClient ? 600 : 400,
+                    borderBottom: '1px solid #f7f7f7',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}
+                  onMouseEnter={e => { if (filterClient) e.currentTarget.style.background = '#f8faf9'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = !filterClient ? '#f0fdf4' : 'transparent'; }}
+                >
+                  All Businesses
+                  {!filterClient && (
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="2,6 5,9 10,3"/>
+                    </svg>
+                  )}
+                </div>
+                {/* Filtered clients */}
+                {clients
+                  .filter(c => c && c._id && c.businessName)
+                  .filter(c => !clientSearch || c.businessName?.toLowerCase().includes(clientSearch.toLowerCase()))
+                  .map(c => (
+                    <div
+                      key={c._id}
+                      onClick={() => { onFilterClientChange(c._id); setShowClientDropdown(false); setClientSearch(''); }}
+                      style={{
+                        padding: '9px 14px', cursor: 'pointer', fontSize: '0.875rem',
+                        background: filterClient === c._id ? '#f0fdf4' : 'transparent',
+                        color: filterClient === c._id ? '#059669' : '#374151',
+                        fontWeight: filterClient === c._id ? 600 : 400,
+                        borderBottom: '1px solid #f7f7f7',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        gap: 8,
+                      }}
+                      onMouseEnter={e => { if (filterClient !== c._id) e.currentTarget.style.background = '#f8faf9'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = filterClient === c._id ? '#f0fdf4' : 'transparent'; }}
+                    >
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {c.businessName}
+                      </span>
+                      {filterClient === c._id && (
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <polyline points="2,6 5,9 10,3"/>
+                        </svg>
+                      )}
+                    </div>
+                  ))}
+                {clients.filter(c => c && c._id && c.businessName).filter(c => !clientSearch || c.businessName?.toLowerCase().includes(clientSearch.toLowerCase())).length === 0 && (
+                  <div style={{ padding: '12px 14px', fontSize: '0.83rem', color: '#a0aec0', textAlign: 'center' }}>
+                    No businesses found
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
         <button
           onClick={onNew}
           style={{
@@ -175,14 +343,8 @@ return (
         >
           + New Staff
         </button>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div style={{ background: '#fff0ee', color: '#c13515', padding: '10px 20px', fontSize: '0.875rem' }}>
-          {error}
         </div>
-      )}
+      </div>
 
       {/* Table */}
       {loading ? (
@@ -194,8 +356,8 @@ return (
           {staffs.length === 0 ? 'No staff accounts yet. Create one to get started.' : 'No results match your search.'}
         </div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #f0f2f5' }}>
                 <th style={{ padding: '10px 16px 10px 20px', width: 36 }}>
@@ -238,7 +400,7 @@ return (
                     </td>
 
                     {/* Staff name + email */}
-                    <td style={{ padding: '12px 16px' }}>
+                    <td style={{ padding: '12px 16px', minWidth: 140 }}>
                       <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
                         {s.firstName} {s.lastName}
                       </div>
@@ -255,7 +417,7 @@ return (
                     </td>
 
                     {/* Client */}
-                    <td style={{ padding: '12px 16px', fontSize: '0.83rem', color: '#4a5568' }}>
+                    <td style={{ padding: '12px 16px', fontSize: '0.83rem', color: '#4a5568', minWidth: 120 }}>
                       {client ? client.businessName : <span style={{ color: '#d1d5db' }}>—</span>}
                     </td>
 
@@ -316,8 +478,8 @@ return (
             padding: '12px 20px',
             borderTop: '1px solid #f0f2f5',
           }}>
-            <span style={{ fontSize: '0.78rem', color: '#9ca3af' }}>
-              Page {page} of {totalPages} · {totalCount} {totalCount === 1 ? 'Staff' : 'Staffs'}
+            <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+              {page}/{totalPages} · {totalCount} {totalCount === 1 ? 'Staff' : 'Staffs'}
             </span>
             <div style={{ display: 'flex', gap: 8 }}>
               <button

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 const TAB_ICONS = {
   All: (
@@ -41,12 +41,28 @@ export default function TeamLeaderTable({
 
   const [selected, setSelected] = useState([]);
   const [activeTab, setActiveTab] = useState('All');
+  const tabScrollRef = useRef(null);
+  const [tabScrollLeft, setTabScrollLeft] = useState(0);
+  const [tabScrollable, setTabScrollable] = useState(false);
+
+  function handleTabScroll() {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    setTabScrollLeft(el.scrollLeft);
+    setTabScrollable(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  }
 
   const tabs = [
     { label: 'All', count: teamLeaders.length },
     { label: 'Active', count: teamLeaders.filter((tl) => tl.isActive).length },
     { label: 'Inactive', count: teamLeaders.filter((tl) => !tl.isActive).length },
   ];
+
+  useEffect(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    setTabScrollable(el.scrollWidth > el.clientWidth);
+  }, [tabs.length]);
 
   const tabFiltered =
     activeTab === 'All'
@@ -75,13 +91,43 @@ export default function TeamLeaderTable({
       {/* Top header: tab bar */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 0, flexWrap: 'wrap', gap: 10, paddingBottom: 0,
+        marginBottom: 0, flexWrap: 'nowrap', gap: 10, paddingBottom: 0,
+        overflow: 'hidden', position: 'relative',
       }}>
-        <div style={{
-          display: 'inline-flex', alignItems: 'flex-end', gap: 0,
-          background: 'transparent',
-          padding: '0 0 0 0', marginBottom: '-1px',
-        }}>
+        {tabScrollLeft > 0 && (
+          <div style={{
+            position: 'absolute', left: 0, top: 0, bottom: 0, zIndex: 10,
+            display: 'flex', alignItems: 'center',
+            background: 'linear-gradient(to right, #f0f4f0 60%, transparent)',
+            paddingRight: 8, paddingLeft: 2, pointerEvents: 'none',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5">
+              <path d="M13 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        )}
+        {tabScrollable && (
+          <div style={{
+            position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 10,
+            display: 'flex', alignItems: 'center',
+            background: 'linear-gradient(to left, #f0f4f0 60%, transparent)',
+            paddingLeft: 8, paddingRight: 2, pointerEvents: 'none',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5">
+              <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        )}
+        <div
+          ref={tabScrollRef}
+          onScroll={handleTabScroll}
+          style={{
+            display: 'flex', alignItems: 'flex-end', gap: 0,
+            background: 'transparent',
+            padding: '0 0 0 0', marginBottom: '-1px',
+            overflowX: 'auto', WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none', msOverflowStyle: 'none',
+          }}>
           {tabs.map((tab) => {
             const isActive = activeTab === tab.label;
             return (
@@ -127,10 +173,10 @@ export default function TeamLeaderTable({
         paddingBottom: 4, position: 'relative',
       }}>
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: '12px 20px 14px', borderBottom: '1px solid #f0f2f5', flexWrap: 'wrap',
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '12px 16px 14px', borderBottom: '1px solid #f0f2f5', flexWrap: 'wrap', rowGap: 8,
         }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: 180, maxWidth: 280 }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 120, maxWidth: 280 }}>
             <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2"
               style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
               <circle cx="9" cy="9" r="6" /><path d="M15 15l-3.5-3.5" strokeLinecap="round" />
@@ -148,9 +194,10 @@ export default function TeamLeaderTable({
               }}
             />
           </div>
-          <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto' }}>
+          <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto', whiteSpace: 'nowrap', flexShrink: 0 }}>
             {tabFiltered.length} team leader{tabFiltered.length !== 1 ? 's' : ''}
           </span>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <button
             onClick={onNew}
             style={{
@@ -167,14 +214,8 @@ export default function TeamLeaderTable({
           >
             + New Team Leader
           </button>
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div style={{ background: '#fff0ee', color: '#c13515', padding: '10px 20px', fontSize: '0.875rem' }}>
-            {error}
           </div>
-        )}
+        </div>
 
         {/* Table */}
         {loading ? (
@@ -188,8 +229,8 @@ export default function TeamLeaderTable({
               : 'No results match your search.'}
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #f0f2f5' }}>
                   <th style={{ padding: '10px 16px 10px 20px', width: 36 }}>
