@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import './dashboard.css';
 
+import { exportDashboardPdf } from './utils/exportDashboardPdf';
+
 import Sidebar              from './components/Sidebar';
 import TopBar               from './components/TopBar';
 import StatsRow             from './components/StatsRow';
@@ -59,6 +61,20 @@ export default function Dashboard() {
   const openModal  = (type, data = null) => setModal({ open: true, type, data });
   const closeModal = ()                  => setModal({ open: false, type: null, data: null });
 
+  const [exportLoading, setExportLoading] = useState(false);
+
+  const handleExport = async () => {
+    if (exportLoading || statsLoading) return;
+    setExportLoading(true);
+    try {
+      await exportDashboardPdf({ overview, stats, appliedRange });
+    } catch (err) {
+      console.error('[exportDashboardPdf] failed:', err);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   // useStats fetches the full /api/dashboard-overview payload.
   const { stats, overview, loading: statsLoading } = useStats(appliedRange);
 
@@ -78,6 +94,8 @@ export default function Dashboard() {
         */}
         <TopBar
           onAction={() => openModal('create')}
+          onExport={handleExport}
+          exportLoading={exportLoading || statsLoading}
           alerts={overview?.alerts ?? []}
           activities={overview?.recentActivities ?? []}
           notifLoading={statsLoading}

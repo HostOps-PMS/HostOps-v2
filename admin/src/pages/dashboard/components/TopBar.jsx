@@ -31,24 +31,25 @@ function getInitialsAvatar(name) {
 // SVG icon set — no emojis anywhere
 const TypeIcon = ({ type, size = 15 }) => {
   const s = { width: size, height: size, flexShrink: 0 };
+  const sw = '1.9'; // strokeWidth — slightly bolder for small sizes
   switch (type) {
     case 'booking':
       return (
-        <svg {...s} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7">
+        <svg {...s} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={sw}>
           <rect x="3" y="4" width="14" height="13" rx="2"/>
           <path d="M3 8h14M7 2v4M13 2v4" strokeLinecap="round"/>
         </svg>
       );
     case 'cancellation':
       return (
-        <svg {...s} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7">
+        <svg {...s} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={sw}>
           <circle cx="10" cy="10" r="7"/>
           <path d="M7 7l6 6M13 7l-6 6" strokeLinecap="round"/>
         </svg>
       );
     case 'payment':
       return (
-        <svg {...s} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7">
+        <svg {...s} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={sw}>
           <rect x="2" y="5" width="16" height="11" rx="2"/>
           <path d="M2 9h16" strokeLinecap="round"/>
           <rect x="5" y="12" width="3" height="2" rx="0.5" fill="currentColor" stroke="none"/>
@@ -56,28 +57,28 @@ const TypeIcon = ({ type, size = 15 }) => {
       );
     case 'warning':
       return (
-        <svg {...s} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7">
+        <svg {...s} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={sw}>
           <path d="M10 3L2 17h16L10 3z" strokeLinejoin="round"/>
-          <path d="M10 9v4M10 14.5v.5" strokeLinecap="round"/>
+          <path d="M10 9v3.5M10 14.2v.5" strokeLinecap="round"/>
         </svg>
       );
     case 'checkin':
       return (
-        <svg {...s} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7">
+        <svg {...s} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={sw}>
           <path d="M13 10H3M9 6l4 4-4 4" strokeLinecap="round" strokeLinejoin="round"/>
           <path d="M17 4v12" strokeLinecap="round"/>
         </svg>
       );
     case 'checkout':
       return (
-        <svg {...s} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7">
+        <svg {...s} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={sw}>
           <path d="M7 10h10M13 6l4 4-4 4" strokeLinecap="round" strokeLinejoin="round"/>
           <path d="M3 4v12" strokeLinecap="round"/>
         </svg>
       );
     default:
       return (
-        <svg {...s} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7">
+        <svg {...s} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={sw}>
           <path d="M10 2a6 6 0 00-6 6v3l-1.5 2H17.5L16 11V8a6 6 0 00-6-6z"/>
           <path d="M8.5 17a1.5 1.5 0 003 0" strokeLinecap="round"/>
         </svg>
@@ -85,13 +86,14 @@ const TypeIcon = ({ type, size = 15 }) => {
   }
 };
 
+// Light pastel bg + saturated icon color — always enough contrast
 const ALERT_TYPE_STYLE = {
-  booking:      { bg: '#e8f5e9', color: '#2e7d32' },
-  cancellation: { bg: '#fce4ec', color: '#c62828' },
-  payment:      { bg: '#e3f2fd', color: '#1565c0' },
-  warning:      { bg: '#fff8e1', color: '#f57f17' },
-  info:         { bg: '#f3e5f5', color: '#6a1b9a' },
-  default:      { bg: '#f5f5f5', color: '#555'    },
+  booking:      { bg: '#e6f4ea', color: '#1e7e45' },
+  cancellation: { bg: '#fdecea', color: '#c0392b' },
+  payment:      { bg: '#e8f0fe', color: '#1a56c4' },
+  warning:      { bg: '#fef6e0', color: '#c47c00' },
+  info:         { bg: '#f0ebfc', color: '#6d28d9' },
+  default:      { bg: '#f0f0f0', color: '#444'    },
 };
 
 function getAlertStyle(type) {
@@ -268,14 +270,14 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
                   transition: 'background 0.12s',
                 }}
               >
-                {/* Always use InitialsAvatar — never <img> */}
+                {/* Type icon — always use our controlled bg+color, never backend avatarBg */}
                 <div style={{
                   width: 34, height: 34, borderRadius: 10,
-                  background: alert.avatarBg || typeStyle.bg,
+                  background: typeStyle.bg,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0, color: typeStyle.color,
                 }}>
-                  <TypeIcon type={alert.type} size={16} />
+                  <TypeIcon type={alert.type} size={17} />
                 </div>
 
                 {/* Text */}
@@ -377,7 +379,7 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
 // ─────────────────────────────────────────────────────────────────
 // TopBar
 // ─────────────────────────────────────────────────────────────────
-export default function TopBar({ onAction, alerts = [], activities = [], notifLoading = false }) {
+export default function TopBar({ onAction, onExport, exportLoading = false, alerts = [], activities = [], notifLoading = false }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef(null);
 
@@ -434,24 +436,44 @@ export default function TopBar({ onAction, alerts = [], activities = [], notifLo
       {/* Right — Actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
 
-        {/* Add Property button */}
+        {/* Export PDF button */}
         <button
-          onClick={onAction}
+          onClick={onExport}
+          disabled={exportLoading}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '8px 14px',
-            background: '#1a9e6e', color: '#fff',
+            background: exportLoading ? '#e0e0e0' : '#1a9e6e',
+            color: exportLoading ? '#aaa' : '#fff',
             border: 'none', borderRadius: 10,
-            cursor: 'pointer', fontSize: 12, fontWeight: 600,
+            cursor: exportLoading ? 'not-allowed' : 'pointer',
+            fontSize: 12, fontWeight: 600,
             fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
             letterSpacing: '0.01em', whiteSpace: 'nowrap',
+            transition: 'background 0.15s, color 0.15s',
           }}
+          title="Export dashboard as PDF"
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M6 1v10M1 6h10" strokeLinecap="round" />
-          </svg>
-          Add Property
+          {exportLoading ? (
+            /* Spinner */
+            <svg
+              width="13" height="13" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" strokeWidth="2.2"
+              style={{ animation: 'pdf-spin 0.8s linear infinite' }}
+            >
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+            </svg>
+          ) : (
+            /* Download icon */
+            <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M3 16h14" strokeLinecap="round" />
+            </svg>
+          )}
+          {exportLoading ? 'Exporting...' : 'Export PDF'}
         </button>
+        <style>{`@keyframes pdf-spin { to { transform: rotate(360deg); } }`}</style>
 
         {/* Notification bell */}
         <div ref={notifRef} style={{ position: 'relative' }}>
