@@ -80,6 +80,32 @@ function authHeaders() {
 
 function apiUrl(path) { return `${API_BASE}${path}`; }
 
+// ── Upload one or more photos for a Smoobu apartment ──────────────
+// POSTs multipart/form-data to the backend, which stores them on
+// Cloudinary and returns the full updated image list [{ id, url }].
+// NOTE: we deliberately do NOT set Content-Type — the browser must set
+// the multipart boundary itself for FormData to parse correctly.
+async function uploadApartmentPhotos(clientId, apartmentId, files) {
+  const fd = new FormData();
+  Array.from(files).forEach((f) => fd.append('photos', f));
+  const token = sessionStorage.getItem('hp_access_token') ?? '';
+  const res = await fetch(
+    apiUrl(`/api/accounts/${clientId}/smoobu-apartments/${apartmentId}/photos`),
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'x-api-key':   import.meta.env.VITE_API_KEY ?? '',
+      },
+      credentials: 'include',
+      body: fd,
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `upload failed (${res.status})`);
+  return Array.isArray(data.images) ? data.images : [];
+}
+
 // Smoobu returns lat/lng as strings like "9.7925080000000" — parseFloat them.
 function toCoord(val) {
   if (val === null || val === undefined || val === '') return null;
@@ -569,11 +595,18 @@ function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId, mapS
 }
 
 // ── PhotoCarousel — used in the modal Detail panel ────────────────
-// Shows apartment images from Smoobu with prev/next navigation.
+// Shows self-hosted apartment photos with prev/next navigation.
 // Falls back to the branded gradient when no images are available.
-function PhotoCarousel({ images = [], altText = '' }) {
+// `onAddPhoto` (when provided + canAdd) makes the "Add photo" controls
+// clickable so admins can upload images for the apartment.
+function PhotoCarousel({ images = [], altText = '', onAddPhoto = null, uploading = false, canAdd = false }) {
   const [idx, setIdx] = useState(0);
   const valid = images.filter((img) => img && img.url);
+
+  // Keep index in range when the image list shrinks/grows
+  useEffect(() => { setIdx((i) => (valid.length === 0 ? 0 : Math.min(i, valid.length - 1))); }, [valid.length]);
+
+  const triggerAdd = () => { if (canAdd && onAddPhoto && !uploading) onAddPhoto(); };
 
   if (valid.length === 0) {
     return (
@@ -588,25 +621,33 @@ function PhotoCarousel({ images = [], altText = '' }) {
           position: 'absolute', bottom: 8, left: 10,
           fontSize: '.63rem', color: 'rgba(255,255,255,0.85)',
           background: 'rgba(0,0,0,0.28)', padding: '2px 8px', borderRadius: 20,
-        }}>No photo yet</span>
-        <button style={{
-          position: 'absolute', bottom: 8, right: 10,
-          fontSize: '.63rem', background: 'rgba(255,255,255,0.92)',
-          border: 'none', padding: '3px 9px', borderRadius: 20,
-          cursor: 'pointer', fontFamily: 'var(--font-body)',
-        }}>↑ Add photo</button>
+        }}>{uploading ? 'Uploading…' : 'No photo yet'}</span>
+        {canAdd && (
+          <button
+            onClick={triggerAdd}
+            disabled={uploading}
+            style={{
+              position: 'absolute', bottom: 8, right: 10,
+              fontSize: '.63rem', background: 'rgba(255,255,255,0.92)',
+              border: 'none', padding: '3px 9px', borderRadius: 20,
+              cursor: uploading ? 'not-allowed' : 'pointer',
+              fontFamily: 'var(--font-body)', fontWeight: 600,
+            }}
+          >↑ Add photo</button>
+        )}
       </div>
     );
   }
 
   const prev = () => setIdx((i) => (i - 1 + valid.length) % valid.length);
   const next = () => setIdx((i) => (i + 1) % valid.length);
+  const safeIdx = Math.min(idx, valid.length - 1);
 
   return (
     <div style={{ position: 'relative', height: 140, flexShrink: 0, overflow: 'hidden', background: '#111' }}>
       <img
-        key={valid[idx].url}
-        src={valid[idx].url}
+        key={valid[safeIdx].url}
+        src={valid[safeIdx].url}
         alt={altText}
         style={{
           width: '100%', height: '100%',
@@ -622,8 +663,23 @@ function PhotoCarousel({ images = [], altText = '' }) {
         background: 'rgba(0,0,0,0.50)', padding: '2px 8px', borderRadius: 20,
         pointerEvents: 'none',
       }}>
-        📷 {idx + 1} / {valid.length}
+        📷 {safeIdx + 1} / {valid.length}
       </span>
+      {/* Add-more button (top-left) */}
+      {canAdd && (
+        <button
+          onClick={triggerAdd}
+          disabled={uploading}
+          style={{
+            position: 'absolute', top: 8, left: 8,
+            fontSize: '.6rem', color: '#fff', fontWeight: 600,
+            background: 'rgba(0,0,0,0.50)', border: 'none',
+            padding: '2px 8px', borderRadius: 20,
+            cursor: uploading ? 'not-allowed' : 'pointer',
+            fontFamily: 'var(--font-body)',
+          }}
+        >{uploading ? 'Uploading…' : '+ Add'}</button>
+      )}
       {/* Prev / Next — only shown when there are multiple images */}
       {valid.length > 1 && (
         <>
@@ -661,10 +717,10 @@ function PhotoCarousel({ images = [], altText = '' }) {
                 key={di}
                 onClick={() => setIdx(di)}
                 style={{
-                  width: di === idx ? 14 : 6,
+                  width: di === safeIdx ? 14 : 6,
                   height: 6, borderRadius: 3,
                   border: 'none', padding: 0,
-                  background: di === idx ? '#fff' : 'rgba(255,255,255,0.45)',
+                  background: di === safeIdx ? '#fff' : 'rgba(255,255,255,0.45)',
                   cursor: 'pointer', transition: 'width 0.2s, background 0.2s',
                 }}
                 aria-label={`Photo ${di + 1}`}
@@ -688,6 +744,16 @@ export default function PropertyMap({ mapLocations, loading }) {
   const [selectedLegendApt, setSelectedLegendApt]   = useState(null);
   const [legendSearch,       setLegendSearch]        = useState('');
   const [activeTab,          setActiveTab]           = useState('properties'); // 'properties' | 'detail'
+  // ── Photo upload state (Detail panel) ──
+  const [uploadedImages, setUploadedImages] = useState(null); // overrides detailImages after a successful upload
+  const [uploading,      setUploading]      = useState(false);
+  const [uploadError,    setUploadError]    = useState(null);
+  // apartmentId → images[] : lets freshly-uploaded photos appear on the map
+  // markers/popups (and legend) immediately, without refetching everything.
+  const [photoOverrides, setPhotoOverrides] = useState({});
+  // Tracks apartmentIds we've already looked photos up for (avoids refetch loops).
+  const attemptedPhotoIdsRef = useRef(new Set());
+  const photoInputRef = useRef(null);
   const modalMapContainerRef = useRef(null);
   const modalMarkerMapRef    = useRef({});
 
@@ -742,10 +808,52 @@ export default function PropertyMap({ mapLocations, loading }) {
     needsImgFetch ? legendImgClientId : null,
     needsImgFetch ? legendImgAptId    : null
   );
-  // Merge: prefer already-attached images, fall back to on-demand fetched ones
-  const detailImages = (Array.isArray(selectedLegendApt?.images) && selectedLegendApt.images.length > 0)
-    ? selectedLegendApt.images
-    : (fetchedImages ?? []);
+  // Merge: a fresh upload wins; otherwise prefer already-attached images,
+  // falling back to on-demand fetched ones.
+  const detailImages = (Array.isArray(uploadedImages))
+    ? uploadedImages
+    : (Array.isArray(selectedLegendApt?.images) && selectedLegendApt.images.length > 0)
+      ? selectedLegendApt.images
+      : (fetchedImages ?? []);
+
+  // Reset upload override + error whenever a different apartment is selected.
+  useEffect(() => {
+    setUploadedImages(null);
+    setUploadError(null);
+  }, [selectedLegendApt?.apartmentId]);
+
+  // Photos can only be added to real Smoobu apartments (not db:/stub: entries).
+  const canAddPhoto = selectedLegendApt != null &&
+    !!selectedLegendApt.clientId &&
+    !!selectedLegendApt.apartmentId &&
+    !String(selectedLegendApt.apartmentId).startsWith('db:') &&
+    !String(selectedLegendApt.apartmentId).startsWith('stub:');
+
+  const triggerAddPhoto = () => {
+    setUploadError(null);
+    if (photoInputRef.current) photoInputRef.current.click();
+  };
+
+  async function handlePhotoFiles(files) {
+    if (!files || files.length === 0 || !selectedLegendApt) return;
+    const cId = selectedLegendApt.clientId;
+    const aId = selectedLegendApt.apartmentId;
+    if (!canAddPhoto) { setUploadError('Cannot add photos to this entry.'); return; }
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const images = await uploadApartmentPhotos(cId, aId, files);
+      setUploadedImages(images);
+      // Make the new photos show up on the map popup + legend right away.
+      attemptedPhotoIdsRef.current.add(String(aId));
+      setPhotoOverrides((prev) => ({ ...prev, [String(aId)]: images }));
+    } catch (err) {
+      console.warn('[PropertyMap] photo upload failed:', err.message);
+      setUploadError(err.message || 'Upload failed.');
+    } finally {
+      setUploading(false);
+    }
+  }
 
   // Normalise overview coords (may also be strings)
   const overviewLocs = useMemo(() =>
@@ -760,6 +868,14 @@ export default function PropertyMap({ mapLocations, loading }) {
 
   // ── Build full location list (legend + map source) ─────────────
   const locations = useMemo(() => {
+    // Merge any uploaded/stored photos (by apartmentId) into a location list.
+    // Only a NON-EMPTY override wins, so we never wipe images that the
+    // backend already attached.
+    const applyOv = (arr) => arr.map((l) => {
+      const ov = photoOverrides[String(l.apartmentId)];
+      return (ov && ov.length > 0) ? { ...l, images: ov } : l;
+    });
+
     if (smoobuClientId) {
       // While loading, show DB property names as placeholders
       if (aptLoading && smoobuApts.length === 0) {
@@ -778,7 +894,7 @@ export default function PropertyMap({ mapLocations, loading }) {
           latitude: null, longitude: null,
         }));
       }
-      return smoobuApts;
+      return applyOv(smoobuApts);
     }
 
     // All accounts mode — overviewLocs first, then DB-only stubs for
@@ -803,9 +919,57 @@ export default function PropertyMap({ mapLocations, loading }) {
         });
       }
     });
-    return [...overviewLocs, ...stubs];
+    return applyOv([...overviewLocs, ...stubs]);
   }, [smoobuClientId, selectedPropIndex, smoobuApts, aptLoading,
-      clients, overviewLocs, activeClient]);
+      clients, overviewLocs, activeClient, photoOverrides]);
+
+  // ── Prefetch self-hosted photos for all visible apartments ──────
+  // Reads straight from the photo store (one bulk request), so photos show
+  // on every marker / legend / detail entry regardless of whether the Smoobu
+  // apartment-list merge ran. This is what keeps photos visible after you
+  // select a client or filter to a property.
+  const visibleRealAptIds = useMemo(() =>
+    [...new Set(
+      locations
+        .map((l) => String(l.apartmentId))
+        .filter((id) => id && !id.startsWith('db:') && !id.startsWith('stub:'))
+    )],
+  [locations]);
+  const visibleIdsKey = visibleRealAptIds.join(',');
+
+  useEffect(() => {
+    const missing = visibleRealAptIds.filter((id) => !attemptedPhotoIdsRef.current.has(id));
+    if (missing.length === 0) return;
+    missing.forEach((id) => attemptedPhotoIdsRef.current.add(id));
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = sessionStorage.getItem('hp_access_token') ?? '';
+        const res = await fetch(apiUrl('/api/accounts/apartment-photos/bulk'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization:  `Bearer ${token}`,
+            'x-api-key':    import.meta.env.VITE_API_KEY ?? '',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ apartmentIds: missing }),
+        });
+        if (!res.ok || cancelled) return;
+        const data   = await res.json().catch(() => ({}));
+        const photos = data?.photos || {};
+        const nonEmpty = {};
+        Object.keys(photos).forEach((id) => {
+          if (Array.isArray(photos[id]) && photos[id].length > 0) nonEmpty[id] = photos[id];
+        });
+        if (!cancelled && Object.keys(nonEmpty).length > 0) {
+          setPhotoOverrides((prev) => ({ ...prev, ...nonEmpty }));
+        }
+      } catch { /* non-fatal — popups just fall back to "No photo yet" */ }
+    })();
+    return () => { cancelled = true; };
+  }, [visibleIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Only entries with valid numeric coords go on the map
   const plottable = useMemo(() =>
@@ -1409,7 +1573,16 @@ export default function PropertyMap({ mapLocations, loading }) {
                 {/* Detail tab */}
                 {activeTab === 'detail' && selectedLegendApt && (
                   <div style={{ width: '100%', overflowY: 'auto', flex: 1 }}>
-                    {imgLoading ? (
+                    {/* Hidden multi-file picker — triggered by the carousel's Add buttons */}
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      style={{ display: 'none' }}
+                      onChange={(e) => { handlePhotoFiles(e.target.files); e.target.value = ''; }}
+                    />
+                    {(imgLoading && !uploading) ? (
                       <div style={{
                         height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: 'var(--color-surface-2, #f3f4f6)', flexShrink: 0,
@@ -1420,7 +1593,15 @@ export default function PropertyMap({ mapLocations, loading }) {
                       <PhotoCarousel
                         images={detailImages}
                         altText={selectedLegendApt.apartmentName || selectedLegendApt.propertyName || ''}
+                        canAdd={canAddPhoto}
+                        uploading={uploading}
+                        onAddPhoto={triggerAddPhoto}
                       />
+                    )}
+                    {uploadError && (
+                      <div style={{ padding: '6px 14px 0', fontSize: '.7rem', color: '#c0392b' }}>
+                        {uploadError}
+                      </div>
                     )}
                     <div style={{ padding: '14px' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
