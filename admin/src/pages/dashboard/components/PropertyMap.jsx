@@ -748,6 +748,11 @@ export default function PropertyMap({ mapLocations, loading }) {
   const [uploadedImages, setUploadedImages] = useState(null); // overrides detailImages after a successful upload
   const [uploading,      setUploading]      = useState(false);
   const [uploadError,    setUploadError]    = useState(null);
+  // apartmentId → images[] : lets freshly-uploaded photos appear on the map
+  // markers/popups (and legend) immediately, without refetching everything.
+  const [photoOverrides, setPhotoOverrides] = useState({});
+  // Tracks apartmentIds we've already looked photos up for (avoids refetch loops).
+  const attemptedPhotoIdsRef = useRef(new Set());
   const photoInputRef = useRef(null);
   const modalMapContainerRef = useRef(null);
   const modalMarkerMapRef    = useRef({});
@@ -839,6 +844,9 @@ export default function PropertyMap({ mapLocations, loading }) {
     try {
       const images = await uploadApartmentPhotos(cId, aId, files);
       setUploadedImages(images);
+      // Make the new photos show up on the map popup + legend right away.
+      attemptedPhotoIdsRef.current.add(String(aId));
+      setPhotoOverrides((prev) => ({ ...prev, [String(aId)]: images }));
     } catch (err) {
       console.warn('[PropertyMap] photo upload failed:', err.message);
       setUploadError(err.message || 'Upload failed.');
@@ -860,6 +868,14 @@ export default function PropertyMap({ mapLocations, loading }) {
 
   // ── Build full location list (legend + map source) ─────────────
   const locations = useMemo(() => {
+    // Merge any uploaded/stored photos (by apartmentId) into a location list.
+    // Only a NON-EMPTY override wins, so we never wipe images that the
+    // backend already attached.
+    const applyOv = (arr) => arr.map((l) => {
+      const ov = photoOverrides[String(l.apartmentId)];
+      return (ov && ov.length > 0) ? { ...l, images: ov } : l;
+    });
+
     if (smoobuClientId) {
       // While loading, show DB property names as placeholders
       if (aptLoading && smoobuApts.length === 0) {
@@ -878,7 +894,7 @@ export default function PropertyMap({ mapLocations, loading }) {
           latitude: null, longitude: null,
         }));
       }
-      return smoobuApts;
+      return applyOv(smoobuApts);
     }
 
     // All accounts mode — overviewLocs first, then DB-only stubs for
@@ -903,9 +919,57 @@ export default function PropertyMap({ mapLocations, loading }) {
         });
       }
     });
-    return [...overviewLocs, ...stubs];
+    return applyOv([...overviewLocs, ...stubs]);
   }, [smoobuClientId, selectedPropIndex, smoobuApts, aptLoading,
-      clients, overviewLocs, activeClient]);
+      clients, overviewLocs, activeClient, photoOverrides]);
+
+  // ── Prefetch self-hosted photos for all visible apartments ──────
+  // Reads straight from the photo store (one bulk request), so photos show
+  // on every marker / legend / detail entry regardless of whether the Smoobu
+  // apartment-list merge ran. This is what keeps photos visible after you
+  // select a client or filter to a property.
+  const visibleRealAptIds = useMemo(() =>
+    [...new Set(
+      locations
+        .map((l) => String(l.apartmentId))
+        .filter((id) => id && !id.startsWith('db:') && !id.startsWith('stub:'))
+    )],
+  [locations]);
+  const visibleIdsKey = visibleRealAptIds.join(',');
+
+  useEffect(() => {
+    const missing = visibleRealAptIds.filter((id) => !attemptedPhotoIdsRef.current.has(id));
+    if (missing.length === 0) return;
+    missing.forEach((id) => attemptedPhotoIdsRef.current.add(id));
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = sessionStorage.getItem('hp_access_token') ?? '';
+        const res = await fetch(apiUrl('/api/accounts/apartment-photos/bulk'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization:  `Bearer ${token}`,
+            'x-api-key':    import.meta.env.VITE_API_KEY ?? '',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ apartmentIds: missing }),
+        });
+        if (!res.ok || cancelled) return;
+        const data   = await res.json().catch(() => ({}));
+        const photos = data?.photos || {};
+        const nonEmpty = {};
+        Object.keys(photos).forEach((id) => {
+          if (Array.isArray(photos[id]) && photos[id].length > 0) nonEmpty[id] = photos[id];
+        });
+        if (!cancelled && Object.keys(nonEmpty).length > 0) {
+          setPhotoOverrides((prev) => ({ ...prev, ...nonEmpty }));
+        }
+      } catch { /* non-fatal — popups just fall back to "No photo yet" */ }
+    })();
+    return () => { cancelled = true; };
+  }, [visibleIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Only entries with valid numeric coords go on the map
   const plottable = useMemo(() =>
