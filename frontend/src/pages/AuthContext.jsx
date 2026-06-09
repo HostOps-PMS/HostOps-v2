@@ -21,7 +21,7 @@ export function AuthProvider({ children }) {
   const accessTokenRef = useRef(null);
 
   // isReady: true once the AuthProvider has finished its one-time
-  // hydration pass (consuming URL params, attempting silent refresh).
+  // hydration pass (attempting silent refresh via rt cookie).
   // ProtectedRoute waits for this before calling verifySession.
   const [isReady, setIsReady] = useState(false);
 
@@ -68,8 +68,13 @@ export function AuthProvider({ children }) {
   // ── Silent refresh on mount ───────────────────────────────────────
   // On hard reload the in-memory token is gone. Attempt a silent
   // refresh using the HttpOnly 'rt' cookie. If the cookie is valid,
-  // the server returns a new encrypted access token and we store it
-  // in memory. If the cookie is missing/expired, we stay logged out.
+  // the server returns a new access token and we store it in memory.
+  // If the cookie is missing/expired, we stay logged out.
+  //
+  // IMPORTANT: setIsReady(true) is called in the finally block so
+  // ProtectedRoute always unblocks — whether the refresh succeeded or
+  // failed. accessTokenRef.current will be null on failure, causing
+  // ProtectedRoute to redirect to login as expected.
   useEffect(() => {
     let cancelled = false;
 
@@ -86,7 +91,6 @@ export function AuthProvider({ children }) {
           accessTokenRef.current = data.accessToken || null;
           if (data.user) setUser(data.user);
         } else if (!cancelled) {
-          // Cookie missing or revoked — ensure memory is clean
           accessTokenRef.current = null;
         }
       } catch {
@@ -101,23 +105,56 @@ export function AuthProvider({ children }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Tab-close beacon ──────────────────────────────────────────────
-  // When the user closes the tab or navigates away, send a beacon to
-  // /auth/revoke-token so the server marks the jti as revoked.
-  // sendBeacon is fire-and-forget and works even during page unload.
+  // Send a revoke beacon ONLY on true tab/window close, NOT on refresh.
+  //
+  // ROOT CAUSE OF REDIRECT-ON-REFRESH BUG:
+  // The original code used 'beforeunload' which fires on F5/Ctrl+R too.
+  // This revoked the refresh token BEFORE the page reloaded, so the
+  // hydrate() call above always got 401 → token = null → redirect to "/".
+  //
+  // THE FIX — pagehide + focus-cancel timer:
+  // 'pagehide' fires on both close and refresh. We delay the beacon by
+  // 500ms. If the window receives a 'focus' event within that window
+  // (meaning the page just reloaded and the browser tab is active again),
+  // we cancel the beacon. A true tab/window close never regains focus,
+  // so the beacon fires normally after the delay.
   useEffect(() => {
-    function handleUnload() {
+    let revokeTimer = null;
+
+    function handlePageHide(e) {
+      // persisted=true means the page went into bfcache (back/forward nav)
+      // — definitely not a close, skip entirely.
+      if (e.persisted) return;
+
       const token = accessTokenRef.current;
       if (!token) return;
 
-      const blob = new Blob(
-        [JSON.stringify({ token })],
-        { type: 'application/json' }
-      );
-      navigator.sendBeacon(`${HP_API_BASE}/auth/revoke-token`, blob);
+      revokeTimer = setTimeout(() => {
+        const blob = new Blob(
+          [JSON.stringify({ token })],
+          { type: 'application/json' }
+        );
+        navigator.sendBeacon(`${HP_API_BASE}/auth/revoke-token`, blob);
+        revokeTimer = null;
+      }, 500);
     }
 
-    window.addEventListener('beforeunload', handleUnload);
-    return () => window.removeEventListener('beforeunload', handleUnload);
+    function handleFocus() {
+      // Window regained focus — the page was refreshed, not closed.
+      // Cancel the pending beacon so the session stays alive.
+      if (revokeTimer !== null) {
+        clearTimeout(revokeTimer);
+        revokeTimer = null;
+      }
+    }
+
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('focus',    handleFocus);
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('focus',    handleFocus);
+      if (revokeTimer !== null) clearTimeout(revokeTimer);
+    };
   }, []);
 
   return (
