@@ -64,15 +64,22 @@ function toCoord(val) {
 }
 
 // ── Helper: extract images from ANY Smoobu response shape ─────────
-// Smoobu returns images on BOTH the list endpoint (per apt object)
-// and the detail endpoint. Field names vary by API version.
+// Smoobu returns images on the detail endpoint. Field names vary by API version.
+// We try every known path exhaustively and log what we find.
 function extractImages(obj) {
   if (!obj) return [];
 
-  // Try every known field name
-  const raw = Array.isArray(obj.images)   ? obj.images
-            : Array.isArray(obj.pictures) ? obj.pictures
-            : Array.isArray(obj.photos)   ? obj.photos
+  // ── Unwrap nested shapes ──────────────────────────────────────────
+  // Some Smoobu API versions nest the apartment inside obj.apartment
+  const target = obj.apartment ?? obj;
+
+  // ── Try every known field name ────────────────────────────────────
+  const raw = Array.isArray(target.images)      ? target.images
+            : Array.isArray(target.pictures)    ? target.pictures
+            : Array.isArray(target.photos)      ? target.photos
+            : Array.isArray(target.media)       ? target.media
+            : Array.isArray(target.gallery)     ? target.gallery
+            : Array.isArray(target.attachments) ? target.attachments
             : null;
 
   if (!raw) return [];
@@ -80,12 +87,21 @@ function extractImages(obj) {
   return raw
     .filter((img) => img != null)
     .map((img) => {
+      // Plain URL string
       if (typeof img === 'string' && img.trim())
         return { id: null, url: img.trim() };
+      // Object with .url
       if (img && typeof img.url === 'string' && img.url.trim())
         return { id: img.id ?? null, url: img.url.trim() };
+      // Object with .image
       if (img && typeof img.image === 'string' && img.image.trim())
         return { id: img.id ?? null, url: img.image.trim() };
+      // Object with .src
+      if (img && typeof img.src === 'string' && img.src.trim())
+        return { id: img.id ?? null, url: img.src.trim() };
+      // Object with .link
+      if (img && typeof img.link === 'string' && img.link.trim())
+        return { id: img.id ?? null, url: img.link.trim() };
       return null;
     })
     .filter(Boolean);
@@ -93,14 +109,19 @@ function extractImages(obj) {
 
 // ── Main fetch: list + detail per apartment ───────────────────────
 async function fetchApartmentsForKey(apiKey, propId, propertyName, clientId, clientName) {
-  // Step 1 — GET /apartments (list): has name, id, AND images[] per item
+  // Step 1 — GET /apartments (list)
   const listData = await smoobuGet('/apartments', apiKey, `${propId}:/apartments`);
 
-  // Log the raw list to see its shape
+  // Log the FULL raw shape of the first apartment in the list
   const firstApt = (listData?.apartments ?? [])[0];
   if (firstApt) {
-    console.log(`[smoobuApartments] LIST apt keys:`, Object.keys(firstApt));
-    console.log(`[smoobuApartments] LIST apt.images raw:`, JSON.stringify(firstApt.images ?? firstApt.pictures ?? 'MISSING').slice(0, 400));
+    console.log(`[smoobuApartments] LIST apt ALL keys:`, Object.keys(firstApt));
+    // Log every array-valued key so we can spot the images field no matter its name
+    const arrayKeys = Object.keys(firstApt).filter(k => Array.isArray(firstApt[k]));
+    console.log(`[smoobuApartments] LIST apt array-keys:`, arrayKeys);
+    arrayKeys.forEach(k => {
+      console.log(`[smoobuApartments]   LIST apt.${k}[0]:`, JSON.stringify(firstApt[k][0]).slice(0, 200));
+    });
   }
 
   const aptList = listData?.apartments ?? [];
@@ -110,22 +131,34 @@ async function fetchApartmentsForKey(apiKey, propId, propertyName, clientId, cli
     aptList.map(async (apt) => {
       const aptId = apt.id ?? apt;
 
-      // Images from the LIST endpoint — this is the reliable source
+      // Images from the LIST endpoint (usually absent, but check anyway)
       const listImages = extractImages(apt);
 
       try {
-        // Step 2 — GET /apartments/{id}: adds location, rooms, type
+        // Step 2 — GET /apartments/{id}: adds location, rooms, type, AND images
         const detail = await smoobuGet(
           `/apartments/${aptId}`,
           apiKey,
           `${propId}:/apartments/${aptId}`
         );
 
-        // Log detail shape once
-        console.log(`[smoobuApartments]   detail apt ${aptId} keys:`, Object.keys(detail || {}));
+        // Log the FULL raw shape of the detail response — ONCE per apartment type
+        console.log(`[smoobuApartments]   detail apt ${aptId} ALL keys:`, Object.keys(detail || {}));
+        const detailArrayKeys = Object.keys(detail || {}).filter(k => Array.isArray(detail[k]));
+        console.log(`[smoobuApartments]   detail apt ${aptId} array-keys:`, detailArrayKeys);
+        detailArrayKeys.forEach(k => {
+          console.log(`[smoobuApartments]   detail apt.${k}[0]:`, JSON.stringify((detail[k] || [])[0]).slice(0, 200));
+        });
+        // Also check if there's a nested .apartment sub-object
+        if (detail?.apartment) {
+          console.log(`[smoobuApartments]   detail.apartment keys:`, Object.keys(detail.apartment));
+          const nestedArrayKeys = Object.keys(detail.apartment).filter(k => Array.isArray(detail.apartment[k]));
+          console.log(`[smoobuApartments]   detail.apartment array-keys:`, nestedArrayKeys);
+        }
+
         const detailImages = extractImages(detail);
 
-        // Prefer list images (usually has more), fall back to detail images
+        // Prefer list images if present; otherwise use detail images
         const images = listImages.length > 0 ? listImages : detailImages;
 
         console.log(`[smoobuApartments]   apt ${aptId} "${apt.name || detail?.name}" → listImgs=${listImages.length} detailImgs=${detailImages.length} using=${images.length}`);
@@ -154,8 +187,6 @@ async function fetchApartmentsForKey(apiKey, propId, propertyName, clientId, cli
         };
       } catch (detailErr) {
         console.warn(`[smoobuApartments] detail failed apt ${aptId}:`, detailErr.message);
-        // Still return what we have from the list — coords will be null
-        // but at least images from the list can show in the UI
         return {
           apartmentId:   aptId,
           apartmentName: apt.name || `Apartment ${aptId}`,
