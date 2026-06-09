@@ -23,7 +23,7 @@
 // ─────────────────────────────────────────────────────────────────
 
 import User  from '../models/user.js';
-import { getApartments, getBookings, getApiKeyForUser, getApartmentDetail, getApartmentPictures } from './smoobu.js';
+import { getApartments, getBookings, getApiKeyForUser, getApartmentDetail } from './smoobu.js';
 import { decrypt } from '../utils/encryption.js';
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -81,40 +81,51 @@ async function runWithConcurrency(tasks, limit = 5) {
   return results;
 }
 
-// ── Image extractor — mirrors the logic in smoobuApartments.js ────
-// Smoobu's detail endpoint returns images on the apartment object.
-// Field names vary across API versions: images / pictures / photos / media / gallery.
-// Some versions nest the data under obj.apartment — we unwrap that too.
-function extractImages(obj) {
-  if (!obj) return [];
+// ── Scrape apartment images from Smoobu's public page ───────────
+// Smoobu's REST API has NO images endpoint — confirmed from official docs.
+// Photos are only available on the public apartment page:
+//   https://login.smoobu.com/en/website-external/apartment/{id}
+// We fetch the HTML and parse every src=/upload/images/... tag,
+// stripping the thumb_ prefix to get the full-resolution URL.
+// Cached per apartment for 10 minutes.
+const _imgCache = new Map();
+async function scrapeApartmentImages(aptId) {
+  const cacheKey = `img:apt:${aptId}`;
+  const hit = _imgCache.get(cacheKey);
+  if (hit && Date.now() < hit.exp) return hit.data;
 
-  // Unwrap nested shapes — some Smoobu API versions nest under obj.apartment
-  const target = obj.apartment ?? obj;
-
-  const raw = Array.isArray(target.images)      ? target.images
-            : Array.isArray(target.pictures)    ? target.pictures
-            : Array.isArray(target.photos)      ? target.photos
-            : Array.isArray(target.media)       ? target.media
-            : Array.isArray(target.gallery)     ? target.gallery
-            : Array.isArray(target.attachments) ? target.attachments
-            : null;
-  if (!raw) return [];
-  return raw
-    .filter((img) => img != null)
-    .map((img) => {
-      if (typeof img === 'string' && img.trim())
-        return { id: null, url: img.trim() };
-      if (img && typeof img.url === 'string' && img.url.trim())
-        return { id: img.id ?? null, url: img.url.trim() };
-      if (img && typeof img.image === 'string' && img.image.trim())
-        return { id: img.id ?? null, url: img.image.trim() };
-      if (img && typeof img.src === 'string' && img.src.trim())
-        return { id: img.id ?? null, url: img.src.trim() };
-      if (img && typeof img.link === 'string' && img.link.trim())
-        return { id: img.id ?? null, url: img.link.trim() };
-      return null;
-    })
-    .filter(Boolean);
+  const url = `https://login.smoobu.com/en/website-external/apartment/${aptId}`;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; HostPilot/1.0)',
+        'Accept':     'text/html,application/xhtml+xml',
+      },
+    });
+    if (!res.ok) {
+      console.warn(`[overview] scrape apt ${aptId} → HTTP ${res.status}`);
+      _imgCache.set(cacheKey, { data: [], exp: Date.now() + 10 * 60_000 });
+      return [];
+    }
+    const html = await res.text();
+    const srcRegex = /src=["'](\/upload\/images\/[^"']+)["']/gi;
+    const seen = new Set();
+    const images = [];
+    let m;
+    while ((m = srcRegex.exec(html)) !== null) {
+      let path = m[1];
+      if (!path.startsWith('http')) path = `https://login.smoobu.com/${path.replace(/^\//, '')}`;
+      const fullPath = path.replace(/\/thumb_([^/]+)$/, '/$1');
+      if (!seen.has(fullPath)) { seen.add(fullPath); images.push({ id: null, url: fullPath }); }
+    }
+    console.log(`[overview] scrape apt ${aptId} → ${images.length} images`);
+    _imgCache.set(cacheKey, { data: images, exp: Date.now() + 10 * 60_000 });
+    return images;
+  } catch (err) {
+    console.warn(`[overview] scrape apt ${aptId} failed:`, err.message);
+    _imgCache.set(cacheKey, { data: [], exp: Date.now() + 10 * 60_000 });
+    return [];
+  }
 }
 
 // ── Per-property Smoobu fetcher ───────────────────────────────────
@@ -151,94 +162,51 @@ async function fetchPropertyData(propertyCtx, dateRange, clientId, clientName, p
   const apartments   = apartmentsData.apartments || [];
   const allBookings  = bookingsData.bookings     || [];
 
-  // ── Fetch per-apartment location detail (GET /apartments/{id}) ──────────────
-  // Each apartment in this Smoobu account gets its address + lat/lng so the
-  // dashboard PropertyMap can plot it. Failures per apartment are swallowed so
-  // one bad apartment id never breaks the whole property's data.
-  //
-  // Images come from TWO sources:
-  //   1. The list endpoint (GET /apartments) — `apt.images` on each item.
-  //      This is the most reliable source and already in memory.
-  //   2. The detail endpoint (GET /apartments/{id}) — may have extra photos.
-  //      We merge both, preferring the list images when available.
+  // ── Fetch per-apartment detail (coords/rooms) + scrape images in parallel ──
+  // Smoobu's REST API has no images endpoint — we scrape the public page
+  // https://login.smoobu.com/en/website-external/apartment/{id} for photos.
   const apartmentLocations = await Promise.all(
     apartments.map(async (apt) => {
       const aptId = apt.id ?? apt;
-      // Images from the list response — extract before the detail call
-      const listImages = extractImages(apt);
-      try {
-        const detail = await getApartmentDetail(propertyCtx, aptId);
-        const loc = detail?.location || {};
-        const lat = parseFloat(loc.latitude);
-        const lng = parseFloat(loc.longitude);
 
-        // ── Diagnostic: log ALL detail keys once so we can confirm the image field name ──
-        if (apartments.indexOf(apt) === 0) { // only log for first apt to avoid spam
-          console.log(`[overview] detail apt ${aptId} ALL keys:`, Object.keys(detail || {}));
-          const detailArrayKeys = Object.keys(detail || {}).filter(k => Array.isArray(detail[k]));
-          console.log(`[overview] detail apt ${aptId} array-keys:`, detailArrayKeys);
-          if (detail?.apartment) {
-            console.log(`[overview] detail.apartment keys:`, Object.keys(detail.apartment));
-          }
-        }
+      const [detailResult, imagesResult] = await Promise.allSettled([
+        getApartmentDetail(propertyCtx, aptId),
+        scrapeApartmentImages(aptId),
+      ]);
 
-        // Also extract images from the detail response as a fallback
-        const detailImages = extractImages(detail);
-        // Prefer list images (richer); fall back to detail images
-        let images = listImages.length > 0 ? listImages : detailImages;
+      const detail = detailResult.status === 'fulfilled' ? detailResult.value : null;
+      const images = imagesResult.status  === 'fulfilled' ? imagesResult.value  : [];
 
-        // ── Step 3: dedicated pictures endpoint ─────────────────────────────
-        // If neither the list nor the detail returned any images, hit the
-        // separate GET /apartments/{id}/pictures endpoint.  Smoobu stores
-        // photos there on most account configurations and does NOT include
-        // them in the list or detail responses.
-        if (images.length === 0) {
-          try {
-            const picImages = await getApartmentPictures(propertyCtx, aptId);
-            if (picImages.length > 0) images = picImages;
-          } catch (picErr) {
-            console.warn(`[overview] pictures endpoint failed apt ${aptId}:`, picErr.message);
-          }
-        }
-
-        console.log(`[overview] apt ${aptId} "${apt.name}" listImgs=${listImages.length} detailImgs=${detailImages.length} using=${images.length}`);
-        return {
-          apartmentId:  aptId,
-          apartmentName: apt.name || detail?.name || `Apartment ${aptId}`,
-          propertyName,                 // the business' property group name
-          clientId,
-          clientName,
-          street:    loc.street  || '',
-          zip:       loc.zip     || '',
-          city:      loc.city    || '',
-          country:   loc.country || '',
-          latitude:  Number.isFinite(lat) ? lat : null,
-          longitude: Number.isFinite(lng) ? lng : null,
-          timeZone:  detail?.timeZone || null,
-          currency:  detail?.currency || null,
-          maxOccupancy: detail?.rooms?.maxOccupancy ?? null,
-          bedrooms:     detail?.rooms?.bedrooms ?? null,
-          bathrooms:    detail?.rooms?.bathrooms ?? null,
-          type:         detail?.type?.name || null,
-          images,
-        };
-      } catch {
-        // Detail fetch failed — still return a stub so counts stay consistent.
-        // We still carry list-level images so the map popup can show photos
-        // even when the detail endpoint is unavailable.
-        return {
-          apartmentId:  aptId,
-          apartmentName: apt.name || `Apartment ${aptId}`,
-          propertyName,
-          clientId,
-          clientName,
-          street: '', zip: '', city: '', country: '',
-          latitude: null, longitude: null,
-          timeZone: null, currency: null,
-          maxOccupancy: null, bedrooms: null, bathrooms: null, type: null,
-          images: listImages,
-        };
+      if (detailResult.status === 'rejected') {
+        console.warn(`[overview] detail failed apt ${aptId}:`, detailResult.reason?.message);
       }
+
+      const loc = detail?.location || {};
+      const lat = parseFloat(loc.latitude);
+      const lng = parseFloat(loc.longitude);
+
+      console.log(`[overview] apt ${aptId} "${apt.name}" → images=${images.length}`);
+
+      return {
+        apartmentId:   aptId,
+        apartmentName: apt.name || detail?.name || `Apartment ${aptId}`,
+        propertyName,
+        clientId,
+        clientName,
+        street:    loc.street  || '',
+        zip:       loc.zip     || '',
+        city:      loc.city    || '',
+        country:   loc.country || '',
+        latitude:  Number.isFinite(lat) ? lat : null,
+        longitude: Number.isFinite(lng) ? lng : null,
+        timeZone:  detail?.timeZone || null,
+        currency:  detail?.currency || null,
+        maxOccupancy: detail?.rooms?.maxOccupancy ?? null,
+        bedrooms:     detail?.rooms?.bedrooms ?? null,
+        bathrooms:    detail?.rooms?.bathrooms ?? null,
+        type:         detail?.type?.name || null,
+        images,
+      };
     })
   );
 
