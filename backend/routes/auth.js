@@ -57,6 +57,28 @@ function extractJti(encryptedOrRaw) {
   }
 }
 
+// ── Helper: issue an access+refresh token pair atomically ────────
+// Signs both tokens, stores the refresh token in DB with the access
+// token's jti bound to it (accessJti), then returns both.
+async function issueTokenPair(signFnAccess, signFnRefresh, entity, req, extra = {}) {
+  const rawAccess  = signFnAccess(entity);
+  const rawRefresh = signFnRefresh(entity);
+  const isStaffEntity = !!entity.clientId;
+
+  const { jti: accessJti } = verifyAccessToken(encryptToken(rawAccess));
+  await RefreshToken.create({
+    userId:    isStaffEntity ? entity.clientId : entity._id,
+    staffId:   isStaffEntity ? entity._id : undefined,
+    token:     hashToken(rawRefresh),
+    expiresAt: refreshTokenExpiry(),
+    ipAddress: req.ip,
+    userAgent: req.get('user-agent'),
+    accessJti,
+    ...extra,
+  });
+  return { encAccessToken: encryptToken(rawAccess), rawRefresh, accessJti };
+}
+
 // ── Helper: set the encrypted rt cookie ─────────────────────────
 // Single place that controls cookie options so they stay consistent.
 function setRefreshCookie(res, rawRefreshToken) {
@@ -180,36 +202,20 @@ router.post('/login', async (req, res, next) => {
     const { email, password, deviceId } = data;
 
     // ── 1. Try Staff login first ──────────────────────────────────
-    // IMPORTANT: must select +password so comparePassword has a hash to compare.
-    const staff = await Staff.findOne({ email: email.toLowerCase() }).select('+password');
+    const staff = await Staff.findOne({ email: email.toLowerCase() });
     if (staff) {
       if (!staff.isActive) {
         return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
       }
 
-      // Verify password before issuing any tokens
-      const staffPasswordMatch = await staff.comparePassword(password);
-      if (!staffPasswordMatch) {
-        return res.status(401).json({ error: 'Invalid email or password' });
-      }
-
-      // Use staff-specific token signers so the JWT carries role:'staff' + staffId
-      // claims that requireAuth middleware needs to identify this as a staff session.
-      const encAccessToken = encryptToken(signStaffAccessToken(staff));
-      const refreshToken   = signStaffRefreshToken(staff);
-
-      await RefreshToken.create({
-        userId:    staff._id,
-        token:     hashToken(refreshToken),
-        expiresAt: refreshTokenExpiry(),
-        ipAddress: req.ip,
-        userAgent: req.get('user-agent'),
-      });
+      const { encAccessToken, rawRefresh } = await issueTokenPair(
+        signStaffAccessToken, signStaffRefreshToken, staff, req
+      );
 
       staff.lastLoginAt = new Date();
       await staff.save();
 
-      setRefreshCookie(res, refreshToken);
+      setRefreshCookie(res, rawRefresh);
 
       return res.json({
         accessToken: encAccessToken,
@@ -253,41 +259,22 @@ router.post('/login', async (req, res, next) => {
       }
     }
 
-    // ── Check for existing valid rt cookie (reuse if still good) ──
-    let refreshTokenToUse = null;
-
-    if (!isAdmin && isTrusted) {
-      const existingRaw = getRefreshCookie(req); // decrypt cookie first
-      if (existingRaw) {
-        try {
-          const decoded = verifyRefreshToken(existingRaw);
-          if (decoded.sub === user._id.toString()) {
-            const stored = await RefreshToken.findOne({ token: hashToken(existingRaw) });
-            if (stored && stored.isActive()) refreshTokenToUse = existingRaw;
-          }
-        } catch { /* ignore — issue a fresh one below */ }
-      }
+    // ── Always issue a fresh token pair on login ──────────────────
+    // We never reuse an old rt cookie here. Every login produces a
+    // new access token with a new jti, bound to a new RefreshToken
+    // row. This ensures the session ownership check in middleware
+    // always has a valid, current accessJti to verify against.
+    if (deviceId) {
+      await RefreshToken.updateMany(
+        { userId: user._id, deviceId, revokedAt: null },
+        { revokedAt: new Date() }
+      );
     }
 
-    if (!refreshTokenToUse) {
-      if (deviceId) {
-        await RefreshToken.updateMany(
-          { userId: user._id, deviceId, revokedAt: null },
-          { revokedAt: new Date() }
-        );
-      }
-      refreshTokenToUse = signRefreshToken(user);
-      await RefreshToken.create({
-        userId:    user._id,
-        token:     hashToken(refreshTokenToUse),
-        expiresAt: refreshTokenExpiry(),
-        ipAddress: req.ip,
-        userAgent: req.get('user-agent'),
-        deviceId:  deviceId || undefined,
-      });
-    }
-
-    const encAccessToken = encryptToken(signAccessToken(user));
+    const { encAccessToken, rawRefresh: refreshTokenToUse } = await issueTokenPair(
+      signAccessToken, signRefreshToken, user, req,
+      { deviceId: deviceId || undefined }
+    );
 
     user.lastLoginAt = new Date();
     user.activityLog = user.activityLog || [];
@@ -327,21 +314,14 @@ router.post('/staff-login', async (req, res, next) => {
       return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
     }
 
-    const encAccessToken = encryptToken(signStaffAccessToken(staff));
-    const refreshToken   = signStaffRefreshToken(staff);
-
-    await RefreshToken.create({
-      userId:    staff._id,
-      token:     hashToken(refreshToken),
-      expiresAt: refreshTokenExpiry(),
-      ipAddress: req.ip,
-      userAgent: req.get('user-agent'),
-    });
+    const { encAccessToken, rawRefresh } = await issueTokenPair(
+      signStaffAccessToken, signStaffRefreshToken, staff, req
+    );
 
     staff.lastLoginAt = new Date();
     await staff.save();
 
-    setRefreshCookie(res, refreshToken);
+    setRefreshCookie(res, rawRefresh);
 
     res.json({
       accessToken: encAccessToken,
@@ -386,9 +366,6 @@ router.post('/verify-login-otp', async (req, res, next) => {
         );
       }
 
-      const encAccessToken = encryptToken(signAccessToken(user));
-      const refreshToken   = signRefreshToken(user);
-
       if (deviceId) {
         await RefreshToken.updateMany(
           { userId: user._id, deviceId, revokedAt: null },
@@ -396,14 +373,10 @@ router.post('/verify-login-otp', async (req, res, next) => {
         );
       }
 
-      await RefreshToken.create({
-        userId:    user._id,
-        token:     hashToken(refreshToken),
-        expiresAt: refreshTokenExpiry(),
-        ipAddress: req.ip,
-        userAgent: req.get('user-agent'),
-        deviceId:  deviceId || undefined,
-      });
+      const { encAccessToken, rawRefresh } = await issueTokenPair(
+        signAccessToken, signRefreshToken, user, req,
+        { deviceId: deviceId || undefined }
+      );
 
       user.lastLoginAt = new Date();
       user.activityLog = user.activityLog || [];
@@ -417,7 +390,7 @@ router.post('/verify-login-otp', async (req, res, next) => {
       if (user.activityLog.length > 50) user.activityLog = user.activityLog.slice(-50);
       await user.save();
 
-      setRefreshCookie(res, refreshToken);
+      setRefreshCookie(res, rawRefresh);
 
       const isAdmin = user.tag === 'Main Admin' || user.role === 'admin' || user.email === process.env.ADMIN_ROLE;
       return res.json({ accessToken: encAccessToken, user: user.toJSON(), isAdmin });
@@ -495,23 +468,28 @@ router.post('/refresh', async (req, res, next) => {
       const staff = await Staff.findById(decoded.staffId || decoded.sub);
       if (!staff || !staff.isActive) return res.status(401).json({ error: 'Staff account not found or inactive' });
 
+      const rawNewAccess   = signStaffAccessToken(staff);
       const newRefreshToken = signStaffRefreshToken(staff);
+      const { jti: newAccessJti } = verifyAccessToken(encryptToken(rawNewAccess));
+
       stored.revokedAt  = new Date();
       stored.replacedBy = hashToken(newRefreshToken);
       await stored.save();
 
       await RefreshToken.create({
-        userId:    staff._id,
+        userId:    staff.clientId, 
+        staffId:   staff._id,   
         token:     hashToken(newRefreshToken),
         expiresAt: refreshTokenExpiry(),
         ipAddress: req.ip,
         userAgent: req.get('user-agent'),
+        accessJti: newAccessJti,
       });
 
       setRefreshCookie(res, newRefreshToken);
 
       return res.json({
-        accessToken: encryptToken(signStaffAccessToken(staff)),
+        accessToken: encryptToken(rawNewAccess),
         user: { ...staff.toJSON(), role: 'staff', isStaff: true, clientId: staff.clientId?.toString() },
       });
     }
@@ -520,7 +498,10 @@ router.post('/refresh', async (req, res, next) => {
     const user = await User.findById(decoded.sub);
     if (!user) return res.status(401).json({ error: 'User not found' });
 
+    const rawNewAccess    = signAccessToken(user);
     const newRefreshToken = signRefreshToken(user);
+    const { jti: newAccessJti } = verifyAccessToken(encryptToken(rawNewAccess));
+
     stored.revokedAt  = new Date();
     stored.replacedBy = hashToken(newRefreshToken);
     await stored.save();
@@ -531,10 +512,11 @@ router.post('/refresh', async (req, res, next) => {
       expiresAt: refreshTokenExpiry(),
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
+      accessJti: newAccessJti,
     });
 
     setRefreshCookie(res, newRefreshToken);
-    res.json({ accessToken: encryptToken(signAccessToken(user)) });
+    res.json({ accessToken: encryptToken(rawNewAccess) });
   } catch (err) { next(err); }
 });
 
@@ -1076,17 +1058,12 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
 
       if (!propertyId) return res.status(400).json({ error: 'Property selection is required.' });
 
-      // Verify PIN first — before checking property access.
-      // Reversing this order would let an unauthenticated caller probe whether
-      // a given propertyId is valid by observing which 400/403 comes back,
-      // without ever needing to supply a correct PIN.
       const pinMatch = await bcrypt.compare(String(pin), staff.pin || '');
       if (!pinMatch) {
         const failResult = await registerPinFailure(staff, now, 'manager');
         return res.status(failResult.status).json(failResult.body);
       }
 
-      // PIN is correct — now enforce property access
       const clientUser = await User.findById(staff.clientId).select('properties');
       let hasAccess = false;
       if (clientUser?.properties) {
@@ -1098,18 +1075,11 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
       resetPinLockout(staff);
       await staff.save();
 
-      const encAccessToken  = encryptToken(signStaffAccessToken(staff));
-      const staffRefreshTok = signStaffRefreshToken(staff);
+      const { encAccessToken, rawRefresh } = await issueTokenPair(
+        signStaffAccessToken, signStaffRefreshToken, staff, req
+      );
 
-      await RefreshToken.create({
-        userId:    staff._id,
-        token:     hashToken(staffRefreshTok),
-        expiresAt: refreshTokenExpiry(),
-        ipAddress: req.ip,
-        userAgent: req.get('user-agent'),
-      });
-
-      setRefreshCookie(res, staffRefreshTok);
+      setRefreshCookie(res, rawRefresh);
 
       return res.json({
         ok:          true,
@@ -1136,18 +1106,11 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
     resetPinLockout(ownUser);
     await ownUser.save();
 
-    const encAccessToken = encryptToken(signAccessToken(ownUser));
-    const userRefreshTok = signRefreshToken(ownUser);
+    const { encAccessToken, rawRefresh } = await issueTokenPair(
+      signAccessToken, signRefreshToken, ownUser, req
+    );
 
-    await RefreshToken.create({
-      userId:    ownUser._id,
-      token:     hashToken(userRefreshTok),
-      expiresAt: refreshTokenExpiry(),
-      ipAddress: req.ip,
-      userAgent: req.get('user-agent'),
-    });
-
-    setRefreshCookie(res, userRefreshTok);
+    setRefreshCookie(res, rawRefresh);
 
     return res.json({ ok: true, accessToken: encAccessToken, user: ownUser.toJSON() });
   } catch (err) { next(err); }
@@ -1158,14 +1121,6 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.get('/pin-status', requireAuth, async (req, res, next) => {
   try {
-    // Staff accounts live in the Staff collection, not User.
-    // Querying User with a staff email returns null → 404.
-    if (req.isStaff) {
-      const staff = await Staff.findById(req.staff._id).select('+pin');
-      if (!staff) return res.status(404).json({ error: 'Staff not found' });
-      return res.json({ email: staff.email, role: 'staff', hasPin: !!staff.pin, pinLength: staff.pin ? staff.pin.length : 0 });
-    }
-
     const user = await User.findOne({ email: req.user.email }).select('+pin');
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({ email: user.email, role: user.role, hasPin: !!user.pin, pinLength: user.pin ? user.pin.length : 0 });
