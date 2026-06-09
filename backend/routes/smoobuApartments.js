@@ -12,19 +12,55 @@
 // Smoobu API strategy:
 //   1. GET /apartments                              → list of IDs + names
 //   2. GET /apartments/{id}                         → detail: coords, rooms, type
-//   3. GET /en/website-external/apartment/{id}      → HTML scrape for photos
-//      Smoobu's REST API has NO images endpoint. Photos are only available on
-//      the public apartment page as <img src="/upload/images/..."> tags.
+//   3. Photos: SELF-HOSTED. Smoobu's REST API has NO image endpoint, and the
+//      public apartment page redirects to a login wall, so photos cannot be
+//      read from Smoobu at all. Admins upload photos via the routes below;
+//      they are stored on Cloudinary and read from the ApartmentPhoto model.
+//
+// Photo endpoints (admin / team_leader):
+//   GET    /api/accounts/:clientId/smoobu-apartments/:apartmentId/photos
+//   POST   /api/accounts/:clientId/smoobu-apartments/:apartmentId/photos   (multipart: photos[])
+//   DELETE /api/accounts/:clientId/smoobu-apartments/:apartmentId/photos?publicId=...
 // ─────────────────────────────────────────────────────────────────
 
 import { Router }  from 'express';
+import { v2 as cloudinary } from 'cloudinary';
+import multer      from 'multer';
+import fs          from 'fs';
+import os          from 'os';
 import User        from '../models/user.js';
 import { decrypt } from '../utils/encryption.js';
+import { requireAuth } from '../middleware/auth.js';
+import ApartmentPhoto from '../models/apartmentPhoto.js';
+import { getStoredApartmentImages } from '../services/apartmentPhotos.js';
 
 const router = Router();
 
 const SMOOBU_BASE     = 'https://login.smoobu.com/api';
 const SMOOBU_WEB_BASE = 'https://login.smoobu.com';
+
+// ── Cloudinary + Multer (mirrors routes/clients.js exactly) ───────
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const photoUpload = multer({
+  dest: os.tmpdir(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB per file
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files are allowed'), false);
+  },
+});
+
+const PHOTO_FOLDER = 'hostops/apartment-photos';
+
+// Small role guard reused by all photo routes (admin or team_leader).
+function isAdminOrTeamLeader(req) {
+  return req.user && (req.user.role === 'admin' || req.user.role === 'team_leader');
+}
 
 // ── In-process cache ──────────────────────────────────────────────
 // API responses: 60 s TTL.  Image scrapes: 10 min TTL (rarely change).
@@ -182,10 +218,13 @@ async function fetchApartmentsForKey(apiKey, propId, propertyName, clientId, cli
     aptList.map(async (apt) => {
       const aptId = apt.id ?? apt;
 
-      // Steps 2 + 3 in parallel — API detail and HTML image scrape
+      // Steps 2 + 3 in parallel — API detail and self-hosted photo lookup.
+      // (The old HTML scrape was removed from the call path: that public page
+      //  redirects to a login wall, so it always returned 0 photos and added
+      //  ~10s of latency. Photos now come from the ApartmentPhoto collection.)
       const [detailResult, imagesResult] = await Promise.allSettled([
         smoobuGet(`/apartments/${aptId}`, apiKey, `${propId}:/apartments/${aptId}`),
-        scrapeApartmentImages(aptId),
+        getStoredApartmentImages(aptId),
       ]);
 
       const detail = detailResult.status === 'fulfilled' ? detailResult.value : null;
@@ -325,6 +364,133 @@ router.get('/:clientId/smoobu-apartments', async (req, res) => {
 
   } catch (err) {
     console.error('[smoobuApartments] unexpected error:', err);
+    return res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// PHOTO ROUTES (self-hosted apartment photos via Cloudinary)
+// ─────────────────────────────────────────────────────────────────
+
+// GET /:clientId/smoobu-apartments/:apartmentId/photos
+// Returns the stored photos for one apartment.
+router.get('/:clientId/smoobu-apartments/:apartmentId/photos', requireAuth, async (req, res) => {
+  try {
+    if (!isAdminOrTeamLeader(req)) return res.status(403).json({ error: 'Forbidden' });
+    const images = await getStoredApartmentImages(req.params.apartmentId);
+    return res.json({ apartmentId: String(req.params.apartmentId), images });
+  } catch (err) {
+    console.error('[apartment-photos GET] error:', err.message || err);
+    return res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+// POST /:clientId/smoobu-apartments/:apartmentId/photos
+// Multipart upload of one or more images (field name: "photos"). Appends to
+// any existing photos so the carousel can hold multiple images.
+router.post(
+  '/:clientId/smoobu-apartments/:apartmentId/photos',
+  requireAuth,
+  photoUpload.array('photos', 12),
+  async (req, res) => {
+    const tempPaths = (req.files || []).map((f) => f.path);
+    const cleanupTemps = () => tempPaths.forEach((p) => {
+      try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch { /* ignore */ }
+    });
+
+    try {
+      if (!isAdminOrTeamLeader(req)) { cleanupTemps(); return res.status(403).json({ error: 'Forbidden' }); }
+
+      const { clientId, apartmentId } = req.params;
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ error: 'No photo files provided (field name must be "photos").' });
+      }
+
+      // Best-effort client name for metadata
+      let clientName = '';
+      try {
+        const client = await User.findById(clientId)
+          .select('businessName firstName lastName email')
+          .lean();
+        if (client) {
+          clientName = client.businessName ||
+            [client.firstName, client.lastName].filter(Boolean).join(' ') ||
+            client.email || '';
+        }
+      } catch { /* metadata only — non-fatal */ }
+
+      // Upload each file to Cloudinary (unique public_id so nothing overwrites)
+      const uploaded = [];
+      for (let i = 0; i < req.files.length; i++) {
+        const file = req.files[i];
+        const result = await cloudinary.uploader.upload(file.path, {
+          folder: PHOTO_FOLDER,
+          public_id: `${apartmentId}_${Date.now()}_${i}`,
+          overwrite: false,
+        });
+        uploaded.push({ url: result.secure_url, publicId: result.public_id });
+        try { if (fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch { /* ignore */ }
+      }
+
+      // Upsert into ApartmentPhoto, appending to existing images
+      const update = {
+        $setOnInsert: { apartmentId: String(apartmentId), clientId: clientId || null },
+        $push: { images: { $each: uploaded } },
+      };
+      if (clientName) update.$set = { clientName };
+
+      const doc = await ApartmentPhoto.findOneAndUpdate(
+        { apartmentId: String(apartmentId) },
+        update,
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
+
+      const images = (doc.images || [])
+        .filter((im) => im && im.url)
+        .map((im) => ({ id: im.publicId || null, url: im.url }));
+
+      console.log(`[apartment-photos POST] apt ${apartmentId} → +${uploaded.length} (total ${images.length})`);
+      return res.status(201).json({ message: 'Photos uploaded.', apartmentId: String(apartmentId), images });
+    } catch (err) {
+      cleanupTemps();
+      console.error('[apartment-photos POST] error:', err.message || err);
+      if (err.http_code || /cloudinary/i.test(err.message || '')) {
+        return res.status(502).json({ error: 'Image service error: ' + (err.message || 'Unknown') });
+      }
+      if (err.name === 'CastError') return res.status(400).json({ error: 'Invalid ID' });
+      return res.status(500).json({ error: err.message || 'Internal server error' });
+    }
+  }
+);
+
+// DELETE /:clientId/smoobu-apartments/:apartmentId/photos?publicId=<urlencoded>
+// Removes a single photo (from Cloudinary + DB). publicId comes from the
+// image objects returned by GET/POST (the `id` field).
+router.delete('/:clientId/smoobu-apartments/:apartmentId/photos', requireAuth, async (req, res) => {
+  try {
+    if (!isAdminOrTeamLeader(req)) return res.status(403).json({ error: 'Forbidden' });
+
+    const { apartmentId } = req.params;
+    const publicId = req.query.publicId ? decodeURIComponent(String(req.query.publicId)) : '';
+    if (!publicId) return res.status(400).json({ error: 'publicId query param is required.' });
+
+    // Remove from Cloudinary (best-effort — DB pull happens regardless)
+    try { await cloudinary.uploader.destroy(publicId); }
+    catch (e) { console.warn('[apartment-photos DELETE] cloudinary destroy failed:', e.message); }
+
+    const doc = await ApartmentPhoto.findOneAndUpdate(
+      { apartmentId: String(apartmentId) },
+      { $pull: { images: { publicId } } },
+      { new: true }
+    );
+
+    const images = (doc?.images || [])
+      .filter((im) => im && im.url)
+      .map((im) => ({ id: im.publicId || null, url: im.url }));
+
+    return res.json({ message: 'Photo removed.', apartmentId: String(apartmentId), images });
+  } catch (err) {
+    console.error('[apartment-photos DELETE] error:', err.message || err);
     return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });
