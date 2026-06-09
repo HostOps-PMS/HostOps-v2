@@ -555,19 +555,23 @@ router.post('/revoke-token', async (req, res, next) => {
     const { token } = req.body || {};
     if (!token) return res.status(400).json({ error: 'token required' });
 
+    // Revoke ONLY the access token jti.
+    // Do NOT touch the refresh token cookie or its DB row.
+    //
+    // Previously this route also called:
+    //   RefreshToken.findOneAndUpdate({ revokedAt: new Date() })
+    //   res.clearCookie('rt')
+    //
+    // That caused redirect-on-refresh: the 'beforeunload'/'pagehide' beacon
+    // fired during F5, revoked the rt row, then hydrate() on reload got 401
+    // from /auth/refresh → no token → ProtectedRoute redirected to "/".
+    //
+    // The rt cookie must stay alive so the page can silently re-authenticate
+    // after a refresh. It will expire naturally (7 days) or be revoked by
+    // POST /auth/logout on intentional sign-out.
     const jti = extractJti(token);
     if (jti) await revokeAccessJti(jti, 'beacon', 'tab_close');
 
-    // Also revoke the refresh token cookie if present
-    const rawRt = getRefreshCookie(req);
-    if (rawRt) {
-      await RefreshToken.findOneAndUpdate(
-        { token: hashToken(rawRt) },
-        { revokedAt: new Date() }
-      );
-    }
-
-    res.clearCookie('rt', { path: '/auth' });
     res.status(204).send();
   } catch (err) { next(err); }
 });
