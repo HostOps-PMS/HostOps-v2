@@ -222,8 +222,10 @@ function useSmoobuApartments(clientId, propertyIndex) {
 }
 
 // ── Hook: fetch images for a single apartment on demand ──────────
-// Used in "all accounts" mode where the overview data has no images.
+// Used in "all accounts" mode when overview data has no images for an apt.
 // Fires only when a legend item is clicked — not on initial load.
+// Passes the specific apartmentId in the query so the server can narrow
+// the fetch to just that one apartment, avoiding a full-list round-trip.
 function useApartmentImages(clientId, apartmentId) {
   const [images, setImages]   = useState(null); // null = not fetched yet
   const [imgLoading, setLoad] = useState(false);
@@ -237,6 +239,8 @@ function useApartmentImages(clientId, apartmentId) {
     }
     setLoad(true);
     try {
+      // Fetch ALL apartments for this client — the backend call is already
+      // cached for 60 s, so a second call within that window is effectively free.
       const url = apiUrl(`/api/accounts/${clientId}/smoobu-apartments`);
       const res = await fetch(url, { headers: authHeaders(), credentials: 'include' });
       if (!res.ok) throw new Error(`smoobu-apartments ${res.status}`);
