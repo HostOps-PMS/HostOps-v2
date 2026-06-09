@@ -1,4 +1,5 @@
 // src/middleware/auth.js
+import mongoose     from 'mongoose';
 import { verifyAccessToken } from '../utils/tokens.js';
 import User         from '../models/user.js';
 import Staff        from '../models/staff.js';
@@ -49,10 +50,13 @@ export async function requireAuth(req, res, next) {
       if (!staff)       return res.status(401).json({ error: 'Staff not found' });
       if (!staff.isActive) return res.status(403).json({ error: 'Staff account is inactive' });
 
-      // Find an active session that belongs to this staff member
+      // Find an active session that belongs to this staff member.
+      // Cast staff._id to ObjectId explicitly — staffId in RefreshToken schema
+      // is ObjectId and Mongoose already handles this, but being explicit here
+      // prevents any future type-coercion surprises.
       const owningSession = await RefreshToken.findOne({
-        staffId:   staff._id,
-        revoked:   { $ne: true },
+        staffId:   new mongoose.Types.ObjectId(String(staff._id)),
+        revokedAt: null,
         expiresAt: { $gt: new Date() },
       });
 
@@ -96,10 +100,14 @@ export async function requireAuth(req, res, next) {
     }
 
     // ── 7b. REGULAR USER / ADMIN ─────────────────────────────────
-    // Find an active session that belongs to the user in the token
+    // Find an active session that belongs to the user in the token.
+    // decoded.sub is a string (from JWT), but userId in RefreshToken schema is
+    // ObjectId. Cast explicitly to avoid a string-vs-ObjectId mismatch where
+    // MongoDB returns no results even when a valid session exists, causing a
+    // false 403 "session revoked" on every request.
     const owningSession = await RefreshToken.findOne({
-      userId:    decoded.sub,
-      revoked:   { $ne: true },
+      userId:    new mongoose.Types.ObjectId(decoded.sub),
+      revokedAt: null,
       expiresAt: { $gt: new Date() },
     });
 
