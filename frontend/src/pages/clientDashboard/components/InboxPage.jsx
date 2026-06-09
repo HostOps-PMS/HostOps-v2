@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
 import { useDashboard } from "../context/DashboardContext";
 import { useDashboardData } from "../hooks/useDashboardData";
@@ -106,6 +107,7 @@ export default function InboxPage() {
   const { dashState, dark } = useDashboard();
   const { loadData } = useDashboardData();
   const auth = useAuth();
+  const navigate = useNavigate();
 
   // Detect if the currently logged-in user is a staff member.
   // We check multiple signals because the login form may store the session
@@ -271,15 +273,19 @@ export default function InboxPage() {
           {/* Left header */}
           <div style={{ padding: "16px 16px 10px", borderBottom: `1px solid ${border}` }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-              <a href="/dashboard" style={{
-                display: "inline-flex", alignItems: "center", gap: 5,
-                fontSize: "12px", fontWeight: 600, color: textSub, textDecoration: "none",
-              }}>
+              <button
+                onClick={() => navigate("/dashboard")}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                  fontSize: "12px", fontWeight: 600, color: textSub,
+                  background: "none", border: "none", cursor: "pointer", padding: 0,
+                }}
+              >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
                 Dashboard
-              </a>
+              </button>
               <span style={{ fontSize: "11px", color: textSub }}>
                 {filtered.length} thread{filtered.length !== 1 ? "s" : ""}
               </span>

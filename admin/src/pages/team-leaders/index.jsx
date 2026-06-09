@@ -96,19 +96,29 @@ export default function TeamLeaders() {
           )}
 
           {/* Page Header */}
-          <header className="db-content__header" style={{ marginBottom: 20 }}>
+          <header className="cl-content__header" style={{ marginBottom: 20 }}>
             <div>
-              <h1 className="db-content__title">Team Leaders</h1>
-              <p className="db-content__sub">Manage team leader accounts and assignments</p>
+              <h1 className="cl-content__title">Team Leaders</h1>
+              <p className="cl-content__sub">Manage team leader accounts and assignments</p>
             </div>
           </header>
+
+          {error && (
+            <div style={{
+              background: '#fee2e2', color: '#b91c1c',
+              borderRadius: 'var(--radius-sm)', padding: '12px 16px',
+              fontSize: '.875rem', fontWeight: 500,
+            }}>
+              ⚠️ {error}
+            </div>
+          )}
 
           <TeamLeaderTable
             teamLeaders={teamLeaders}
             clients={clients}
             filtered={paginated}
             loading={loading}
-            error={error}
+            error={null}
             search={search}
             onSearchChange={handleSearchChange}
             onEdit={(tl) => setModal({ type: 'edit', teamLeader: tl })}

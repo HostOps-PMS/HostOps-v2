@@ -201,6 +201,8 @@ function useSmoobuApartments(clientId, propertyIndex) {
         ...a,
         latitude:  toCoord(a.latitude),
         longitude: toCoord(a.longitude),
+        // Ensure images is always an array — backend guarantees this but guard anyway
+        images: Array.isArray(a.images) ? a.images : [],
       }));
       const withCoords = apts.filter(a => a.latitude !== null && a.longitude !== null).length;
       console.log(`[PropertyMap] smoobu-apartments client=${clientId} propIdx=${propertyIndex ?? 'all'} → ${apts.length} apts (${withCoords} with coords)`, apts[0]);
@@ -217,6 +219,46 @@ function useSmoobuApartments(clientId, propertyIndex) {
   useEffect(() => { fetch_(); }, [fetch_]);
 
   return { apartments, aptLoading, aptError, refetch: fetch_ };
+}
+
+// ── Hook: fetch images for a single apartment on demand ──────────
+// Used in "all accounts" mode when overview data has no images for an apt.
+// Fires only when a legend item is clicked — not on initial load.
+// Passes the specific apartmentId in the query so the server can narrow
+// the fetch to just that one apartment, avoiding a full-list round-trip.
+function useApartmentImages(clientId, apartmentId) {
+  const [images, setImages]   = useState(null); // null = not fetched yet
+  const [imgLoading, setLoad] = useState(false);
+
+  const fetch_ = useCallback(async () => {
+    if (!clientId || !apartmentId) { setImages(null); return; }
+    // Skip stubs (db: / stub: prefixed ids have no Smoobu detail)
+    if (String(apartmentId).startsWith('db:') || String(apartmentId).startsWith('stub:')) {
+      setImages([]);
+      return;
+    }
+    setLoad(true);
+    try {
+      // Fetch ALL apartments for this client — the backend call is already
+      // cached for 60 s, so a second call within that window is effectively free.
+      const url = apiUrl(`/api/accounts/${clientId}/smoobu-apartments`);
+      const res = await fetch(url, { headers: authHeaders(), credentials: 'include' });
+      if (!res.ok) throw new Error(`smoobu-apartments ${res.status}`);
+      const data = await res.json();
+      const match = (data.allApartments || []).find(
+        (a) => String(a.apartmentId) === String(apartmentId)
+      );
+      setImages(Array.isArray(match?.images) ? match.images : []);
+    } catch (err) {
+      console.warn('[PropertyMap] image fetch failed:', err.message);
+      setImages([]);
+    } finally {
+      setLoad(false);
+    }
+  }, [clientId, apartmentId]);
+
+  useEffect(() => { fetch_(); }, [fetch_]);
+  return { images, imgLoading };
 }
 
 // ── Leaflet map hook ──────────────────────────────────────────────
@@ -397,19 +439,32 @@ function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId, mapS
         color,
       };
 
-      const popupHtml = `
-        <div style="font-size:11.5px;line-height:1.45;width:220px;overflow:hidden;border-radius:10px;margin:-9px -11px;">
-          <div style="height:90px;background:linear-gradient(135deg,#9FE1CB,#085041);display:flex;align-items:center;justify-content:center;position:relative;">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 22V12h6v10"/><path d="M3 9h18"/></svg>
-            <span style="position:absolute;bottom:7px;left:9px;font-size:10px;color:rgba(255,255,255,0.85);background:rgba(0,0,0,0.28);padding:2px 8px;border-radius:20px;">No photo yet · Add one →</span>
-          </div>
-          <div style="padding:10px 12px 12px;">
-            <div style="font-weight:700;font-size:13px;margin-bottom:2px;color:#111827;">${escHtml(label)}</div>
-            ${client ? `<div style="color:#1a9e6e;font-weight:600;font-size:11.5px;margin-bottom:5px;">${escHtml(client)}</div>` : ''}
-            ${addr ? `<div style="display:flex;align-items:flex-start;gap:4px;color:#6b7280;font-size:11px;margin-bottom:3px;"><span>📍</span><span>${escHtml(addr)}</span></div>` : ''}
-            ${p.type || p.maxOccupancy != null ? `<div style="display:flex;align-items:center;gap:4px;color:#6b7280;font-size:11px;"><span>🏠</span><span>${escHtml(p.type || '')}${p.type && p.maxOccupancy != null ? ' · ' : ''}${p.maxOccupancy != null ? 'Max ' + p.maxOccupancy : ''}</span></div>` : ''}
-          </div>
-        </div>`;
+      const popupHtml = (() => {
+        const firstImg  = Array.isArray(p.images) && p.images.length > 0 ? p.images[0].url : null;
+        const imgCount  = Array.isArray(p.images) ? p.images.length : 0;
+        const heroHtml  = firstImg
+          ? `<img src="${escHtml(firstImg)}" alt="${escHtml(label)}" style="width:100%;height:90px;object-fit:cover;display:block;" loading="lazy" />`
+          : `<div style="height:90px;background:linear-gradient(135deg,#9FE1CB,#085041);display:flex;align-items:center;justify-content:center;position:relative;">
+               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 22V12h6v10"/><path d="M3 9h18"/></svg>
+               <span style="position:absolute;bottom:7px;left:9px;font-size:10px;color:rgba(255,255,255,0.85);background:rgba(0,0,0,0.28);padding:2px 8px;border-radius:20px;">No photo yet · Add one →</span>
+             </div>`;
+        const countBadge = firstImg && imgCount > 1
+          ? `<span style="position:absolute;top:6px;right:8px;font-size:9.5px;color:#fff;background:rgba(0,0,0,0.42);padding:2px 7px;border-radius:20px;">📷 ${imgCount}</span>`
+          : '';
+        return `
+          <div style="font-size:11.5px;line-height:1.45;width:220px;overflow:hidden;border-radius:10px;margin:-9px -11px;">
+            <div style="position:relative;overflow:hidden;">
+              ${heroHtml}
+              ${countBadge}
+            </div>
+            <div style="padding:10px 12px 12px;">
+              <div style="font-weight:700;font-size:13px;margin-bottom:2px;color:#111827;">${escHtml(label)}</div>
+              ${client ? `<div style="color:#1a9e6e;font-weight:600;font-size:11.5px;margin-bottom:5px;">${escHtml(client)}</div>` : ''}
+              ${addr ? `<div style="display:flex;align-items:flex-start;gap:4px;color:#6b7280;font-size:11px;margin-bottom:3px;"><span>📍</span><span>${escHtml(addr)}</span></div>` : ''}
+              ${p.type || p.maxOccupancy != null ? `<div style="display:flex;align-items:center;gap:4px;color:#6b7280;font-size:11px;"><span>🏠</span><span>${escHtml(p.type || '')}${p.type && p.maxOccupancy != null ? ' · ' : ''}${p.maxOccupancy != null ? 'Max ' + p.maxOccupancy : ''}</span></div>` : ''}
+            </div>
+          </div>`;
+      })();
       // Compact popup — no close button, no auto-pan; shown on HOVER only.
       marker.bindPopup(popupHtml, {
         closeButton: false,
@@ -513,7 +568,116 @@ function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId, mapS
   return {};
 }
 
-// ── Main Component ────────────────────────────────────────────────
+// ── PhotoCarousel — used in the modal Detail panel ────────────────
+// Shows apartment images from Smoobu with prev/next navigation.
+// Falls back to the branded gradient when no images are available.
+function PhotoCarousel({ images = [], altText = '' }) {
+  const [idx, setIdx] = useState(0);
+  const valid = images.filter((img) => img && img.url);
+
+  if (valid.length === 0) {
+    return (
+      <div style={{
+        height: 140,
+        background: 'linear-gradient(135deg,#9FE1CB,#085041)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'relative', flexShrink: 0, overflow: 'hidden',
+      }}>
+        <span style={{ fontSize: 36, opacity: 0.45 }}>🏢</span>
+        <span style={{
+          position: 'absolute', bottom: 8, left: 10,
+          fontSize: '.63rem', color: 'rgba(255,255,255,0.85)',
+          background: 'rgba(0,0,0,0.28)', padding: '2px 8px', borderRadius: 20,
+        }}>No photo yet</span>
+        <button style={{
+          position: 'absolute', bottom: 8, right: 10,
+          fontSize: '.63rem', background: 'rgba(255,255,255,0.92)',
+          border: 'none', padding: '3px 9px', borderRadius: 20,
+          cursor: 'pointer', fontFamily: 'var(--font-body)',
+        }}>↑ Add photo</button>
+      </div>
+    );
+  }
+
+  const prev = () => setIdx((i) => (i - 1 + valid.length) % valid.length);
+  const next = () => setIdx((i) => (i + 1) % valid.length);
+
+  return (
+    <div style={{ position: 'relative', height: 140, flexShrink: 0, overflow: 'hidden', background: '#111' }}>
+      <img
+        key={valid[idx].url}
+        src={valid[idx].url}
+        alt={altText}
+        style={{
+          width: '100%', height: '100%',
+          objectFit: 'cover', display: 'block',
+          transition: 'opacity 0.2s',
+        }}
+        loading="lazy"
+      />
+      {/* Count badge */}
+      <span style={{
+        position: 'absolute', top: 8, right: 8,
+        fontSize: '.6rem', color: '#fff',
+        background: 'rgba(0,0,0,0.50)', padding: '2px 8px', borderRadius: 20,
+        pointerEvents: 'none',
+      }}>
+        📷 {idx + 1} / {valid.length}
+      </span>
+      {/* Prev / Next — only shown when there are multiple images */}
+      {valid.length > 1 && (
+        <>
+          <button
+            onClick={prev}
+            style={{
+              position: 'absolute', left: 6, top: '50%', transform: 'translateY(-50%)',
+              width: 26, height: 26, borderRadius: '50%',
+              border: 'none', cursor: 'pointer',
+              background: 'rgba(0,0,0,0.45)', color: '#fff',
+              fontSize: 13, lineHeight: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            aria-label="Previous photo"
+          >‹</button>
+          <button
+            onClick={next}
+            style={{
+              position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+              width: 26, height: 26, borderRadius: '50%',
+              border: 'none', cursor: 'pointer',
+              background: 'rgba(0,0,0,0.45)', color: '#fff',
+              fontSize: 13, lineHeight: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            aria-label="Next photo"
+          >›</button>
+          {/* Dot indicators */}
+          <div style={{
+            position: 'absolute', bottom: 6, left: '50%', transform: 'translateX(-50%)',
+            display: 'flex', gap: 4,
+          }}>
+            {valid.map((_, di) => (
+              <button
+                key={di}
+                onClick={() => setIdx(di)}
+                style={{
+                  width: di === idx ? 14 : 6,
+                  height: 6, borderRadius: 3,
+                  border: 'none', padding: 0,
+                  background: di === idx ? '#fff' : 'rgba(255,255,255,0.45)',
+                  cursor: 'pointer', transition: 'width 0.2s, background 0.2s',
+                }}
+                aria-label={`Photo ${di + 1}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
 export default function PropertyMap({ mapLocations, loading }) {
   const [selectedClient,    setSelectedClient]    = useState('all');
   const [selectedPropIndex, setSelectedPropIndex] = useState(null);
@@ -522,6 +686,8 @@ export default function PropertyMap({ mapLocations, loading }) {
   const [isModalOpen,       setIsModalOpen]        = useState(false);
   const [mapStyle,          setMapStyle]            = useState('standard');
   const [selectedLegendApt, setSelectedLegendApt]   = useState(null);
+  const [legendSearch,       setLegendSearch]        = useState('');
+  const [activeTab,          setActiveTab]           = useState('properties'); // 'properties' | 'detail'
   const modalMapContainerRef = useRef(null);
   const modalMarkerMapRef    = useRef({});
 
@@ -540,12 +706,16 @@ export default function PropertyMap({ mapLocations, loading }) {
     setSelectedPropIndex(null);
     setSelectedAptId('');
     setSelectedLegendApt(null);
+    setLegendSearch('');
+    setActiveTab('properties');
   }
 
   function handlePropChange(raw) {
     setSelectedPropIndex(raw === '' || raw === null || raw === 'all' ? null : Number(raw));
     setSelectedAptId('');
     setSelectedLegendApt(null);
+    setLegendSearch('');
+    setActiveTab('properties');
   }
 
   function handleAptChange(aptId) {
@@ -558,12 +728,33 @@ export default function PropertyMap({ mapLocations, loading }) {
   const { apartments: smoobuApts, aptLoading, aptError } =
     useSmoobuApartments(smoobuClientId, selectedPropIndex);
 
+  // On-demand image fetch for "all accounts" mode (overview locs have no images).
+  // clientId comes from the clicked apartment's clientId field.
+  const legendImgClientId = selectedLegendApt?.clientId ?? null;
+  const legendImgAptId    = selectedLegendApt?.apartmentId ?? null;
+  // Only trigger when the apt genuinely has no images (avoid redundant calls
+  // when images were already fetched via useSmoobuApartments above).
+  const needsImgFetch = selectedLegendApt != null &&
+    (!Array.isArray(selectedLegendApt.images) || selectedLegendApt.images.length === 0) &&
+    !String(legendImgAptId ?? '').startsWith('db:') &&
+    !String(legendImgAptId ?? '').startsWith('stub:');
+  const { images: fetchedImages, imgLoading } = useApartmentImages(
+    needsImgFetch ? legendImgClientId : null,
+    needsImgFetch ? legendImgAptId    : null
+  );
+  // Merge: prefer already-attached images, fall back to on-demand fetched ones
+  const detailImages = (Array.isArray(selectedLegendApt?.images) && selectedLegendApt.images.length > 0)
+    ? selectedLegendApt.images
+    : (fetchedImages ?? []);
+
   // Normalise overview coords (may also be strings)
   const overviewLocs = useMemo(() =>
     (Array.isArray(mapLocations) ? mapLocations : []).map((l) => ({
       ...l,
       latitude:  toCoord(l.latitude),
       longitude: toCoord(l.longitude),
+      // Ensure images is always an array — overview data may not include it
+      images: Array.isArray(l.images) ? l.images : [],
     })),
   [mapLocations]);
 
@@ -1090,27 +1281,27 @@ export default function PropertyMap({ mapLocations, loading }) {
                 {/* Tab bar */}
                 <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
                   <button
-                    onClick={() => setSelectedLegendApt(null)}
+                    onClick={() => setActiveTab('properties')}
                     style={{
                       flex: 1, padding: '9px 4px', fontSize: '.72rem', fontWeight: 600,
                       fontFamily: 'var(--font-body)', border: 'none', cursor: 'pointer',
                       background: 'transparent',
-                      color: !selectedLegendApt ? 'var(--color-brand, #1a9e6e)' : 'var(--color-muted)',
-                      borderBottom: !selectedLegendApt ? '2px solid var(--color-brand, #1a9e6e)' : '2px solid transparent',
+                      color: activeTab === 'properties' ? 'var(--color-brand, #1a9e6e)' : 'var(--color-muted)',
+                      borderBottom: activeTab === 'properties' ? '2px solid var(--color-brand, #1a9e6e)' : '2px solid transparent',
                       transition: 'color 0.15s',
                     }}
                   >
                     Properties <span style={{ fontSize: '.65rem', background: 'var(--color-surface-2,#f3f4f6)', borderRadius: 20, padding: '1px 6px', marginLeft: 4 }}>{locations.length}</span>
                   </button>
                   <button
-                    onClick={() => {}}
+                    onClick={() => { if (selectedLegendApt) setActiveTab('detail'); }}
                     disabled={!selectedLegendApt}
                     style={{
                       flex: 1, padding: '9px 4px', fontSize: '.72rem', fontWeight: 600,
                       fontFamily: 'var(--font-body)', border: 'none', cursor: selectedLegendApt ? 'pointer' : 'default',
                       background: 'transparent',
-                      color: selectedLegendApt ? 'var(--color-brand, #1a9e6e)' : 'var(--color-muted)',
-                      borderBottom: selectedLegendApt ? '2px solid var(--color-brand, #1a9e6e)' : '2px solid transparent',
+                      color: activeTab === 'detail' && selectedLegendApt ? 'var(--color-brand, #1a9e6e)' : 'var(--color-muted)',
+                      borderBottom: activeTab === 'detail' && selectedLegendApt ? '2px solid var(--color-brand, #1a9e6e)' : '2px solid transparent',
                       opacity: selectedLegendApt ? 1 : 0.45,
                       transition: 'color 0.15s',
                     }}
@@ -1120,10 +1311,12 @@ export default function PropertyMap({ mapLocations, loading }) {
                 </div>
 
                 {/* Properties tab */}
-                {!selectedLegendApt && (
+                {activeTab === 'properties' && (
                   <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', padding: '10px 8px' }}>
                     <input
                       placeholder="Search…"
+                      value={legendSearch}
+                      onChange={e => setLegendSearch(e.target.value)}
                       style={{
                         width: '100%', padding: '5px 9px', marginBottom: 6,
                         border: '1px solid var(--color-border)',
@@ -1135,7 +1328,18 @@ export default function PropertyMap({ mapLocations, loading }) {
                       }}
                     />
                     <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      {locations.map((p) => {
+                      {locations
+                        .filter(p => {
+                          if (!legendSearch.trim()) return true;
+                          const q = legendSearch.toLowerCase();
+                          return (
+                            (p.apartmentName || '').toLowerCase().includes(q) ||
+                            (p.propertyName  || '').toLowerCase().includes(q) ||
+                            (p.clientName    || '').toLowerCase().includes(q) ||
+                            (p.city          || '').toLowerCase().includes(q)
+                          );
+                        })
+                        .map((p) => {
                         const addrParts = [p.street, p.city, p.country].filter(Boolean);
                         const addr      = addrParts.join(', ');
                         const hasCoords = p.latitude !== null && p.longitude !== null &&
@@ -1150,6 +1354,7 @@ export default function PropertyMap({ mapLocations, loading }) {
                               if (!hasCoords) return;
                               handleAptChange(String(p.apartmentId) === focusedAptId ? '' : String(p.apartmentId));
                               setSelectedLegendApt(prev => prev?.apartmentId === p.apartmentId ? null : p);
+                              setActiveTab('detail');
                             }}
                             style={{
                               display: 'flex', alignItems: 'flex-start', gap: 6,
@@ -1199,13 +1404,21 @@ export default function PropertyMap({ mapLocations, loading }) {
                 )}
 
                 {/* Detail tab */}
-                {selectedLegendApt && (
+                {activeTab === 'detail' && selectedLegendApt && (
                   <div style={{ width: '100%', overflowY: 'auto', flex: 1 }}>
-                    <div style={{ height: 110, background: 'linear-gradient(135deg,#9FE1CB,#085041)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', flexShrink: 0 }}>
-                      <span style={{ fontSize: 32, opacity: 0.5 }}>🏢</span>
-                      <span style={{ position: 'absolute', bottom: 7, left: 10, fontSize: '.65rem', color: 'rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.28)', padding: '2px 8px', borderRadius: 20 }}>No photo yet</span>
-                      <button style={{ position: 'absolute', bottom: 7, right: 10, fontSize: '.65rem', background: 'rgba(255,255,255,0.92)', border: 'none', padding: '3px 9px', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>↑ Add photo</button>
-                    </div>
+                    {imgLoading ? (
+                      <div style={{
+                        height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'var(--color-surface-2, #f3f4f6)', flexShrink: 0,
+                      }}>
+                        <span style={{ fontSize: '.75rem', color: 'var(--color-muted)' }}>Loading photos…</span>
+                      </div>
+                    ) : (
+                      <PhotoCarousel
+                        images={detailImages}
+                        altText={selectedLegendApt.apartmentName || selectedLegendApt.propertyName || ''}
+                      />
+                    )}
                     <div style={{ padding: '14px' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
                         <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
@@ -1221,7 +1434,7 @@ export default function PropertyMap({ mapLocations, loading }) {
                             {selectedLegendApt.clientName}
                           </div>
                         </div>
-                        <button onClick={() => setSelectedLegendApt(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-muted)', fontSize: '1rem', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>✕</button>
+                        <button onClick={() => { setSelectedLegendApt(null); setActiveTab('properties'); }} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-muted)', fontSize: '1rem', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>✕</button>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--color-surface-2, #f9fafb)', borderRadius: 8, marginBottom: 12 }}>

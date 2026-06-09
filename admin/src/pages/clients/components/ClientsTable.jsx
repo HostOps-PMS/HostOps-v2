@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 function initials(businessName = '') {
   const parts = businessName.trim().split(/\s+/);
@@ -100,6 +100,16 @@ function isUnverified(client) {
 export default function ClientsTable({ clients, loading, onRowClick, search, onSearchChange, onAddClient, onRefresh, page, totalPages, totalCount, onPrev, onNext }) {
   const [activeTab, setActiveTab] = useState('All');
   const [selected, setSelected] = useState([]);
+  const tabScrollRef = useRef(null);
+  const [tabScrollLeft, setTabScrollLeft] = useState(0);
+  const [tabScrollable, setTabScrollable] = useState(false);
+
+  function handleTabScroll() {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    setTabScrollLeft(el.scrollLeft);
+    setTabScrollable(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  }
 
   const tabs = [
     { label: 'All', count: clients.length },
@@ -107,6 +117,12 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
     { label: 'Partial', count: clients.filter(isPartial).length },
     { label: 'Unverified', count: clients.filter(isUnverified).length },
   ];
+
+  useEffect(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    setTabScrollable(el.scrollWidth > el.clientWidth);
+  }, [tabs.length]);
 
   const tabFiltered =
     activeTab === 'All' ? clients
@@ -134,14 +150,41 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
       {/* Tab bar */}
       <div style={{
         marginBottom: 0, paddingBottom: 0,
-        overflowX: 'auto', WebkitOverflowScrolling: 'touch',
-        msOverflowStyle: 'none', scrollbarWidth: 'none',
+        position: 'relative', overflowX: 'clip', overflowY: 'visible',
       }}>
-        <div style={{
-          display: 'inline-flex', alignItems: 'flex-end', gap: 0,
-          background: 'transparent', marginBottom: '-1px',
-          minWidth: 'max-content',
-        }}>
+        {tabScrollLeft > 0 && (
+          <div style={{
+            position: 'absolute', left: 0, top: 0, bottom: 0, zIndex: 10,
+            display: 'flex', alignItems: 'center',
+            background: 'linear-gradient(to right, #f0f4f0 60%, transparent)',
+            paddingRight: 8, paddingLeft: 2, pointerEvents: 'none',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5">
+              <path d="M13 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        )}
+        {tabScrollable && (
+          <div style={{
+            position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 10,
+            display: 'flex', alignItems: 'center',
+            background: 'linear-gradient(to left, #f0f4f0 60%, transparent)',
+            paddingLeft: 8, paddingRight: 2, pointerEvents: 'none',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5">
+              <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        )}
+        <div
+          ref={tabScrollRef}
+          onScroll={handleTabScroll}
+          style={{
+            display: 'flex', alignItems: 'flex-end', gap: 0,
+            background: 'transparent', marginBottom: '-1px',
+            overflowX: 'auto', WebkitOverflowScrolling: 'touch',
+            msOverflowStyle: 'none', scrollbarWidth: 'none',
+          }}>
           {tabs.map((tab) => {
             const isActive = activeTab === tab.label;
             return (
@@ -187,10 +230,10 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
         paddingBottom: 4, position: 'relative',
       }}>
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
+          display: 'flex', alignItems: 'center', gap: 8,
           padding: '10px 12px 12px', borderBottom: '1px solid #f0f2f5', flexWrap: 'wrap', rowGap: 8,
         }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: 140, maxWidth: 280 }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 120, maxWidth: 280 }}>
             <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2"
               style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
               <circle cx="9" cy="9" r="6"/><path d="M15 15l-3.5-3.5" strokeLinecap="round"/>
@@ -208,9 +251,10 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
               }}
             />
           </div>
-          <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto', whiteSpace: 'nowrap', flexShrink: 0 }}>
             {tabFiltered.length} {tabFiltered.length === 1 ? 'Business' : 'Businesses'}
           </span>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <button
             onClick={onRefresh}
             style={{
@@ -218,7 +262,7 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
               padding: '7px 10px', borderRadius: 8,
               border: '1px solid #10b981', background: '#fff',
               fontSize: '0.82rem', fontWeight: 600, color: '#10b981',
-              cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+              cursor: 'pointer', whiteSpace: 'nowrap',
             }}
           >
             <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
@@ -234,7 +278,7 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
               padding: '7px 14px', borderRadius: 999,
               border: 'none', background: '#10b981',
               color: '#fff', fontSize: '0.82rem', fontWeight: 700,
-              cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+              cursor: 'pointer', whiteSpace: 'nowrap',
               boxShadow: '0 2px 8px rgba(59,95,192,0.18)',
               transition: 'background 0.15s',
             }}
@@ -243,6 +287,7 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
           >
             + Add Business
           </button>
+          </div>
         </div>
 
         {/* Table */}

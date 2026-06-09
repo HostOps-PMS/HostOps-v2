@@ -1,10 +1,4 @@
-// src/pages/Accounts/index.jsx
-// ─────────────────────────────────────────────────────────────────
-// Admin-only page: shows all Users + Staffs in one view.
-// Displays pinAttempts, pinPermanentlyLocked, pinLockedUntil.
-// UI matches StaffTable style: floating tab bar + card with filter bar.
-// ─────────────────────────────────────────────────────────────────
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import Sidebar from '../Sidebar';
 
 const API     = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
@@ -416,7 +410,7 @@ function AccountRow({ account, onUnlock, isLast }) {
       onMouseLeave={e => { if (!needsAttention) e.currentTarget.style.background = 'transparent'; }}
     >
       {/* Name / Email */}
-      <td style={{ padding: '12px 16px 12px 20px' }}>
+      <td style={{ padding: '12px 16px 12px 20px', minWidth: 160 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
             width: 32, height: 32, borderRadius: '50%',
@@ -510,6 +504,17 @@ export default function AccountsPage() {
   const [page,         setPage]         = useState(1);
   const PAGE_SIZE = 10;
 
+  const tabScrollRef  = useRef(null);
+  const [tabScrollLeft, setTabScrollLeft]   = useState(0);
+  const [tabScrollable, setTabScrollable]   = useState(false);
+
+  function handleTabScroll() {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    setTabScrollLeft(el.scrollLeft);
+    setTabScrollable(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  }
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -553,6 +558,12 @@ export default function AccountsPage() {
     { id: 'staffs', label: 'Staffs',      count: staffs.length },
     { id: 'locked', label: 'PIN Issues',  count: lockedCount, warn: lockedCount > 0 },
   ];
+
+  useEffect(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    setTabScrollable(el.scrollWidth > el.clientWidth);
+  }, [tabs.length]);
 
   const totalFiltered = combined.filter(a => {
     const q = search.toLowerCase();
@@ -601,10 +612,10 @@ export default function AccountsPage() {
 
         <div className="cl-content">
           {/* Page Header */}
-          <header className="db-content__header" style={{ marginBottom: 28 }}>
+          <header className="cl-content__header" style={{ marginBottom: 28 }}>
             <div>
-              <h1 className="db-content__title">Accounts</h1>
-              <p className="db-content__sub">
+              <h1 className="cl-content__title">Accounts</h1>
+              <p className="cl-content__sub">
                 All platform users and staffs — PIN lockout status, attempts, and access control.
               </p>
             </div>
@@ -614,12 +625,44 @@ export default function AccountsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              marginBottom: 0, flexWrap: 'wrap', gap: 10, paddingBottom: 0,
+              marginBottom: 0, flexWrap: 'nowrap', gap: 10, paddingBottom: 0,
+              overflow: 'hidden', position: 'relative',
             }}>
-              <div style={{
-                display: 'inline-flex', alignItems: 'flex-end', gap: 0,
+              {/* Left fade/arrow */}
+              {tabScrollLeft > 0 && (
+                <div style={{
+                  position: 'absolute', left: 0, top: 0, bottom: 0, zIndex: 10,
+                  display: 'flex', alignItems: 'center',
+                  background: 'linear-gradient(to right, #f0f4f0 60%, transparent)',
+                  paddingRight: 8, paddingLeft: 2, pointerEvents: 'none',
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5">
+                    <path d="M13 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              )}
+              {/* Right fade/arrow */}
+              {tabScrollable && (
+                <div style={{
+                  position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 10,
+                  display: 'flex', alignItems: 'center',
+                  background: 'linear-gradient(to left, #f0f4f0 60%, transparent)',
+                  paddingLeft: 8, paddingRight: 2, pointerEvents: 'none',
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5">
+                    <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              )}
+              <div
+                ref={tabScrollRef}
+                onScroll={handleTabScroll}
+                style={{
+                display: 'flex', alignItems: 'flex-end', gap: 0,
                 background: 'transparent',
                 marginBottom: '-1px',
+                overflowX: 'auto', WebkitOverflowScrolling: 'touch',
+                scrollbarWidth: 'none', msOverflowStyle: 'none',
               }}>
                 {tabs.map(t => {
                   const isActive = tab === t.id;
@@ -671,10 +714,10 @@ export default function AccountsPage() {
             }}>
               {/* Filter bar */}
               <div style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '12px 20px 14px', borderBottom: '1px solid #f0f2f5', flexWrap: 'wrap',
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '12px 16px 14px', borderBottom: '1px solid #f0f2f5', flexWrap: 'wrap', rowGap: 8,
               }}>
-                <div style={{ position: 'relative', flex: 1, minWidth: 180, maxWidth: 280 }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: 120, maxWidth: 280 }}>
                   <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2"
                     style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
                     <circle cx="9" cy="9" r="6"/><path d="M15 15l-3.5-3.5" strokeLinecap="round"/>
@@ -693,11 +736,12 @@ export default function AccountsPage() {
                   />
                 </div>
 
-                <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto' }}>
+                <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto', whiteSpace: 'nowrap', flexShrink: 0 }}>
                   {totalFiltered.length} account{totalFiltered.length !== 1 ? 's' : ''}
                 </span>
 
                 {/* Refresh button */}
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                 <button
                   onClick={loadData}
                   disabled={loading}
@@ -720,15 +764,16 @@ export default function AccountsPage() {
                   </svg>
                   Refresh
                 </button>
+                </div>
               </div>
 
-              {/* Error */}
               {error && (
                 <div style={{
-                  background: '#fff0ee', color: '#c13515',
-                  padding: '10px 20px', fontSize: '0.875rem',
+                  background: '#fee2e2', color: '#b91c1c',
+                  borderRadius: 'var(--radius-sm)', padding: '12px 16px',
+                  fontSize: '.875rem', fontWeight: 500, margin: '12px 16px 0',
                 }}>
-                  {error}
+                  ⚠️ {error}
                 </div>
               )}
 
@@ -742,8 +787,8 @@ export default function AccountsPage() {
                   {combined.length === 0 ? 'No accounts yet.' : 'No results match your search.'}
                 </div>
               ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 650 }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid #f0f2f5' }}>
                         {['Account', 'Role', 'PIN Status', 'Attempts', 'Locked Until', 'Last Login', ''].map(h => (
