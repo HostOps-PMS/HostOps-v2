@@ -9,110 +9,128 @@
 //   propertyIndex  (optional) — 0-based index into client.properties[].
 //                               Omit to fetch ALL properties for this client.
 //
-// Each property has its own smoobuApiKey stored encrypted in the DB.
-// For each key we call GET /apartments (Smoobu) to list all sub-apartments,
-// then GET /apartments/:id for each one to fetch the full detail JSON:
+// Smoobu API strategy:
+//   1. GET /apartments          → list with images[] on EACH apartment object
+//   2. GET /apartments/{id}     → detail with location (lat/lng), rooms, type
 //
-//   {
-//     "location": {
-//       "street":    "3 Tourism Rd, Brgy. Poblacion 3,",
-//       "zip":       "8419",
-//       "city":      "General Luna",
-//       "country":   "Philippines",
-//       "latitude":  "9.7925...",    ← string from Smoobu, we parseFloat
-//       "longitude": "126.1614..."   ← string from Smoobu, we parseFloat
-//     },
-//     "timeZone": "Asia/Manila",
-//     "rooms": {
-//       "maxOccupancy": 4,
-//       "bedrooms":     4,
-//       "bathrooms":    2,
-//       ...
-//     },
-//     "currency": "PHP",
-//     "type": { "id": 2, "name": "Holiday rental" },
-//     "images": [
-//       { "id": 123, "url": "https://..." },
-//       ...
-//     ]
-//   }
-//
-//   Response shape:
-//   {
-//     allApartments: [{
-//       apartmentId, apartmentName, propertyName, clientId, clientName,
-//       street, zip, city, country, latitude, longitude,
-//       timeZone, currency, maxOccupancy, bedrooms, bathrooms, type,
-//       images   // array of { id, url } — may be empty []
-//     }],
-//     propertyCount: number,   // how many DB properties were queried
-//     totalFound:   number,    // total sub-apartments returned by Smoobu
-//   }
+// Images come from step 1 (the list). Step 2 adds coords + room details.
+// We merge both so the response has everything.
 // ─────────────────────────────────────────────────────────────────
 
-import { Router }    from 'express';
-import User          from '../models/user.js';
-import { decrypt }   from '../utils/encryption.js';
-import { getApartments, getApartmentDetail } from '../services/smoobu.js';
+import { Router }  from 'express';
+import User        from '../models/user.js';
+import { decrypt } from '../utils/encryption.js';
 
 const router = Router();
 
-// ── Helper: parse a coordinate value that Smoobu returns as a string ──────────
-// Smoobu returns lat/lng as strings like "9.7925080000000" — we must parseFloat.
-// Returns a finite number or null.
+const SMOOBU_BASE = 'https://login.smoobu.com/api';
+
+// ── In-process cache (same TTL pattern as smoobu.js) ──────────────
+const _cache = new Map();
+function _getCache(key) {
+  const hit = _cache.get(key);
+  if (!hit) return null;
+  if (Date.now() > hit.exp) { _cache.delete(key); return null; }
+  return hit.data;
+}
+function _setCache(key, data, ttlMs = 60_000) {
+  _cache.set(key, { data, exp: Date.now() + ttlMs });
+}
+
+// ── Direct Smoobu fetch (bypasses smoobu.js so we get the FULL response) ──────
+async function smoobuGet(path, apiKey, cacheKey) {
+  const cached = _getCache(cacheKey);
+  if (cached) return cached;
+
+  const res = await fetch(SMOOBU_BASE + path, {
+    headers: { 'Api-Key': apiKey, 'Cache-Control': 'no-cache' },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    const err = new Error(`Smoobu ${res.status} ${path}: ${text}`);
+    err.status = res.status;
+    throw err;
+  }
+  const data = await res.json();
+  _setCache(cacheKey, data);
+  return data;
+}
+
+// ── Helper: parse coord strings ───────────────────────────────────
 function toCoord(val) {
   if (val === null || val === undefined || val === '') return null;
   const n = parseFloat(val);
   return Number.isFinite(n) ? n : null;
 }
 
-// ── Helper: fetch all sub-apartments for one Smoobu API key ───────
-async function fetchApartmentsForKey(propertyCtx, propertyName, clientId, clientName) {
-  const { apartments } = await getApartments(propertyCtx);
+// ── Helper: extract images from ANY Smoobu response shape ─────────
+// Smoobu returns images on BOTH the list endpoint (per apt object)
+// and the detail endpoint. Field names vary by API version.
+function extractImages(obj) {
+  if (!obj) return [];
 
-  console.log(`[smoobuApartments] property="${propertyName}" client=${clientId} → ${apartments.length} apartments from Smoobu`);
+  // Try every known field name
+  const raw = Array.isArray(obj.images)   ? obj.images
+            : Array.isArray(obj.pictures) ? obj.pictures
+            : Array.isArray(obj.photos)   ? obj.photos
+            : null;
+
+  if (!raw) return [];
+
+  return raw
+    .filter((img) => img != null)
+    .map((img) => {
+      if (typeof img === 'string' && img.trim())
+        return { id: null, url: img.trim() };
+      if (img && typeof img.url === 'string' && img.url.trim())
+        return { id: img.id ?? null, url: img.url.trim() };
+      if (img && typeof img.image === 'string' && img.image.trim())
+        return { id: img.id ?? null, url: img.image.trim() };
+      return null;
+    })
+    .filter(Boolean);
+}
+
+// ── Main fetch: list + detail per apartment ───────────────────────
+async function fetchApartmentsForKey(apiKey, propId, propertyName, clientId, clientName) {
+  // Step 1 — GET /apartments (list): has name, id, AND images[] per item
+  const listData = await smoobuGet('/apartments', apiKey, `${propId}:/apartments`);
+
+  // Log the raw list to see its shape
+  const firstApt = (listData?.apartments ?? [])[0];
+  if (firstApt) {
+    console.log(`[smoobuApartments] LIST apt keys:`, Object.keys(firstApt));
+    console.log(`[smoobuApartments] LIST apt.images raw:`, JSON.stringify(firstApt.images ?? firstApt.pictures ?? 'MISSING').slice(0, 400));
+  }
+
+  const aptList = listData?.apartments ?? [];
+  console.log(`[smoobuApartments] property="${propertyName}" → ${aptList.length} apartments from list`);
 
   const results = await Promise.all(
-    apartments.map(async (apt) => {
+    aptList.map(async (apt) => {
       const aptId = apt.id ?? apt;
+
+      // Images from the LIST endpoint — this is the reliable source
+      const listImages = extractImages(apt);
+
       try {
-        // GET /apartments/{id} — returns full detail including location with lat/lng
-        const detail = await getApartmentDetail(propertyCtx, aptId);
+        // Step 2 — GET /apartments/{id}: adds location, rooms, type
+        const detail = await smoobuGet(
+          `/apartments/${aptId}`,
+          apiKey,
+          `${propId}:/apartments/${aptId}`
+        );
 
-        // Smoobu returns location.latitude and location.longitude as STRINGS,
-        // e.g. "9.7925080000000" — always parseFloat before storing.
+        // Log detail shape once
+        console.log(`[smoobuApartments]   detail apt ${aptId} keys:`, Object.keys(detail || {}));
+        const detailImages = extractImages(detail);
+
+        // Prefer list images (usually has more), fall back to detail images
+        const images = listImages.length > 0 ? listImages : detailImages;
+
+        console.log(`[smoobuApartments]   apt ${aptId} "${apt.name || detail?.name}" → listImgs=${listImages.length} detailImgs=${detailImages.length} using=${images.length}`);
+
         const loc = detail?.location || {};
-        const lat = toCoord(loc.latitude);
-        const lng = toCoord(loc.longitude);
-
-        // ── Extract images ─────────────────────────────────────────
-        // Smoobu API uses different field names depending on version:
-        //   Standard: "images" → [{ id, url }]
-        //   Older:    "pictures" → [{ id, url }] or [{ id, image }]
-        //   Some:     plain string array
-        // Log the full key list + raw images field once for debugging.
-        console.log(`[smoobuApartments]   apt ${aptId} detail keys:`, Object.keys(detail || {}));
-        const _rawImgField = detail?.images ?? detail?.pictures;
-        console.log(`[smoobuApartments]   apt ${aptId} raw images field:`, JSON.stringify(_rawImgField ?? 'MISSING').slice(0, 400));
-
-        const rawImages = Array.isArray(detail?.images)   ? detail.images
-                        : Array.isArray(detail?.pictures) ? detail.pictures
-                        : [];
-
-        const images = rawImages
-          .filter((img) => img != null)
-          .map((img) => {
-            if (typeof img === 'string' && img.trim())
-              return { id: null, url: img.trim() };
-            if (typeof img.url === 'string' && img.url.trim())
-              return { id: img.id ?? null, url: img.url.trim() };
-            if (typeof img.image === 'string' && img.image.trim())
-              return { id: img.id ?? null, url: img.image.trim() };
-            return null;
-          })
-          .filter(Boolean);
-
-        console.log(`[smoobuApartments]   apt ${aptId} "${apt.name || detail?.name}" → lat=${lat} lng=${lng} city="${loc.city || ''}" images=${images.length}`);
 
         return {
           apartmentId:   aptId,
@@ -120,27 +138,24 @@ async function fetchApartmentsForKey(propertyCtx, propertyName, clientId, client
           propertyName,
           clientId,
           clientName,
-          // Address fields from Smoobu location object
           street:    loc.street  || '',
           zip:       loc.zip     || '',
           city:      loc.city    || '',
           country:   loc.country || '',
-          // Coordinates — parsed from strings
-          latitude:  lat,
-          longitude: lng,
-          // Extra detail fields
+          latitude:  toCoord(loc.latitude),
+          longitude: toCoord(loc.longitude),
           timeZone:     detail?.timeZone || null,
           currency:     detail?.currency || null,
           maxOccupancy: detail?.rooms?.maxOccupancy ?? null,
           bedrooms:     detail?.rooms?.bedrooms     ?? null,
           bathrooms:    detail?.rooms?.bathrooms    ?? null,
           type:         detail?.type?.name          || null,
-          // Images from Smoobu — array of { id, url }; empty [] when none set
           images,
         };
       } catch (detailErr) {
-        // Detail failed — return stub so counts stay consistent
-        console.warn(`[smoobuApartments] detail fetch failed for apt ${aptId} in "${propertyName}":`, detailErr.message);
+        console.warn(`[smoobuApartments] detail failed apt ${aptId}:`, detailErr.message);
+        // Still return what we have from the list — coords will be null
+        // but at least images from the list can show in the UI
         return {
           apartmentId:   aptId,
           apartmentName: apt.name || `Apartment ${aptId}`,
@@ -148,11 +163,10 @@ async function fetchApartmentsForKey(propertyCtx, propertyName, clientId, client
           clientId,
           clientName,
           street: '', zip: '', city: '', country: '',
-          latitude:  null,
-          longitude: null,
+          latitude: null, longitude: null,
           timeZone: null, currency: null,
           maxOccupancy: null, bedrooms: null, bathrooms: null, type: null,
-          images: [],
+          images: listImages,
           fetchError: detailErr.message,
         };
       }
@@ -165,22 +179,18 @@ async function fetchApartmentsForKey(propertyCtx, propertyName, clientId, client
 // ── Route ─────────────────────────────────────────────────────────
 router.get('/:clientId/smoobu-apartments', async (req, res) => {
   try {
-    const { clientId } = req.params;
-    const { propertyIndex } = req.query; // optional
+    const { clientId }      = req.params;
+    const { propertyIndex } = req.query;
 
-    // Only admin/team_leader may call this endpoint
     if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'team_leader')) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    // Load the client (include properties with smoobuApiKey via lean)
     const client = await User.findById(clientId)
       .select('businessName firstName lastName email properties')
       .lean();
 
-    if (!client) {
-      return res.status(404).json({ error: 'Client not found' });
-    }
+    if (!client) return res.status(404).json({ error: 'Client not found' });
 
     const clientName = client.businessName ||
       [client.firstName, client.lastName].filter(Boolean).join(' ') ||
@@ -188,56 +198,55 @@ router.get('/:clientId/smoobu-apartments', async (req, res) => {
 
     const allProps = Array.isArray(client.properties) ? client.properties : [];
 
-    // Determine which properties to query
     let propsToQuery = [];
     if (propertyIndex !== undefined && propertyIndex !== null && propertyIndex !== '') {
       const idx = parseInt(propertyIndex, 10);
       if (isNaN(idx) || idx < 0 || idx >= allProps.length) {
-        return res.status(400).json({ error: `propertyIndex ${propertyIndex} is out of range (0–${allProps.length - 1})` });
+        return res.status(400).json({
+          error: `propertyIndex ${propertyIndex} is out of range (0–${allProps.length - 1})`,
+        });
       }
       propsToQuery = [{ prop: allProps[idx], propName: allProps[idx].propertyName || `Property ${idx + 1}` }];
     } else {
-      // All properties for this client
       propsToQuery = allProps.map((prop, i) => ({
         prop,
         propName: prop.propertyName || `Property ${i + 1}`,
       }));
     }
 
-    // For each property, decrypt the key and fetch sub-apartments
     const allApartments = [];
 
     await Promise.all(
       propsToQuery.map(async ({ prop, propName }) => {
-        if (!prop.smoobuApiKey || !prop.smoobuApiKey.trim()) {
-          console.warn(`[smoobuApartments] property "${propName}" of client ${clientId} has no API key — skipping`);
+        if (!prop.smoobuApiKey?.trim()) {
+          console.warn(`[smoobuApartments] "${propName}" has no API key — skipping`);
           return;
         }
 
         let decryptedKey = '';
         try {
-          decryptedKey = decrypt(prop.smoobuApiKey) || '';
+          decryptedKey = (decrypt(prop.smoobuApiKey) || '').trim();
         } catch (e) {
-          console.warn(`[smoobuApartments] decrypt failed for property "${propName}":`, e.message);
+          console.warn(`[smoobuApartments] decrypt failed for "${propName}":`, e.message);
           return;
         }
 
-        if (!decryptedKey || !decryptedKey.trim()) {
-          console.warn(`[smoobuApartments] empty key after decrypt for property "${propName}" — skipping`);
+        if (!decryptedKey) {
+          console.warn(`[smoobuApartments] empty key after decrypt for "${propName}" — skipping`);
           return;
         }
-
-        const propertyCtx = {
-          _id:          String(prop._id),
-          smoobuApiKey: decryptedKey.trim(),
-        };
 
         try {
-          const apts = await fetchApartmentsForKey(propertyCtx, propName, String(clientId), clientName);
+          const apts = await fetchApartmentsForKey(
+            decryptedKey,
+            String(prop._id),
+            propName,
+            String(clientId),
+            clientName
+          );
           allApartments.push(...apts);
         } catch (fetchErr) {
-          console.warn(`[smoobuApartments] Smoobu fetch failed for property "${propName}":`, fetchErr.message);
-          // Push a stub so the frontend still shows this property in the legend
+          console.warn(`[smoobuApartments] fetch failed for "${propName}":`, fetchErr.message);
           allApartments.push({
             apartmentId:   `stub:${String(prop._id)}`,
             apartmentName: propName,
@@ -245,8 +254,7 @@ router.get('/:clientId/smoobu-apartments', async (req, res) => {
             clientId:      String(clientId),
             clientName,
             street: '', zip: '', city: '', country: '',
-            latitude:  null,
-            longitude: null,
+            latitude: null, longitude: null,
             timeZone: null, currency: null,
             maxOccupancy: null, bedrooms: null, bathrooms: null, type: null,
             images: [],
@@ -257,7 +265,8 @@ router.get('/:clientId/smoobu-apartments', async (req, res) => {
     );
 
     const withCoords = allApartments.filter(a => a.latitude !== null && a.longitude !== null).length;
-    console.log(`[smoobuApartments] client=${clientId} propertyIndex=${propertyIndex ?? 'all'} → ${allApartments.length} apartments (${withCoords} with coords)`);
+    const withImages = allApartments.filter(a => a.images?.length > 0).length;
+    console.log(`[smoobuApartments] client=${clientId} → ${allApartments.length} apts (${withCoords} coords, ${withImages} with images)`);
 
     return res.json({
       allApartments,
