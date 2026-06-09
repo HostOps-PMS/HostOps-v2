@@ -10,7 +10,7 @@
 import express from 'express';
 import { z } from 'zod';
 import User from '../models/user.js';
-import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { requireAuth, requireAdmin, requireAdminOrTeamLeader } from '../middleware/auth.js';
 import { getDashboard } from '../services/smoobu.js';
 import { v2 as cloudinary } from 'cloudinary';
 import multer from 'multer';
@@ -44,12 +44,19 @@ router.use(requireAuth);
 
 // ─────────────────────────────────────────────────────────────────
 // GET /api/clients
-// Returns all registered users.
-// Excludes sensitive fields (password, tokens).
+// Returns registered users.
+// Admins see all users.
+// Team leaders only see their own assigned client (serverId).
 // ─────────────────────────────────────────────────────────────────
-router.get('/clients', requireAdmin, async (req, res, next) => {
+router.get('/clients', requireAdminOrTeamLeader, async (req, res, next) => {
   try {
-    const clients = await User.find({})
+    // Team leaders are scoped to a single client (the one they are assigned to).
+    // Admins get the full list.
+    const filter = req.user.role === 'team_leader'
+      ? { _id: req.user.serverId }
+      : {};
+
+    const clients = await User.find(filter)
       .select('-password -verifyToken -verifyTokenExpiry -resetToken -resetTokenExpiry -__v')
       .sort({ createdAt: -1 })
       .lean();
