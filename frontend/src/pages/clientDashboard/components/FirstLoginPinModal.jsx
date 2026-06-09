@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { changePin } from '../../Login/services/authservice';
+import { useAuth } from '../../AuthContext';
 import safeStorage from '../../safeStorage';
 
 // Inline validation for exactly 6 digits
@@ -21,6 +22,8 @@ function validateNewPin(pin) {
  *  - Modal unmounts and dashboard becomes accessible
  */
 export default function FirstLoginPinModal({ onComplete }) {
+  const auth = useAuth();
+
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin]         = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -46,7 +49,12 @@ export default function FirstLoginPinModal({ onComplete }) {
 
     setLoading(true);
     try {
-      const data = await changePin({ currentPin, newPin });
+      // ── FIX: pass the in-memory access token so the backend's
+      // requireAuth middleware receives the Authorization header.
+      // Without this, the request arrives with no Bearer token and
+      // the server returns 401 "Missing token".
+      const currentToken = auth.getToken();
+      const data = await changePin({ currentPin, newPin }, currentToken);
 
       // Construct the full updated user object
       let updatedUser = null;

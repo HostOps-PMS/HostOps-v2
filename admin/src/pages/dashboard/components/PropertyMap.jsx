@@ -201,6 +201,8 @@ function useSmoobuApartments(clientId, propertyIndex) {
         ...a,
         latitude:  toCoord(a.latitude),
         longitude: toCoord(a.longitude),
+        // Ensure images is always an array — backend guarantees this but guard anyway
+        images: Array.isArray(a.images) ? a.images : [],
       }));
       const withCoords = apts.filter(a => a.latitude !== null && a.longitude !== null).length;
       console.log(`[PropertyMap] smoobu-apartments client=${clientId} propIdx=${propertyIndex ?? 'all'} → ${apts.length} apts (${withCoords} with coords)`, apts[0]);
@@ -397,19 +399,32 @@ function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId, mapS
         color,
       };
 
-      const popupHtml = `
-        <div style="font-size:11.5px;line-height:1.45;width:220px;overflow:hidden;border-radius:10px;margin:-9px -11px;">
-          <div style="height:90px;background:linear-gradient(135deg,#9FE1CB,#085041);display:flex;align-items:center;justify-content:center;position:relative;">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 22V12h6v10"/><path d="M3 9h18"/></svg>
-            <span style="position:absolute;bottom:7px;left:9px;font-size:10px;color:rgba(255,255,255,0.85);background:rgba(0,0,0,0.28);padding:2px 8px;border-radius:20px;">No photo yet · Add one →</span>
-          </div>
-          <div style="padding:10px 12px 12px;">
-            <div style="font-weight:700;font-size:13px;margin-bottom:2px;color:#111827;">${escHtml(label)}</div>
-            ${client ? `<div style="color:#1a9e6e;font-weight:600;font-size:11.5px;margin-bottom:5px;">${escHtml(client)}</div>` : ''}
-            ${addr ? `<div style="display:flex;align-items:flex-start;gap:4px;color:#6b7280;font-size:11px;margin-bottom:3px;"><span>📍</span><span>${escHtml(addr)}</span></div>` : ''}
-            ${p.type || p.maxOccupancy != null ? `<div style="display:flex;align-items:center;gap:4px;color:#6b7280;font-size:11px;"><span>🏠</span><span>${escHtml(p.type || '')}${p.type && p.maxOccupancy != null ? ' · ' : ''}${p.maxOccupancy != null ? 'Max ' + p.maxOccupancy : ''}</span></div>` : ''}
-          </div>
-        </div>`;
+      const popupHtml = (() => {
+        const firstImg  = Array.isArray(p.images) && p.images.length > 0 ? p.images[0].url : null;
+        const imgCount  = Array.isArray(p.images) ? p.images.length : 0;
+        const heroHtml  = firstImg
+          ? `<img src="${escHtml(firstImg)}" alt="${escHtml(label)}" style="width:100%;height:90px;object-fit:cover;display:block;" loading="lazy" />`
+          : `<div style="height:90px;background:linear-gradient(135deg,#9FE1CB,#085041);display:flex;align-items:center;justify-content:center;position:relative;">
+               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 22V12h6v10"/><path d="M3 9h18"/></svg>
+               <span style="position:absolute;bottom:7px;left:9px;font-size:10px;color:rgba(255,255,255,0.85);background:rgba(0,0,0,0.28);padding:2px 8px;border-radius:20px;">No photo yet · Add one →</span>
+             </div>`;
+        const countBadge = firstImg && imgCount > 1
+          ? `<span style="position:absolute;top:6px;right:8px;font-size:9.5px;color:#fff;background:rgba(0,0,0,0.42);padding:2px 7px;border-radius:20px;">📷 ${imgCount}</span>`
+          : '';
+        return `
+          <div style="font-size:11.5px;line-height:1.45;width:220px;overflow:hidden;border-radius:10px;margin:-9px -11px;">
+            <div style="position:relative;overflow:hidden;">
+              ${heroHtml}
+              ${countBadge}
+            </div>
+            <div style="padding:10px 12px 12px;">
+              <div style="font-weight:700;font-size:13px;margin-bottom:2px;color:#111827;">${escHtml(label)}</div>
+              ${client ? `<div style="color:#1a9e6e;font-weight:600;font-size:11.5px;margin-bottom:5px;">${escHtml(client)}</div>` : ''}
+              ${addr ? `<div style="display:flex;align-items:flex-start;gap:4px;color:#6b7280;font-size:11px;margin-bottom:3px;"><span>📍</span><span>${escHtml(addr)}</span></div>` : ''}
+              ${p.type || p.maxOccupancy != null ? `<div style="display:flex;align-items:center;gap:4px;color:#6b7280;font-size:11px;"><span>🏠</span><span>${escHtml(p.type || '')}${p.type && p.maxOccupancy != null ? ' · ' : ''}${p.maxOccupancy != null ? 'Max ' + p.maxOccupancy : ''}</span></div>` : ''}
+            </div>
+          </div>`;
+      })();
       // Compact popup — no close button, no auto-pan; shown on HOVER only.
       marker.bindPopup(popupHtml, {
         closeButton: false,
@@ -513,7 +528,116 @@ function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId, mapS
   return {};
 }
 
-// ── Main Component ────────────────────────────────────────────────
+// ── PhotoCarousel — used in the modal Detail panel ────────────────
+// Shows apartment images from Smoobu with prev/next navigation.
+// Falls back to the branded gradient when no images are available.
+function PhotoCarousel({ images = [], altText = '' }) {
+  const [idx, setIdx] = useState(0);
+  const valid = images.filter((img) => img && img.url);
+
+  if (valid.length === 0) {
+    return (
+      <div style={{
+        height: 140,
+        background: 'linear-gradient(135deg,#9FE1CB,#085041)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'relative', flexShrink: 0, overflow: 'hidden',
+      }}>
+        <span style={{ fontSize: 36, opacity: 0.45 }}>🏢</span>
+        <span style={{
+          position: 'absolute', bottom: 8, left: 10,
+          fontSize: '.63rem', color: 'rgba(255,255,255,0.85)',
+          background: 'rgba(0,0,0,0.28)', padding: '2px 8px', borderRadius: 20,
+        }}>No photo yet</span>
+        <button style={{
+          position: 'absolute', bottom: 8, right: 10,
+          fontSize: '.63rem', background: 'rgba(255,255,255,0.92)',
+          border: 'none', padding: '3px 9px', borderRadius: 20,
+          cursor: 'pointer', fontFamily: 'var(--font-body)',
+        }}>↑ Add photo</button>
+      </div>
+    );
+  }
+
+  const prev = () => setIdx((i) => (i - 1 + valid.length) % valid.length);
+  const next = () => setIdx((i) => (i + 1) % valid.length);
+
+  return (
+    <div style={{ position: 'relative', height: 140, flexShrink: 0, overflow: 'hidden', background: '#111' }}>
+      <img
+        key={valid[idx].url}
+        src={valid[idx].url}
+        alt={altText}
+        style={{
+          width: '100%', height: '100%',
+          objectFit: 'cover', display: 'block',
+          transition: 'opacity 0.2s',
+        }}
+        loading="lazy"
+      />
+      {/* Count badge */}
+      <span style={{
+        position: 'absolute', top: 8, right: 8,
+        fontSize: '.6rem', color: '#fff',
+        background: 'rgba(0,0,0,0.50)', padding: '2px 8px', borderRadius: 20,
+        pointerEvents: 'none',
+      }}>
+        📷 {idx + 1} / {valid.length}
+      </span>
+      {/* Prev / Next — only shown when there are multiple images */}
+      {valid.length > 1 && (
+        <>
+          <button
+            onClick={prev}
+            style={{
+              position: 'absolute', left: 6, top: '50%', transform: 'translateY(-50%)',
+              width: 26, height: 26, borderRadius: '50%',
+              border: 'none', cursor: 'pointer',
+              background: 'rgba(0,0,0,0.45)', color: '#fff',
+              fontSize: 13, lineHeight: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            aria-label="Previous photo"
+          >‹</button>
+          <button
+            onClick={next}
+            style={{
+              position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+              width: 26, height: 26, borderRadius: '50%',
+              border: 'none', cursor: 'pointer',
+              background: 'rgba(0,0,0,0.45)', color: '#fff',
+              fontSize: 13, lineHeight: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            aria-label="Next photo"
+          >›</button>
+          {/* Dot indicators */}
+          <div style={{
+            position: 'absolute', bottom: 6, left: '50%', transform: 'translateX(-50%)',
+            display: 'flex', gap: 4,
+          }}>
+            {valid.map((_, di) => (
+              <button
+                key={di}
+                onClick={() => setIdx(di)}
+                style={{
+                  width: di === idx ? 14 : 6,
+                  height: 6, borderRadius: 3,
+                  border: 'none', padding: 0,
+                  background: di === idx ? '#fff' : 'rgba(255,255,255,0.45)',
+                  cursor: 'pointer', transition: 'width 0.2s, background 0.2s',
+                }}
+                aria-label={`Photo ${di + 1}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
 export default function PropertyMap({ mapLocations, loading }) {
   const [selectedClient,    setSelectedClient]    = useState('all');
   const [selectedPropIndex, setSelectedPropIndex] = useState(null);
@@ -1201,11 +1325,10 @@ export default function PropertyMap({ mapLocations, loading }) {
                 {/* Detail tab */}
                 {selectedLegendApt && (
                   <div style={{ width: '100%', overflowY: 'auto', flex: 1 }}>
-                    <div style={{ height: 110, background: 'linear-gradient(135deg,#9FE1CB,#085041)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', flexShrink: 0 }}>
-                      <span style={{ fontSize: 32, opacity: 0.5 }}>🏢</span>
-                      <span style={{ position: 'absolute', bottom: 7, left: 10, fontSize: '.65rem', color: 'rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.28)', padding: '2px 8px', borderRadius: 20 }}>No photo yet</span>
-                      <button style={{ position: 'absolute', bottom: 7, right: 10, fontSize: '.65rem', background: 'rgba(255,255,255,0.92)', border: 'none', padding: '3px 9px', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>↑ Add photo</button>
-                    </div>
+                    <PhotoCarousel
+                      images={selectedLegendApt.images ?? []}
+                      altText={selectedLegendApt.apartmentName || selectedLegendApt.propertyName || ''}
+                    />
                     <div style={{ padding: '14px' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
                         <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>

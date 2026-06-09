@@ -30,7 +30,11 @@
 //       ...
 //     },
 //     "currency": "PHP",
-//     "type": { "id": 2, "name": "Holiday rental" }
+//     "type": { "id": 2, "name": "Holiday rental" },
+//     "images": [
+//       { "id": 123, "url": "https://..." },
+//       ...
+//     ]
 //   }
 //
 //   Response shape:
@@ -38,7 +42,8 @@
 //     allApartments: [{
 //       apartmentId, apartmentName, propertyName, clientId, clientName,
 //       street, zip, city, country, latitude, longitude,
-//       timeZone, currency, maxOccupancy, bedrooms, bathrooms, type
+//       timeZone, currency, maxOccupancy, bedrooms, bathrooms, type,
+//       images   // array of { id, url } — may be empty []
 //     }],
 //     propertyCount: number,   // how many DB properties were queried
 //     totalFound:   number,    // total sub-apartments returned by Smoobu
@@ -80,7 +85,16 @@ async function fetchApartmentsForKey(propertyCtx, propertyName, clientId, client
         const lat = toCoord(loc.latitude);
         const lng = toCoord(loc.longitude);
 
-        console.log(`[smoobuApartments]   apt ${aptId} "${apt.name || detail?.name}" → lat=${lat} lng=${lng} city="${loc.city || ''}"`);
+        // ── Extract images ─────────────────────────────────────────
+        // Smoobu returns an `images` array on the detail object.
+        // Each element has at minimum: { id, url }
+        // We only keep id + url to keep the payload lean.
+        const rawImages = Array.isArray(detail?.images) ? detail.images : [];
+        const images = rawImages
+          .filter((img) => img && typeof img.url === 'string' && img.url.trim())
+          .map((img) => ({ id: img.id ?? null, url: img.url.trim() }));
+
+        console.log(`[smoobuApartments]   apt ${aptId} "${apt.name || detail?.name}" → lat=${lat} lng=${lng} city="${loc.city || ''}" images=${images.length}`);
 
         return {
           apartmentId:   aptId,
@@ -103,6 +117,8 @@ async function fetchApartmentsForKey(propertyCtx, propertyName, clientId, client
           bedrooms:     detail?.rooms?.bedrooms     ?? null,
           bathrooms:    detail?.rooms?.bathrooms    ?? null,
           type:         detail?.type?.name          || null,
+          // Images from Smoobu — array of { id, url }; empty [] when none set
+          images,
         };
       } catch (detailErr) {
         // Detail failed — return stub so counts stay consistent
@@ -118,6 +134,7 @@ async function fetchApartmentsForKey(propertyCtx, propertyName, clientId, client
           longitude: null,
           timeZone: null, currency: null,
           maxOccupancy: null, bedrooms: null, bathrooms: null, type: null,
+          images: [],
           fetchError: detailErr.message,
         };
       }
@@ -214,6 +231,7 @@ router.get('/:clientId/smoobu-apartments', async (req, res) => {
             longitude: null,
             timeZone: null, currency: null,
             maxOccupancy: null, bedrooms: null, bathrooms: null, type: null,
+            images: [],
             fetchError: fetchErr.message,
           });
         }
