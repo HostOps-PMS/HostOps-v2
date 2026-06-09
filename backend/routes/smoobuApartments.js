@@ -86,13 +86,31 @@ async function fetchApartmentsForKey(propertyCtx, propertyName, clientId, client
         const lng = toCoord(loc.longitude);
 
         // ── Extract images ─────────────────────────────────────────
-        // Smoobu returns an `images` array on the detail object.
-        // Each element has at minimum: { id, url }
-        // We only keep id + url to keep the payload lean.
-        const rawImages = Array.isArray(detail?.images) ? detail.images : [];
+        // Smoobu API uses different field names depending on version:
+        //   Standard: "images" → [{ id, url }]
+        //   Older:    "pictures" → [{ id, url }] or [{ id, image }]
+        //   Some:     plain string array
+        // Log the full key list + raw images field once for debugging.
+        console.log(`[smoobuApartments]   apt ${aptId} detail keys:`, Object.keys(detail || {}));
+        const _rawImgField = detail?.images ?? detail?.pictures;
+        console.log(`[smoobuApartments]   apt ${aptId} raw images field:`, JSON.stringify(_rawImgField ?? 'MISSING').slice(0, 400));
+
+        const rawImages = Array.isArray(detail?.images)   ? detail.images
+                        : Array.isArray(detail?.pictures) ? detail.pictures
+                        : [];
+
         const images = rawImages
-          .filter((img) => img && typeof img.url === 'string' && img.url.trim())
-          .map((img) => ({ id: img.id ?? null, url: img.url.trim() }));
+          .filter((img) => img != null)
+          .map((img) => {
+            if (typeof img === 'string' && img.trim())
+              return { id: null, url: img.trim() };
+            if (typeof img.url === 'string' && img.url.trim())
+              return { id: img.id ?? null, url: img.url.trim() };
+            if (typeof img.image === 'string' && img.image.trim())
+              return { id: img.id ?? null, url: img.image.trim() };
+            return null;
+          })
+          .filter(Boolean);
 
         console.log(`[smoobuApartments]   apt ${aptId} "${apt.name || detail?.name}" → lat=${lat} lng=${lng} city="${loc.city || ''}" images=${images.length}`);
 
