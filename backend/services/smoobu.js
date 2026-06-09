@@ -133,6 +133,98 @@ export async function getApartmentDetail(user, apartmentId) {
   return data;
 }
 
+// ─────────────────────────────────────────────────────────────────
+// GET APARTMENT PICTURES  (GET /apartments/{id}/pictures)
+//
+// Smoobu stores images on a SEPARATE endpoint — they do NOT appear on
+// GET /apartments or GET /apartments/{id}.  This function tries every
+// known Smoobu image sub-path so we find them regardless of API version:
+//   /apartments/{id}/pictures   ← primary (confirmed in Smoobu docs v2)
+//   /apartments/{id}/photos     ← older API versions
+//   /apartments/{id}/images     ← some white-label builds
+//
+// Returns a normalised array: [{ id, url }, ...]
+// Returns [] on any error so callers never break.
+// Full raw response is logged on the first apartment so you can see the
+// exact field names Smoobu uses for YOUR account.
+// ─────────────────────────────────────────────────────────────────
+export async function getApartmentPictures(user, apartmentId) {
+  const apiKey = getApiKeyForUser(user);
+  const userId = getCacheUserId(user);
+
+  const paths = [
+    `/apartments/${apartmentId}/pictures`,
+    `/apartments/${apartmentId}/photos`,
+    `/apartments/${apartmentId}/images`,
+  ];
+
+  for (const path of paths) {
+    try {
+      const data = await smoobuRequest(path, apiKey, userId);
+
+      // Diagnostic: log the full raw shape so we know what Smoobu actually sends
+      console.log(`[smoobu] getApartmentPictures apt=${apartmentId} path=${path} → keys:`, Object.keys(data || {}));
+      const arrayKeys = Object.keys(data || {}).filter((k) => Array.isArray(data[k]));
+      console.log(`[smoobu] getApartmentPictures apt=${apartmentId} array-keys:`, arrayKeys);
+      if (arrayKeys.length > 0) {
+        arrayKeys.forEach((k) => {
+          console.log(`[smoobu]   data.${k}[0]:`, JSON.stringify((data[k] || [])[0]).slice(0, 200));
+        });
+      }
+
+      // Extract from every known shape
+      const raw =
+        Array.isArray(data)           ? data              // bare array
+      : Array.isArray(data?.pictures) ? data.pictures
+      : Array.isArray(data?.photos)   ? data.photos
+      : Array.isArray(data?.images)   ? data.images
+      : Array.isArray(data?.media)    ? data.media
+      : Array.isArray(data?.gallery)  ? data.gallery
+      : Array.isArray(data?.data)     ? data.data         // paginated wrapper
+      : [];
+
+      if (raw.length === 0) {
+        console.log(`[smoobu] getApartmentPictures apt=${apartmentId} path=${path} → empty, trying next`);
+        continue;
+      }
+
+      const normalised = raw
+        .filter((img) => img != null)
+        .map((img) => {
+          if (typeof img === 'string' && img.trim())
+            return { id: null, url: img.trim() };
+          if (img && typeof img.url === 'string' && img.url.trim())
+            return { id: img.id ?? null, url: img.url.trim() };
+          if (img && typeof img.image === 'string' && img.image.trim())
+            return { id: img.id ?? null, url: img.image.trim() };
+          if (img && typeof img.src === 'string' && img.src.trim())
+            return { id: img.id ?? null, url: img.src.trim() };
+          if (img && typeof img.link === 'string' && img.link.trim())
+            return { id: img.id ?? null, url: img.link.trim() };
+          if (img && typeof img.picture === 'string' && img.picture.trim())
+            return { id: img.id ?? null, url: img.picture.trim() };
+          return null;
+        })
+        .filter(Boolean);
+
+      console.log(`[smoobu] getApartmentPictures apt=${apartmentId} → found ${normalised.length} images via ${path}`);
+      return normalised;
+    } catch (err) {
+      // 404 = endpoint doesn't exist for this Smoobu account; try next path
+      if (err.status === 404 || err.status === 405) {
+        console.log(`[smoobu] getApartmentPictures apt=${apartmentId} path=${path} → ${err.status}, trying next`);
+        continue;
+      }
+      // Any other error (401, 500, network) — bail out entirely, don't spam
+      console.warn(`[smoobu] getApartmentPictures apt=${apartmentId} path=${path} → error:`, err.message);
+      return [];
+    }
+  }
+
+  console.log(`[smoobu] getApartmentPictures apt=${apartmentId} → all paths exhausted, returning []`);
+  return [];
+}
+
 export async function getBookings(user, { from, to, apartmentId, showCancellation = true } = {}) {
   const apiKey = getApiKeyForUser(user);
   const userId = getCacheUserId(user);

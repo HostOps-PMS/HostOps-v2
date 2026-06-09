@@ -23,7 +23,7 @@
 // ─────────────────────────────────────────────────────────────────
 
 import User  from '../models/user.js';
-import { getApartments, getBookings, getApiKeyForUser, getApartmentDetail } from './smoobu.js';
+import { getApartments, getBookings, getApiKeyForUser, getApartmentDetail, getApartmentPictures } from './smoobu.js';
 import { decrypt } from '../utils/encryption.js';
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -185,7 +185,22 @@ async function fetchPropertyData(propertyCtx, dateRange, clientId, clientName, p
         // Also extract images from the detail response as a fallback
         const detailImages = extractImages(detail);
         // Prefer list images (richer); fall back to detail images
-        const images = listImages.length > 0 ? listImages : detailImages;
+        let images = listImages.length > 0 ? listImages : detailImages;
+
+        // ── Step 3: dedicated pictures endpoint ─────────────────────────────
+        // If neither the list nor the detail returned any images, hit the
+        // separate GET /apartments/{id}/pictures endpoint.  Smoobu stores
+        // photos there on most account configurations and does NOT include
+        // them in the list or detail responses.
+        if (images.length === 0) {
+          try {
+            const picImages = await getApartmentPictures(propertyCtx, aptId);
+            if (picImages.length > 0) images = picImages;
+          } catch (picErr) {
+            console.warn(`[overview] pictures endpoint failed apt ${aptId}:`, picErr.message);
+          }
+        }
+
         console.log(`[overview] apt ${aptId} "${apt.name}" listImgs=${listImages.length} detailImgs=${detailImages.length} using=${images.length}`);
         return {
           apartmentId:  aptId,
