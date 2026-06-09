@@ -1,45 +1,6 @@
-// components/PropertyMap.jsx
-// ─────────────────────────────────────────────────────────────────
-// Leaflet.js map + real markers + side legend.
-//
-// FIX (CSP): Previously loaded Leaflet from CDN via dynamic <script>
-// injection, which was blocked by the server's Content-Security-Policy
-// (scriptSrc: ["'self'"]).  Now imports Leaflet directly from the npm
-// package so it is bundled by Vite — no external script needed.
-//
-// Run once in your project root if not already installed:
-//   npm install leaflet leaflet.markercluster
-//   npm install -D @types/leaflet
-//
-// Flow:
-//   1. Dropdown 1 — Business Account  (from /api/accounts)
-//   2. Dropdown 2 — Property          (DB properties of selected client)
-//   3. Dropdown 3 — Room / Apartment  (from Smoobu sub-apartments; only
-//                                      visible when a specific property
-//                                      is selected)
-//      Selecting a room highlights it in the legend and flies the map
-//      to that marker, opening its popup automatically.
-//
-// Colour consistency:
-//   Marker colour is derived from a stable hash of apartmentId — NOT
-//   the array index.  This means legend dot colour always matches the
-//   map marker colour even when some apartments have no coordinates
-//   (those are excluded from the map but still shown in the legend).
-//
-// Coordinate handling:
-//   Smoobu returns latitude/longitude as STRINGS ("9.7925080000000").
-//   toCoord() calls parseFloat() and rejects non-finite values.
-// ─────────────────────────────────────────────────────────────────
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-
-// ── Leaflet npm imports ───────────────────────────────────────────
-// Bundled by Vite — no external script injection, no window.L, no CSP issues.
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-
-// markercluster: optional plugin for spiderfy on overlapping markers.
-// Import order matters — core Leaflet must be imported first.
-// If the package is not installed the catch below prevents a hard crash.
 let markerClusterReady = false;
 try {
   await import('leaflet.markercluster');
@@ -51,9 +12,6 @@ try {
   console.warn('[PropertyMap] leaflet.markercluster not installed — using plain markers');
 }
 
-// ── Fix Leaflet default icon paths broken by Vite asset hashing ──
-// Without this every marker shows a broken image instead of the pin icon.
-// We use a coloured divIcon anyway, but fixing it prevents console noise.
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: new URL('leaflet/dist/images/marker-icon-2x.png', import.meta.url).href,
@@ -64,9 +22,19 @@ L.Icon.Default.mergeOptions({
 const COLORS = ['#1a9e6e','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4',
                 '#ec4899','#14b8a6','#f97316','#a855f7'];
 
-// ── Stable colour from apartmentId ───────────────────────────────
-// Uses a simple hash so the same apartment always gets the same colour
-// regardless of its position in the sorted array.
+const MAP_STYLES = {
+  standard: {
+    label: 'Standard',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  },
+  satellite: {
+    label: 'Satellite',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: '© <a href="https://www.esri.com">Esri</a> — Esri, Maxar, Earthstar Geographics',
+  },
+};
+
 function colorForId(id) {
   let h = 0;
   const s = String(id ?? '');
@@ -76,13 +44,6 @@ function colorForId(id) {
   return COLORS[Math.abs(h) % COLORS.length];
 }
 
-// ── Jitter helper ─────────────────────────────────────────────────
-// NOTE: No longer used by the map. We previously nudged overlapping
-// markers apart by ~20m, which made rooms of the SAME building look
-// scattered around the neighborhood (the "unrealistic positioning").
-// That job is now handled properly by Leaflet.markercluster spiderfy:
-// overlapping markers stay on their TRUE coordinates and fan out only
-// when clicked. Helper is kept here for backward compatibility / reuse.
 function applyCoordJitter(points) {
   const seen = {};
   return points.map((p) => {
@@ -102,7 +63,11 @@ function applyCoordJitter(points) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+const API_BASE = (
+  import.meta.env.VITE_API_BASE_URL ??
+  import.meta.env.VITE_API_URL ??
+  'https://hostpilot-smoobu.onrender.com'
+).replace(/\/$/, '');
 
 function authHeaders() {
   const token = sessionStorage.getItem('hp_access_token') ?? '';
@@ -122,10 +87,6 @@ function toCoord(val) {
   return Number.isFinite(n) ? n : null;
 }
 
-// ── Inject styles for permanent marker name labels ───────────────
-// Each map marker shows its room name beside the dot (permanent Leaflet
-// tooltip). When markers are collapsed inside a cluster, their labels are
-// hidden automatically; they appear on spiderfy / when shown individually.
 function ensurePmStyles() {
   if (typeof document === 'undefined') return;
   if (document.querySelector('#pm-map-styles')) return;
@@ -237,7 +198,7 @@ function useSmoobuApartments(clientId, propertyIndex) {
         longitude: toCoord(a.longitude),
       }));
       const withCoords = apts.filter(a => a.latitude !== null && a.longitude !== null).length;
-      console.log(`[PropertyMap] smoobu-apartments client=${clientId} propIdx=${propertyIndex ?? 'all'} → ${apts.length} apts (${withCoords} with coords)`);
+      console.log(`[PropertyMap] smoobu-apartments client=${clientId} propIdx=${propertyIndex ?? 'all'} → ${apts.length} apts (${withCoords} with coords)`, apts[0]);
       setApartments(apts);
     } catch (err) {
       console.warn('[PropertyMap] smoobu-apartments fetch failed:', err.message);
@@ -259,12 +220,11 @@ function useSmoobuApartments(clientId, propertyIndex) {
 //
 // NOTE: L is now a bundled import, not window.L. The map is created
 // directly — no async CDN loading, no leafletReady / leafletError state.
-function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId) {
+function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId, mapStyle = 'standard') {
   const mapRef     = useRef(null);
   const markersRef = useRef([]);
-  // clusterRef holds the active layer that contains all markers — either a
-  // L.markerClusterGroup (spiderfy enabled) or a plain L.layerGroup fallback.
   const clusterRef = useRef(null);
+  const tileRef    = useRef(null);
 
   // Init / re-init map when DOM node becomes available
   useEffect(() => {
@@ -281,8 +241,9 @@ function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId) {
       center: [14.5, 121.0], zoom: 6,
       zoomControl: true, scrollWheelZoom: false,
     });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    const initStyle = MAP_STYLES[mapStyle] ?? MAP_STYLES.standard;
+    tileRef.current = L.tileLayer(initStyle.url, {
+      attribution: initStyle.attribution,
       maxZoom: 19,
     }).addTo(map);
     mapRef.current = map;
@@ -432,13 +393,17 @@ function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId) {
       };
 
       const popupHtml = `
-        <div style="font-size:11.5px;line-height:1.45;min-width:150px;max-width:220px;">
-          <div style="font-weight:700;font-size:12.5px;margin-bottom:2px;color:#111827;">${escHtml(label)}</div>
-          ${client ? `<div style="color:#1a9e6e;font-weight:600;">${escHtml(client)}</div>` : ''}
-          ${addr    ? `<div style="color:#6b7280;">${escHtml(addr)}</div>` : ''}
-          ${p.type  ? `<div style="color:#6b7280;">${escHtml(p.type)}</div>` : ''}
-          ${p.maxOccupancy != null ? `<div style="color:#6b7280;">Max occupancy: ${p.maxOccupancy}</div>` : ''}
-          ${p.bedrooms != null ? `<div style="color:#6b7280;">Bedrooms: ${p.bedrooms}${p.bathrooms != null ? ` · Bathrooms: ${p.bathrooms}` : ''}</div>` : ''}
+        <div style="font-size:11.5px;line-height:1.45;width:220px;overflow:hidden;border-radius:10px;margin:-9px -11px;">
+          <div style="height:90px;background:linear-gradient(135deg,#9FE1CB,#085041);display:flex;align-items:center;justify-content:center;position:relative;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 22V12h6v10"/><path d="M3 9h18"/></svg>
+            <span style="position:absolute;bottom:7px;left:9px;font-size:10px;color:rgba(255,255,255,0.85);background:rgba(0,0,0,0.28);padding:2px 8px;border-radius:20px;">No photo yet · Add one →</span>
+          </div>
+          <div style="padding:10px 12px 12px;">
+            <div style="font-weight:700;font-size:13px;margin-bottom:2px;color:#111827;">${escHtml(label)}</div>
+            ${client ? `<div style="color:#1a9e6e;font-weight:600;font-size:11.5px;margin-bottom:5px;">${escHtml(client)}</div>` : ''}
+            ${addr ? `<div style="display:flex;align-items:flex-start;gap:4px;color:#6b7280;font-size:11px;margin-bottom:3px;"><span>📍</span><span>${escHtml(addr)}</span></div>` : ''}
+            ${p.type || p.maxOccupancy != null ? `<div style="display:flex;align-items:center;gap:4px;color:#6b7280;font-size:11px;"><span>🏠</span><span>${escHtml(p.type || '')}${p.type && p.maxOccupancy != null ? ' · ' : ''}${p.maxOccupancy != null ? 'Max ' + p.maxOccupancy : ''}</span></div>` : ''}
+          </div>
         </div>`;
       // Compact popup — no close button, no auto-pan; shown on HOVER only.
       marker.bindPopup(popupHtml, {
@@ -527,7 +492,19 @@ function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId) {
     }
   }, [focusedAptId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // No leafletError / retryLeaflet needed — Leaflet is bundled, always available.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (tileRef.current) {
+      try { map.removeLayer(tileRef.current); } catch { /* noop */ }
+    }
+    const style = MAP_STYLES[mapStyle] ?? MAP_STYLES.standard;
+    tileRef.current = L.tileLayer(style.url, {
+      attribution: style.attribution,
+      maxZoom: 19,
+    }).addTo(map);
+  }, [mapStyle]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return {};
 }
 
@@ -537,6 +514,11 @@ export default function PropertyMap({ mapLocations, loading }) {
   const [selectedPropIndex, setSelectedPropIndex] = useState(null);
   // Third dropdown: selected room/apartment id (string)
   const [selectedAptId,     setSelectedAptId]     = useState('');
+  const [isModalOpen,       setIsModalOpen]        = useState(false);
+  const [mapStyle,          setMapStyle]            = useState('standard');
+  const [selectedLegendApt, setSelectedLegendApt]   = useState(null);
+  const modalMapContainerRef = useRef(null);
+  const modalMarkerMapRef    = useRef({});
 
   // markerMapRef holds { apartmentId → L.Marker } for fly-to
   const markerMapRef = useRef({});
@@ -552,11 +534,13 @@ export default function PropertyMap({ mapLocations, loading }) {
     setSelectedClient(clientId);
     setSelectedPropIndex(null);
     setSelectedAptId('');
+    setSelectedLegendApt(null);
   }
 
   function handlePropChange(raw) {
     setSelectedPropIndex(raw === '' || raw === null || raw === 'all' ? null : Number(raw));
     setSelectedAptId('');
+    setSelectedLegendApt(null);
   }
 
   function handleAptChange(aptId) {
@@ -654,7 +638,8 @@ export default function PropertyMap({ mapLocations, loading }) {
 
   // ── Leaflet map ────────────────────────────────────────────────
   const mapContainerRef = useRef(null);
-  useLeafletMap(mapContainerRef, mapPoints, markerMapRef, focusedAptId);
+  useLeafletMap(mapContainerRef, mapPoints, markerMapRef, focusedAptId, mapStyle);
+  useLeafletMap(modalMapContainerRef, mapPoints, modalMarkerMapRef, focusedAptId, mapStyle);
 
   // ── Dropdown options ───────────────────────────────────────────
   const propertyOptions = useMemo(() => {
@@ -706,6 +691,32 @@ export default function PropertyMap({ mapLocations, loading }) {
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => {
+              setIsModalOpen(true);
+              setTimeout(() => {
+                if (modalMapContainerRef.current) {
+                  window.dispatchEvent(new Event('resize'));
+                }
+              }, 100);
+            }}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-pill)',
+              border: '1px solid var(--color-border)',
+              background: 'var(--color-surface)',
+              color: 'var(--color-text)',
+              fontWeight: 600,
+              fontSize: '.78rem',
+              fontFamily: 'var(--font-body)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+            }}
+          >
+            ⤢ Expand
+          </button>
 
           {/* Dropdown 1 — Business Account */}
           <select
@@ -766,13 +777,37 @@ export default function PropertyMap({ mapLocations, loading }) {
           The map container is ALWAYS mounted (Leaflet inits once and keeps
           its size). While loading we lay a skeleton OVER it instead of
           unmounting it — this fixes the half-rendered / broken-tiles look. */}
-      <div style={{ position: 'relative', display: 'flex', height: 325, overflow: 'hidden', borderRadius: '0 0 var(--radius-card, 12px) var(--radius-card, 12px)' }}>
+      <div style={{ position: 'relative', display: 'flex', height: 410, overflow: 'hidden', borderRadius: '0 0 var(--radius-card, 12px) var(--radius-card, 12px)' }}>
 
           {/* Leaflet map container */}
           <div
             ref={mapContainerRef}
             style={{ flex: 1, minWidth: 0, zIndex: 0, overflow: 'hidden', position: 'relative' }}
           >
+            {/* Map style switcher */}
+            <div style={{
+              position: 'absolute', top: 80, left: 10, zIndex: 1000,
+              display: 'flex', borderRadius: 8, overflow: 'hidden',
+              border: '1px solid rgba(0,0,0,0.18)',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
+            }}>
+              {Object.entries(MAP_STYLES).map(([key, val], i, arr) => (
+                <button
+                  key={key}
+                  onClick={() => setMapStyle(key)}
+                  style={{
+                    padding: '4px 9px', fontSize: '11px', fontWeight: 600,
+                    fontFamily: 'var(--font-body)', border: 'none',
+                    borderRight: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.1)' : 'none',
+                    cursor: 'pointer',
+                    background: mapStyle === key ? '#1a9e6e' : 'rgba(255,255,255,0.93)',
+                    color: mapStyle === key ? '#fff' : '#374151',
+                    transition: 'background 0.15s, color 0.15s',
+                  }}
+                >{val.label}</button>
+              ))}
+            </div>
+
             {/* No coords set — informational overlay (never shown during loading) */}
             {!isMapLoading && locations.length > 0 && plottable.length === 0 && (
               <div style={{
@@ -882,9 +917,371 @@ export default function PropertyMap({ mapLocations, loading }) {
             </div>
           )}
         </div>
+    {/* ── Full-screen modal ── */}
+      {isModalOpen && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setIsModalOpen(false); }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 24,
+          }}
+        >
+          <div style={{
+            background: 'var(--color-surface, #fff)',
+            borderRadius: 16,
+            width: '95vw', maxWidth: 1300,
+            height: '92vh',
+            display: 'flex', flexDirection: 'column',
+            overflow: 'hidden',
+            boxShadow: '0 32px 80px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.06)',
+          }}>
+            {/* Modal header with ALL dropdowns */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '12px 20px',
+              borderBottom: '1px solid var(--color-border)',
+              background: 'var(--color-surface)',
+              flexWrap: 'wrap', gap: 10,
+              minHeight: 56,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: 'linear-gradient(135deg, var(--color-brand, #1a9e6e), #0d7a54)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 15, flexShrink: 0, color: 'white',
+                }}>🗺</div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', lineHeight: 1.2, color: 'var(--color-text)' }}>
+                    Property Map
+                  </div>
+                  <div style={{ fontSize: '.72rem', color: 'var(--color-muted)', lineHeight: 1.2 }}>
+                    {statusText}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* Dropdown 1 — Business Account */}
+                <select
+                  value={selectedClient}
+                  onChange={(e) => handleClientChange(e.target.value)}
+                  disabled={isDropdownLoading}
+                  style={dropdownStyle(isDropdownLoading)}
+                >
+                  <option value="all">
+                    {isDropdownLoading ? 'Loading accounts…' : `All accounts (${clients.length})`}
+                  </option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+
+                {/* Dropdown 2 — Property */}
+                {selectedClient !== 'all' && (
+                  <select
+                    value={selectedPropIndex ?? ''}
+                    onChange={(e) => handlePropChange(e.target.value)}
+                    disabled={isDropdownLoading || propertyOptions.length === 0}
+                    style={dropdownStyle(isDropdownLoading || propertyOptions.length === 0)}
+                  >
+                    <option value="">
+                      {propertyOptions.length === 0 ? 'No properties' : `All properties (${propertyOptions.length})`}
+                    </option>
+                    {propertyOptions.map((p) => (
+                      <option key={p.index} value={p.index}>{p.name}</option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Dropdown 3 — Room */}
+                {selectedClient !== 'all' && selectedPropIndex !== null && roomOptions.length > 0 && (
+                  <select
+                    value={selectedAptId}
+                    onChange={(e) => handleAptChange(e.target.value)}
+                    disabled={aptLoading}
+                    style={dropdownStyle(aptLoading)}
+                  >
+                    <option value="">All rooms ({roomOptions.length})</option>
+                    {roomOptions.map((r) => (
+                      <option key={r.id} value={r.id} disabled={!r.hasCoord}>
+                        {r.name}{!r.hasCoord ? ' (no coords)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  style={{
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-surface)',
+                    fontSize: '1rem', cursor: 'pointer',
+                    color: 'var(--color-muted)', lineHeight: 1,
+                    padding: '6px 10px', borderRadius: 8,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-2, #f3f4f6)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'var(--color-surface)'}
+                >✕</button>
+              </div>
+            </div>
+
+            {/* Modal map + legend + detail */}
+            <div style={{ position: 'relative', display: 'flex', flex: 1, overflow: 'hidden', minWidth: 0 }}>
+              <div
+                ref={modalMapContainerRef}
+                style={{ flex: 1, minWidth: 0, zIndex: 0, overflow: 'hidden', position: 'relative' }}
+              >
+                {!isMapLoading && locations.length > 0 && plottable.length === 0 && (
+                  <div style={{
+                    position: 'absolute', inset: 0, zIndex: 1000,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(255,255,255,0.85)', textAlign: 'center', padding: 20,
+                  }}>
+                    <div style={{ color: 'var(--color-muted)', fontSize: '.82rem', maxWidth: 300 }}>
+                      {aptError
+                        ? `Could not load Smoobu data: ${aptError}`
+                        : "No map coordinates set for these properties yet."}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Map style switcher — modal */}
+              <div style={{
+                position: 'absolute', top: 80, left: 10, zIndex: 1000,
+                display: 'flex', borderRadius: 8, overflow: 'hidden',
+                border: '1px solid rgba(0,0,0,0.18)',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
+              }}>
+                {Object.entries(MAP_STYLES).map(([key, val], i, arr) => (
+                  <button
+                    key={key}
+                    onClick={() => setMapStyle(key)}
+                    style={{
+                      padding: '5px 12px', fontSize: '12px', fontWeight: 600,
+                      fontFamily: 'var(--font-body)', border: 'none',
+                      borderRight: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.1)' : 'none',
+                      cursor: 'pointer',
+                      background: mapStyle === key ? '#1a9e6e' : 'rgba(255,255,255,0.93)',
+                      color: mapStyle === key ? '#fff' : '#374151',
+                      transition: 'background 0.15s, color 0.15s',
+                    }}
+                  >{val.label}</button>
+                ))}
+              </div>
+
+              {/* Legend + Detail — tabbed */}
+              <div style={{
+                width: 300, flexShrink: 0,
+                borderLeft: '1px solid var(--color-border)',
+                display: 'flex', flexDirection: 'column',
+                overflow: 'hidden',
+                background: 'var(--color-surface, #fff)',
+              }}>
+                {/* Tab bar */}
+                <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
+                  <button
+                    onClick={() => setSelectedLegendApt(null)}
+                    style={{
+                      flex: 1, padding: '9px 4px', fontSize: '.72rem', fontWeight: 600,
+                      fontFamily: 'var(--font-body)', border: 'none', cursor: 'pointer',
+                      background: 'transparent',
+                      color: !selectedLegendApt ? 'var(--color-brand, #1a9e6e)' : 'var(--color-muted)',
+                      borderBottom: !selectedLegendApt ? '2px solid var(--color-brand, #1a9e6e)' : '2px solid transparent',
+                      transition: 'color 0.15s',
+                    }}
+                  >
+                    Properties <span style={{ fontSize: '.65rem', background: 'var(--color-surface-2,#f3f4f6)', borderRadius: 20, padding: '1px 6px', marginLeft: 4 }}>{locations.length}</span>
+                  </button>
+                  <button
+                    onClick={() => {}}
+                    disabled={!selectedLegendApt}
+                    style={{
+                      flex: 1, padding: '9px 4px', fontSize: '.72rem', fontWeight: 600,
+                      fontFamily: 'var(--font-body)', border: 'none', cursor: selectedLegendApt ? 'pointer' : 'default',
+                      background: 'transparent',
+                      color: selectedLegendApt ? 'var(--color-brand, #1a9e6e)' : 'var(--color-muted)',
+                      borderBottom: selectedLegendApt ? '2px solid var(--color-brand, #1a9e6e)' : '2px solid transparent',
+                      opacity: selectedLegendApt ? 1 : 0.45,
+                      transition: 'color 0.15s',
+                    }}
+                  >
+                    Detail
+                  </button>
+                </div>
+
+                {/* Properties tab */}
+                {!selectedLegendApt && (
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', padding: '10px 8px' }}>
+                    <input
+                      placeholder="Search…"
+                      style={{
+                        width: '100%', padding: '5px 9px', marginBottom: 6,
+                        border: '1px solid var(--color-border)',
+                        borderRadius: 8, fontSize: '.72rem',
+                        background: 'var(--color-surface-2,#f9fafb)',
+                        color: 'var(--color-text)', outline: 'none',
+                        fontFamily: 'var(--font-body)',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      {locations.map((p) => {
+                        const addrParts = [p.street, p.city, p.country].filter(Boolean);
+                        const addr      = addrParts.join(', ');
+                        const hasCoords = p.latitude !== null && p.longitude !== null &&
+                                          Number.isFinite(p.latitude) && Number.isFinite(p.longitude);
+                        const dotColor  = hasCoords ? colorForId(p.apartmentId) : '#d1d5db';
+                        const subtitle  = addr || p.type || (hasCoords ? '' : 'No address in Smoobu');
+                        const isFocused = focusedAptId && String(p.apartmentId) === focusedAptId;
+                        return (
+                          <div
+                            key={String(p.apartmentId)}
+                            onClick={() => {
+                              if (!hasCoords) return;
+                              handleAptChange(String(p.apartmentId) === focusedAptId ? '' : String(p.apartmentId));
+                              setSelectedLegendApt(prev => prev?.apartmentId === p.apartmentId ? null : p);
+                            }}
+                            style={{
+                              display: 'flex', alignItems: 'flex-start', gap: 6,
+                              cursor: hasCoords ? 'pointer' : 'default',
+                              background: isFocused ? 'var(--color-brand-light, #e6f7f1)' : 'transparent',
+                              borderRadius: 6, padding: '4px 4px', transition: 'background 0.15s',
+                              outline: isFocused ? '1.5px solid var(--color-brand, #1a9e6e)' : 'none',
+                            }}
+                          >
+                            <div style={{
+                              width: 8, height: 8, borderRadius: '50%',
+                              background: dotColor, flexShrink: 0, marginTop: 4,
+                              boxShadow: isFocused ? `0 0 0 2px ${dotColor}55` : 'none',
+                            }} />
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                                <div style={{
+                                  fontSize: '.7rem', fontWeight: isFocused ? 700 : 600, lineHeight: 1.25,
+                                  color: isFocused ? 'var(--color-brand)' : 'var(--color-text)',
+                                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                }}>
+                                  {p.apartmentName || p.propertyName}
+                                </div>
+                                {p.type && (
+                                  <span style={{ fontSize: '.58rem', padding: '1px 5px', borderRadius: 20, background: 'var(--color-surface-2,#f3f4f6)', color: 'var(--color-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                    {p.type}
+                                  </span>
+                                )}
+                              </div>
+                              {p.propertyName && p.apartmentName !== p.propertyName && (
+                                <div style={{ fontSize: '.63rem', color: 'var(--color-muted)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {p.propertyName}
+                                </div>
+                              )}
+                              <div style={{ fontSize: '.63rem', color: 'var(--color-brand)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {p.clientName}
+                              </div>
+                              <div style={{ fontSize: '.61rem', color: 'var(--color-muted)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {subtitle}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Detail tab */}
+                {selectedLegendApt && (
+                  <div style={{ width: '100%', overflowY: 'auto', flex: 1 }}>
+                    <div style={{ height: 110, background: 'linear-gradient(135deg,#9FE1CB,#085041)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', flexShrink: 0 }}>
+                      <span style={{ fontSize: 32, opacity: 0.5 }}>🏢</span>
+                      <span style={{ position: 'absolute', bottom: 7, left: 10, fontSize: '.65rem', color: 'rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.28)', padding: '2px 8px', borderRadius: 20 }}>No photo yet</span>
+                      <button style={{ position: 'absolute', bottom: 7, right: 10, fontSize: '.65rem', background: 'rgba(255,255,255,0.92)', border: 'none', padding: '3px 9px', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>↑ Add photo</button>
+                    </div>
+                    <div style={{ padding: '14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+                        <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                          <div style={{ fontWeight: 700, fontSize: '.85rem', color: 'var(--color-text)', lineHeight: 1.3, marginBottom: 2 }}>
+                            {selectedLegendApt.apartmentName || selectedLegendApt.propertyName}
+                          </div>
+                          {selectedLegendApt.propertyName && selectedLegendApt.apartmentName !== selectedLegendApt.propertyName && (
+                            <div style={{ fontSize: '.72rem', color: 'var(--color-muted)', marginBottom: 2 }}>
+                              {selectedLegendApt.propertyName}
+                            </div>
+                          )}
+                          <div style={{ fontSize: '.72rem', color: 'var(--color-brand)', fontWeight: 600 }}>
+                            {selectedLegendApt.clientName}
+                          </div>
+                        </div>
+                        <button onClick={() => setSelectedLegendApt(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-muted)', fontSize: '1rem', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>✕</button>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--color-surface-2, #f9fafb)', borderRadius: 8, marginBottom: 12 }}>
+                        <div style={{ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: colorForId(selectedLegendApt.apartmentId) }} />
+                        <span style={{ fontSize: '.7rem', color: 'var(--color-muted)', fontFamily: 'monospace' }}>ID: {selectedLegendApt.apartmentId}</span>
+                      </div>
+
+                      {(selectedLegendApt.street || selectedLegendApt.city) && (
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--color-muted)', marginBottom: 5 }}>Address</div>
+                          <div style={{ fontSize: '.78rem', color: 'var(--color-text)', lineHeight: 1.5 }}>
+                            {[selectedLegendApt.street, selectedLegendApt.zip, selectedLegendApt.city, selectedLegendApt.country].filter(Boolean).join(', ')}
+                          </div>
+                        </div>
+                      )}
+
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--color-muted)', marginBottom: 5 }}>Room Details</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                          {[
+                            { label: 'Type',       value: selectedLegendApt.type },
+                            { label: 'Max Guests', value: selectedLegendApt.maxOccupancy },
+                            { label: 'Bedrooms',   value: selectedLegendApt.bedrooms },
+                            { label: 'Bathrooms',  value: selectedLegendApt.bathrooms },
+                            { label: 'Beds',       value: selectedLegendApt.beds },
+                            { label: 'Size',       value: selectedLegendApt.squareMeters ? `${selectedLegendApt.squareMeters} m²` : null },
+                          ].filter(d => d.value != null && d.value !== '').map(d => (
+                            <div key={d.label} style={{ background: 'var(--color-surface-2, #f9fafb)', borderRadius: 7, padding: '7px 10px' }}>
+                              <div style={{ fontSize: '.63rem', color: 'var(--color-muted)', marginBottom: 2 }}>{d.label}</div>
+                              <div style={{ fontSize: '.8rem', fontWeight: 700, color: 'var(--color-text)' }}>{d.value}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {selectedLegendApt.latitude != null && (
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--color-muted)', marginBottom: 5 }}>Coordinates</div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface-2, #f9fafb)', borderRadius: 7, padding: '7px 10px' }}>
+                            <span style={{ fontSize: '.7rem', color: 'var(--color-text)', fontFamily: 'monospace' }}>
+                              {Number(selectedLegendApt.latitude).toFixed(5)}, {Number(selectedLegendApt.longitude).toFixed(5)}
+                            </span>
+                            <button onClick={() => navigator.clipboard.writeText(`${selectedLegendApt.latitude}, ${selectedLegendApt.longitude}`)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '11px', color: 'var(--color-brand)', fontWeight: 600, padding: '2px 4px' }}>Copy</button>
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedLegendApt.apartmentId && !String(selectedLegendApt.apartmentId).startsWith('db:') && (
+                        <a href={`https://login.smoobu.com/en/cockpit/apartments/view/id/${selectedLegendApt.apartmentId}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '8px 0', background: 'var(--color-brand, #1a9e6e)', color: '#fff', borderRadius: 8, fontSize: '.78rem', fontWeight: 700, textDecoration: 'none', marginBottom: 6 }}>
+                          View in Smoobu ↗
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 
 // ── Shared dropdown style helper ──────────────────────────────────
 function dropdownStyle(disabled) {
