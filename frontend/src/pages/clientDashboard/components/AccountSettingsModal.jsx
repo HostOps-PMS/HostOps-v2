@@ -285,7 +285,7 @@ function OTPModal({ email, auth, onVerified, onCancel }) {
           maxWidth: 380,
           boxShadow: "0 24px 64px rgba(12,28,20,0.22)",
           animation: "modalSlideIn 0.22s cubic-bezier(0.34,1.56,0.64,1)",
-          padding: "28px 28px 24px",
+          padding: "24px 20px 20px",
         }}
         role="dialog"
         aria-modal="true"
@@ -814,14 +814,14 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      padding: "20px",
+      padding: "12px",
     },
     modal: {
       background: "#fff",
       borderRadius: "20px",
       width: "100%",
       maxWidth: "480px",
-      maxHeight: "80vh",
+      maxHeight: "90vh",
       overflowY: "hidden",
       display: "flex",
       flexDirection: "column",
@@ -888,7 +888,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       transition: "background 0.15s, color 0.15s",
     },
     body: {
-      padding: "24px 28px",
+      padding: "16px 20px",
     },
     section: {
       marginBottom: 20,
@@ -972,8 +972,8 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
     },
     row2: {
       display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: 12,
+      gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+      gap: 10,
     },
     pwInputWrap: {
       position: "relative",
@@ -1012,7 +1012,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       margin: "4px 0 20px",
     },
     footer: {
-      padding: "16px 28px 24px",
+      padding: "14px 20px 18px",
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
@@ -1128,6 +1128,13 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
         .acc-eye-btn:hover { color: #0c1c14!important; }
         .acc-modal-scroll::-webkit-scrollbar { display: none; }
         .acc-modal-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        @media (max-width: 480px) {
+          .acc-tab-label-password { display: none; }
+          .acc-tab-label-short { display: inline; }
+        }
+        @media (min-width: 481px) {
+          .acc-tab-label-short { display: none; }
+        }
       `}</style>
 
       {/* OTP modal layer */}
@@ -1168,7 +1175,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
           </div>
 
           {/* ── Tabs ── */}
-          <div style={{ display: "flex", borderBottom: "1px solid #eaf3ee", padding: "0 28px" }}>
+          <div style={{ display: "flex", borderBottom: "1px solid #eaf3ee", padding: "0 20px" }}>
             {["profile", ...(isStaffUser ? [] : ["password"]), "pin", "activity"].map((tab) => (
               <button
                 key={tab}
@@ -1181,8 +1188,8 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                   if (tab === "activity") fetchActivityLog();
                 }}
                 style={{
-                  padding: "12px 16px",
-                  fontSize: 13,
+                  padding: "10px 10px",
+                  fontSize: 12,
                   fontWeight: 700,
                   color: activeTab === tab ? "#0c1c14" : "#9ab8a9",
                   background: "none",
@@ -1194,7 +1201,11 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                   transition: "color 0.15s",
                 }}
               >
-                {tab === "profile" ? "Profile" : tab === "password" ? "Change Password" : tab === "pin" ? "Change PIN" : "Activity"}
+                {tab === "profile" ? "Profile" : tab === "password" ? (
+  <><span className="acc-tab-label-password">Change Password</span><span className="acc-tab-label-short">Password</span></>
+) : tab === "pin" ? (
+  <><span className="acc-tab-label-password">Change PIN</span><span className="acc-tab-label-short">PIN</span></>
+) : "Activity"}
               </button>
             ))}
           </div>
