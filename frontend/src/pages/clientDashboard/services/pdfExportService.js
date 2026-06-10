@@ -22,6 +22,12 @@ const C = {
   subtext:    [106, 139, 122],
   border:     [216, 235, 224],
   gray:       [248, 250, 248],
+  // ── Stat-card accent colors ─────────────────────────────────────────────
+  blue:       [37,  99,  235],
+  blueLight:  [219, 230, 252],
+  red:        [203, 68,  54],
+  redLight:   [250, 226, 222],
+  gold:       [232, 184, 92],
 };
 
 const PAGE_H         = 210;
@@ -95,8 +101,8 @@ function drawFooter(doc, pageNum, pageCount, period, pageWidth) {
 
 /**
  * Draws the full dark header band on every page.
- * Property image and name are now shown in the content area (drawPropertyBanner),
- * so the page header stays clean: just HOSTOPS pill, title, period, generated.
+ * The property image and name are shown in the business profile card
+ * (drawBusinessProfile) in the content area, so the page header stays clean: just HOSTOPS pill, title, period, generated.
  *
  * @param {object} doc           - jsPDF instance
  * @param {string} businessName  - e.g. "Juan dela Cruz Properties"
@@ -148,80 +154,126 @@ function drawPageHeader(doc, businessName, propertyName, period, pageWidth) {
 }
 
 /**
- * Draws the property image + title block on the LEFT side of the content area.
- * This is drawn ABOVE the Platform Breakdown table on page 1 only.
+ * Draws the BUSINESS PROFILE card for the LEFT column of page 1.
  *
- * Layout (left column):
+ * Layout (title is ABOVE the image, image keeps its aspect ratio):
  *   ┌──────────────────────────────────────┐
- *   │  [property image, full width]        │
- *   │  Business Name                       │
- *   │  Property Name badge (if selected)   │
+ *   │ ▌ Business Name                      │  ← title on TOP
+ *   │   PERFORMANCE DASHBOARD              │
+ *   │   [Property badge if selected]       │
+ *   │   ┌──────────────────────────────┐   │
+ *   │   │      property image          │   │  ← below, "contain" fit (no stretch)
+ *   │   └──────────────────────────────┘   │
  *   └──────────────────────────────────────┘
  *
  * @param {object} doc
  * @param {string} businessName
  * @param {string} propertyName       - selected property name, or '' for all
  * @param {number} x                  - left edge of the column
- * @param {number} y                  - top of the block
+ * @param {number} y                  - top of the card
  * @param {number} w                  - width of the column
  * @param {string|null} imgDataUrl    - base64 property image, or null
- * @returns {number}                  - new Y after the block
+ * @returns {number}                  - new Y after the card
  */
-function drawPropertyBanner(doc, businessName, propertyName, x, y, w, imgDataUrl) {
-  const imgH     = 28;   // image height in mm
-  const padding  = 3;
+function drawBusinessProfile(doc, businessName, propertyName, x, y, w, imgDataUrl) {
+  const pad      = 5;
+  const imgBoxH  = 44;                       // image thumbnail height in mm
+  const headerH  = propertyName ? 28 : 22;   // space for title + subtitle (+ badge)
+  const cardH    = headerH + imgBoxH + pad;
 
-  // ── Background card ───────────────────────────────────────────────────────
-  const cardH = imgH + (propertyName ? 22 : 16);
-  doc.setFillColor(C.dark[0], C.dark[1], C.dark[2]);
-  doc.roundedRect(x, y, w, cardH, 2, 2, 'F');
+  // ── Soft shadow ───────────────────────────────────────────────────────────
+  doc.setFillColor(C.border[0], C.border[1], C.border[2]);
+  doc.roundedRect(x + 0.8, y + 1, w, cardH, 3, 3, 'F');
+
+  // ── White card (matches the rest of the report) ───────────────────────────
+  doc.setFillColor(C.white[0], C.white[1], C.white[2]);
+  doc.roundedRect(x, y, w, cardH, 3, 3, 'F');
 
   // ── Green top accent bar ──────────────────────────────────────────────────
   doc.setFillColor(C.green[0], C.green[1], C.green[2]);
   doc.roundedRect(x, y, w, 2.5, 1, 1, 'F');
 
-  // ── Property image ────────────────────────────────────────────────────────
-  if (imgDataUrl) {
-    try {
-      doc.addImage(imgDataUrl, 'JPEG', x, y + 2.5, w, imgH, '', 'FAST');
-    } catch {
-      // Image failed — leave blank
-    }
-  } else {
-    // Placeholder: dark rect with icon-style "no image" indicator
-    doc.setFillColor(C.greenMid[0], C.greenMid[1], C.greenMid[2]);
-    doc.rect(x, y + 2.5, w, imgH, 'F');
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(C.muted[0], C.muted[1], C.muted[2]);
-    doc.text('No image', x + w / 2, y + 2.5 + imgH / 2 + 1, { align: 'center' });
-  }
+  // ── Border ────────────────────────────────────────────────────────────────
+  doc.setDrawColor(C.border[0], C.border[1], C.border[2]);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(x, y, w, cardH, 3, 3, 'S');
 
-  // ── Business name ─────────────────────────────────────────────────────────
-  const textY = y + 2.5 + imgH + 6;
+  // ── Title (TOP) ───────────────────────────────────────────────────────────
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(C.white[0], C.white[1], C.white[2]);
-  // Truncate if too long for the column
-  const maxChars = Math.floor(w / 2);
-  const safeName = (businessName || 'Dashboard').length > maxChars
-    ? (businessName || 'Dashboard').slice(0, maxChars - 1) + '…'
-    : (businessName || 'Dashboard');
-  doc.text(safeName, x + padding, textY);
+  doc.setFontSize(13);
+  doc.setTextColor(C.text[0], C.text[1], C.text[2]);
+  const maxChars = 28;
+  const baseName = businessName || 'Dashboard';
+  const safeName = baseName.length > maxChars ? baseName.slice(0, maxChars - 1) + '…' : baseName;
+  doc.text(safeName, x + pad, y + 11);
 
-  // ── Property name badge ───────────────────────────────────────────────────
+  // ── Subtitle ──────────────────────────────────────────────────────────────
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(C.green[0], C.green[1], C.green[2]);
+  doc.text('PERFORMANCE DASHBOARD', x + pad, y + 16);
+
+  // ── Property badge ────────────────────────────────────────────────────────
   if (propertyName) {
-    const badgeY  = textY + 5;
-    const badgeW  = Math.min(w - padding * 2, propertyName.length * 1.7 + 8);
-    doc.setFillColor(C.greenMid[0], C.greenMid[1], C.greenMid[2]);
-    doc.roundedRect(x + padding, badgeY - 3.5, badgeW, 7, 1.5, 1.5, 'F');
+    const badgeY = y + 19.5;
+    const badgeW = Math.min(w - pad * 2, propertyName.length * 1.8 + 9);
+    doc.setFillColor(C.greenLight[0], C.greenLight[1], C.greenLight[2]);
+    doc.roundedRect(x + pad, badgeY, badgeW, 6.5, 1.5, 1.5, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
-    doc.setTextColor(C.green[0], C.green[1], C.green[2]);
+    doc.setTextColor(C.greenMid[0], C.greenMid[1], C.greenMid[2]);
+    const maxBadge = Math.floor(badgeW / 1.8);
     doc.text(
-      propertyName.length > Math.floor(badgeW / 1.7) ? propertyName.slice(0, Math.floor(badgeW / 1.7) - 1) + '…' : propertyName,
-      x + padding + badgeW / 2, badgeY + 0.5, { align: 'center' }
+      propertyName.length > maxBadge ? propertyName.slice(0, maxBadge - 1) + '…' : propertyName,
+      x + pad + badgeW / 2, badgeY + 4.4, { align: 'center' }
     );
+  }
+
+  // ── Image thumbnail (centered, on-brand light panel) ──────────────────────
+  // A compact, roughly 4:3 panel keeps a square logo OR a photo looking tidy
+  // instead of a wide letterbox. Centered horizontally under the text.
+  const panelH = imgBoxH;
+  const panelW = Math.min(w - pad * 2, panelH * 1.45);
+  const panelX = x + (w - panelW) / 2;
+  const panelY = y + headerH;
+
+  // Light panel + subtle border (matches greenLight used across the report)
+  doc.setFillColor(C.greenLight[0], C.greenLight[1], C.greenLight[2]);
+  doc.roundedRect(panelX, panelY, panelW, panelH, 2.5, 2.5, 'F');
+  doc.setDrawColor(C.border[0], C.border[1], C.border[2]);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(panelX, panelY, panelW, panelH, 2.5, 2.5, 'S');
+
+  if (imgDataUrl) {
+    // "Contain" fit: no stretching, no cropping — safe for logos and photos.
+    let natW = 4, natH = 3;   // sensible default ratio if props can't be read
+    try {
+      const props = doc.getImageProperties(imgDataUrl);
+      if (props && props.width && props.height) {
+        natW = props.width;
+        natH = props.height;
+      }
+    } catch {
+      // keep default ratio
+    }
+    const innerPad = 2.5;
+    const fitW  = panelW - innerPad * 2;
+    const fitH  = panelH - innerPad * 2;
+    const scale = Math.min(fitW / natW, fitH / natH);
+    const drawW = natW * scale;
+    const drawH = natH * scale;
+    const dx    = panelX + (panelW - drawW) / 2;
+    const dy    = panelY + (panelH - drawH) / 2;
+    try {
+      doc.addImage(imgDataUrl, 'JPEG', dx, dy, drawW, drawH, '', 'FAST');
+    } catch {
+      // Image failed — light panel stays as placeholder
+    }
+  } else {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(C.subtext[0], C.subtext[1], C.subtext[2]);
+    doc.text('No image', panelX + panelW / 2, panelY + panelH / 2 + 1, { align: 'center' });
   }
 
   return y + cardH + 4;
@@ -240,163 +292,213 @@ function drawSectionLabel(doc, label, y, pageWidth, margin) {
 }
 
 /**
- * Draws the two-column block:
- *   LEFT  column: property image+title banner  THEN  Platform Breakdown table
- *   RIGHT column: KPI stat cards (2 cols × 3 rows)
+ * Draws exactly FOUR fixed stat cards in a single full-width row:
+ *   1. REVENUE          – green "hero" card (filled)
+ *   2. BOOKINGS         – white card, blue accent
+ *   3. CANCELLATIONS    – white card, red accent
+ *   4. OCCUPANCY RATE   – white card, green accent
  *
- * The two columns share the same top Y and we return the lower of the two
- * bottom edges so the caller can continue below.
+ * Each `card` = { kind, label, value, sub, accent, accentLight }.
+ *
+ * @returns {number} new Y after the row
  */
-function drawKpiAndBreakdown(
-  doc, kpiCards, channelEntries, byChannel,
-  y, pageWidth, margin,
-  businessName, propertyName, propertyImageDataUrl
-) {
-  const totalRev   = channelEntries.reduce((s, e) => s + (e[1].revenue || 0), 0);
-  const gap        = 6;   // gap between left and right columns
+function drawStatCards(doc, cards, y, pageWidth, margin) {
+  const totalW = pageWidth - margin * 2;
+  const gap    = 5;
+  const n      = cards.length;                 // fixed: 4
+  const cardW  = (totalW - gap * (n - 1)) / n;
+  const cardH  = 36;
 
-  // ── Column widths ─────────────────────────────────────────────────────────
-  // Left column holds: property banner + platform breakdown
-  // Right column holds: KPI cards
-  const totalW   = pageWidth - margin * 2;
-  const leftW    = totalW * 0.48;   // ~48 % for breakdown side
-  const rightW   = totalW - leftW - gap;
-  const leftX    = margin;
-  const rightX   = margin + leftW + gap;
+  cards.forEach((card, i) => {
+    const cx = margin + i * (cardW + gap);
+    const cy = y;
 
-  // ── LEFT: property image + title banner ───────────────────────────────────
-  let leftY = y;
-  leftY = drawPropertyBanner(doc, businessName, propertyName, leftX, leftY, leftW, propertyImageDataUrl);
+    // Soft shadow (shared by all cards)
+    doc.setFillColor(C.border[0], C.border[1], C.border[2]);
+    doc.roundedRect(cx + 0.8, cy + 1, cardW, cardH, 3, 3, 'F');
 
-  // ── LEFT: Platform Breakdown table ────────────────────────────────────────
-  const tableX = leftX;
-  const tableW = leftW;
+    if (card.kind === 'revenue') {
+      // ── Green "hero" card ────────────────────────────────────────────────
+      doc.setFillColor(C.green[0], C.green[1], C.green[2]);
+      doc.roundedRect(cx, cy, cardW, cardH, 3, 3, 'F');
+      // Darker band at the bottom for depth
+      doc.setFillColor(C.greenMid[0], C.greenMid[1], C.greenMid[2]);
+      doc.roundedRect(cx, cy + cardH - 11, cardW, 11, 3, 3, 'F');
+      doc.rect(cx, cy + cardH - 13, cardW, 4, 'F');
 
-  // Table title bar
+      // "Chip" glyph (credit-card nod)
+      doc.setFillColor(C.gold[0], C.gold[1], C.gold[2]);
+      doc.roundedRect(cx + cardW - 13, cy + 6, 8, 6, 1, 1, 'F');
+
+      // Label
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6.5);
+      doc.setTextColor(C.greenLight[0], C.greenLight[1], C.greenLight[2]);
+      doc.text('REVENUE', cx + 5, cy + 9);
+
+      // Value
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(C.white[0], C.white[1], C.white[2]);
+      doc.text(String(card.value), cx + 5, cy + 22);
+
+      // Sub (total bookings) — sits on the dark band
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6);
+      doc.setTextColor(C.muted[0], C.muted[1], C.muted[2]);
+      doc.text(String(card.sub).toUpperCase(), cx + 5, cy + cardH - 4);
+
+      // HostOps mark
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(C.greenLight[0], C.greenLight[1], C.greenLight[2]);
+      doc.text('HostOps', cx + cardW - 5, cy + cardH - 4, { align: 'right' });
+    } else {
+      // ── White card with a colored accent ─────────────────────────────────
+      const a  = card.accent;
+      const aL = card.accentLight;
+
+      doc.setFillColor(C.white[0], C.white[1], C.white[2]);
+      doc.roundedRect(cx, cy, cardW, cardH, 3, 3, 'F');
+
+      // Colored top bar
+      doc.setFillColor(a[0], a[1], a[2]);
+      doc.roundedRect(cx, cy, cardW, 2.5, 1, 1, 'F');
+
+      // Border
+      doc.setDrawColor(C.border[0], C.border[1], C.border[2]);
+      doc.setLineWidth(0.25);
+      doc.roundedRect(cx, cy, cardW, cardH, 3, 3, 'S');
+
+      // Icon circle (top-right)
+      doc.setFillColor(aL[0], aL[1], aL[2]);
+      doc.circle(cx + cardW - 9, cy + 11, 4.6, 'F');
+      doc.setFillColor(a[0], a[1], a[2]);
+      doc.circle(cx + cardW - 9, cy + 11, 1.7, 'F');
+
+      // Label
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6.5);
+      doc.setTextColor(C.subtext[0], C.subtext[1], C.subtext[2]);
+      doc.text(card.label, cx + 5, cy + 9);
+
+      // Value
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(a[0], a[1], a[2]);
+      doc.text(String(card.value), cx + 5, cy + 23);
+
+      // Sub
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.setTextColor(C.subtext[0], C.subtext[1], C.subtext[2]);
+      doc.text(String(card.sub), cx + 5, cy + 31);
+    }
+  });
+
+  return y + cardH + 5;
+}
+
+/**
+ * Draws the Platform Breakdown table inside a COLUMN of width `w` at (x, y).
+ * Used as the RIGHT column beside the business profile.
+ *
+ * @returns {number} new Y after the table
+ */
+function drawPlatformBreakdown(doc, channelEntries, x, y, w) {
+  const totalRev = channelEntries.reduce((s, e) => s + (e[1].revenue || 0), 0);
+
+  // ── Title bar ─────────────────────────────────────────────────────────────
   doc.setFillColor(C.dark[0], C.dark[1], C.dark[2]);
-  doc.roundedRect(tableX, leftY, tableW, 8, 1.5, 1.5, 'F');
+  doc.roundedRect(x, y, w, 8, 1.5, 1.5, 'F');
   doc.setFillColor(C.green[0], C.green[1], C.green[2]);
-  doc.rect(tableX, leftY, 3, 8, 'F');
+  doc.rect(x, y, 3, 8, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(C.white[0], C.white[1], C.white[2]);
-  doc.text('PLATFORM BREAKDOWN', tableX + 6, leftY + 5.5);
+  doc.text('PLATFORM BREAKDOWN', x + 6, y + 5.5);
 
-  // Column headers
-  const colY      = leftY + 12;
-  const colLabels = ['Channel', 'Revenue', 'Bk', 'Nts', 'Share'];
-  const colWidths = [tableW * 0.32, tableW * 0.30, tableW * 0.12, tableW * 0.12, tableW * 0.14];
-  let colX        = tableX;
+  // ── Column geometry ───────────────────────────────────────────────────────
+  const wChannel = w * 0.30;
+  const wRev     = w * 0.28;
+  const wBk      = w * 0.12;
+  const wNts     = w * 0.12;
+  const wShare   = w * 0.18;
+  const xChannel = x;
+  const xRev     = xChannel + wChannel;
+  const xBk      = xRev + wRev;
+  const xNts     = xBk + wBk;
+  const xShare   = xNts + wNts;
 
+  const colY = y + 13;
+
+  // ── Headers ───────────────────────────────────────────────────────────────
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
   doc.setTextColor(C.subtext[0], C.subtext[1], C.subtext[2]);
-  colLabels.forEach((lbl, ci) => {
-    doc.text(lbl, colX + 2, colY, ci > 0 ? { align: 'left' } : {});
-    colX += colWidths[ci];
-  });
+  doc.text('Channel', xChannel + 2, colY);
+  doc.text('Revenue', xRev + 2,     colY);
+  doc.text('Bk',      xBk + 2,      colY);
+  doc.text('Nts',     xNts + 2,     colY);
+  doc.text('Share',   xShare + wShare - 2, colY, { align: 'right' });
 
-  // Divider
+  // Header divider
   doc.setDrawColor(C.border[0], C.border[1], C.border[2]);
   doc.setLineWidth(0.3);
-  doc.line(tableX, colY + 2, tableX + tableW, colY + 2);
+  doc.line(x, colY + 2.5, x + w, colY + 2.5);
 
-  // Rows
+  // ── Rows ──────────────────────────────────────────────────────────────────
+  const rowH = 9;
   channelEntries.forEach(([ch, v], ri) => {
-    const rowY  = colY + 6 + ri * 10;
+    const rowY  = colY + 6 + ri * rowH;
     const share = totalRev > 0 ? ((v.revenue || 0) / totalRev * 100).toFixed(1) : '0.0';
 
     if (ri % 2 === 1) {
       doc.setFillColor(C.greenLight[0], C.greenLight[1], C.greenLight[2]);
-      doc.rect(tableX, rowY - 4, tableW, 10, 'F');
+      doc.rect(x, rowY - 4, w, rowH, 'F');
     }
 
-    const vals = [ch, fmtMoney(v.revenue || 0), String(v.bookings || 0), String(v.nights || 0), share + '%'];
-    let rx = tableX;
+    // Channel
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(C.text[0], C.text[1], C.text[2]);
+    doc.text(String(ch), xChannel + 2, rowY + 1.5);
 
-    vals.forEach((val, ci) => {
-      if (ci === 1) {
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(C.green[0], C.green[1], C.green[2]);
-        doc.setFontSize(7);
-      } else if (ci === 4) {
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(C.subtext[0], C.subtext[1], C.subtext[2]);
-        doc.setFontSize(7);
-      } else {
-        doc.setFont('helvetica', ci === 0 ? 'bold' : 'normal');
-        doc.setTextColor(C.text[0], C.text[1], C.text[2]);
-        doc.setFontSize(7);
-      }
-      doc.text(val, rx + 2, rowY + 2);
-      rx += colWidths[ci];
-    });
+    // Revenue
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(C.green[0], C.green[1], C.green[2]);
+    doc.text(fmtMoney(v.revenue || 0), xRev + 2, rowY + 1.5);
+
+    // Bookings
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(C.text[0], C.text[1], C.text[2]);
+    doc.text(String(v.bookings || 0), xBk + 2, rowY + 1.5);
+
+    // Nights
+    doc.text(String(v.nights || 0), xNts + 2, rowY + 1.5);
+
+    // Share (right aligned)
+    doc.setTextColor(C.subtext[0], C.subtext[1], C.subtext[2]);
+    doc.text(share + '%', xShare + wShare - 2, rowY + 1.5, { align: 'right' });
 
     // Row divider
     doc.setDrawColor(C.border[0], C.border[1], C.border[2]);
     doc.setLineWidth(0.15);
-    doc.line(tableX, rowY + 5, tableX + tableW, rowY + 5);
+    doc.line(x, rowY + rowH - 4, x + w, rowY + rowH - 4);
   });
 
-  // Total row
-  const totalRowY = colY + 6 + channelEntries.length * 10 + 2;
+  // ── Total row ─────────────────────────────────────────────────────────────
+  const totalRowY = colY + 6 + channelEntries.length * rowH + 1;
   doc.setFillColor(C.dark[0], C.dark[1], C.dark[2]);
-  doc.rect(tableX, totalRowY - 3, tableW, 9, 'F');
+  doc.roundedRect(x, totalRowY - 4, w, 9, 1.5, 1.5, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
+  doc.setFontSize(7.5);
   doc.setTextColor(C.white[0], C.white[1], C.white[2]);
-  doc.text('TOTAL', tableX + 2, totalRowY + 3);
+  doc.text('TOTAL', xChannel + 2, totalRowY + 1.5);
   doc.setTextColor(C.green[0], C.green[1], C.green[2]);
-  doc.text(fmtMoney(totalRev), tableX + colWidths[0] + 2, totalRowY + 3);
+  doc.text(fmtMoney(totalRev), xRev + 2, totalRowY + 1.5);
 
-  const leftBottom = totalRowY + 9;
-
-  // ── RIGHT: KPI stat cards (2 cols × 3 rows) ───────────────────────────────
-  const cardCols = 2;
-  const cardGap  = 4;
-  const cardW    = (rightW - cardGap) / cardCols;
-  const cardH    = 20;
-
-  kpiCards.forEach((card, i) => {
-    const col = i % cardCols;
-    const row = Math.floor(i / cardCols);
-    const cx  = rightX + col * (cardW + cardGap);
-    const cy  = y + row * (cardH + cardGap);
-
-    // Shadow
-    doc.setFillColor(C.border[0], C.border[1], C.border[2]);
-    doc.roundedRect(cx + 0.8, cy + 0.8, cardW, cardH, 2, 2, 'F');
-
-    // Card bg
-    doc.setFillColor(C.white[0], C.white[1], C.white[2]);
-    doc.roundedRect(cx, cy, cardW, cardH, 2, 2, 'F');
-
-    // Green top bar
-    doc.setFillColor(C.green[0], C.green[1], C.green[2]);
-    doc.roundedRect(cx, cy, cardW, 2.5, 1, 1, 'F');
-
-    // Border
-    doc.setDrawColor(C.border[0], C.border[1], C.border[2]);
-    doc.setLineWidth(0.25);
-    doc.roundedRect(cx, cy, cardW, cardH, 2, 2, 'S');
-
-    // Label
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(C.subtext[0], C.subtext[1], C.subtext[2]);
-    doc.text(card.label.toUpperCase(), cx + 4, cy + 9);
-
-    // Value
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10.5);
-    doc.setTextColor(C.text[0], C.text[1], C.text[2]);
-    doc.text(String(card.value), cx + 4, cy + 17);
-  });
-
-  const kpiRows   = Math.ceil(kpiCards.length / cardCols);
-  const rightBottom = y + kpiRows * (cardH + cardGap);
-
-  return Math.max(leftBottom, rightBottom) + 6;
+  return totalRowY + 9;
 }
 
 function getGuestName(b) {
@@ -479,7 +581,9 @@ export async function exportDashboardPDF(dashState, user) {
   drawPageHeader(doc, businessName, propertyName, period, pageWidth);
   let y = CONTENT_TOP;
 
-  // ── KPI + PLATFORM BREAKDOWN SIDE BY SIDE ────────────────────────────────
+  // ── PAGE 1 CONTENT ────────────────────────────────────────────────────────
+  // 1) Stat cards full-width on top.
+  // 2) Business profile (LEFT) + Platform Breakdown (RIGHT) side by side.
   const revenue      = stats.revenue       || stats.totalRevenue      || 0;
   const bookingCount = stats.bookings      || stats.totalBookings      || 0;
   const cancels      = stats.cancellations || stats.totalCancellations || 0;
@@ -488,20 +592,47 @@ export async function exportDashboardPDF(dashState, user) {
   const occupancy    = stats.occupancyRate || stats.occupancy          || 0;
 
   const kpiCards = [
-    { label: 'Total Revenue',   value: fmtMoney(revenue) },
-    { label: 'Total Bookings',  value: String(bookingCount) },
-    { label: 'Cancellations',   value: String(cancels) },
-    { label: 'Nights Affected', value: String(nightsAff) },
-    { label: 'Booked Nights',   value: String(bookedN) },
-    { label: 'Occupancy Rate',  value: occupancy + '%' },
+    {
+      kind: 'revenue', label: 'REVENUE',
+      value: fmtMoney(revenue),
+      sub: 'Total bookings: ' + bookingCount,
+    },
+    {
+      kind: 'bookings', label: 'BOOKINGS',
+      value: String(bookingCount),
+      sub: bookedN + ' nights total',
+      accent: C.blue, accentLight: C.blueLight,
+    },
+    {
+      kind: 'cancellations', label: 'CANCELLATIONS',
+      value: String(cancels),
+      sub: nightsAff + ' nights affected',
+      accent: C.red, accentLight: C.redLight,
+    },
+    {
+      kind: 'occupancy', label: 'OCCUPANCY RATE',
+      value: occupancy + '%',
+      sub: 'Selected period',
+      accent: C.green, accentLight: C.greenLight,
+    },
   ];
 
+  // ── 1) Stat cards — full width, TOP (fixed row of 4) ──────────────────────
+  y = drawStatCards(doc, kpiCards, y, pageWidth, margin);
+
+  // ── 2) Two columns: business profile (left) | platform breakdown (right) ──
   const channelEntries = Object.entries(byChannel);
-  y = drawKpiAndBreakdown(
-    doc, kpiCards, channelEntries, byChannel,
-    y, pageWidth, margin,
-    businessName, propertyName, propertyImageDataUrl
-  );
+  const totalW = pageWidth - margin * 2;
+  const colGap = 6;
+  const leftW  = (totalW - colGap) * 0.40;   // business profile
+  const rightW = (totalW - colGap) * 0.60;   // platform breakdown
+  const leftX  = margin;
+  const rightX = margin + leftW + colGap;
+
+  const leftBottom  = drawBusinessProfile(doc, businessName, propertyName, leftX, y, leftW, propertyImageDataUrl);
+  const rightBottom = drawPlatformBreakdown(doc, channelEntries, rightX, y, rightW);
+
+  y = Math.max(leftBottom, rightBottom) + 4;
 
   // ── BOOKINGS TABLE ────────────────────────────────────────────────────────
   if (bookings.length > 0) {

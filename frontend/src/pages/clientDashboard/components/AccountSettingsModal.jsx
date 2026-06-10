@@ -591,7 +591,11 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
   async function fetchActivityLog() {
     setActivityLoading(true);
     try {
-      const res = await fetchWithAuth(`${API_BASE}/api/activity-log`);
+      const res = await fetchWithAuth(`${API_BASE}/api/activity-log`, {
+        headers: {
+          "x-api-key": import.meta.env.VITE_API_KEY,
+        },
+      });
       const data = await res.json().catch(() => ({}));
       if (res.ok) setActivityLog(data.activityLog || []);
     } catch (e) {
