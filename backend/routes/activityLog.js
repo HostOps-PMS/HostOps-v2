@@ -21,20 +21,36 @@ router.post('/activity-log', requireAuth, async (req, res, next) => {
 
     // req.user is always the client/owner (set by requireAuth middleware).
     // req.staff is set only when a staff member is logged in.
-    const userId  = req.user._id;
+    const owner   = req.user;
+    const userId  = owner._id;
     const staffId = req.isStaff ? req.staff._id : null;
+
+    // Snapshot the owner account's properties WITHOUT the Smoobu API key.
+    // We only keep id + display name so the key is never written to the log.
+    const ownerProperties = (owner.properties || []).map((p) => ({
+      id:           p._id,
+      propertyName: p.propertyName || '',
+    }));
 
     await ActivityLog.create({
       userId,
       staffId,
       performedBy: {
-        userId:    req.isStaff ? req.staff._id   : req.user._id,
+        userId:    req.isStaff ? req.staff._id   : owner._id,
         staffId:   req.isStaff ? req.staff._id   : undefined,
-        email:     req.isStaff ? req.staff.email : req.user.email,
-        firstName: req.isStaff ? req.staff.firstName : (req.user.firstName || ''),
-        lastName:  req.isStaff ? req.staff.lastName  : (req.user.lastName  || ''),
-        role:      req.isStaff ? 'staff' : (req.user.role || 'client'),
+        email:     req.isStaff ? req.staff.email : owner.email,
+        firstName: req.isStaff ? req.staff.firstName : (owner.firstName || ''),
+        lastName:  req.isStaff ? req.staff.lastName  : (owner.lastName  || ''),
+        role:      req.isStaff ? 'staff' : (owner.role || 'client'),
+        // staffRole only applies to staff logins; empty for client/admin.
+        staffRole: req.isStaff ? (req.staff.staffRole || '') : '',
       },
+
+      // Account context — always taken from the owner/client account.
+      // For staff logins this is the client they belong to.
+      businessName: owner.businessName || '',
+      properties:   ownerProperties,
+
       action:    action.trim(),
       meta,
       ipAddress: req.ip || '',
