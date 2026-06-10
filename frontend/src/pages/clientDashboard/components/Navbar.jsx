@@ -520,11 +520,12 @@ export default function Navbar() {
                 </button>
                 {notifOpen && (
                   <div style={{
-                    position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-                    width: '290px', background: dark ? '#1a2e20' : '#fff',
+                    position: 'fixed', top: '60px', left: 8, right: 8,
+                    width: 'auto',
+                    background: dark ? '#1a2e20' : '#fff',
                     border: `1px solid ${dark ? '#1e3a2a' : '#d4eddf'}`,
-                    borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.13)',
-                    zIndex: 999, overflow: 'hidden',
+                    borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+                    zIndex: 9999, overflow: 'hidden',
                   }}>
                     <div style={{
                       padding: '14px 16px', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#e8f5ee'}`,
@@ -587,6 +588,10 @@ export default function Navbar() {
               {/* Export PDF */}
               {ExportButton}
 
+              <Link to="/inbox" style={{ ...t.iconBtn, textDecoration: 'none' }} aria-label="Inbox">
+                <i className="ti ti-inbox" style={t.iconBtnIcon} aria-hidden="true" />
+              </Link>
+
               <button
                 style={t.iconBtn}
                 onClick={() => setDark((prev) => !prev)}
@@ -614,19 +619,6 @@ export default function Navbar() {
                     <p style={t.dropEmail}>{user?.email || ""}</p>
                   </div>
                   <div style={t.dropBody}>
-                    <button
-                      style={{
-                        ...t.dropBtn,
-                        color: dark ? "#eaf5f0" : "#0c1c14",
-                      }}
-                    >
-                      <i
-                        className="ti ti-bell"
-                        style={{ fontSize: "15px", color: "#1e8760" }}
-                        aria-hidden="true"
-                      />
-                      Notifications
-                    </button>
                     <button
                       style={{
                         ...t.dropBtn,
@@ -729,7 +721,8 @@ export default function Navbar() {
               {notifOpen && (
                 <div style={{
                   position: 'absolute', top: 'calc(100% + 8px)', left: 0,
-                  width: '320px', background: dark ? '#1a2e20' : '#fff',
+                  width: 'clamp(280px, 90vw, 340px)',
+                  background: dark ? '#1a2e20' : '#fff',
                   border: `1px solid ${dark ? '#1e3a2a' : '#d4eddf'}`,
                   borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.13)',
                   zIndex: 999, overflow: 'hidden',

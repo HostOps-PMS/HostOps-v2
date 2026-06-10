@@ -14,6 +14,7 @@ import FirstLoginPinModal from "./components/FirstLoginPinModal";
 import { useDashboard } from "./context/DashboardContext";
 import { useDashboardData } from "./hooks/useDashboardData";
 import Footer from "./components/Footer";
+import ProfitabilityCalculator from "./components/ProfitabilityCalculator";
 import safeStorage from "../safeStorage";
 import "./globals.css";
 
@@ -83,7 +84,9 @@ export default function DashboardPage() {
   });
 
   // Pricing modal state
-  const [pricingOpen, setPricingOpen] = useState(false);
+const [pricingOpen, setPricingOpen] = useState(false);
+const [profitOpen, setProfitOpen] = useState(false);
+console.log("profitOpen:", profitOpen);
 
   // Message modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -170,6 +173,13 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+      <style>{`
+        @keyframes fabPulse {
+          0% { box-shadow: 0 0 0 0 rgba(30,135,96,0.5), 0 4px 20px rgba(0,0,0,0.25); }
+          70% { box-shadow: 0 0 0 10px rgba(30,135,96,0), 0 4px 20px rgba(0,0,0,0.25); }
+          100% { box-shadow: 0 0 0 0 rgba(30,135,96,0), 0 4px 20px rgba(0,0,0,0.25); }
+        }
+      `}</style>
 
       <style>{`
         @media (max-width: 768px) {
@@ -289,6 +299,95 @@ export default function DashboardPage() {
             </div>
           </>
       </div>
+
+      <button
+        onClick={() => setProfitOpen(true)}
+        onMouseEnter={e => { if (window.innerWidth > 768) e.currentTarget.style.transform = "translateX(0)"; }}
+        onMouseLeave={e => { if (window.innerWidth > 768) e.currentTarget.style.transform = "translateX(calc(100% - 48px))"; }}
+        title="Profitability Calculator"
+        aria-label="Open Profitability Calculator"
+        style={{
+          position: "fixed",
+          bottom: window.innerWidth <= 768 ? 0 : 120,
+          right: 0,
+          zIndex: 999,
+          background: "#1e8760",
+          border: "none",
+          borderRadius: window.innerWidth <= 768 ? "16px 0 0 0" : "999px 0 0 999px",
+          padding: window.innerWidth <= 768 ? "10px 18px 14px 16px" : "0 16px 0 12px",
+          height: window.innerWidth <= 768 ? "auto" : 44,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          cursor: "pointer",
+          transform: window.innerWidth <= 768 ? "none" : "translateX(calc(100% - 48px))",
+          transition: "transform 0.3s ease",
+          boxShadow: "-4px -4px 20px rgba(0,0,0,0.15)",
+        }}
+      >
+        <i className="ti ti-calculator" style={{ fontSize: 18, color: "#fff" }} />
+        <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2 }}>
+          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", letterSpacing: "0.06em" }}>OPEN</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", whiteSpace: "nowrap" }}>Profitability</span>
+        </div>
+      </button>
+
+      {profitOpen && (
+        <div
+          onClick={(e) => e.target === e.currentTarget && setProfitOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(12,28,20,0.45)",
+            backdropFilter: "blur(4px)",
+            zIndex: 10000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "clamp(8px, 4vw, 20px)",
+          }}
+        >
+          <div style={{
+            width: "min(720px, 96vw)",
+            maxHeight: "90vh",
+            overflowY: "auto",
+            borderRadius: 20,
+            boxShadow: "0 24px 64px rgba(12,28,20,0.2)",
+            position: "relative",
+          }}>
+            {/* X button — fixed sa loob ng modal, hindi nag-scroll */}
+            <button
+              onClick={() => setProfitOpen(false)}
+              aria-label="Close"
+              style={{
+                position: "absolute",
+                top: 35,
+                right: 20,
+                zIndex: 20,
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                border: "1px solid #e0ede6",
+                background: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                color: "#6a8b7c",
+                fontSize: 14,
+                flexShrink: 0,
+              }}
+            >
+              <i className="ti ti-x" />
+            </button>
+            <ProfitabilityCalculator
+              dark={dark}
+              stats={stats}
+              period={period}
+            />
+          </div>
+        </div>
+      )}
 
       <Footer />
 
