@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../AuthContext";
-const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "https://hostpilot-smoobu.onrender.com";
+import { useActivityLog } from "../hooks/useActivityLog";
+const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 
 function getEmailFromToken(token) {
   try {
@@ -520,6 +521,8 @@ function SuccessModal({ context, onDone }) {
 export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch }) {
   const { getUser, setUser } = useAuth();
   const auth = useAuth();
+  const { fetchWithAuth } = useAuth();
+  const { logActivity } = useActivityLog();
   const user = getUserData(auth);  
   const accountEmail = user?.email || auth.getUser()?.email || getEmailFromToken(auth.getToken());
   const isStaffUser = user?.isStaff || user?.role === "staff";
@@ -588,15 +591,12 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
   async function fetchActivityLog() {
     setActivityLoading(true);
     try {
-      const token = auth.getToken();
-      const res = await fetch(`${API_BASE}/auth/activity-log`, {
+      const res = await fetchWithAuth(`${API_BASE}/api/activity-log`, {
         headers: {
           "x-api-key": import.meta.env.VITE_API_KEY,
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
       const data = await res.json().catch(() => ({}));
-      console.log("Activity log response:", res.status, data);
       if (res.ok) setActivityLog(data.activityLog || []);
     } catch (e) {
       console.error("Failed to fetch activity log:", e);
@@ -623,8 +623,17 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       setShowSuccessModal(false);
       setSuccessContext("");
       verifiedTokenRef.current = null;
+
+      logActivity('opened_account_settings');
     }
   }, [isOpen]);
+
+  // Fetch activity log whenever the activity tab is opened
+  useEffect(() => {
+    if (isOpen && activeTab === 'activity') {
+      fetchActivityLog();
+    }
+  }, [isOpen, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close on Escape key
   useEffect(() => {
@@ -761,6 +770,8 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
         setShowPw({ current: false, next: false, confirm: false });
         verifiedTokenRef.current = null;
 
+        logActivity('password_changed');
+
         // Show success modal
         setSuccessContext("password");
         setShowSuccessModal(true);
@@ -780,6 +791,8 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
         setPinForm({ currentPin: "", newPin: "", confirmPin: "" });
         setShowPin({ current: false, next: false, confirm: false });
         verifiedTokenRef.current = null;
+
+        logActivity('pin_changed');
 
         // Show success modal
         setSuccessContext("pin");
@@ -1460,7 +1473,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
             {activeTab === "activity" && (() => {
               const now = new Date();
               const filtered = activityLog.filter((e) => {
-                const d = new Date(e.timestamp);
+                const d = new Date(e.createdAt || e.timestamp);
                 if (activityFilter === 'today') {
                   return d.toDateString() === now.toDateString();
                 }
@@ -1489,7 +1502,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                           opened_message_thread: 'Opened message thread',
                         };
                         const label = actionLabels[e.action] || e.action;
-                        const time = new Date(e.timestamp).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+                        const time = new Date(e.createdAt || e.timestamp).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
                         return `"${label}","${time}","${e.ipAddress || ''}"`;
                       });
                       const csv = ['Action,Date & Time,IP Address', ...rows].join('\n');
@@ -1535,7 +1548,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                       const iconColor = isLogin ? "#1e8760" : isPwChange ? "#f59e0b" : "#9ab8a9";
                       const iconBg = isLogin ? "#eaf8f1" : isPwChange ? "#fffbeb" : "#f7faf8";
                       const label = isLogin ? "Logged in" : isPwChange ? "Password changed" : entry.action;
-                      const time = new Date(entry.timestamp).toLocaleString("en-PH", {
+                      const time = new Date(entry.createdAt || entry.timestamp).toLocaleString("en-PH", {
                         month: "short", day: "numeric", year: "numeric",
                         hour: "numeric", minute: "2-digit", hour12: true,
                       });

@@ -62,13 +62,6 @@ export function useStats({ from, to } = {}) {
       // localhost but not in prod" from a stale inline fetch().
       const data = await getDashboardOverview({ from, to });
 
-      // Debug: confirm overview shape in production logs
-      console.log('[useStats] overview keys:', Object.keys(data));
-      console.log('[useStats] alerts count:', Array.isArray(data.alerts) ? data.alerts.length : 'MISSING');
-      console.log('[useStats] recentActivities count:', Array.isArray(data.recentActivities) ? data.recentActivities.length : 'MISSING');
-      console.log('[useStats] mapLocations count:', Array.isArray(data.mapLocations) ? data.mapLocations.length : 'MISSING');
-      console.log('[useStats] _version:', data._version ?? 'n/a');
-
       setOverview(data);
       setStats(buildStatsCards(data));
     } catch (err) {
