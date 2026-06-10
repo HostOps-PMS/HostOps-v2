@@ -81,11 +81,16 @@ async function issueTokenPair(signFnAccess, signFnRefresh, entity, req, extra = 
 
 // ── Helper: set the encrypted rt cookie ─────────────────────────
 // Single place that controls cookie options so they stay consistent.
+// Production (HTTPS): Secure=true + SameSite=None for cross-origin support.
+// Development (HTTP):  Secure=false + SameSite=Lax — SameSite=None requires
+//   Secure=true, and Secure cookies are never sent over plain HTTP, so the
+//   browser silently drops them and every /auth/refresh returns 401.
 function setRefreshCookie(res, rawRefreshToken) {
+  const isProd = process.env.NODE_ENV === 'production';
   res.cookie('rt', encryptToken(rawRefreshToken), {
     httpOnly: true,
-    secure:   process.env.NODE_ENV === 'production',
-    sameSite: 'none',
+    secure:   isProd,
+    sameSite: isProd ? 'none' : 'lax',
     maxAge:   7 * 24 * 60 * 60 * 1000,
     path:     '/auth',
   });
