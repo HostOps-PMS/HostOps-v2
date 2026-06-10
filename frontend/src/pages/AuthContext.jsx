@@ -49,6 +49,65 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // ── Silent token refresh (callable by any hook/component) ────────
+  // Attempts to get a new access token using the HttpOnly rt cookie.
+  // Returns the new token string on success, or null on failure.
+  // Used by fetchWithAuth to auto-retry after a 401.
+  const refreshToken = useCallback(async () => {
+    try {
+      const res = await fetch(`${HP_API_BASE}/auth/refresh`, {
+        method:      'POST',
+        credentials: 'include',
+        headers:     { 'x-api-key': import.meta.env.VITE_API_KEY },
+      });
+      if (!res.ok) {
+        accessTokenRef.current = null;
+        return null;
+      }
+      const data = await res.json();
+      const newToken = data.accessToken || null;
+      accessTokenRef.current = newToken;
+      if (data.user) setUser(data.user);
+      return newToken;
+    } catch {
+      accessTokenRef.current = null;
+      return null;
+    }
+  }, [setUser]);
+
+  // ── fetchWithAuth ─────────────────────────────────────────────────
+  // Drop-in replacement for fetch() that:
+  //   1. Attaches the current access token + API key automatically
+  //   2. On 401, silently refreshes the token once and retries
+  //   3. On second 401 (refresh also failed), returns the failed response
+  //      so the caller can handle it (e.g. redirect to login)
+  const fetchWithAuth = useCallback(async (url, options = {}) => {
+    const makeHeaders = (token) => ({
+      'Content-Type': 'application/json',
+      'x-api-key':    import.meta.env.VITE_API_KEY,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    });
+
+    // First attempt
+    let res = await fetch(url, {
+      ...options,
+      headers: makeHeaders(accessTokenRef.current),
+    });
+
+    // If 401, try to refresh once then retry
+    if (res.status === 401) {
+      const newToken = await refreshToken();
+      if (!newToken) return res; // refresh failed — return 401 to caller
+      res = await fetch(url, {
+        ...options,
+        headers: makeHeaders(newToken),
+      });
+    }
+
+    return res;
+  }, [refreshToken]);
+
   // ── Clear: wipe memory token + stored user ────────────────────────
   const clear = useCallback(() => {
     accessTokenRef.current = null;
@@ -166,6 +225,8 @@ export function AuthProvider({ children }) {
         setUser,
         clear,
         isReady,
+        refreshToken,
+        fetchWithAuth,
         storageIsPersistent: safeStorage.isPersistent,
       }}
     >
