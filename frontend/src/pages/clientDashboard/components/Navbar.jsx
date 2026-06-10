@@ -230,7 +230,9 @@ export default function Navbar() {
     try {
       // Small tick so the spinner renders before the heavy PDF work blocks the thread
       await new Promise((r) => setTimeout(r, 50));
-      await exportDashboardPDF(dashState);
+      // Pass the logged-in user so the PDF can display the business name,
+      // selected property name, and the property thumbnail image.
+      await exportDashboardPDF(dashState, user);
     } catch (err) {
       console.error("PDF export failed:", err);
       alert("Export failed. Please try again.");

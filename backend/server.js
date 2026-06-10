@@ -19,6 +19,7 @@ import { publicRecoveryRouter, adminRecoveryRouter } from './routes/recoveryRequ
 import { requireApiKey } from './middleware/apiKeyAuth.js';
 import keyDiagnosticRoute from './routes/keyDiagnosticRoute.js';
 import smoobuApartmentsRoute   from './routes/smoobuApartments.js';
+import activityLogRoute        from './routes/activityLog.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -165,6 +166,7 @@ app.use('/api/accounts', smoobuApartmentsRoute); // GET /api/accounts/:clientId/
 app.use('/api',  dashboardOverviewRoute); // GET /api/dashboard-overview (admin)
 app.use('/api',  adminRecoveryRouter);    // GET|PATCH /api/recovery-requests (admin)
 app.use('/api', keyDiagnosticRoute);
+app.use('/api', activityLogRoute);   // GET|POST /api/activity-log
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {

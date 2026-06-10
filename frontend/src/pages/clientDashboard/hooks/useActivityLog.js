@@ -8,7 +8,7 @@ export function useActivityLog() {
   async function logActivity(action, meta = {}) {
     try {
       const token = auth.getToken();
-      await fetch(`${API_BASE}/auth/log-activity`, {
+      await fetch(`${API_BASE}/api/activity-log`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
