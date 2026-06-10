@@ -139,8 +139,16 @@ export default function InboxPage() {
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState(false);
   const msgEndRef = useRef(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [showThread, setShowThread] = useState(false);
 
-  const STAFF_PIN = "1234"; // <-- palitan mo ng gusto mong PIN (only used for non-staff client users)
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const STAFF_PIN = "1234";
 
   function handlePinSubmit() {
     if (pinInput === STAFF_PIN) {
@@ -189,7 +197,10 @@ export default function InboxPage() {
 
   // Auto-select first thread
   useEffect(() => {
-    if (inbox.length > 0 && !selected) setSelected(inbox[0]);
+    if (inbox.length > 0 && !selected) {
+      setSelected(inbox[0]);
+      if (!isMobile) setShowThread(true);
+    }
   }, [inbox]);
 
   // Load messages when thread selected
@@ -271,140 +282,118 @@ export default function InboxPage() {
 
         {/* ── LEFT PANEL — Thread list ── */}
         <div style={{
-          width: "340px", flexShrink: 0,
+          width: isMobile ? "100%" : "340px", flexShrink: 0,
           background: panelBg,
           borderRight: `1px solid ${border}`,
-          display: "flex", flexDirection: "column",
+          display: isMobile && showThread ? "none" : "flex", flexDirection: "column",
           overflow: "hidden",
         }}>
           {/* Left header */}
-          <div style={{ padding: "16px 16px 10px", borderBottom: `1px solid ${border}` }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+          <div style={{ padding: "12px 16px 10px", borderBottom: `1px solid ${border}`, background: panelBg }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <button
                 onClick={() => navigate("/dashboard")}
                 style={{
-                  display: "inline-flex", alignItems: "center", gap: 5,
-                  fontSize: "12px", fontWeight: 600, color: textSub,
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  fontSize: "14px", fontWeight: 500, color: "#26a676",
                   background: "none", border: "none", cursor: "pointer", padding: 0,
                 }}
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <polyline points="15 18 9 12 15 6" />
+                <svg width="8" height="13" viewBox="0 0 9 15" fill="none">
+                  <path d="M8 1L1.5 7.5L8 14" stroke="#26a676" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 Dashboard
               </button>
-              <span style={{ fontSize: "11px", color: textSub }}>
-                {filtered.length} thread{filtered.length !== 1 ? "s" : ""}
+              <span style={{ fontSize: "15px", fontWeight: 700, color: textMain, letterSpacing: "-0.3px" }}>
+                Messages
+              </span>
+              <span style={{
+                fontSize: "11px", fontWeight: 600, color: textSub,
+                background: inputBg, padding: "2px 8px", borderRadius: 20,
+              }}>
+                {filtered.length}
               </span>
             </div>
-
-            {/* Property scope indicator — shows which property's messages are displayed */}
-            {dashState.selectedPropertyName ? (
-              <div style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "6px 10px", marginBottom: "10px",
-                borderRadius: "8px", background: dark ? "#0f2d1f" : "#eaf7f0",
-                border: `1px solid ${dark ? "#1e3a2a" : "#c3e8d4"}`,
-              }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#26a676" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                  <polyline points="9 22 9 12 15 12 15 22"/>
+            <div style={{ marginBottom: "10px" }}>
+              {/* Search */}
+              <div style={{ position: "relative", marginBottom: propertyOptions.length > 1 ? 8 : 0 }}>
+                <svg style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: textSub, pointerEvents: "none" }}
+                  width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                <span style={{ fontSize: "11px", fontWeight: 700, color: "#26a676", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {dashState.selectedPropertyName}
-                </span>
+                <input
+                  type="text"
+                  placeholder="Search…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{
+                    width: "100%", padding: "7px 10px 7px 28px",
+                    borderRadius: "8px", border: `1px solid ${border}`,
+                    background: inputBg, color: textMain,
+                    fontSize: "12.5px", outline: "none", boxSizing: "border-box",
+                  }}
+                />
               </div>
-            ) : (
-              <div style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "6px 10px", marginBottom: "10px",
-                borderRadius: "8px", background: dark ? "#0f2d1f" : "#f4f7f5",
-                border: `1px solid ${border}`,
-              }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={textSub} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-                </svg>
-                <span style={{ fontSize: "11px", fontWeight: 600, color: textSub }}>
-                  All Properties
-                </span>
-              </div>
-            )}
-            <div style={{ position: "relative", marginBottom: "10px" }}>
-              {/* Property filter dropdown */}
+              {/* Property dropdown — only shows when multiple properties */}
               {propertyOptions.length > 1 && (
-                <div style={{ marginBottom: "8px" }}>
-                  <div style={{ position: "relative" }}>
-                    <svg
-                      style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
-                      width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={textSub} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                    >
-                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                      <polyline points="9 22 9 12 15 12 15 22"/>
-                    </svg>
-                    <select
-                      value={propertyFilter}
-                      onChange={(e) => setPropertyFilter(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "7px 10px 7px 28px",
-                        borderRadius: "8px",
-                        border: `1px solid ${propertyFilter !== "all" ? "#26a676" : border}`,
-                        background: propertyFilter !== "all" ? (dark ? "#0f2d1f" : "#eaf7f0") : inputBg,
-                        color: propertyFilter !== "all" ? "#26a676" : textMain,
-                        fontSize: "12px",
-                        fontWeight: propertyFilter !== "all" ? 700 : 500,
-                        outline: "none",
-                        cursor: "pointer",
-                        appearance: "none",
-                        WebkitAppearance: "none",
-                        boxSizing: "border-box",
-                      }}
-                    >
-                      <option value="all">All Properties</option>
-                      {propertyOptions.map((name) => (
-                        <option key={name} value={name}>{name}</option>
-                      ))}
-                    </select>
-                    <svg
-                      style={{ position: "absolute", right: 9, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
-                      width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={textSub} strokeWidth="2.5" strokeLinecap="round"
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  </div>
+                <div style={{ position: "relative" }}>
+                  <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+                    width="12" height="12" viewBox="0 0 24 24" fill="none"
+                    stroke={propertyFilter !== "all" ? "#26a676" : textSub}
+                    strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  <select
+                    value={propertyFilter}
+                    onChange={(e) => setPropertyFilter(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "7px 28px 7px 28px",
+                      borderRadius: "8px",
+                      border: `1px solid ${propertyFilter !== "all" ? "#26a676" : border}`,
+                      background: propertyFilter !== "all" ? (dark ? "#0f2d1f" : "#eaf7f0") : inputBg,
+                      color: propertyFilter !== "all" ? "#26a676" : textMain,
+                      fontSize: "12px",
+                      fontWeight: propertyFilter !== "all" ? 700 : 500,
+                      outline: "none", cursor: "pointer",
+                      appearance: "none", WebkitAppearance: "none",
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    <option value="all">All Properties</option>
+                    {propertyOptions.map((name) => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                  <svg style={{ position: "absolute", right: 9, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+                    width="11" height="11" viewBox="0 0 24 24" fill="none"
+                    stroke={propertyFilter !== "all" ? "#26a676" : textSub}
+                    strokeWidth="2.5" strokeLinecap="round">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
                 </div>
               )}
-              <svg style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: textSub, pointerEvents: "none" }}
-                width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{
-                  width: "100%", padding: "7px 10px 7px 28px",
-                  borderRadius: "8px", border: `1px solid ${border}`,
-                  background: inputBg, color: textMain,
-                  fontSize: "12.5px", outline: "none", boxSizing: "border-box",
-                }}
-              />
             </div>
 
-            {/* Filter pills */}
-            <div style={{ display: "flex", gap: "6px" }}>
+            {/* Filter pills + property — single scrollable row */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 6,
+              overflowX: "auto", paddingBottom: 2,
+              scrollbarWidth: "none", msOverflowStyle: "none",
+            }}>
               {[
                 { key: "all", label: "All" },
                 { key: "unread", label: `Unread${totalUnread > 0 ? ` (${totalUnread})` : ""}` },
                 { key: "replied", label: "Replied" },
               ].map((f) => (
                 <button key={f.key} onClick={() => setFilter(f.key)} style={{
-                  padding: "4px 11px", borderRadius: 100, cursor: "pointer",
-                  border: `1px solid ${filter === f.key ? "#26a676" : border}`,
+                  padding: "4px 12px", borderRadius: 20, cursor: "pointer",
+                  border: "none", flexShrink: 0,
                   background: filter === f.key ? "#26a676" : inputBg,
                   color: filter === f.key ? "#fff" : textSub,
-                  fontSize: "11px", fontWeight: 600, transition: "all .15s",
+                  fontSize: "11px", fontWeight: filter === f.key ? 600 : 400,
+                  transition: "all .15s", whiteSpace: "nowrap",
                 }}>
                   {f.label}
                 </button>
@@ -442,7 +431,7 @@ export default function InboxPage() {
                     return (
                       <div
                         key={idx}
-                        onClick={() => setSelected(thread)}
+                        onClick={() => { setSelected(thread); setShowThread(true); }}
                         style={{
                           display: "flex", alignItems: "center", gap: "11px",
                           padding: "12px 16px",
@@ -495,7 +484,12 @@ export default function InboxPage() {
         </div>
 
         {/* ── RIGHT PANEL — Conversation ── */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: bg }}>
+        <div style={{
+          flex: 1,
+          display: isMobile && !showThread ? "none" : "flex",
+          flexDirection: "column", overflow: "hidden", background: bg,
+          width: isMobile ? "100%" : undefined,
+        }}>
           {!selected ? (
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 10, color: textSub }}>
               <div style={{ fontSize: "32px" }}>✉</div>
@@ -505,11 +499,25 @@ export default function InboxPage() {
             <>
               {/* Conversation header */}
               <div style={{
-                padding: "14px 24px",
+                padding: isMobile ? "10px 14px" : "14px 24px",
                 borderBottom: `1px solid ${border}`,
                 background: panelBg,
                 display: "flex", alignItems: "center", gap: "14px", flexShrink: 0,
               }}>
+                {isMobile && (
+                  <button
+                    onClick={() => setShowThread(false)}
+                    style={{
+                      background: "none", border: "none", cursor: "pointer",
+                      color: "#26a676", display: "flex", alignItems: "center",
+                      gap: 4, padding: 0, fontWeight: 700, fontSize: "13px", flexShrink: 0,
+                    }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <polyline points="15 18 9 12 15 6" />
+                    </svg>
+                  </button>
+                )}
                 <Avatar name={selected.guestName} size={38} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 800, fontSize: "15px", color: textMain }}>
@@ -530,7 +538,7 @@ export default function InboxPage() {
               </div>
 
               {/* Messages */}
-              <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
+              <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "14px 12px" : "24px 28px" }}>
                 {loadingMsgs && (
                   <div style={{ textAlign: "center", color: textSub, fontSize: "13px", paddingTop: 40 }}>
                     Loading messages…
@@ -554,7 +562,7 @@ export default function InboxPage() {
 
               {/* Reply box */}
               <div style={{
-                padding: "14px 24px",
+                padding: isMobile ? "10px 12px" : "14px 24px",
                 borderTop: `1px solid ${border}`,
                 background: panelBg,
                 flexShrink: 0,
@@ -613,21 +621,29 @@ export default function InboxPage() {
                     </div>
                   </>
                 ) : (
-                  <div
-                    style={{
-                      padding: "14px 16px", borderRadius: "10px",
-                      border: `1px dashed ${border}`,
-                      background: inputBg,
-                      display: "flex", alignItems: "center", gap: 10,
-                    }}
-                  >
-                    <span style={{ fontSize: "18px" }}>🔒</span>
+                  <div style={{
+                    padding: "12px 16px", borderRadius: "10px",
+                    border: `1px solid ${border}`,
+                    background: inputBg,
+                    display: "flex", alignItems: "center", gap: 12,
+                  }}>
+                    <div style={{
+                      width: 34, height: 34, borderRadius: "8px", flexShrink: 0,
+                      background: dark ? "#1e3a2a" : "#e4ede8",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                        stroke={textSub} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                      </svg>
+                    </div>
                     <div>
-                      <div style={{ fontSize: "13px", fontWeight: 600, color: textSub }}>
-                        Replying is restricted to staff accounts
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: textMain }}>
+                        Staff access required
                       </div>
-                      <div style={{ fontSize: "11px", color: dark ? "#2e5c3e" : "#b8d0c4" }}>
-                        Only staff members can send messages to guests
+                      <div style={{ fontSize: "11px", color: textSub, marginTop: 1 }}>
+                        Only staff accounts can reply to guests
                       </div>
                     </div>
                   </div>
