@@ -69,7 +69,6 @@ function PropertyRow({ prop, allBookings, dateRange, ymdRange, todayISO }) {
   const propBookings = allBookings.filter((b) => {
     if (!b.apartment || b.apartment.id !== prop.id) return false;
     if (!b["guest-name"] && b["is-blocked-booking"]) return false;
-    if (b.type === 'cancellation' || (b.type && b.type.toLowerCase().includes('cancel'))) return false;
     const arrYMD = toYMD(b.arrival);
     const depYMD = toYMD(b.departure);
     return arrYMD <= rangeEndYMD && depYMD > rangeStartYMD;
@@ -251,7 +250,6 @@ function SingleCalendarView({ prop, allBookings, dark }) {
     if (!b.apartment) return false;
     if (String(b.apartment.id) !== String(prop.id)) return false;
     if (!b['guest-name'] && b['is-blocked-booking']) return false;
-    if (b.type === 'cancellation' || (b.type && b.type.toLowerCase().includes('cancel'))) return false;
     return true;
   });
 
@@ -315,8 +313,9 @@ function SingleCalendarView({ prop, allBookings, dark }) {
   const weekendBg = dark ? '#0c2416' : '#fdf8f8';
   const todayBg = dark ? '#1a4a2e' : '#f0faf4';
 
-  const [viewYear, setViewYear] = useState(year);
-  const [viewMonth, setViewMonth] = useState(month);
+const [viewYear, setViewYear] = useState(year);
+const [viewMonth, setViewMonth] = useState(month);
+const [showBookings, setShowBookings] = useState(false);
 
   const MONTHS_FULL_NAV = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const navFirstDay = new Date(viewYear, viewMonth, 1);
@@ -384,6 +383,54 @@ function SingleCalendarView({ prop, allBookings, dark }) {
 
   return (
     <div style={{ width: '100%', fontFamily: "'DM Sans', sans-serif" }}>
+      <style>{`
+        @media (max-width: 768px) {
+          /* Stats strip — 2 col grid, compact */
+          .single-cal-stats { grid-template-columns: repeat(2, 1fr) !important; }
+          .single-cal-stats > div { padding: 10px 14px !important; }
+          .single-cal-stats > div > div:first-child { font-size: 10px !important; }
+          .single-cal-stats > div > div:last-child { font-size: 18px !important; }
+          .single-cal-stats > div:nth-child(2) { border-right: none !important; }
+          .single-cal-stats > div:nth-child(3) { border-top: 1px solid #e3ede8 !important; }
+          .single-cal-stats > div:nth-child(4) { border-top: 1px solid #e3ede8 !important; border-right: none !important; }
+
+          /* Layout */
+          .single-cal-layout { flex-direction: column !important; }
+
+          /* Sidebar: hidden on mobile, shown as modal when toggled */
+          .single-cal-sidebar { display: flex !important; }
+          .single-cal-bookings-btn { display: none !important; }
+          .single-cal-close-btn { display: none !important; }
+          @media (max-width: 768px) {
+            .single-cal-sidebar { display: none !important; width: 100% !important; min-width: unset !important; border-left: none !important; position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; z-index: 1001 !important; width: 90vw !important; max-height: 80vh !important; border-radius: 16px !important; box-shadow: 0 20px 60px rgba(0,0,0,0.25) !important; overflow: hidden !important; }
+            .single-cal-sidebar.mobile-open { display: flex !important; flex-direction: column !important; }
+            .single-cal-bookings-btn { display: flex !important; }
+            .single-cal-close-btn { display: flex !important; }
+          }
+
+          /* Month nav header — tighter */
+          .single-cal-month-header { padding: 8px 12px !important; }
+
+          /* Calendar cells — shorter height, smaller font */
+          .single-cal-cell { min-height: 64px !important; padding: 4px !important; }
+          .single-cal-cell-date { font-size: 11px !important; }
+          .single-cal-today-circle { width: 18px !important; height: 18px !important; font-size: 11px !important; }
+
+          /* Booking bars — smaller text, prevent overflow */
+          .single-cal-bar { height: 20px !important; top: 24px !important; font-size: 9px !important; padding: 0 4px 0 2px !important; }
+          .single-cal-bar-icon { width: 14px !important; height: 14px !important; }
+          .single-cal-bar-price { display: none !important; }
+
+          /* Day labels row */
+          .single-cal-daylabels > div { font-size: 9px !important; padding: 6px 2px !important; }
+        }
+        @media (min-width: 769px) {
+          .single-cal-month-header { justify-content: space-between !important; }
+        }
+        @media (max-width: 768px) {
+          .single-cal-month-header { justify-content: center !important; flex-direction: column !important; align-items: center !important; }
+        }
+      `}</style>
       {/* Stats strip */}
       <div className="single-cal-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', borderBottom: `1px solid ${borderCol}` }}>
         {[
@@ -406,7 +453,7 @@ function SingleCalendarView({ prop, allBookings, dark }) {
       <div style={{ flex: 1, minWidth: 0, borderRight: `1px solid ${borderCol}` }}>
 
       {/* Month header + nav + legend */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: `1px solid ${borderCol}`, background: cardBg }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: `1px solid ${borderCol}`, background: cardBg, flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button onClick={() => { const d = new Date(viewYear, viewMonth - 1, 1); setViewMonth(d.getMonth()); setViewYear(d.getFullYear()); }} style={{ width: 28, height: 28, borderRadius: '50%', border: `1px solid ${borderCol}`, background: cardBg, color: textSecondary, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -416,7 +463,7 @@ function SingleCalendarView({ prop, allBookings, dark }) {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
         </div>
-        <div style={{ display: 'flex', gap: 14, fontSize: 12, color: textSecondary, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 14, fontSize: 12, color: textSecondary, alignItems: 'center', marginLeft: 24 }}>
           {[
             { color: '#1D9E75', label: 'Booked' },
             { color: '#9FE1CB', border: '#9FE1CB', label: 'Available' },
@@ -430,7 +477,7 @@ function SingleCalendarView({ prop, allBookings, dark }) {
       </div>
 
       {/* Day-of-week headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: surfaceBg, borderBottom: `1px solid ${borderCol}` }}>
+      <div className="single-cal-daylabels" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: surfaceBg, borderBottom: `1px solid ${borderCol}` }}>
         {DAY_LABELS.map((d, i) => (
           <div key={d} style={{ padding: '8px 4px', textAlign: 'center', fontSize: 11, fontWeight: 600, color: i >= 5 ? '#D4537E' : textSecondary, letterSpacing: '0.05em' }}>
             {d}
@@ -464,13 +511,13 @@ function SingleCalendarView({ prop, allBookings, dark }) {
           else if (isWeekend) bg = weekendBg;
 
           return (
-            <div key={dateISO} style={{ minHeight: 88, background: bg, borderRight: `1px solid ${cellBorder}`, borderBottom: `1px solid ${cellBorder}`, padding: 6, position: 'relative' }}>
+            <div key={dateISO} className="single-cal-cell" style={{ minHeight: 88, background: bg, borderRight: `1px solid ${cellBorder}`, borderBottom: `1px solid ${cellBorder}`, padding: 6, position: 'relative' }}>
               {/* Date number */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
                 {isToday ? (
-                  <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#1D9E75', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500 }}>{day}</span>
+                  <span className="single-cal-today-circle" style={{ width: 22, height: 22, borderRadius: '50%', background: '#1D9E75', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500 }}>{day}</span>
                 ) : (
-                  <span style={{ fontSize: 13, fontWeight: 500, color: isWeekend ? '#D4537E' : textPrimary }}>{day}</span>
+                  <span className="single-cal-cell-date" style={{ fontSize: 13, fontWeight: 500, color: isWeekend ? '#D4537E' : textPrimary }}>{day}</span>
                 )}
               </div>
 
@@ -483,7 +530,7 @@ function SingleCalendarView({ prop, allBookings, dark }) {
 
               {/* Booking bar — only render at bar start */}
               {barInfo && (
-                <div style={{
+                <div className="single-cal-bar" style={{
                   position: 'absolute',
                   top: 30,
                   left: 2,
@@ -505,7 +552,7 @@ function SingleCalendarView({ prop, allBookings, dark }) {
                   boxShadow: '0 1px 3px rgba(0,0,0,0.10)',
                 }}>
                   {barInfo.isFirst && (
-                    <span style={{ width: 18, height: 18, borderRadius: '50%', background: getChannelLogo(((barInfo.booking.channel && barInfo.booking.channel.name) || 'Direct')) ? '#fff' : getChannelColor((barInfo.booking.channel && barInfo.booking.channel.name) || 'Direct'), border: getChannelLogo(((barInfo.booking.channel && barInfo.booking.channel.name) || 'Direct')) ? '0.5px solid rgba(255,255,255,0.4)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                    <span className="single-cal-bar-icon" style={{ width: 18, height: 18, borderRadius: '50%', background: getChannelLogo(((barInfo.booking.channel && barInfo.booking.channel.name) || 'Direct')) ? '#fff' : getChannelColor((barInfo.booking.channel && barInfo.booking.channel.name) || 'Direct'), border: getChannelLogo(((barInfo.booking.channel && barInfo.booking.channel.name) || 'Direct')) ? '0.5px solid rgba(255,255,255,0.4)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
                       {getChannelLogo((barInfo.booking.channel && barInfo.booking.channel.name) || 'Direct') ? (
                         <img src={getChannelLogo((barInfo.booking.channel && barInfo.booking.channel.name) || 'Direct')} alt="" style={{ width: 12, height: 12, objectFit: 'contain', display: 'block' }} />
                       ) : (
@@ -520,7 +567,7 @@ function SingleCalendarView({ prop, allBookings, dark }) {
                     {barInfo.booking['guest-name'] || 'Guest'}
                   </span>
                   {barInfo.isFirst && (
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', marginLeft: 6, flexShrink: 0 }}>
+                    <span className="single-cal-bar-price" style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', marginLeft: 6, flexShrink: 0 }}>
                       · {fmtMoney(barInfo.booking.price)}
                     </span>
                   )}
@@ -534,12 +581,58 @@ function SingleCalendarView({ prop, allBookings, dark }) {
         })}
       </div>
 
+      {/* Mobile: View Upcoming Bookings tab button */}
+      <button
+        onClick={() => setShowBookings(true)}
+        style={{
+          display: 'none',
+          margin: '12px 16px 16px',
+          padding: '11px 0',
+          width: 'calc(100% - 32px)',
+          background: '#1D9E75',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 10,
+          fontSize: 13,
+          fontWeight: 700,
+          cursor: 'pointer',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+        }}
+        className="single-cal-bookings-btn"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 6 }}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        View Upcoming Bookings ({navMonthBookings.length})
+      </button>
+
       </div> {/* end LEFT calendar column */}
 
+      {/* MODAL OVERLAY — mobile only */}
+      {showBookings && (
+        <div
+          onClick={() => setShowBookings(false)}
+          className="single-cal-modal-overlay"
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            display: 'none',
+          }}
+        />
+      )}
+
       {/* RIGHT: Upcoming bookings */}
-      <div className="single-cal-sidebar" style={{ width: 335, minWidth: 295, flexShrink: 0, background: surfaceBg, borderLeft: `1px solid ${borderCol}`, display: 'flex', flexDirection: 'column', alignSelf: 'stretch' }}>
-        <div style={{ padding: '13px 20px', borderBottom: `1px solid ${borderCol}`, background: cardBg }}>
+      <div className={`single-cal-sidebar${showBookings ? ' mobile-open' : ''}`} style={{ width: 335, minWidth: 295, flexShrink: 0, background: surfaceBg, borderLeft: `1px solid ${borderCol}`, display: 'flex', flexDirection: 'column', alignSelf: 'stretch' }}>
+        <div style={{ padding: '13px 20px', borderBottom: `1px solid ${borderCol}`, background: cardBg, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: textSecondary, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Upcoming bookings</div>
+          <button
+            onClick={() => setShowBookings(false)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: textSecondary, padding: 4, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
       <div style={{ padding: '12px 16px', background: surfaceBg, flex: 1, overflowY: 'auto', maxHeight: 480, minHeight: 0 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -646,18 +739,13 @@ const { dark } = useDashboard();
   const dateRange = buildDateRange(calBaseDate, calMonthsCount);
   const ymdRange = dateRange.map(toYMD);
 
-  // Filter out cancelled bookings so they never appear on the calendar
-  const nonCancelledBookings = bookings.filter(
-    (b) => !(b.type === 'cancellation' || (b.type && b.type.toLowerCase().includes('cancel')))
-  );
-
   const filteredBookings =
     channels.length > 0
-      ? nonCancelledBookings.filter((b) => {
+      ? bookings.filter((b) => {
           const ch = (b.channel && b.channel.name) || "Direct";
           return channels.includes(ch);
         })
-      : nonCancelledBookings;
+      : bookings;
 
   const singleProp = view === "single"
     ? (properties.find(p => String(p.id) === String(singlePropId))
@@ -808,7 +896,7 @@ const { dark } = useDashboard();
           .cal-scroll::-webkit-scrollbar-track { background: #f4f7f5; border-radius: 6px; margin: 0 4px; }
           .cal-scroll::-webkit-scrollbar-thumb { background: #b7e4cf; border-radius: 6px; border: 2px solid #f4f7f5; }
           .cal-scroll::-webkit-scrollbar-thumb:hover { background: #56c299; }
-          .cal-scroll-inner { display: block; min-height: 500px; }
+          .cal-scroll-inner { display: block; min-height: 0; }
 
           /* ── Table ── */
           .cal-table { width: max-content; min-width: 100%; border-collapse: collapse; }
@@ -859,7 +947,7 @@ const { dark } = useDashboard();
           .cal-scroll::-webkit-scrollbar-track { background: #f4f7f5; border-radius: 6px; margin: 0 4px; }
           .cal-scroll::-webkit-scrollbar-thumb { background: #b7e4cf; border-radius: 6px; border: 2px solid #f4f7f5; }
           .cal-scroll::-webkit-scrollbar-thumb:hover { background: #56c299; }
-          .cal-scroll-inner { display: block; min-height: 500px; }
+          .cal-scroll-inner { display: block; min-height: 0; }
 
           /* ── Table ── */
           .cal-table { width: max-content; min-width: 100%; border-collapse: collapse; }
@@ -920,7 +1008,10 @@ const { dark } = useDashboard();
 
             /* Single view: stack vertically */
             .single-cal-layout { flex-direction: column !important; }
-            .single-cal-sidebar { width: 100% !important; min-width: unset !important; border-left: none !important; border-top: 1px solid #e3ede8 !important; }
+            .single-cal-sidebar { display: none; width: 100% !important; min-width: unset !important; border-left: none !important; border-top: 1px solid #e3ede8 !important; }
+            .single-cal-sidebar.mobile-open { display: flex !important; flex-direction: column !important; }
+            .single-cal-bookings-btn { display: flex !important; }
+            .single-cal-close-btn { display: flex !important; }
 
             /* Single view: stats 2-col */
             .single-cal-stats { grid-template-columns: repeat(2, 1fr) !important; }
