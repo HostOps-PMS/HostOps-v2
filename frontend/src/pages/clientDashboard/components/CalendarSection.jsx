@@ -102,7 +102,7 @@ export default function CalendarSection() {
         .cal-btn-group { background: #f0f5f2; border-radius: 100px; padding: 3px; display: flex; }
         .cal-btn-group button { background: transparent; border: none; padding: 5px 12px; border-radius: 100px; font-size: .75rem; font-weight: 700; color: #6a8b7c; cursor: pointer; font-family: 'DM Sans', sans-serif; }
         .cal-btn-group button.active { background: #26a676; color: #fff; }
-        .cal-nav { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 14px 24px; border-bottom: 1px solid #f0f5f2; background: #fff; flex-wrap: nowrap; white-space: nowrap; }
+        .cal-nav { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 14px 24px; border-bottom: 1px solid #f0f5f2; background: #fff; flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
         .cal-nav > * { flex-shrink: 0; }
         .cal-nav-btn { width: 30px; height: 30px; border: 1px solid #e3ede8; border-radius: 50%; background: #fff; color: #6a8b7c; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; }
         .cal-nav-btn:hover { background: #eaf8f1; color: #1e8760; border-color: #b7e4cf; }
@@ -213,7 +213,7 @@ export default function CalendarSection() {
       </div>
 
       {/* Calendar nav bar — hidden in single view */}
-      {dashState.view !== 'single' && <div className="cal-nav" style={{ background: dark ? '#0f2d1f' : '#fff', borderBottom: dark ? '1px solid #1e3a2a' : '1px solid #f0f5f2' }}>
+      {dashState.view !== 'single' && <div className="cal-nav" style={{ background: dark ? '#0f2d1f' : '#fff', borderBottom: dark ? '1px solid #1e3a2a' : '1px solid #f0f5f2', overflowX: 'auto', overflowY: 'visible' }}>
         <button className="cal-nav-btn" onClick={() => shiftCalendar(-30)} title="Previous month">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>

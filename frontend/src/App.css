@@ -38,7 +38,7 @@ ul { list-style: none; }
 img, svg { display: block; max-width: 100%; }
 
 /* ─── SITE WRAPPER ───────────────────────────────────── */
-.site { min-height: 100vh; overflow-x: hidden; }
+.site { min-height: unset; overflow-x: hidden; }
 
 /* ─── BUTTONS ────────────────────────────────────────── */
 .btn {
