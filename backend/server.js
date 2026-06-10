@@ -159,6 +159,14 @@ app.use('/auth', authRoutes);
 app.use('/auth', publicRecoveryRouter);   // POST /auth/recovery-request (public)
 app.use('/api',  dashboardRoutes);
 app.use('/api',  clientsRoutes);
+// NOTE: activityLogRoute is registered HERE, before the admin-scoped routers
+// (accounts / dashboard-overview / recovery), on purpose. Those admin routers
+// apply requireAdmin at the router level (router.use), which runs for ANY path
+// that enters them — even one with no matching route. Because /api/activity-log
+// would otherwise only match in the LAST router, the request had to traverse the
+// admin routers first and got a false 403 "Admin access required" for non-admins.
+// Matching it here lets it respond before reaching any admin router.
+app.use('/api',  activityLogRoute);   // GET|POST /api/activity-log
 app.use('/api',  propertiesRoutes);
 app.use('/api',  staffsRoutes);
 app.use('/api',  accountsRoutes);         // GET /api/accounts (admin)
@@ -166,7 +174,6 @@ app.use('/api/accounts', smoobuApartmentsRoute); // GET /api/accounts/:clientId/
 app.use('/api',  dashboardOverviewRoute); // GET /api/dashboard-overview (admin)
 app.use('/api',  adminRecoveryRouter);    // GET|PATCH /api/recovery-requests (admin)
 app.use('/api', keyDiagnosticRoute);
-app.use('/api', activityLogRoute);   // GET|POST /api/activity-log
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
