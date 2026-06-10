@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../AuthContext";
 import { useActivityLog } from "../hooks/useActivityLog";
-const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "https://hostpilot-smoobu.onrender.com";
+const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 
 function getEmailFromToken(token) {
   try {
@@ -521,6 +521,7 @@ function SuccessModal({ context, onDone }) {
 export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch }) {
   const { getUser, setUser } = useAuth();
   const auth = useAuth();
+  const { fetchWithAuth } = useAuth();
   const { logActivity } = useActivityLog();
   const user = getUserData(auth);  
   const accountEmail = user?.email || auth.getUser()?.email || getEmailFromToken(auth.getToken());
@@ -590,13 +591,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
   async function fetchActivityLog() {
     setActivityLoading(true);
     try {
-      const token = auth.getToken();
-      const res = await fetch(`${API_BASE}/api/activity-log`, {
-        headers: {
-          "x-api-key": import.meta.env.VITE_API_KEY,
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
+      const res = await fetchWithAuth(`${API_BASE}/api/activity-log`);
       const data = await res.json().catch(() => ({}));
       if (res.ok) setActivityLog(data.activityLog || []);
     } catch (e) {
@@ -628,6 +623,13 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       logActivity('opened_account_settings');
     }
   }, [isOpen]);
+
+  // Fetch activity log whenever the activity tab is opened
+  useEffect(() => {
+    if (isOpen && activeTab === 'activity') {
+      fetchActivityLog();
+    }
+  }, [isOpen, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close on Escape key
   useEffect(() => {
