@@ -17,7 +17,7 @@ export default function Footer() {
           justify-content: space-between;
           flex-wrap: nowrap;
           gap: 12px;
-          padding: 20px 200px;
+          padding: 20px clamp(16px, 5vw, 80px);
         }
         .footer-links a:hover {
           background: #f0faf6 !important;
