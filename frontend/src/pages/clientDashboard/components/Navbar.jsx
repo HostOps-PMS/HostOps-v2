@@ -683,14 +683,15 @@ export default function Navbar() {
         <SwitchAccountModal
           isOpen={switchAccountOpen}
           onClose={() => setSwitchAccountOpen(false)}
-          onSwitch={({ id, name }) => {
-            const fromId   = safeStorage.getItem('hp_selected_property_id')   || null;
-            const fromName = safeStorage.getItem('hp_selected_property_name') || null;
+          onSwitch={({ id, name, fromPropertyId, fromPropertyName }) => {
+            // fromPropertyId/fromPropertyName are captured by SwitchAccountModal
+            // BEFORE it overwrites safeStorage — so these are always the correct
+            // "from" values even if the user switches to a same-named property.
             logActivity('switched_property', {
-              fromPropertyId:   fromId,
-              fromPropertyName: fromName,
-              toPropertyId:     id,
-              toPropertyName:   name,
+              fromPropertyId,
+              fromPropertyName,
+              toPropertyId:   id,
+              toPropertyName: name,
             });
             selectProperty(id, name);
             setSwitchAccountOpen(false);
@@ -900,14 +901,15 @@ export default function Navbar() {
       <SwitchAccountModal
         isOpen={switchAccountOpen}
         onClose={() => setSwitchAccountOpen(false)}
-        onSwitch={({ id, name }) => {
-            const fromId   = safeStorage.getItem('hp_selected_property_id')   || null;
-            const fromName = safeStorage.getItem('hp_selected_property_name') || null;
+        onSwitch={({ id, name, fromPropertyId, fromPropertyName }) => {
+            // fromPropertyId/fromPropertyName are captured by SwitchAccountModal
+            // BEFORE it overwrites safeStorage — so these are always the correct
+            // "from" values even if the user switches to a same-named property.
             logActivity('switched_property', {
-              fromPropertyId:   fromId,
-              fromPropertyName: fromName,
-              toPropertyId:     id,
-              toPropertyName:   name,
+              fromPropertyId,
+              fromPropertyName,
+              toPropertyId:   id,
+              toPropertyName: name,
             });
             selectProperty(id, name);
             setSwitchAccountOpen(false);
