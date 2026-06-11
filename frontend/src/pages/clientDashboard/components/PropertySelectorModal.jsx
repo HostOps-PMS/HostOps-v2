@@ -1,503 +1,503 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../AuthContext';
-import { authFetch } from '../../apiService';
 
-// ── Design tokens (matching the rest of the dashboard) ────────────────────────
-const T = {
-  green:       '#26a676',
-  greenDark:   '#1a7a57',
-  greenLight:  '#e8f7f0',
-  greenBorder: '#b8e8d0',
-  text:        '#0c1c14',
-  muted:       '#7a9e8c',
-  faint:       '#b8d0c4',
-  border:      '#e4ede8',
-  bg:          '#f7faf8',
-  white:       '#ffffff',
-  fontDisplay: "'Sora', sans-serif",
-  fontBody:    "'DM Sans', sans-serif",
-};
+const API_BASE = import.meta.env.VITE_API_BASE || 'https://hostpilot-smoobu.onrender.com';
 
-// Simple colour hash for property card accent
-function propColor(name = '') {
-  const palette = [
-    '#26a676', '#1555C0', '#ec4899', '#8b5cf6',
-    '#e07c2a', '#64748b', '#0891b2', '#16a34a',
-  ];
-  const idx = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % palette.length;
-  return palette[idx];
-}
+// ─────────────────────────────────────────────────────────────────
+// PropertySelectForm
+//
+// Shown after OTP verification (or directly after login for staff).
+// Fetches the user's embedded properties from GET /auth/my-properties
+// and lets them pick one before advancing to PinModal.
+// Displays one card at a time with arrow navigation + dot scrubber.
+// Clicking the card proceeds immediately — no Continue button.
+//
+// Props:
+//   userData           {object}   - user object from authData (role, email, etc.)
+//   isClientAccount    {boolean}  - true when a clientAccount session is active
+//   showMsg            {fn}
+//   hideMsg            {fn}
+//   onPropertySelected {fn(id, name)} - called when user selects + confirms a property
+//   onContinue         {fn(id)}       - legacy fallback (kept for safety)
+//   onBack             {fn}
+// ─────────────────────────────────────────────────────────────────
+export default function PropertySelectForm({
+  userData,
+  isClientAccount = false,
+  showMsg,
+  hideMsg,
+  onPropertySelected,
+  onContinue,
+  onBack,
+}) {
+  const auth = useAuth();
 
-// Property card
-function PropertyCard({ property, selected, onClick }) {
-  const [hov, setHov] = useState(false);
-  const [imgError, setImgError] = useState(false);
-  const color = propColor(property.name);
+  const [properties,   setProperties]   = useState([]);
+  const [activeIndex,  setActiveIndex]  = useState(0);
+  const [loading,      setLoading]      = useState(true);
+  const [submitting,   setSubmitting]   = useState(false);
+  const [slideDir,     setSlideDir]     = useState(''); // 'left' | 'right' | ''
 
-  // Build proxy URL from userId + propertyId stored on the property object.
-  // Falls back to letter initial if either ID is missing or image fails to load.
-  const proxyUrl = property.userId && property.propertyDbId
-    ? `${import.meta.env.VITE_API_URL || ''}/api/image/property/${property.userId}/${property.propertyDbId}`
-    : null;
-  const showImage = proxyUrl && !imgError;
+  // ── Fetch properties on mount ──────────────────────────────────
+  useEffect(() => {
+    const fetchProperties = async () => {
+      setLoading(true);
+      try {
+        const token = auth.getToken();
+        const res = await fetch(`${API_BASE}/auth/my-properties`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key':    import.meta.env.VITE_API_KEY || '',
+            Authorization:  `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          showMsg(err.error || 'Failed to load properties. Please try again.');
+          setLoading(false);
+          return;
+        }
+
+        const data = await res.json();
+        // Filter out properties the user has no access to.
+        // For staff, the server sets hasAccess:false on properties outside
+        // their propertyIds assignment. Showing those cards then failing at
+        // PIN verify creates a confusing dead-end for the user.
+        // For regular clients hasAccess is always true, so this is a no-op.
+        const list = (data.properties || []).filter(p => p.hasAccess !== false);
+        setProperties(list);
+
+        // Auto-proceed if only one property
+        if (list.length === 1) {
+          proceedWithProp(list[0]);
+        }
+      } catch (err) {
+        showMsg('Network error. Please check your connection and try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProperties();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Proceed to PIN screen with a given property ────────────────
+  const proceedWithProp = (prop) => {
+    if (submitting) return;
+    setSubmitting(true);
+    hideMsg();
+    if (onPropertySelected) {
+      onPropertySelected(prop._id, prop.propertyName);
+    } else if (onContinue) {
+      onContinue(prop._id);
+    }
+    // Note: do NOT setSubmitting(false) — parent unmounts this component
+  };
+
+  // ── Carousel navigation ────────────────────────────────────────
+  const goTo = (idx) => {
+    if (idx === activeIndex) return;
+    setSlideDir(idx > activeIndex ? 'left' : 'right');
+    setActiveIndex(idx);
+  };
+  const goPrev = () => goTo(activeIndex > 0 ? activeIndex - 1 : properties.length - 1);
+  const goNext = () => goTo(activeIndex < properties.length - 1 ? activeIndex + 1 : 0);
+
+  const activeProp = properties[activeIndex] || null;
 
   return (
-    <div
-      onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        cursor: 'pointer',
-        borderRadius: 14,
-        border: `2px solid ${selected ? color : (hov ? color + '88' : T.border)}`,
-        background: selected ? color + '12' : (hov ? color + '08' : T.white),
-        padding: '16px 18px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 14,
-        transition: 'all .15s',
-        boxShadow: selected ? `0 0 0 3px ${color}30` : (hov ? '0 2px 8px rgba(0,0,0,.06)' : 'none'),
-      }}
-    >
-      {/* Property thumbnail — proxy image with letter-initial fallback */}
-      <div style={{
-        width: 42,
-        height: 42,
-        borderRadius: 10,
-        background: selected || hov ? color : color + '22',
-        color: selected || hov ? '#fff' : color,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 17,
-        fontWeight: 800,
-        fontFamily: T.fontDisplay,
-        flexShrink: 0,
-        overflow: 'hidden',
-        transition: 'all .15s',
-      }}>
-        {showImage ? (
-          <img
-            src={proxyUrl}
-            alt={property.name}
-            onError={() => setImgError(true)}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              display: 'block',
-              borderRadius: 10,
-            }}
-          />
+    <>
+      {/* ── Fixed header ── */}
+      <div style={{ flexShrink: 0, marginBottom: '14px' }}>
+        <h1 className="lp-h1">Select Property</h1>
+        <p className="lp-sub" style={{ marginBottom: 0 }}>Choose the property you want to log into.</p>
+      </div>
+
+      {/* ── Body ── */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px', overflow: 'hidden' }}>
+
+        {loading ? (
+          <div style={styles.loadingWrap}>
+            <div style={styles.spinner} />
+            <span style={styles.loadingText}>Loading properties…</span>
+          </div>
+
+        ) : properties.length === 0 ? (
+          <div style={styles.emptyWrap}>
+            <div style={styles.emptyIcon}>🏠</div>
+            <p style={styles.emptyText}>No properties found for your account.</p>
+            <p style={styles.emptySubText}>Please contact your administrator.</p>
+          </div>
+
         ) : (
-          (property.name || '?')[0].toUpperCase()
+          <>
+            {/* ── Carousel row: prev arrow + card + next arrow ── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
+
+              {/* Prev arrow */}
+              <button
+                type="button"
+                onClick={goPrev}
+                disabled={submitting}
+                className="carousel-arrow"
+                aria-label="Previous property"
+                style={{
+                  flexShrink:     0,
+                  width:          '36px',
+                  height:         '36px',
+                  borderRadius:   '50%',
+                  border:         '1.5px solid #e3ede8',
+                  background:     '#fff',
+                  display:        'flex',
+                  alignItems:     'center',
+                  justifyContent: 'center',
+                  cursor:         submitting ? 'not-allowed' : 'pointer',
+                  fontSize:       '16px',
+                  color:          '#2a4e3c',
+                  padding:        0,
+                  opacity:        submitting ? 0.4 : 1,
+                }}
+              >
+                ‹
+              </button>
+
+              {/* Card */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {activeProp && (
+                  <PropertyCard
+                    key={activeProp._id}
+                    prop={activeProp}
+                    disabled={submitting}
+                    slideDir={slideDir}
+                    onClick={() => proceedWithProp(activeProp)}
+                  />
+                )}
+              </div>
+
+              {/* Next arrow */}
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={submitting}
+                className="carousel-arrow"
+                aria-label="Next property"
+                style={{
+                  flexShrink:     0,
+                  width:          '36px',
+                  height:         '36px',
+                  borderRadius:   '50%',
+                  border:         '1.5px solid #e3ede8',
+                  background:     '#fff',
+                  display:        'flex',
+                  alignItems:     'center',
+                  justifyContent: 'center',
+                  cursor:         submitting ? 'not-allowed' : 'pointer',
+                  fontSize:       '16px',
+                  color:          '#2a4e3c',
+                  padding:        0,
+                  opacity:        submitting ? 0.4 : 1,
+                }}
+              >
+                ›
+              </button>
+            </div>
+
+            {/* ── Dot indicators ── */}
+            {properties.length > 1 && (
+              <div style={{ display: 'flex', gap: '7px', alignItems: 'center' }}>
+                {properties.map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => goTo(i)}
+                    disabled={submitting}
+                    aria-label={`Property ${i + 1}`}
+                    style={{
+                      width:        i === activeIndex ? '22px' : '7px',
+                      height:       '7px',
+                      borderRadius: '4px',
+                      border:       'none',
+                      background:   i === activeIndex ? '#26a676' : '#c8ddd4',
+                      padding:      0,
+                      cursor:       submitting ? 'default' : 'pointer',
+                      transition:   'width 0.28s cubic-bezier(0.22,1,0.36,1), background 0.2s ease',
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontFamily: T.fontBody,
-          fontWeight: 700,
-          fontSize: 14,
-          color: T.text,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          marginBottom: 2,
-        }}>
-          {property.name}
-        </div>
-        {property.city || property.location ? (
-          <div style={{ fontFamily: T.fontBody, fontSize: 12, color: T.muted }}>
-            {[property.city, property.country].filter(Boolean).join(', ')}
-          </div>
-        ) : null}
+      {/* ── Back link ── */}
+      <div style={{ flexShrink: 0, marginTop: '14px' }}>
+        <button type="button" className="lp-link" onClick={onBack}>
+          ← Back to sign in
+        </button>
       </div>
 
-      {/* Check indicator */}
-      {selected && (
-        <div style={{
-          width: 22,
-          height: 22,
-          borderRadius: '50%',
-          background: color,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-        }}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </div>
-      )}
-    </div>
+      <style>{cardAnimations}</style>
+    </>
   );
 }
 
-// "All Properties" card
-function AllPropertiesCard({ selected, count, onClick }) {
-  const [hov, setHov] = useState(false);
-  const color = T.green;
+// ── PropertyCard ───────────────────────────────────────────────────
+function PropertyCard({ prop, disabled, onClick, slideDir }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const hasPicture = prop.propertyPicture && !imgFailed;
 
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
+      disabled={disabled}
+      className={`prop-card prop-card--slide-${slideDir || 'in'}`}
       style={{
-        cursor: 'pointer',
-        borderRadius: 14,
-        border: `2px solid ${selected ? color : (hov ? color + '88' : T.border)}`,
-        background: selected ? color + '12' : (hov ? color + '08' : T.white),
-        padding: '16px 18px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 14,
-        transition: 'all .15s',
-        boxShadow: selected ? `0 0 0 3px ${color}30` : (hov ? '0 2px 8px rgba(0,0,0,.06)' : 'none'),
-        gridColumn: '1 / -1', // span full width
+        display:      'block',
+        width:        '100%',
+        border:       'none',
+        borderRadius: '22px',
+        overflow:     'hidden',
+        cursor:       disabled ? 'not-allowed' : 'pointer',
+        padding:      0,
+        background:   'none',
+        textAlign:    'left',
+        outline:      'none',
+        position:     'relative',
       }}
     >
+      {/* ── Full card visual ── */}
       <div style={{
-        width: 42,
-        height: 42,
-        borderRadius: 10,
-        background: selected || hov ? color : color + '22',
-        color: selected || hov ? '#fff' : color,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 18,
-        flexShrink: 0,
-        transition: 'all .15s',
+        position:     'relative',
+        width:        '100%',
+        aspectRatio:  '4 / 3',
+        borderRadius: '22px',
+        overflow:     'hidden',
+        boxShadow:    '0 10px 40px rgba(0,0,0,0.22)',
       }}>
-        🏘
-      </div>
 
-      <div style={{ flex: 1 }}>
-        <div style={{ fontFamily: T.fontBody, fontWeight: 700, fontSize: 14, color: T.text, marginBottom: 2 }}>
-          All Properties
-        </div>
-        <div style={{ fontFamily: T.fontBody, fontSize: 12, color: T.muted }}>
-          View combined data across all {count} propert{count === 1 ? 'y' : 'ies'}
-        </div>
-      </div>
+        {/* ── Photo or placeholder ── */}
+        {hasPicture ? (
+          <img
+            src={prop.propertyPicture}
+            alt={prop.propertyName}
+            onError={() => setImgFailed(true)}
+            className="prop-card__img"
+            style={{
+              position:  'absolute',
+              inset:     0,
+              width:     '100%',
+              height:    '100%',
+              objectFit: 'cover',
+              display:   'block',
+            }}
+          />
+        ) : (
+          <div style={{
+            position:       'absolute',
+            inset:          0,
+            background:     'linear-gradient(160deg, #0d3d28 0%, #26a676 60%, #1a5c40 100%)',
+            display:        'flex',
+            alignItems:     'center',
+            justifyContent: 'center',
+          }}>
+            <div style={{ position: 'absolute', width: '240px', height: '240px', borderRadius: '50%', background: 'rgba(255,255,255,0.04)', top: '-40px', right: '-40px' }} />
+            <div style={{ position: 'absolute', width: '140px', height: '140px', borderRadius: '50%', background: 'rgba(255,255,255,0.06)', bottom: '30px', left: '-30px' }} />
+            <span style={{ fontSize: '80px', filter: 'drop-shadow(0 8px 20px rgba(0,0,0,0.4))' }}>🏡</span>
+          </div>
+        )}
 
-      {selected && (
+        {/* ── Deep scrim ── */}
         <div style={{
-          width: 22,
-          height: 22,
-          borderRadius: '50%',
-          background: color,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
+          position:      'absolute',
+          inset:         0,
+          background:    'linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.4) 38%, rgba(0,0,0,0.0) 65%, transparent 100%)',
+          pointerEvents: 'none',
+        }} />
+
+        {/* ── Hover shimmer ── */}
+        <div className="prop-card__shimmer" style={{
+          position:      'absolute',
+          inset:         0,
+          background:    'linear-gradient(160deg, rgba(38,166,118,0.25) 0%, transparent 50%)',
+          opacity:       0,
+          pointerEvents: 'none',
+        }} />
+
+        {/* ── "Tap to select" hint — top right ── */}
+        <div className="prop-card__hint" style={{
+          position:             'absolute',
+          top:                  '14px',
+          right:                '14px',
+          background:           'rgba(255,255,255,0.13)',
+          backdropFilter:       'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          border:               '1px solid rgba(255,255,255,0.2)',
+          borderRadius:         '20px',
+          padding:              '5px 12px',
+          fontSize:             '11px',
+          fontWeight:           '600',
+          color:                'rgba(255,255,255,0.9)',
+          letterSpacing:        '0.2px',
+          pointerEvents:        'none',
+          opacity:              0,
         }}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
+          Tap to select
         </div>
-      )}
-    </div>
+
+        {/* ── Bottom text block ── */}
+        <div style={{
+          position:      'absolute',
+          bottom:        0,
+          left:          0,
+          right:         0,
+          padding:       '28px 22px 22px',
+          pointerEvents: 'none',
+        }}>
+          <p style={{
+            margin:        0,
+            fontSize:      '10px',
+            fontWeight:    '700',
+            color:         'rgba(255,255,255,0.5)',
+            letterSpacing: '1.8px',
+            textTransform: 'uppercase',
+            marginBottom:  '5px',
+          }}>
+            Property
+          </p>
+          <p style={{
+            margin:        0,
+            fontSize:      '22px',
+            fontWeight:    '800',
+            color:         '#ffffff',
+            lineHeight:    1.15,
+            letterSpacing: '-0.4px',
+            textShadow:    '0 2px 16px rgba(0,0,0,0.5)',
+          }}>
+            {prop.propertyName}
+          </p>
+        </div>
+
+      </div>
+    </button>
   );
 }
 
-/**
- * PropertySelectorModal
- *
- * Full-screen overlay shown after login when no property has been selected yet
- * for this session.  Also shown when the user taps "Change Property".
- *
- * Props:
- *   onSelect(id, name) — called when the user confirms a selection.
- *                        id === null means "All Properties".
- */
-export default function PropertySelectorModal({ onSelect }) {
-  const auth = useAuth();
-  const [properties, setProperties]   = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState('');
-  const [pendingId, setPendingId]     = useState(undefined); // undefined = not chosen yet
-  const [confirming, setConfirming]   = useState(false);
+// ── Static styles ──────────────────────────────────────────────────
+const styles = {
+  loadingWrap: {
+    display:        'flex',
+    flexDirection:  'column',
+    alignItems:     'center',
+    justifyContent: 'center',
+    padding:        '40px 0',
+    gap:            '12px',
+  },
+  spinner: {
+    width:        '28px',
+    height:       '28px',
+    border:       '3px solid #e3ede8',
+    borderTop:    '3px solid #26a676',
+    borderRadius: '50%',
+    animation:    'spin 0.7s linear infinite',
+  },
+  loadingText: {
+    fontSize: '13px',
+    color:    '#9ab8a9',
+  },
+  emptyWrap: {
+    textAlign: 'center',
+    padding:   '32px 0',
+  },
+  emptyIcon: {
+    fontSize:     '36px',
+    marginBottom: '10px',
+  },
+  emptyText: {
+    fontSize:   '14px',
+    color:      '#2a4e3c',
+    fontWeight: '600',
+    margin:     '0 0 4px',
+  },
+  emptySubText: {
+    fontSize: '13px',
+    color:    '#9ab8a9',
+    margin:   0,
+  },
+};
 
-  // The auth user object (from login response / localStorage) contains the
-  // user's MongoDB _id and their properties array with MongoDB _ids.
-  // We use these to build proxy URLs by matching Smoobu apartment id → DB _id.
-  const authUser = (() => {
-    try {
-      const CANDIDATE_KEYS = ['hp_user', 'user', 'auth_user', 'currentUser', 'hostpilot_user'];
-      for (const key of CANDIDATE_KEYS) {
-        const raw = localStorage.getItem(key);
-        if (!raw) continue;
-        const parsed = JSON.parse(raw);
-        if (parsed && (parsed._id || parsed.email)) return parsed;
-        if (parsed?.user && (parsed.user._id || parsed.user.email)) return parsed.user;
-      }
-      return null;
-    } catch { return null; }
-  })();
-
-  // Fetch the user's property list
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError('');
-
-    authFetch('/api/properties', {}, auth)
-      .then(async (res) => {
-        if (cancelled) return;
-        if (!res?.ok) throw new Error('Failed to load properties');
-        const data = await res.json();
-        if (!cancelled) {
-          // Cross-reference each Smoobu apartment with the auth user's DB properties
-          // to get the MongoDB _id needed to build the image proxy URL.
-          // Matching strategy: propertyName (Smoobu "name") vs DB "propertyName".
-          const dbProps = authUser?.properties || [];
-          const apartments = (data.apartments || []).map(apt => {
-            const match = dbProps.find(
-              p => p.propertyName?.trim().toLowerCase() === apt.name?.trim().toLowerCase()
-            );
-            return {
-              ...apt,
-              propertyDbId: match?._id || null,
-              userId:       authUser?._id || null,
-            };
-          });
-          setProperties(apartments);
-          // Default selection: null = All Properties
-          setPendingId(null);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [auth]);
-
-  function handleConfirm() {
-    if (pendingId === undefined) return;
-    setConfirming(true);
-
-    const selectedName = pendingId === null
-      ? ''
-      : (properties.find((p) => String(p.id) === String(pendingId))?.name || '');
-
-    // Small delay so the button gives visual feedback
-    setTimeout(() => {
-      onSelect(pendingId, selectedName);
-      setConfirming(false);
-    }, 180);
+const cardAnimations = `
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes slide-in-left {
+    from { opacity: 0; transform: translateX(40px) scale(0.97); }
+    to   { opacity: 1; transform: translateX(0)    scale(1);    }
+  }
+  @keyframes slide-in-right {
+    from { opacity: 0; transform: translateX(-40px) scale(0.97); }
+    to   { opacity: 1; transform: translateX(0)     scale(1);    }
+  }
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)    scale(1);    }
+  }
+  @keyframes check-pop {
+    0%   { transform: scale(0.3) rotate(-20deg); opacity: 0; }
+    65%  { transform: scale(1.25) rotate(6deg);  opacity: 1; }
+    100% { transform: scale(1)    rotate(0deg);  opacity: 1; }
   }
 
-  const canConfirm = pendingId !== undefined;
+  /* ── Card slide directions ── */
+  .prop-card--slide-left  { animation: slide-in-left  0.32s cubic-bezier(0.22,1,0.36,1) both; }
+  .prop-card--slide-right { animation: slide-in-right 0.32s cubic-bezier(0.22,1,0.36,1) both; }
+  .prop-card--slide-in    { animation: slide-in       0.32s cubic-bezier(0.22,1,0.36,1) both; }
 
-  return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      zIndex: 10000,
-      background: 'rgba(8, 20, 14, 0.72)',
-      backdropFilter: 'blur(8px)',
-      WebkitBackdropFilter: 'blur(8px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px',
-    }}>
-      <div style={{
-        background: T.white,
-        borderRadius: 24,
-        width: 560,
-        maxWidth: '100%',
-        maxHeight: '90vh',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        boxShadow: '0 40px 120px rgba(0,0,0,.3), 0 0 0 1px rgba(0,0,0,.06)',
-      }}>
+  /* ── Card hover ── */
+  .prop-card {
+    transition: transform 0.22s cubic-bezier(0.22,1,0.36,1);
+  }
+  .prop-card:not(:disabled):hover {
+    transform: scale(1.015);
+  }
+  .prop-card:not(:disabled):hover .prop-card__img {
+    transform: scale(1.06) !important;
+  }
+  .prop-card:not(:disabled):hover .prop-card__shimmer {
+    opacity: 0.8 !important;
+  }
+  .prop-card:not(:disabled):hover .prop-card__hint {
+    opacity: 1 !important;
+    transition: opacity 0.2s ease;
+  }
+  .prop-card:not(:disabled):active {
+    transform: scale(1.005);
+    transition-duration: 0.08s;
+  }
+  .prop-card__img {
+    transition: transform 0.5s cubic-bezier(0.22,1,0.36,1) !important;
+  }
+  .prop-card__shimmer {
+    transition: opacity 0.28s ease;
+  }
+  .prop-card__hint {
+    transition: opacity 0.2s ease;
+  }
 
-        {/* Header */}
-        <div style={{
-          padding: '28px 28px 20px',
-          borderBottom: `1px solid ${T.border}`,
-          background: T.greenLight,
-          flexShrink: 0,
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            marginBottom: 6,
-          }}>
-            <div style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              background: T.green,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 18,
-              flexShrink: 0,
-            }}>
-              🏠
-            </div>
-            <div>
-              <div style={{
-                fontFamily: T.fontDisplay,
-                fontWeight: 800,
-                fontSize: 18,
-                color: T.text,
-                lineHeight: 1.2,
-              }}>
-                Select a Property
-              </div>
-              <div style={{ fontFamily: T.fontBody, fontSize: 13, color: T.muted, marginTop: 2 }}>
-                Your dashboard and inbox will be filtered to your selection
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Body — property list */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '20px 24px',
-        }}>
-          {loading && (
-            <div style={{
-              padding: '60px 20px',
-              textAlign: 'center',
-              fontFamily: T.fontBody,
-              color: T.muted,
-              fontSize: 14,
-            }}>
-              <div style={{ marginBottom: 10, fontSize: 28 }}>⏳</div>
-              Loading your properties…
-            </div>
-          )}
-
-          {error && !loading && (
-            <div style={{
-              padding: '40px 20px',
-              textAlign: 'center',
-              fontFamily: T.fontBody,
-              color: '#e84545',
-              fontSize: 13,
-              lineHeight: 1.7,
-            }}>
-              <div style={{ fontSize: 28, marginBottom: 8 }}>⚠</div>
-              Could not load properties.<br />
-              <span style={{ color: T.muted, fontSize: 12 }}>{error}</span>
-            </div>
-          )}
-
-          {!loading && !error && (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-              gap: 10,
-            }}>
-              {/* All Properties option — always first, spans full width */}
-              <AllPropertiesCard
-                selected={pendingId === null}
-                count={properties.length}
-                onClick={() => setPendingId(null)}
-              />
-
-              {properties.map((prop) => (
-                <PropertyCard
-                  key={prop.id}
-                  property={prop}
-                  selected={String(pendingId) === String(prop.id)}
-                  onClick={() => setPendingId(prop.id)}
-                />
-              ))}
-
-              {properties.length === 0 && (
-                <div style={{
-                  gridColumn: '1 / -1',
-                  padding: '30px 0',
-                  textAlign: 'center',
-                  fontFamily: T.fontBody,
-                  fontSize: 13,
-                  color: T.faint,
-                  lineHeight: 1.7,
-                }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>🏠</div>
-                  No properties found on your Smoobu account.
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Footer — confirm button */}
-        <div style={{
-          padding: '16px 24px',
-          borderTop: `1px solid ${T.border}`,
-          background: T.bg,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          flexShrink: 0,
-        }}>
-          <div style={{ fontFamily: T.fontBody, fontSize: 13, color: T.muted }}>
-            {pendingId === null
-              ? `Showing all ${properties.length} propert${properties.length === 1 ? 'y' : 'ies'}`
-              : pendingId !== undefined
-                ? `Selected: ${properties.find((p) => String(p.id) === String(pendingId))?.name || ''}`
-                : 'Choose a property above'}
-          </div>
-
-          <button
-            onClick={handleConfirm}
-            disabled={!canConfirm || confirming}
-            style={{
-              padding: '10px 24px',
-              borderRadius: 10,
-              border: 'none',
-              background: canConfirm && !confirming ? T.green : T.faint,
-              color: '#fff',
-              fontFamily: T.fontBody,
-              fontWeight: 700,
-              fontSize: 14,
-              cursor: canConfirm && !confirming ? 'pointer' : 'default',
-              transition: 'all .15s',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 7,
-              flexShrink: 0,
-            }}
-          >
-            {confirming ? (
-              <>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <circle cx="12" cy="12" r="10" strokeDasharray="30 30">
-                    <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.9s" repeatCount="indefinite" />
-                  </circle>
-                </svg>
-                Loading…
-              </>
-            ) : (
-              <>
-                View Dashboard
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-                </svg>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+  /* ── Arrow buttons ── */
+  .carousel-arrow {
+    transition: background 0.18s ease, border-color 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease;
+  }
+  .carousel-arrow:not(:disabled):hover {
+    background:   #26a676 !important;
+    border-color: #26a676 !important;
+    color:        #fff !important;
+    transform:    scale(1.08);
+    box-shadow:   0 4px 14px rgba(38,166,118,0.35);
+  }
+  .carousel-arrow:not(:disabled):active {
+    transform: scale(0.96);
+  }
+`;

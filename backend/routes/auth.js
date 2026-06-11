@@ -28,7 +28,22 @@ const router = express.Router();
 // ── Helper: build image proxy URL ────────────────────────────────
 // Replaces raw Cloudinary URLs with our backend proxy endpoint.
 // The client never sees the real Cloudinary URL in any response.
-const API_BASE_INTERNAL = process.env.API_BASE_URL || '';
+//
+// IMPORTANT: Must return an ABSOLUTE URL (with origin) so that
+// <img> tags on the frontend (different origin) can load the image.
+// A relative URL like "/api/image/..." would resolve to the *frontend*
+// origin, not the backend, causing a 404.
+//
+// Priority:
+//   1. API_BASE_URL env var  (e.g. "https://hostpilot-smoobu.onrender.com")
+//   2. RENDER_EXTERNAL_URL   (set automatically on Render.com deployments)
+//   3. Fallback to hardcoded production URL — change this if your backend
+//      URL is different.
+const API_BASE_INTERNAL = (
+  process.env.API_BASE_URL ||
+  process.env.RENDER_EXTERNAL_URL ||
+  'https://hostpilot-smoobu.onrender.com'
+).replace(/\/$/, ''); // strip trailing slash
 
 function proxyImageUrl(userId, propertyId) {
   return `${API_BASE_INTERNAL}/api/image/property/${userId}/${propertyId}`;
