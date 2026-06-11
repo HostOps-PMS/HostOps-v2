@@ -42,7 +42,11 @@ app.use((req, res, next) => {
 });
 
 // ── Security Headers (Helmet) ─────────────────────────────────────────────────
-const CLOUDINARY_HOSTNAME = 'https://res.cloudinary.com';
+// Images are proxied through /api/image/property/:userId/:propertyId.
+// The backend URL is added to imgSrc so the browser allows loading
+// images from our own API instead of directly from Cloudinary.
+const BACKEND_ORIGIN = process.env.API_BASE_URL || 'https://hostpilot-smoobu.onrender.com';
+
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -50,10 +54,22 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc:  ["'self'"],
         styleSrc:   ["'self'", "'unsafe-inline'"],
-        imgSrc:     ["'self'", 'data:', 'blob:', CLOUDINARY_HOSTNAME,
+        imgSrc: [
+          "'self'",
+          'data:',
+          'blob:',
+          // Backend image proxy — serves property images without exposing Cloudinary
+          BACKEND_ORIGIN,
+          // Cloudinary kept as fallback for other apps (admin dashboard, etc.)
+          'https://res.cloudinary.com',
+          // Map tiles
           'https://*.tile.openstreetmap.org',
+          // Login page slideshow
+          'https://images.unsplash.com',
         ],
-        connectSrc: ["'self'", CLOUDINARY_HOSTNAME,
+        connectSrc: [
+          "'self'",
+          BACKEND_ORIGIN,
           'https://*.tile.openstreetmap.org',
           'https://tile.openstreetmap.org',
         ],
@@ -62,9 +78,13 @@ app.use(
         frameSrc:   ["'none'"],
       },
     },
-    crossOriginEmbedderPolicy: true,
+    crossOriginEmbedderPolicy: false,
     crossOriginOpenerPolicy:   { policy: 'same-origin' },
-    crossOriginResourcePolicy: { policy: 'same-origin' },
+    // 'cross-origin' needed globally so the browser allows the frontend
+    // (go.hostops.online) to load images from the backend API
+    // (hostpilot-smoobu.onrender.com). The imageProxy route also sets
+    // this header explicitly per-response for clarity.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
     referrerPolicy:            { policy: 'strict-origin-when-cross-origin' },
     hsts: {
       maxAge:            31536000,

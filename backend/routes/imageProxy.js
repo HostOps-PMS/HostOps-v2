@@ -109,6 +109,9 @@ router.get('/image/property/:userId/:propertyId', async (req, res, next) => {
       res.setHeader('Content-Type', contentType);
       res.setHeader('Cache-Control', 'private, max-age=300'); // 5 min browser cache
       res.setHeader('X-Content-Type-Options', 'nosniff');
+      // Allow cross-origin image loading — frontend and backend are on different
+      // origins. Without this, the browser blocks the image with NotSameOrigin.
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       if (contentLength) res.setHeader('Content-Length', contentLength);
 
       res.status(proxyRes.statusCode || 200);
