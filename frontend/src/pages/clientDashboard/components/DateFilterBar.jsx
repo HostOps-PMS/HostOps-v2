@@ -320,13 +320,13 @@ export default function DateFilterBar() {
                 <input
                   type="date" value={customFrom}
                   onChange={e => setCustomFrom(e.target.value)}
-                  style={{ padding: '9px 12px', border: '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                  style={{ padding: '9px 12px', border: '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box', minHeight: 44, display: 'block', WebkitAppearance: 'none', appearance: 'none', backgroundColor: '#fff' }}
                 />
                 <label style={{ fontSize: '.75rem', color: '#6a8b7c', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>To</label>
                 <input
                   type="date" value={customTo}
                   onChange={e => setCustomTo(e.target.value)}
-                  style={{ padding: '9px 12px', border: '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                  style={{ padding: '9px 12px', border: '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box', minHeight: 44, display: 'block', WebkitAppearance: 'none', appearance: 'none', backgroundColor: '#fff' }}
                 />
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
