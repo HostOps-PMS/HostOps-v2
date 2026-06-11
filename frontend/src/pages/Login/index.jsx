@@ -94,16 +94,34 @@ export default function LoginPage() {
     return () => clearInterval(timer);
   }, []);
 
+const [showLogin, setShowLogin] = useState(window.innerWidth > 768);
+
   return (
     <div
       className="lp-wrap"
       style={{
-        backgroundImage: `url(${bgImage})`,
+        backgroundImage: window.innerWidth > 768 ? `url(${bgImage})` : 'none',
         backgroundSize: '130%',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
       }}
     >
+      <style>{`
+        @media (max-width: 768px) {
+          .lp-wrap {
+            min-height: unset !important;
+            height: fit-content !important;
+            padding: 0 !important;
+            align-items: flex-start !important;
+            background: #fff !important;
+          }
+          html, body, #root {
+            height: auto !important;
+            min-height: unset !important;
+            background: #fff !important;
+          }
+        }
+      `}</style>
       <div className="lp-card">
 
         {/* ── LEFT: Slideshow Panel ── */}
@@ -137,10 +155,15 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
+          {!showLogin && (
+            <button className="lp-get-started-btn" onClick={() => setShowLogin(true)}>
+              Get Started
+            </button>
+          )}
         </div>
 
         {/* ── RIGHT: Form Panel ── */}
-        <div className="lp-form-panel">
+        <div className={`lp-form-panel${showLogin ? ' lp-form-visible lp-form-slide-up' : ' lp-form-hidden'}`} style={!showLogin ? {display:'none'} : {}}>
           <Message text={message.text} type={message.type} />
 
           {view === VIEWS.LOGIN && (
