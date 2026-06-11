@@ -25,6 +25,49 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// ── Helper: strip sensitive fields before sending user to client ─
+// Never send activityLog, pin state, crop data, or internal IDs
+// in auth responses. Only the minimum the frontend actually needs.
+function sanitizeUser(user) {
+  const obj = typeof user.toJSON === 'function' ? user.toJSON() : { ...user };
+  return {
+    _id:                obj._id,
+    email:              obj.email,
+    firstName:          obj.firstName,
+    lastName:           obj.lastName,
+    businessName:       obj.businessName,
+    role:               obj.role,
+    tag:                obj.tag,
+    isVerified:         obj.isVerified,
+    mustChangePassword: obj.mustChangePassword,
+    mustChangePin:      obj.mustChangePin,
+    propertyTagPrefix:  obj.propertyTagPrefix,
+    serverId:           obj.serverId,
+    properties: (obj.properties || []).map(p => ({
+      _id:             p._id,
+      propertyName:    p.propertyName,
+      propertyPicture: p.propertyPicture || '',
+    })),
+  };
+}
+
+function sanitizeStaff(staff) {
+  const obj = typeof staff.toJSON === 'function' ? staff.toJSON() : { ...staff };
+  return {
+    _id:                obj._id,
+    email:              obj.email,
+    firstName:          obj.firstName,
+    lastName:           obj.lastName,
+    role:               'staff',
+    isStaff:            true,
+    clientId:           obj.clientId?.toString(),
+    mustChangePassword: obj.mustChangePassword,
+    mustChangePin:      obj.mustChangePin,
+    isActive:           obj.isActive,
+    propertyIds:        obj.propertyIds,
+  };
+}
+
 // ── Helper: compute access token expiry in ms ────────────────────
 function accessTokenExpiryMs() {
   const raw = process.env.JWT_ACCESS_EXPIRES || '15m';
@@ -223,8 +266,8 @@ router.post('/login', async (req, res, next) => {
       setRefreshCookie(res, rawRefresh);
 
       return res.json({
-        accessToken: encAccessToken,
-        staff:       { ...staff.toJSON(), role: 'staff', isStaff: true },
+        accessToken:        encAccessToken,
+        staff:              sanitizeStaff(staff),
         mustChangePassword: staff.mustChangePassword,
         mustChangePin:      staff.mustChangePin,
         isStaff:            true,
@@ -294,7 +337,7 @@ router.post('/login', async (req, res, next) => {
     await user.save();
 
     setRefreshCookie(res, refreshTokenToUse);
-    res.json({ accessToken: encAccessToken, user: user.toJSON(), isAdmin });
+    res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin });
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ error: 'Validation failed' });
     next(err);
@@ -329,8 +372,8 @@ router.post('/staff-login', async (req, res, next) => {
     setRefreshCookie(res, rawRefresh);
 
     res.json({
-      accessToken: encAccessToken,
-      staff:       { ...staff.toJSON(), role: 'staff', isStaff: true },
+      accessToken:        encAccessToken,
+      staff:              sanitizeStaff(staff),
       mustChangePassword: staff.mustChangePassword,
       mustChangePin:      staff.mustChangePin,
     });
@@ -398,7 +441,7 @@ router.post('/verify-login-otp', async (req, res, next) => {
       setRefreshCookie(res, rawRefresh);
 
       const isAdmin = user.tag === 'Main Admin' || user.role === 'admin' || user.email === process.env.ADMIN_ROLE;
-      return res.json({ accessToken: encAccessToken, user: user.toJSON(), isAdmin });
+      return res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin });
     }
 
     return res.status(401).json({ error: 'Invalid or expired OTP' });
@@ -495,7 +538,7 @@ router.post('/refresh', async (req, res, next) => {
 
       return res.json({
         accessToken: encryptToken(rawNewAccess),
-        user: { ...staff.toJSON(), role: 'staff', isStaff: true, clientId: staff.clientId?.toString() },
+        user: sanitizeStaff(staff),
       });
     }
 
@@ -586,11 +629,9 @@ router.post('/revoke-token', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.get('/me', requireAuth, (req, res) => {
   if (req.isStaff && req.staff) {
-    return res.json({
-      user: { ...req.staff.toJSON(), role: 'staff', isStaff: true, clientId: req.staff.clientId?.toString() },
-    });
+    return res.json({ user: sanitizeStaff(req.staff) });
   }
-  res.json({ user: req.user.toJSON() });
+  res.json({ user: sanitizeUser(req.user) });
 });
 
 // ─────────────────────────────────────────────────────────────────
@@ -683,7 +724,7 @@ router.post('/change-password', requireAuth, async (req, res, next) => {
         if (jti) await revokeAccessJti(jti, staff._id, 'password_change');
       }
 
-      return res.json({ message: 'Password changed successfully.', staff: staff.toJSON() });
+      return res.json({ message: 'Password changed successfully.', staff: sanitizeStaff(staff) });
     }
 
     // ── Regular user ───────────────────────────────────────────────
@@ -711,7 +752,7 @@ router.post('/change-password', requireAuth, async (req, res, next) => {
       if (jti) await revokeAccessJti(jti, user._id, 'password_change');
     }
 
-    res.json({ message: 'Password changed successfully.', user: user.toJSON() });
+    res.json({ message: 'Password changed successfully.', user: sanitizeUser(user) });
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ error: 'Validation failed', details: err.errors });
     next(err);
@@ -740,7 +781,7 @@ router.post('/change-pin', requireAuth, async (req, res, next) => {
       staff.mustChangePin = false;
       await staff.save();
 
-      return res.json({ message: 'PIN changed successfully.', staff: staff.toJSON() });
+      return res.json({ message: 'PIN changed successfully.', staff: sanitizeStaff(staff) });
     }
 
     const user = await User.findById(req.user._id).select('+pin');
@@ -758,7 +799,7 @@ router.post('/change-pin', requireAuth, async (req, res, next) => {
     if (user.activityLog.length > 50) user.activityLog = user.activityLog.slice(-50);
     await user.save();
 
-    res.json({ message: 'PIN changed successfully.', user: user.toJSON() });
+    res.json({ message: 'PIN changed successfully.', user: sanitizeUser(user) });
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ error: 'Validation failed', details: err.errors });
     next(err);
@@ -785,7 +826,7 @@ router.patch('/profile', requireAuth, async (req, res, next) => {
     user.propertyTagPrefix = data.propertyTagPrefix ?? '';
     await user.save();
 
-    res.json({ message: 'Profile updated successfully.', user: user.toJSON() });
+    res.json({ message: 'Profile updated successfully.', user: sanitizeUser(user) });
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ error: 'Validation failed', details: err.errors });
     next(err);
@@ -1093,7 +1134,7 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
       return res.json({
         ok:          true,
         accessToken: encAccessToken,
-        user:        { ...staff.toJSON(), role: 'staff', isStaff: true, clientId: staff.clientId.toString() },
+        user:        sanitizeStaff(staff),
       });
     }
 
@@ -1121,7 +1162,7 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
 
     setRefreshCookie(res, rawRefresh);
 
-    return res.json({ ok: true, accessToken: encAccessToken, user: ownUser.toJSON() });
+    return res.json({ ok: true, accessToken: encAccessToken, user: sanitizeUser(ownUser) });
   } catch (err) { next(err); }
 });
 
