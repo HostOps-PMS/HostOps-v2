@@ -20,6 +20,7 @@ import { requireApiKey } from './middleware/apiKeyAuth.js';
 import keyDiagnosticRoute from './routes/keyDiagnosticRoute.js';
 import smoobuApartmentsRoute   from './routes/smoobuApartments.js';
 import activityLogRoute        from './routes/activityLog.js';
+import imageProxyRoute         from './routes/imageProxy.js';
 
 // ── Secret rotation ───────────────────────────────────────────────
 // bootstrapSecrets() seeds JWT_SECRET_PREV/CURR/NEXT in .env if they
@@ -42,6 +43,17 @@ app.use((req, res, next) => {
 
 // ── Security Headers (Helmet) ─────────────────────────────────────────────────
 const CLOUDINARY_HOSTNAME = 'https://res.cloudinary.com';
+
+// The image proxy lives on this backend's own origin, so we must allow all
+// known frontend origins to load images from it via <img> tags.
+const IMAGE_PROXY_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim().replace(/\/$/, ''))
+  : [
+      'https://hostops-frontend.onrender.com',
+      'https://hostops-v2-admin.onrender.com',
+      'https://hostpilot-smoobu.onrender.com',
+    ];
+
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -49,7 +61,14 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc:  ["'self'"],
         styleSrc:   ["'self'", "'unsafe-inline'"],
-        imgSrc:     ["'self'", 'data:', 'blob:', CLOUDINARY_HOSTNAME,
+        // Allow images from: self, data URIs, blobs, Cloudinary (direct),
+        // the image proxy backend origins, and OpenStreetMap tiles.
+        imgSrc:     [
+          "'self'",
+          'data:',
+          'blob:',
+          CLOUDINARY_HOSTNAME,
+          ...IMAGE_PROXY_ORIGINS,
           'https://*.tile.openstreetmap.org',
         ],
         connectSrc: ["'self'", CLOUDINARY_HOSTNAME,
@@ -63,7 +82,11 @@ app.use(
     },
     crossOriginEmbedderPolicy: true,
     crossOriginOpenerPolicy:   { policy: 'same-origin' },
-    crossOriginResourcePolicy: { policy: 'same-origin' },
+    // Set to cross-origin so the image proxy route can serve images to
+    // frontends on different origins. imageProxy.js also sets this header
+    // per-response, but Helmet's global setting must not override it to
+    // 'same-origin' or cross-origin <img> loads will be blocked.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
     referrerPolicy:            { policy: 'strict-origin-when-cross-origin' },
     hsts: {
       maxAge:            31536000,
@@ -146,14 +169,20 @@ app.use('/auth/reset-password',   authLimiter);
 app.use((req, res, next) => {
   const isAuthRoute     = req.path.startsWith('/auth');
   const isSensitiveAuth = req.path === '/auth/refresh' || req.path === '/auth/logout';
+  // Image proxy is intentionally unauthenticated — <img> tags cannot send
+  // Authorization headers. Security is enforced inside the route itself
+  // (valid MongoDB ObjectIds + DB ownership check + Cloudinary-only whitelist).
+  const isImageProxy    = req.path.startsWith('/api/image/');
 
   if (isAuthRoute && !isSensitiveAuth) return next();
+  if (isImageProxy) return next();
   requireApiKey(req, res, next);
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/auth', authRoutes);
 app.use('/auth', publicRecoveryRouter);
+app.use('/api',  imageProxyRoute);       // No API-key required — see middleware above
 app.use('/api',  dashboardRoutes);
 app.use('/api',  clientsRoutes);
 app.use('/api',  activityLogRoute);
