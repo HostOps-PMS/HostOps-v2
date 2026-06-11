@@ -1,3 +1,14 @@
+// ── Static imports — jsPDF and autoTable are bundled with the app ────────────
+// Previously loaded from CDN at runtime, which failed on mobile when CDNs
+// were blocked or unreachable. Now bundled via npm so no network request is
+// needed at export time — works offline and on any network.
+//
+// Run once before deploying:
+//   npm install jspdf jspdf-autotable
+// ─────────────────────────────────────────────────────────────────────────────
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
 function fmtMoney(val) {
   const n = Number(val || 0);
   return 'PHP ' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -40,26 +51,6 @@ const FOOTER_Y       = PAGE_H - 10;
 const FOOTER_TY      = PAGE_H - 4;
 const CONTENT_BOTTOM = FOOTER_Y - 3;
 
-function loadScript(src) {
-  return new Promise(function(resolve, reject) {
-    if (document.querySelector('script[src="' + src + '"]')) { resolve(); return; }
-    var s = document.createElement('script');
-    s.src = src;
-    s.onload = resolve;
-    s.onerror = function() { reject(new Error('Failed to load: ' + src)); };
-    document.head.appendChild(s);
-  });
-}
-
-async function ensureLibs() {
-  if (!window.jspdf) {
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
-  }
-  if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF failed to load.');
-  if (typeof window.jspdf.jsPDF.API.autoTable !== 'function') {
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');
-  }
-}
 
 // ── Load an image URL as a base64 data URL ────────────────────────────────
 // Returns null if the image fails to load (network error, CORS, etc.)
@@ -531,9 +522,8 @@ function getBalance(b) {
  *                             Shape: { businessName, firstName, lastName, properties: [{ _id, propertyName, propertyPicture }] }
  */
 export async function exportDashboardPDF(dashState, user) {
-  await ensureLibs();
-
-  const jsPDF     = window.jspdf.jsPDF;
+  // jsPDF and autoTable are imported statically at the top of this module —
+  // no runtime CDN loading needed. autoTable self-registers on import.
   const data      = dashState.rawData || {};
   const stats     = data.stats        || {};
   const byChannel = data.byChannel    || {};
@@ -716,23 +706,158 @@ export async function exportDashboardPDF(dashState, user) {
 
   const filename = 'hostops-report_' + (period.from || 'all') + '_' + (period.to || 'all') + '.pdf';
 
-  // iOS Safari does not support blob download via <a> tag.
-  // Detect iOS and open as data URL in the same tab instead.
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  // ── Mobile-safe PDF delivery ──────────────────────────────────────────────
+  //
+  // Three distinct environments need different handling:
+  //
+  //  1. iOS Safari / WKWebView
+  //     • <a download> is silently ignored — the file never saves.
+  //     • Blob URLs opened via window.open() are blocked by the popup guard.
+  //     • Best path: write the data URI into an <iframe> inside a new tab.
+  //       If window.open() is blocked (popup guard), fall back to a modal
+  //       with a tap-to-open link — never navigate away from the app.
+  //
+  //  2. Android Chrome / Samsung Internet / other Android browsers
+  //     • <a download> works in Chrome and most modern Android browsers, but
+  //       silently fails in some WebViews and Samsung Internet <13.
+  //     • Safest path: create a temporary blob URL, click a hidden <a>, then
+  //       revoke the blob URL after a short delay. This is the most broadly
+  //       compatible approach for Android.
+  //
+  //  3. Desktop browsers
+  //     • jsPDF's doc.save() (blob + <a download>) works everywhere.
+  //
+  // Detection strategy:
+  //   isIOS   — covers iPhone, iPad (including modern iPads that drop "iPad"
+  //             from the UA and report as "Macintosh" with touch support).
+  //   isMobile — catches Android and any other touch-based mobile browser.
+  //             We use this as the trigger for the blob-URL approach.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const ua      = navigator.userAgent || '';
+  const isIOS   = /iPad|iPhone|iPod/.test(ua) ||
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isMobile = isIOS || /Android/i.test(ua) ||
+                  /webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+
   if (isIOS) {
+    // ── iOS: open PDF in a new tab via iframe ────────────────────────────
+    // data URI is the only reliable way to display a PDF inline on iOS Safari.
+    // We write a minimal HTML page with a full-screen <iframe> so the user
+    // can use Safari's native "Save to Files" / share sheet from the viewer.
     const dataUrl = doc.output('datauristring');
-    const newTab = window.open('');
-    if (newTab) {
-      newTab.document.write(
-        '<html><head><title>' + filename + '</title></head>' +
-        '<body style="margin:0"><iframe src="' + dataUrl + '" width="100%" height="100%" style="border:none;position:fixed;top:0;left:0"></iframe></body></html>'
-      );
-      newTab.document.close();
-    } else {
-      // Popup blocked — fallback: navigate current tab
-      window.location.href = dataUrl;
+    let opened = false;
+    try {
+      const newTab = window.open('', '_blank');
+      if (newTab) {
+        newTab.document.write(
+          '<!DOCTYPE html><html><head>' +
+          '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+          '<title>' + filename + '</title>' +
+          '<style>*{margin:0;padding:0}html,body{height:100%;overflow:hidden}' +
+          'iframe{position:fixed;top:0;left:0;width:100%;height:100%;border:none}</style>' +
+          '</head><body>' +
+          '<iframe src="' + dataUrl + '"></iframe>' +
+          '</body></html>'
+        );
+        newTab.document.close();
+        opened = true;
+      }
+    } catch (_) {
+      // window.open() threw (e.g. strict popup blocker) — fall through to modal
     }
+
+    if (!opened) {
+      // ── iOS popup blocked: show in-page modal with tap-to-open link ──
+      // Never navigate away from the app — that loses all dashboard state.
+      _showPDFModal(dataUrl, filename);
+    }
+
+  } else if (isMobile) {
+    // ── Android / other mobile: blob URL + hidden <a> ───────────────────
+    // More reliable than doc.save() on Android WebViews and Samsung Internet.
+    try {
+      const blob    = doc.output('blob');
+      const blobUrl = URL.createObjectURL(blob);
+      const a       = document.createElement('a');
+      a.href        = blobUrl;
+      a.download    = filename;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Revoke after a short delay so the browser has time to start the download
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    } catch (_) {
+      // Blob URL failed (some restricted WebViews) — fall back to data URI modal
+      const dataUrl = doc.output('datauristring');
+      _showPDFModal(dataUrl, filename);
+    }
+
   } else {
+    // ── Desktop: standard jsPDF save ─────────────────────────────────────
     doc.save(filename);
   }
+}
+
+/**
+ * Shows a minimal in-page modal with a tap-to-open PDF link.
+ * Used as the last-resort fallback when popup blockers prevent window.open()
+ * on iOS, or when blob URLs are unavailable in restricted WebViews.
+ *
+ * The modal is self-contained (no React, no framework) so it works regardless
+ * of where in the component tree exportDashboardPDF is called from.
+ *
+ * @param {string} dataUrl  - PDF data URI
+ * @param {string} filename - suggested filename for the title
+ */
+function _showPDFModal(dataUrl, filename) {
+  // Remove any existing modal first (double-export guard)
+  const existing = document.getElementById('__hostops_pdf_modal');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = '__hostops_pdf_modal';
+  overlay.style.cssText = [
+    'position:fixed', 'inset:0', 'z-index:99999',
+    'background:rgba(12,28,20,0.72)', 'backdrop-filter:blur(4px)',
+    'display:flex', 'align-items:center', 'justify-content:center',
+    'padding:24px',
+  ].join(';');
+
+  overlay.innerHTML =
+    '<div style="background:#fff;border-radius:16px;padding:28px 24px;max-width:340px;' +
+    'width:100%;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,0.22)">' +
+      '<div style="width:48px;height:48px;background:#eaf8f1;border-radius:50%;' +
+      'display:flex;align-items:center;justify-content:center;margin:0 auto 16px">' +
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#26a676" ' +
+        'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>' +
+          '<polyline points="14 2 14 8 20 8"/>' +
+        '</svg>' +
+      '</div>' +
+      '<p style="font-weight:700;font-size:16px;color:#0c1c14;margin:0 0 8px">' +
+        'Your PDF is ready' +
+      '</p>' +
+      '<p style="font-size:13px;color:#6a8b7c;margin:0 0 20px;line-height:1.5">' +
+        'Tap the button below to open it. From there you can use the share sheet ' +
+        'to save it to Files or share it.' +
+      '</p>' +
+      '<a href="' + dataUrl + '" target="_blank" rel="noopener noreferrer" ' +
+      'style="display:block;background:#26a676;color:#fff;border-radius:10px;' +
+      'padding:13px 20px;font-weight:600;font-size:14px;text-decoration:none;' +
+      'margin-bottom:10px">Open PDF</a>' +
+      '<button id="__hostops_pdf_modal_close" ' +
+      'style="background:none;border:none;color:#9ab8a9;font-size:13px;' +
+      'cursor:pointer;padding:6px 12px">Dismiss</button>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+
+  // Close on backdrop click or Dismiss button
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) overlay.remove();
+  });
+  const closeBtn = document.getElementById('__hostops_pdf_modal_close');
+  if (closeBtn) closeBtn.addEventListener('click', function() { overlay.remove(); });
 }
