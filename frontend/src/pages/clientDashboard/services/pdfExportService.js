@@ -40,24 +40,60 @@ const FOOTER_Y       = PAGE_H - 10;
 const FOOTER_TY      = PAGE_H - 4;
 const CONTENT_BOTTOM = FOOTER_Y - 3;
 
-function loadScript(src) {
+// ── CDN URLs — primary (cdnjs) and fallback (jsDelivr) ───────────────────────
+// Mobile networks can be flaky; if the primary CDN does not respond within
+// SCRIPT_TIMEOUT_MS we try the fallback. Both serve the exact same builds.
+const SCRIPT_TIMEOUT_MS = 12000;
+
+const CDN = {
+  jspdf: {
+    primary:  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+    fallback: 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
+  },
+  autotable: {
+    primary:  'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',
+    fallback: 'https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js',
+  },
+};
+
+function loadScript(src, timeoutMs) {
   return new Promise(function(resolve, reject) {
+    // If an identical script tag already exists and the lib is ready, resolve immediately.
     if (document.querySelector('script[src="' + src + '"]')) { resolve(); return; }
-    var s = document.createElement('script');
-    s.src = src;
-    s.onload = resolve;
-    s.onerror = function() { reject(new Error('Failed to load: ' + src)); };
+    var s   = document.createElement('script');
+    var tid = setTimeout(function() {
+      s.onload = s.onerror = null;
+      reject(new Error('Timeout loading: ' + src));
+    }, timeoutMs || SCRIPT_TIMEOUT_MS);
+    s.src     = src;
+    s.onload  = function() { clearTimeout(tid); resolve(); };
+    s.onerror = function() { clearTimeout(tid); reject(new Error('Failed to load: ' + src)); };
     document.head.appendChild(s);
   });
 }
 
-async function ensureLibs() {
-  if (!window.jspdf) {
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+// Try primary CDN; on any failure immediately try the fallback CDN.
+async function loadScriptWithFallback(key) {
+  try {
+    await loadScript(CDN[key].primary);
+  } catch (primaryErr) {
+    console.warn('[pdfExport] Primary CDN failed (' + key + '):', primaryErr.message, '— trying fallback');
+    await loadScript(CDN[key].fallback);
   }
-  if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF failed to load.');
+}
+
+async function ensureLibs() {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    await loadScriptWithFallback('jspdf');
+  }
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    throw new Error('jsPDF failed to load from both CDNs. Check your connection and try again.');
+  }
   if (typeof window.jspdf.jsPDF.API.autoTable !== 'function') {
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');
+    await loadScriptWithFallback('autotable');
+  }
+  if (typeof window.jspdf.jsPDF.API.autoTable !== 'function') {
+    throw new Error('autoTable plugin failed to load. Check your connection and try again.');
   }
 }
 

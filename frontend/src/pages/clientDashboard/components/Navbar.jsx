@@ -232,7 +232,7 @@ export default function Navbar() {
     if (isExporting) return;
     logActivity('exported_pdf');
     if (!dashState.rawData) {
-      alert("No dashboard data loaded yet. Please wait for data to load first.");
+      showExportError('No dashboard data loaded yet. Please wait for data to load first.');
       return;
     }
     setIsExporting(true);
@@ -244,10 +244,49 @@ export default function Navbar() {
       await exportDashboardPDF(dashState, user);
     } catch (err) {
       console.error("PDF export failed:", err);
-      alert("Export failed. Please try again.");
+      // Show a mobile-friendly in-page error — alert() is unreliable on some
+      // Android WebViews and gives no useful detail to the user.
+      const msg = (err && err.message) ? err.message : 'Unknown error';
+      showExportError('Export failed: ' + msg);
     } finally {
       setIsExporting(false);
     }
+  }
+
+  // ── Mobile-friendly error display ─────────────────────────────────────────
+  // Uses the same vanilla-JS modal pattern as _showPDFModal in pdfExportService
+  // so error feedback works even when alert() is suppressed by the browser.
+  function showExportError(message) {
+    const existing = document.getElementById('__hostops_export_err');
+    if (existing) existing.remove();
+    const overlay = document.createElement('div');
+    overlay.id = '__hostops_export_err';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(12,28,20,0.72);' +
+      'backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px';
+    overlay.innerHTML =
+      '<div style="background:#fff;border-radius:16px;padding:28px 24px;max-width:340px;' +
+      'width:100%;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,0.22)">' +
+        '<div style="width:48px;height:48px;background:#fdecea;border-radius:50%;' +
+        'display:flex;align-items:center;justify-content:center;margin:0 auto 16px">' +
+          '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c13515" ' +
+          'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>' +
+            '<line x1="12" y1="16" x2="12.01" y2="16"/>' +
+          '</svg>' +
+        '</div>' +
+        '<p style="font-weight:700;font-size:16px;color:#0c1c14;margin:0 0 8px">Export failed</p>' +
+        '<p style="font-size:13px;color:#6a8b7c;margin:0 0 20px;line-height:1.5;word-break:break-word">' +
+          message.replace(/</g, '&lt;') +
+        '</p>' +
+        '<button id="__hostops_export_err_close" ' +
+        'style="background:#26a676;color:#fff;border:none;border-radius:10px;' +
+        'padding:13px 32px;font-weight:600;font-size:14px;cursor:pointer">OK</button>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    const btn = document.getElementById('__hostops_export_err_close');
+    if (btn) btn.addEventListener('click', close);
   }
 
   const t = {
