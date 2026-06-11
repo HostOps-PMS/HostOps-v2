@@ -467,12 +467,12 @@
 
 /* ─── Modal ───────────────────────────────────────────────── */
 .db-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(12,28,20,.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   z-index: 100;
   animation: db-fade-in 150ms var(--ease) forwards;
 }

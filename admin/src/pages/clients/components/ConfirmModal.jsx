@@ -20,7 +20,7 @@ export default function ConfirmModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 200,
+        zIndex: 10001,
         animation: 'db-fade-in 120ms ease forwards',
       }}
     >
