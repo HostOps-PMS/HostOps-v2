@@ -12,6 +12,7 @@ import TeamLeaderLayout from './pages/TeamLeader/index';
 import TeamLeaderStaffs from './pages/TeamLeader/staffs/index';
 import TeamLeaderDashboardPlaceholder from './pages/TeamLeader/dashboard/index';
 import AccountsPage from './pages/Accounts/index';
+import ActivityLogsPage from './pages/ActivityLogs/index';
 
 const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5174';
 
@@ -187,6 +188,16 @@ export default function App() {
           element={
             <PrivateRoute>
               <AccountsPage />
+            </PrivateRoute>
+          }
+        />
+
+        {/* ── Activity Logs page (admin view) ─────────────────── */}
+        <Route
+          path="/activity-logs"
+          element={
+            <PrivateRoute>
+              <ActivityLogsPage />
             </PrivateRoute>
           }
         />
