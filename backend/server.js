@@ -21,6 +21,12 @@ import keyDiagnosticRoute from './routes/keyDiagnosticRoute.js';
 import smoobuApartmentsRoute   from './routes/smoobuApartments.js';
 import activityLogRoute        from './routes/activityLog.js';
 
+// ── Secret rotation ───────────────────────────────────────────────
+// bootstrapSecrets() seeds JWT_SECRET_PREV/CURR/NEXT in .env if they
+// don't exist yet (first deploy). startSecretRotation() then rotates
+// them in-process every hour so stolen tokens expire within ≤1 hour.
+import { bootstrapSecrets, startSecretRotation } from './scripts/rotateSecrets.js';
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -44,13 +50,9 @@ app.use(
         scriptSrc:  ["'self'"],
         styleSrc:   ["'self'", "'unsafe-inline'"],
         imgSrc:     ["'self'", 'data:', 'blob:', CLOUDINARY_HOSTNAME,
-          // Leaflet loads marker icon PNGs — with npm bundling these come from
-          // blob: / data: URLs already covered above, but added for safety.
           'https://*.tile.openstreetmap.org',
         ],
         connectSrc: ["'self'", CLOUDINARY_HOSTNAME,
-          // Leaflet (npm-bundled) fetches OpenStreetMap tiles via XHR/fetch.
-          // Without these entries the browser blocks all tile requests.
           'https://*.tile.openstreetmap.org',
           'https://tile.openstreetmap.org',
         ],
@@ -81,9 +83,6 @@ app.use((req, res, next) => {
 // ── CORS ──────────────────────────────────────────────────────────────────────
 const isDev = process.env.NODE_ENV !== 'production';
 
-// FIX: .trim() removes spaces, .replace(/\/$/, '') removes trailing slashes.
-// Both are common mistakes in .env values that cause silent CORS failures
-// because "https://go.hostops.online/" !== "https://go.hostops.online".
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim().replace(/\/$/, ''))
   : [
@@ -144,35 +143,26 @@ app.use('/auth/forgot-password',  authLimiter);
 app.use('/auth/reset-password',   authLimiter);
 
 // ── Global API Key Protection ─────────────────────────────────────────────────
-// /auth routes are exempt from API key check, EXCEPT for sensitive POST operations 
-// that rely on cookies (/auth/refresh, /auth/logout) to prevent CSRF attacks.
 app.use((req, res, next) => {
-  const isAuthRoute = req.path.startsWith('/auth');
+  const isAuthRoute     = req.path.startsWith('/auth');
   const isSensitiveAuth = req.path === '/auth/refresh' || req.path === '/auth/logout';
-  
+
   if (isAuthRoute && !isSensitiveAuth) return next();
   requireApiKey(req, res, next);
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/auth', authRoutes);
-app.use('/auth', publicRecoveryRouter);   // POST /auth/recovery-request (public)
+app.use('/auth', publicRecoveryRouter);
 app.use('/api',  dashboardRoutes);
 app.use('/api',  clientsRoutes);
-// NOTE: activityLogRoute is registered HERE, before the admin-scoped routers
-// (accounts / dashboard-overview / recovery), on purpose. Those admin routers
-// apply requireAdmin at the router level (router.use), which runs for ANY path
-// that enters them — even one with no matching route. Because /api/activity-log
-// would otherwise only match in the LAST router, the request had to traverse the
-// admin routers first and got a false 403 "Admin access required" for non-admins.
-// Matching it here lets it respond before reaching any admin router.
-app.use('/api',  activityLogRoute);   // GET|POST /api/activity-log
+app.use('/api',  activityLogRoute);
 app.use('/api',  propertiesRoutes);
 app.use('/api',  staffsRoutes);
-app.use('/api',  accountsRoutes);         // GET /api/accounts (admin)
-app.use('/api/accounts', smoobuApartmentsRoute); // GET /api/accounts/:clientId/smoobu-apartments
-app.use('/api',  dashboardOverviewRoute); // GET /api/dashboard-overview (admin)
-app.use('/api',  adminRecoveryRouter);    // GET|PATCH /api/recovery-requests (admin)
+app.use('/api',  accountsRoutes);
+app.use('/api/accounts', smoobuApartmentsRoute);
+app.use('/api',  dashboardOverviewRoute);
+app.use('/api',  adminRecoveryRouter);
 app.use('/api', keyDiagnosticRoute);
 
 // ── Health Check ──────────────────────────────────────────────────────────────
@@ -246,6 +236,13 @@ process.on('uncaughtException', (err) => {
 async function start() {
   try {
     await connectDB();
+
+    // Seed missing secret slots on first boot, then start hourly rotation.
+    // Must run AFTER dotenv/config loads (import 'dotenv/config' at top)
+    // so existing JWT_ACCESS_SECRET is available for the CURR promotion.
+    bootstrapSecrets();
+    startSecretRotation();
+
     server = app.listen(PORT, () => {
       console.log(`✓ Server running on http://localhost:${PORT} [${process.env.NODE_ENV || 'development'}]`);
     });
