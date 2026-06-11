@@ -20,6 +20,7 @@ import { requireApiKey } from './middleware/apiKeyAuth.js';
 import keyDiagnosticRoute from './routes/keyDiagnosticRoute.js';
 import smoobuApartmentsRoute   from './routes/smoobuApartments.js';
 import activityLogRoute        from './routes/activityLog.js';
+import imageProxyRoute          from './routes/imageProxy.js';
 
 // ── Secret rotation ───────────────────────────────────────────────
 // bootstrapSecrets() seeds JWT_SECRET_PREV/CURR/NEXT in .env if they
@@ -164,6 +165,7 @@ app.use('/api/accounts', smoobuApartmentsRoute);
 app.use('/api',  dashboardOverviewRoute);
 app.use('/api',  adminRecoveryRouter);
 app.use('/api', keyDiagnosticRoute);
+app.use('/api', imageProxyRoute);   // GET /api/image/property/:userId/:propertyId
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {

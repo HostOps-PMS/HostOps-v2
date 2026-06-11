@@ -13,6 +13,7 @@ import User from '../models/user.js';
 import { requireAuth, requireAdmin, requireAdminOrTeamLeader } from '../middleware/auth.js';
 import { getDashboard } from '../services/smoobu.js';
 import { v2 as cloudinary } from 'cloudinary';
+import { invalidateImageCache } from './imageProxy.js';
 import multer from 'multer';
 import fs from 'fs';
 import os from 'os';
@@ -380,9 +381,13 @@ router.post('/clients/:id/properties/:propertyId/picture', requireAdmin, upload.
     property.propertyPicture = finalPictureUrl;
     await user.save();
 
+    // Bust the image proxy cache so the new picture is served immediately
+    invalidateImageCache(String(user._id), String(property._id));
+
     res.json({ 
-      message: 'Property picture updated successfully.', 
-      propertyPicture: property.propertyPicture,
+      message: 'Property picture updated successfully.',
+      // Return proxy URL — never expose raw Cloudinary URL to client
+      propertyPicture:         `/api/image/property/${user._id}/${property._id}`,
       propertyPictureOriginal: property.propertyPictureOriginal,
       propertyPictureCropData: property.propertyPictureCropData
     });

@@ -25,6 +25,15 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// ── Helper: build image proxy URL ────────────────────────────────
+// Replaces raw Cloudinary URLs with our backend proxy endpoint.
+// The client never sees the real Cloudinary URL in any response.
+const API_BASE_INTERNAL = process.env.API_BASE_URL || '';
+
+function proxyImageUrl(userId, propertyId) {
+  return `${API_BASE_INTERNAL}/api/image/property/${userId}/${propertyId}`;
+}
+
 // ── Helper: strip sensitive fields before sending user to client ─
 // Never send activityLog, pin state, crop data, or internal IDs
 // in auth responses. Only the minimum the frontend actually needs.
@@ -43,10 +52,14 @@ function sanitizeUser(user) {
     mustChangePin:      obj.mustChangePin,
     propertyTagPrefix:  obj.propertyTagPrefix,
     serverId:           obj.serverId,
+    // propertyPicture is replaced with proxy URL —
+    // the real Cloudinary URL never leaves the server.
     properties: (obj.properties || []).map(p => ({
       _id:             p._id,
       propertyName:    p.propertyName,
-      propertyPicture: p.propertyPicture || '',
+      propertyPicture: p.propertyPicture
+        ? proxyImageUrl(obj._id, p._id)
+        : '',
     })),
   };
 }
@@ -679,13 +692,17 @@ function staffCanAccessEmbeddedProperty(staff, property) {
 }
 
 router.get('/my-properties', requireAuth, (req, res) => {
-  const list = (req.user.properties || []);
+  const list   = (req.user.properties || []);
+  const userId = String(req.isStaff ? req.staff.clientId : req.user._id);
   res.json({
     businessName: req.user.businessName || '',
     properties:   list.map((p) => ({
       _id:             p._id,
       propertyName:    p.propertyName,
-      propertyPicture: p.propertyPicture || '',
+      // Proxy URL — Cloudinary URL stays server-side only
+      propertyPicture: p.propertyPicture
+        ? proxyImageUrl(userId, p._id)
+        : '',
       businessName:    req.user.businessName || '',
       hasAccess:       req.isStaff ? staffCanAccessEmbeddedProperty(req.staff, p) : true,
     })),
