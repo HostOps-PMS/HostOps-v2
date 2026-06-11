@@ -32,7 +32,7 @@
 .am-card {
   background: var(--color-surface);
   border-radius: var(--radius-card);
-  padding: 40px;
+  padding: clamp(24px, 6vw, 40px);   /* responsive padding */
   max-width: 440px;
   width: 100%;
   box-shadow: var(--shadow-card);
@@ -144,27 +144,30 @@
 
 .am-otp-row {
   display: flex;
-  gap: 10px;
+  gap: clamp(4px, 2vw, 10px);       /* gaps shrink on small screens */
   justify-content: center;
+  align-items: center;
   margin-bottom: 24px;
+  width: 100%;
 }
 
 .am-otp-box {
-  width: 52px;
-  height: 58px;
+  width: clamp(36px, 11vw, 52px);   /* fluid: min 36px, max 52px */
+  height: clamp(44px, 13vw, 58px);
+  flex-shrink: 0;
+  min-width: 0;
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-input);
   background: #f8fbf9;
   text-align: center;
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: clamp(1rem, 4vw, 1.5rem);
   font-weight: 700;
   color: var(--color-text);
   outline: none;
   transition: border-color var(--transition), box-shadow var(--transition),
               background var(--transition);
   caret-color: var(--color-brand);
-  /* remove native number spinners */
   -moz-appearance: textfield;
 }
 
@@ -200,6 +203,7 @@
   font-weight: 700;
   user-select: none;
   padding-bottom: 2px;
+  flex-shrink: 0;
 }
 
 /* ── Verify Button ────────────────────────────────────── */
