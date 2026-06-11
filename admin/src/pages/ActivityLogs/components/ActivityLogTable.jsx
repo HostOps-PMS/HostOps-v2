@@ -1,5 +1,6 @@
 // src/pages/ActivityLogs/components/ActivityLogTable.jsx
 import React, { useState } from 'react';
+import { exportActivityLogs } from '../services/activityLogApi';
 
 // ── Action helpers ────────────────────────────────────────────────────────────
 const ACTION_LABELS = {
@@ -48,6 +49,92 @@ function getActionMeta(action) {
   }
 }
 
+// ── CSV helpers ───────────────────────────────────────────────────────────────
+
+/**
+ * Escape a single CSV field value.
+ * Wraps the value in double-quotes and escapes any existing double-quotes
+ * inside it so the output is valid RFC 4180 CSV.
+ */
+function csvField(value) {
+  const str = value == null ? '' : String(value);
+  return `"${str.replace(/"/g, '""')}"`;
+}
+
+/**
+ * Convert an array of ActivityLog entries into a CSV string.
+ * Columns: Action, Badge, Business, Performed By, Role, Email,
+ *          Date & Time, IP Address, Property, Meta (JSON)
+ */
+function buildCsv(entries) {
+  const HEADERS = [
+    'Action',
+    'Badge',
+    'Business',
+    'Performed By',
+    'Role',
+    'Email',
+    'Date & Time',
+    'IP Address',
+    'Property',
+    'Meta',
+  ];
+
+  const rows = entries.map((e) => {
+    const label = ACTION_LABELS[e.action] || e.action;
+    const badge = getActionMeta(e.action).badge;
+    const pb    = e.performedBy || {};
+    const name  = [pb.firstName, pb.lastName].filter(Boolean).join(' ') || pb.email || '';
+    const role  = pb.staffRole || pb.role || 'client';
+    const email = pb.email || '';
+    const time  = new Date(e.createdAt || e.timestamp).toLocaleString('en-PH', {
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true,
+    });
+    const biz  = e.businessName || pb.businessName || '';
+    const ip   = e.ipAddress || '';
+
+    // Property: prefer switched_property meta, else generic meta.propertyName
+    let property = '';
+    if (e.action === 'switched_property') {
+      const from = e.meta?.fromPropertyName || e.meta?.fromPropertyId || '';
+      const to   = e.meta?.toPropertyName   || e.meta?.toPropertyId   || '';
+      if (from || to) property = `${from} → ${to}`;
+    } else {
+      property = e.meta?.propertyName || '';
+    }
+
+    const meta = e.meta && Object.keys(e.meta).length > 0
+      ? JSON.stringify(e.meta)
+      : '';
+
+    return [label, badge, biz, name, role, email, time, ip, property, meta]
+      .map(csvField)
+      .join(',');
+  });
+
+  return [HEADERS.map(csvField).join(','), ...rows].join('\n');
+}
+
+/**
+ * Build a descriptive filename that reflects the active filters.
+ * Examples:
+ *   activity-logs-2024-01-01-to-2024-03-31.csv
+ *   activity-logs-login-2024-06-01.csv
+ *   activity-logs-all-2024-06-11.csv
+ */
+function buildFilename({ filterAction, filterDateFrom, filterDateTo }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const parts  = ['activity-logs'];
+
+  if (filterAction)   parts.push(filterAction.replace(/_/g, '-'));
+  if (filterDateFrom) parts.push(filterDateFrom);
+  if (filterDateTo)   parts.push('to', filterDateTo);
+  if (!filterDateFrom && !filterDateTo) parts.push(today);
+
+  return `${parts.join('-')}.csv`;
+}
+
 // ── Expanded row detail ───────────────────────────────────────────────────────
 function ExpandedDetail({ entry }) {
   const time = new Date(entry.createdAt || entry.timestamp).toLocaleString('en-PH', {
@@ -66,6 +153,7 @@ function ExpandedDetail({ entry }) {
       label: 'Performed By',
       value: `${performedByName} (${performedByRole})`,
     },
+    // For switched_property: show From and To as separate rows
     entry.action === 'switched_property' && (entry.meta?.fromPropertyName || entry.meta?.fromPropertyId) && {
       label: 'Switched From',
       value: entry.meta.fromPropertyName || entry.meta.fromPropertyId,
@@ -78,6 +166,7 @@ function ExpandedDetail({ entry }) {
       color: '#1d4ed8',
       highlight: true,
     },
+    // For non-switch entries, show generic property
     entry.action !== 'switched_property' && entry.meta?.propertyName && {
       label: 'Property', value: entry.meta.propertyName,
     },
@@ -124,19 +213,6 @@ function ExpandedDetail({ entry }) {
   );
 }
 
-// ── Shared date input style (same trick as DateFilterBar) ─────────────────────
-const DATE_SVG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239ab8a9' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E")`;
-
-const dateInputStyle = {
-  backgroundImage: DATE_SVG,
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'right 10px center',
-  paddingRight: 34,
-  WebkitAppearance: 'none',
-  appearance: 'none',
-  colorScheme: 'light',
-};
-
 // ── Main component ────────────────────────────────────────────────────────────
 export default function ActivityLogTable({
   logs = [],
@@ -159,33 +235,40 @@ export default function ActivityLogTable({
   onPrev,
   onNext,
 }) {
-  const [expandedRow, setExpandedRow] = useState(null);
-const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
-const [clientSearch, setClientSearch] = useState('');
-const [actionDropdownOpen, setActionDropdownOpen] = useState(false);
+  const [expandedRow,   setExpandedRow]   = useState(null);
+  const [exporting,     setExporting]     = useState(false);
+  const [exportError,   setExportError]   = useState('');
 
   const hasFilters = search || filterClient || filterAction || filterDateFrom || filterDateTo;
 
   // ── CSV export ──────────────────────────────────────────────────────────────
-  function handleExport() {
-    const rows = logs.map((e) => {
-      const label = ACTION_LABELS[e.action] || e.action;
-      const time  = new Date(e.createdAt || e.timestamp).toLocaleString('en-PH', {
-        month: 'short', day: 'numeric', year: 'numeric',
-        hour: 'numeric', minute: '2-digit', hour12: true,
+  // Fetches ALL records that match the current server-side filters
+  // (userId / action / from / to), not just the current page.
+  async function handleExport() {
+    setExporting(true);
+    setExportError('');
+    try {
+      const allLogs = await exportActivityLogs({
+        userId: filterClient,
+        action: filterAction,
+        from:   filterDateFrom,
+        to:     filterDateTo ? filterDateTo + 'T23:59:59' : '',
       });
-      const pb   = e.performedBy || {};
-      const name = [pb.firstName, pb.lastName].filter(Boolean).join(' ') || pb.email || '—';
-      return `"${label}","${e.businessName || '—'}","${name}","${time}","${e.ipAddress || ''}"`;
-    });
-    const csv  = ['Action,Business,Performed By,Date & Time,IP Address', ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `activity-logs-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+
+      const csv      = buildCsv(allLogs);
+      const filename = buildFilename({ filterAction, filterDateFrom, filterDateTo });
+      const blob     = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url      = URL.createObjectURL(blob);
+      const a        = document.createElement('a');
+      a.href         = url;
+      a.download     = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err.message || 'Export failed. Please try again.');
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -209,7 +292,7 @@ const [actionDropdownOpen, setActionDropdownOpen] = useState(false);
           .al-filters-row2 { display: flex !important; width: 100%; padding: 0 12px 8px; box-sizing: border-box; gap: 8px; flex-wrap: nowrap; }
           .al-filters-row2 select { flex: 1; min-width: 0; max-width: 50%; }
           .al-filters-row3 { display: flex !important; width: 100%; padding: 0 12px 8px; box-sizing: border-box; gap: 6px; align-items: center; flex-wrap: nowrap; }
-          .al-filters-row3 .al-date-input { flex: 1; min-width: 0; }
+          .al-filters-row3 .al-date-input { flex: 1; min-width: 0; max-width: calc(50% - 16px); }
           .al-filters-row4 { display: flex !important; width: 100%; padding: 0 12px 12px; box-sizing: border-box; }
           .al-search-wrap { max-width: 100% !important; flex: 1; }
           .al-select { flex: 1; font-size: 12px; min-width: 0; }
@@ -228,17 +311,14 @@ const [actionDropdownOpen, setActionDropdownOpen] = useState(false);
         .al-search-input:focus { border-color: #1e8760; box-shadow: 0 0 0 3px rgba(30,135,96,0.09); background: #fff; }
         .al-select { padding: 8px 12px; border: 1.5px solid #d4e8dd; border-radius: 9px; font-size: 13px; color: #0c1c14; background: #f7faf8; outline: none; cursor: pointer; font-family: inherit; transition: border-color 0.15s; }
         .al-select:focus { border-color: #1e8760; }
-
-        /* ── UPDATED: date input with custom SVG icon, native picker hidden ── */
-        .al-date-input { padding: 8px 34px 8px 10px; border: 1.5px solid #d4e8dd; border-radius: 9px; font-size: 13px; color: #0c1c14; background: #f7faf8; outline: none; font-family: inherit; transition: border-color 0.15s; position: relative; -webkit-appearance: none; appearance: none; color-scheme: light; background-repeat: no-repeat; background-position: right 10px center; }
+        .al-date-input { padding: 8px 10px; border: 1.5px solid #d4e8dd; border-radius: 9px; font-size: 13px; color: #0c1c14; background: #f7faf8; outline: none; font-family: inherit; transition: border-color 0.15s; }
         .al-date-input:focus { border-color: #1e8760; }
-        input[type="date"].al-date-input::-webkit-calendar-picker-indicator { opacity: 0; position: absolute; right: 0; width: 40px; height: 100%; cursor: pointer; }
-
         .al-clear-btn { padding: 7px 14px; border: 1.5px solid #fca5a5; border-radius: 9px; background: #fff5f5; color: #c13515; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 5px; transition: background 0.15s; white-space: nowrap; }
         .al-clear-btn:hover { background: #fee2e2; }
         .al-export-btn { margin-left: auto; padding: 7px 14px; border: 1.5px solid #d4e8dd; border-radius: 9px; background: #eaf8f1; color: #1e8760; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 5px; transition: background 0.15s; white-space: nowrap; }
         .al-export-btn:hover { background: #d1f5e6; }
         .al-export-btn:disabled { background: #f7faf8; color: #9ab8a9; border-color: #e5ede8; cursor: not-allowed; }
+        .al-export-error { font-size: 11px; color: #c13515; background: #fff0ee; border: 1px solid #fca5a5; border-radius: 7px; padding: 5px 10px; margin: 0 16px 10px; display: flex; align-items: center; gap: 5px; }
         .al-table { width: 100%; border-collapse: collapse; }
         .al-thead th { padding: 10px 16px; text-align: left; font-size: 10px; font-weight: 700; color: #9ab8a9; text-transform: uppercase; letter-spacing: 0.07em; background: #f7faf8; border-bottom: 1px solid #eaf3ee; white-space: nowrap; }
         .al-row { border-bottom: 1px solid #f0f7f3; transition: background 0.1s; }
@@ -293,234 +373,38 @@ const [actionDropdownOpen, setActionDropdownOpen] = useState(false);
           {/* Row 2 — Client + Action filters */}
           <div className="al-filters-row2">
             {clients.length > 0 && (
-  <div style={{ position: 'relative', flex: '1 1 120px', minWidth: 0 }}>
-    <button
-      type="button"
-      onClick={() => { setClientDropdownOpen(o => !o); setClientSearch(''); setActionDropdownOpen(false); }}
-      style={{
-        width: '100%',
-        padding: '8px 12px',
-        border: '1.5px solid #d4e8dd',
-        borderRadius: 9,
-        fontSize: 13,
-        color: filterClient ? '#0c1c14' : '#0c1c14',
-        background: '#f7faf8',
-        outline: 'none',
-        cursor: 'pointer',
-        fontFamily: 'inherit',
-        textAlign: 'left',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 6,
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        boxSizing: 'border-box',
-      }}
-    >
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0, textAlign: 'left' }}>
-        {filterClient
-          ? (clients.find(c => (c._id || c.id) === filterClient)?.businessName ||
-             clients.find(c => (c._id || c.id) === filterClient)?.name ||
-             clients.find(c => (c._id || c.id) === filterClient)?.email ||
-             'All Businesses')
-          : 'All Businesses'}
-      </span>
-      <i className="ti ti-chevron-down" style={{ fontSize: 12, color: '#9ab8a9', flexShrink: 0, transition: 'transform 0.2s', transform: clientDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
-    </button>
-
-    {clientDropdownOpen && (
-      <>
-        <div
-          onClick={() => setClientDropdownOpen(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 99 }}
-        />
-        <div style={{
-          position: 'absolute',
-          top: 'calc(100% + 6px)',
-          left: 0,
-          right: 'auto',
-          minWidth: 220,
-          background: '#fff',
-          border: '1.5px solid #d4e8dd',
-          borderRadius: 12,
-          boxShadow: '0 8px 24px rgba(12,28,20,0.13)',
-          zIndex: 100,
-          overflow: 'hidden',
-        }}>
-          {/* Search box */}
-          <div style={{ padding: '10px 10px 6px', borderBottom: '1px solid #eaf3ee' }}>
-            <div style={{ position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#9ab8a9', display: 'flex', pointerEvents: 'none' }}>
-                <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="9" cy="9" r="7"/><path d="M15 15l3 3" strokeLinecap="round"/>
-                </svg>
-              </span>
-              <input
-                autoFocus
-                type="text"
-                placeholder="Search business..."
-                value={clientSearch}
-                onChange={e => setClientSearch(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '7px 10px 7px 28px',
-                  border: '1.5px solid #d4e8dd',
-                  borderRadius: 8,
-                  fontSize: 12,
-                  color: '#0c1c14',
-                  background: '#f7faf8',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Options list */}
-          <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-            {[{ _id: '', businessName: 'All Businesses' }, ...clients]
-              .filter(c => {
-                if (!clientSearch) return true;
-                const label = c.businessName || c.name || c.email || '';
-                return label.toLowerCase().includes(clientSearch.toLowerCase());
-              })
-              .map(c => {
-                const id = c._id || c.id || '';
-                const label = c.businessName || c.name || c.email || 'All Businesses';
-                const isSelected = filterClient === id;
-                return (
-                  <div
-                    key={id}
-                    onClick={() => { onFilterClientChange(id); setClientDropdownOpen(false); setClientSearch(''); }}
-                    style={{
-                      padding: '9px 14px',
-                      fontSize: 13,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      background: isSelected ? '#eaf8f1' : 'transparent',
-                      color: isSelected ? '#1e8760' : '#0c1c14',
-                      fontWeight: isSelected ? 700 : 400,
-                      transition: 'background 0.1s',
-                    }}
-                    onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f7faf8'; }}
-                    onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
-                  >
-                    {label}
-                    {isSelected && (
-                      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#1e8760" strokeWidth="2.5" strokeLinecap="round">
-                        <path d="M4 10l5 5 7-8"/>
-                      </svg>
-                    )}
-                  </div>
-                );
-              })}
-          </div>
-        </div>
-      </>
-    )}
-  </div>
-)}
-            <div style={{ position: 'relative', flex: '1 1 120px', minWidth: 0 }}>
-              <button
-                type="button"
-                onClick={() => { setActionDropdownOpen(o => !o); setClientDropdownOpen(false); }}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1.5px solid #d4e8dd',
-                  borderRadius: 9,
-                  fontSize: 13,
-                  color: '#0c1c14',
-                  background: '#f7faf8',
-                  outline: 'none',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  textAlign: 'left',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 6,
-                  whiteSpace: 'nowrap',
-                  overflow: 'visible',
-                  boxSizing: 'border-box',
-                }}
+              <select
+                className="al-select"
+                value={filterClient}
+                onChange={e => onFilterClientChange(e.target.value)}
               >
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
-                  {ACTION_OPTIONS.find(o => o.value === filterAction)?.label || 'All Actions'}
-                </span>
-                <i className="ti ti-chevron-down" style={{ fontSize: 12, color: '#9ab8a9', flexShrink: 0, transition: 'transform 0.2s', transform: actionDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
-              </button>
-
-              {actionDropdownOpen && (
-                <>
-                  <div
-                    onClick={() => setActionDropdownOpen(false)}
-                    style={{ position: 'fixed', inset: 0, zIndex: 99 }}
-                  />
-                  <div style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 6px)',
-                    left: 'auto',
-                    right: 0,
-                    minWidth: 220,
-                    background: '#fff',
-                    border: '1.5px solid #d4e8dd',
-                    borderRadius: 12,
-                    boxShadow: '0 8px 24px rgba(12,28,20,0.13)',
-                    zIndex: 100,
-                    overflow: 'hidden',
-                  }}>
-                    <div style={{ maxHeight: 260, overflowY: 'auto' }}>
-                      {ACTION_OPTIONS.map(o => {
-                        const isSelected = filterAction === o.value;
-                        return (
-                          <div
-                            key={o.value}
-                            onClick={() => { onFilterActionChange(o.value); setActionDropdownOpen(false); }}
-                            style={{
-                              padding: '9px 14px',
-                              fontSize: 13,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              background: isSelected ? '#eaf8f1' : 'transparent',
-                              color: isSelected ? '#1e8760' : '#0c1c14',
-                              fontWeight: isSelected ? 700 : 400,
-                              transition: 'background 0.1s',
-                            }}
-                            onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f7faf8'; }}
-                            onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
-                          >
-                            {o.label}
-                            {isSelected && (
-                              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#1e8760" strokeWidth="2.5" strokeLinecap="round">
-                                <path d="M4 10l5 5 7-8"/>
-                              </svg>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+                <option value="">All Businesses</option>
+                {clients.map(c => (
+                  <option key={c._id || c.id} value={c._id || c.id}>
+                    {c.businessName || c.name || c.email}
+                  </option>
+                ))}
+              </select>
+            )}
+            <select
+              className="al-select"
+              value={filterAction}
+              onChange={e => onFilterActionChange(e.target.value)}
+            >
+              {ACTION_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
           </div>
 
           {/* Row 3 — Date range + Clear */}
-          <div className="al-filters-row3" style={{ width: '100%' }}>
+          <div className="al-filters-row3">
             <input
               className="al-date-input"
               type="date"
               title="From date"
               value={filterDateFrom}
               onChange={e => onFilterDateFromChange(e.target.value)}
-              style={dateInputStyle}
             />
             <span className="al-date-sep">–</span>
             <input
@@ -529,7 +413,6 @@ const [actionDropdownOpen, setActionDropdownOpen] = useState(false);
               title="To date"
               value={filterDateTo}
               onChange={e => onFilterDateToChange(e.target.value)}
-              style={dateInputStyle}
             />
             {hasFilters && (
               <button className="al-clear-btn" onClick={onClearFilters}>
@@ -544,13 +427,28 @@ const [actionDropdownOpen, setActionDropdownOpen] = useState(false);
             <button
               className="al-export-btn"
               onClick={handleExport}
-              disabled={logs.length === 0}
+              disabled={exporting || totalCount === 0}
+              title={
+                filterDateFrom || filterDateTo
+                  ? `Export filtered records (${filterDateFrom || '…'} – ${filterDateTo || '…'})`
+                  : 'Export all records as CSV'
+              }
             >
-              <i className="ti ti-download" style={{ fontSize: 13 }} />
-              Export CSV
+              {exporting
+                ? <><i className="ti ti-loader-2 al-spinner" style={{ fontSize: 13 }} /> Exporting…</>
+                : <><i className="ti ti-download" style={{ fontSize: 13 }} /> Export CSV</>
+              }
             </button>
           </div>
         </div>
+
+        {/* ── Export error banner ── */}
+        {exportError && (
+          <div className="al-export-error">
+            <i className="ti ti-alert-circle" style={{ fontSize: 13 }} />
+            {exportError}
+          </div>
+        )}
 
         {/* ── Table body ── */}
         {loading ? (

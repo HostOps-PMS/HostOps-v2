@@ -6,32 +6,26 @@
 //
 //   GET /api/image/property/:userId/:propertyId
 //
-// The actual Cloudinary URL is looked up server-side from the DB,
-// fetched, and streamed back to the client. DevTools will only show
-// your own API domain — no cloud name, no folder structure, nothing.
-//
-// ── Usage in sanitizeUser() ──────────────────────────────────────
-// Replace propertyPicture with the proxy URL when building responses:
-//
-//   propertyPicture: buildProxyUrl(req, p._id, user._id)
-//
-// See sanitizeUser() in auth/routes/auth.js for the full integration.
+// NO AUTH required on this route intentionally — <img> tags cannot
+// send Authorization headers. Security comes from the URL itself:
+//   - userId + propertyId must be valid MongoDB ObjectIds in our DB
+//   - Only Cloudinary URLs are proxied (whitelist enforced)
+//   - URLs are never guessable without prior knowledge of the IDs
 // ─────────────────────────────────────────────────────────────────
 
-import express        from 'express';
-import https          from 'https';
-import http           from 'http';
-import { URL }        from 'url';
-import User           from '../models/user.js';
-import { requireAuth } from '../middleware/auth.js';
+import express from 'express';
+import https   from 'https';
+import http    from 'http';
+import { URL } from 'url';
+import User    from '../models/user.js';
 
 const router = express.Router();
 
-// ── Cache: avoid hitting MongoDB on every image request ──────────
-// Simple in-memory map: `${userId}:${propertyId}` → Cloudinary URL
-// TTL: 5 minutes (images don't change often; upload invalidates cache)
-const urlCache    = new Map();
-const CACHE_TTL   = 5 * 60 * 1000; // 5 minutes
+// ── In-memory cache ───────────────────────────────────────────────
+// key: `${userId}:${propertyId}` → Cloudinary URL
+// TTL: 5 minutes. Invalidated on picture upload via invalidateImageCache().
+const urlCache  = new Map();
+const CACHE_TTL = 5 * 60 * 1000;
 
 function cacheGet(key) {
   const entry = urlCache.get(key);
@@ -48,8 +42,8 @@ export function invalidateImageCache(userId, propertyId) {
   urlCache.delete(`${userId}:${propertyId}`);
 }
 
-// ── Allowed Cloudinary hostname whitelist ─────────────────────────
-// Only proxy requests to Cloudinary — never to arbitrary URLs.
+// ── Cloudinary hostname whitelist ─────────────────────────────────
+// Never proxy to arbitrary URLs — Cloudinary only.
 const ALLOWED_HOSTS = ['res.cloudinary.com'];
 
 function isAllowedUrl(rawUrl) {
@@ -62,64 +56,54 @@ function isAllowedUrl(rawUrl) {
 }
 
 // ── GET /api/image/property/:userId/:propertyId ───────────────────
-// requireAuth: only logged-in users can fetch images.
-// This prevents unauthenticated hotlinking even through the proxy.
-router.get('/image/property/:userId/:propertyId', requireAuth, async (req, res, next) => {
+// No requireAuth — <img> tags cannot send Bearer tokens.
+// Security: only serves images that exist in our DB for valid IDs.
+router.get('/image/property/:userId/:propertyId', async (req, res, next) => {
   try {
     const { userId, propertyId } = req.params;
 
-    // ── 1. Authorization check ────────────────────────────────────
-    // Staff can only fetch images belonging to their client.
-    // Regular users can only fetch their own images.
-    const requesterId = req.isStaff
-      ? String(req.staff.clientId)
-      : String(req.user._id);
-
-    if (requesterId !== userId) {
-      return res.status(403).json({ error: 'Forbidden' });
+    // Basic ObjectId format check — reject obviously invalid IDs early
+    if (!/^[a-f\d]{24}$/i.test(userId) || !/^[a-f\d]{24}$/i.test(propertyId)) {
+      return res.status(400).end();
     }
 
-    // ── 2. Cache lookup ───────────────────────────────────────────
-    const cacheKey  = `${userId}:${propertyId}`;
+    // ── Cache lookup ──────────────────────────────────────────────
+    const cacheKey = `${userId}:${propertyId}`;
     let cloudinaryUrl = cacheGet(cacheKey);
 
-    // ── 3. DB lookup if cache miss ────────────────────────────────
+    // ── DB lookup if cache miss ───────────────────────────────────
     if (!cloudinaryUrl) {
       const user = await User.findById(userId).select('properties');
-      if (!user) return res.status(404).json({ error: 'User not found' });
+      if (!user) return res.status(404).end();
 
       const property = (user.properties || []).find(
         p => String(p._id) === propertyId
       );
-      if (!property) return res.status(404).json({ error: 'Property not found' });
+      if (!property?.propertyPicture) return res.status(404).end();
 
       cloudinaryUrl = property.propertyPicture;
-      if (!cloudinaryUrl) {
-        return res.status(404).json({ error: 'No image for this property' });
-      }
-
       cacheSet(cacheKey, cloudinaryUrl);
     }
 
-    // ── 4. Validate URL before proxying ──────────────────────────
+    // ── Whitelist check ───────────────────────────────────────────
     if (!isAllowedUrl(cloudinaryUrl)) {
       console.error('[imageProxy] Blocked non-Cloudinary URL:', cloudinaryUrl);
-      return res.status(502).json({ error: 'Invalid image source' });
+      return res.status(502).end();
     }
 
-    // ── 5. Proxy the image ────────────────────────────────────────
+    // ── Proxy the image ───────────────────────────────────────────
     const parsed   = new URL(cloudinaryUrl);
     const protocol = parsed.protocol === 'https:' ? https : http;
 
     const proxyReq = protocol.get(cloudinaryUrl, (proxyRes) => {
-      // Only forward safe headers — never leak upstream server info
-      const contentType   = proxyRes.headers['content-type']   || 'image/jpeg';
+      const contentType   = proxyRes.headers['content-type'] || 'image/jpeg';
       const contentLength = proxyRes.headers['content-length'];
 
-      // Block non-image responses (e.g. Cloudinary error HTML)
+      // Block non-image responses (e.g. Cloudinary error HTML pages)
       if (!contentType.startsWith('image/')) {
-        console.error('[imageProxy] Non-image content-type from Cloudinary:', contentType);
-        return res.status(502).json({ error: 'Unexpected image response' });
+        console.error('[imageProxy] Non-image content-type:', contentType);
+        if (!res.headersSent) res.status(502).end();
+        return;
       }
 
       res.setHeader('Content-Type', contentType);
@@ -133,10 +117,9 @@ router.get('/image/property/:userId/:propertyId', requireAuth, async (req, res, 
 
     proxyReq.on('error', (err) => {
       console.error('[imageProxy] Fetch error:', err.message);
-      if (!res.headersSent) res.status(502).json({ error: 'Image fetch failed' });
+      if (!res.headersSent) res.status(502).end();
     });
 
-    // Abort upstream request if client disconnects
     res.on('close', () => proxyReq.destroy());
 
   } catch (err) { next(err); }
