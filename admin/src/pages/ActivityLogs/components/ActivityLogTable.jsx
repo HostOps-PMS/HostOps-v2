@@ -177,8 +177,37 @@ export default function ActivityLogTable({
   return (
     <>
       <style>{`
-        .al-table-wrap { background: #fff; border-radius: 14px; border: 1px solid #eaf3ee; overflow: hidden; box-shadow: 0 2px 8px rgba(12,28,20,0.05); }
-        .al-filters { display: flex; flex-wrap: wrap; gap: 10px; padding: 16px 20px; border-bottom: 1px solid #eaf3ee; align-items: center; }
+        .al-table-wrap { background: #fff; border-radius: 14px; border: 1px solid #eaf3ee; overflow: hidden; box-shadow: 0 2px 8px rgba(12,28,20,0.05); box-sizing: border-box; width: 100%; }
+        .al-filters { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #eaf3ee; align-items: center; }
+        .al-search-wrap { position: relative; flex: 1; min-width: 160px; max-width: 260px; }
+        @media (min-width: 641px) {
+          .al-filters { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center; padding: 10px 16px !important; }
+          .al-filters-row1, .al-filters-row2, .al-filters-row3, .al-filters-row4 { display: contents !important; }
+          .al-filters-row1 .al-search-wrap { flex: 1 1 160px; min-width: 0; max-width: none !important; width: auto !important; }
+          .al-select { flex: 1 1 120px; min-width: 0; }
+          .al-date-input { flex: 1 1 110px; min-width: 0; }
+          .al-export-btn { margin-left: auto !important; flex-shrink: 0; width: auto !important; }
+          .al-clear-btn { flex-shrink: 0; }
+        }
+        @media (max-width: 640px) {
+          .al-filters { gap: 0; padding: 0; flex-direction: column; }
+          .al-filters-row1 { display: flex !important; width: 100%; padding: 10px 12px 8px; box-sizing: border-box; }
+          .al-filters-row2 { display: flex !important; width: 100%; padding: 0 12px 8px; box-sizing: border-box; gap: 8px; flex-wrap: nowrap; }
+          .al-filters-row2 select { flex: 1; min-width: 0; max-width: 50%; }
+          .al-filters-row3 { display: flex !important; width: 100%; padding: 0 12px 8px; box-sizing: border-box; gap: 6px; align-items: center; flex-wrap: nowrap; }
+          .al-filters-row3 .al-date-input { flex: 1; min-width: 0; max-width: calc(50% - 16px); }
+          .al-filters-row4 { display: flex !important; width: 100%; padding: 0 12px 12px; box-sizing: border-box; }
+          .al-search-wrap { max-width: 100% !important; flex: 1; }
+          .al-select { flex: 1; font-size: 12px; min-width: 0; }
+          .al-date-input { flex: 1; font-size: 12px; min-width: 0; }
+          .al-date-sep { flex-shrink: 0; }
+          .al-clear-btn { flex-shrink: 0; padding: 7px 10px; }
+          .al-export-btn { margin-left: 0 !important; width: 100%; justify-content: center; }
+          .al-pagination { flex-direction: column; align-items: flex-start; gap: 10px; }
+          .al-page-btns { justify-content: flex-end; }
+          .al-table-wrap { border-radius: 12px; overflow: visible !important; }
+          .al-page-info { width: 100%; text-align: center; }
+        }
         .al-search-wrap { position: relative; flex: 1; min-width: 180px; max-width: 280px; }
         .al-search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: #9ab8a9; pointer-events: none; display: flex; }
         .al-search-input { width: 100%; padding: 8px 12px 8px 34px; border: 1.5px solid #d4e8dd; border-radius: 9px; font-size: 13px; color: #0c1c14; background: #f7faf8; outline: none; box-sizing: border-box; font-family: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
@@ -205,10 +234,12 @@ export default function ActivityLogTable({
         .al-detail-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 11px; border-radius: 7px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.15s; border: 1px solid #d4e8dd; background: #fff; color: #4a6b5a; }
         .al-detail-btn:hover { background: #f0f8f4; }
         .al-detail-btn.open { border-color: rgba(30,135,96,0.4); background: #eaf8f1; color: #1e8760; }
-        .al-pagination { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-top: 1px solid #eaf3ee; background: #f7faf8; flex-wrap: wrap; gap: 8px; }
+        .al-pagination { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-top: 1px solid #eaf3ee; background: #f7faf8; flex-wrap: nowrap; gap: 8px; border-radius: 0 0 14px 14px; }
         .al-page-info { font-size: 12px; color: #9ab8a9; font-weight: 500; }
         .al-page-btns { display: flex; align-items: center; gap: 6px; }
         .al-page-btn { padding: 6px 14px; border-radius: 8px; border: 1.5px solid #d4e8dd; background: #fff; color: #0c1c14; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 5px; transition: all 0.15s; }
+.al-page-btn.next-btn { background: #0c1c14; color: #fff; border-color: #0c1c14; }
+.al-page-btn.next-btn:hover:not(:disabled) { background: #1e8760; border-color: #1e8760; color: #fff; }
         .al-page-btn:hover:not(:disabled) { background: #eaf8f1; border-color: #1e8760; color: #1e8760; }
         .al-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .al-page-num { padding: 6px 12px; border-radius: 8px; background: #0c1c14; color: #eaf5f0; font-size: 12px; font-weight: 700; }
@@ -222,89 +253,94 @@ export default function ActivityLogTable({
       <div className="al-table-wrap">
 
         {/* ── Filters bar ── */}
+        {/* ── Filters bar ── */}
         <div className="al-filters">
 
-          {/* Search */}
-          <div className="al-search-wrap">
-            <span className="al-search-icon">
-              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="9" cy="9" r="7" />
-                <path d="M15 15l3 3" strokeLinecap="round" />
-              </svg>
-            </span>
-            <input
-              className="al-search-input"
-              type="text"
-              placeholder="Search by name, email, action…"
-              value={search}
-              onChange={e => onSearchChange(e.target.value)}
-            />
+          {/* Row 1 — Search full width */}
+          <div className="al-filters-row1">
+            <div className="al-search-wrap">
+              <span className="al-search-icon">
+                <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="9" cy="9" r="7" />
+                  <path d="M15 15l3 3" strokeLinecap="round" />
+                </svg>
+              </span>
+              <input
+                className="al-search-input"
+                type="text"
+                placeholder="Search by name, email, action…"
+                value={search}
+                onChange={e => onSearchChange(e.target.value)}
+              />
+            </div>
           </div>
 
-          {/* Client filter */}
-          {clients.length > 0 && (
+          {/* Row 2 — Client + Action filters */}
+          <div className="al-filters-row2">
+            {clients.length > 0 && (
+              <select
+                className="al-select"
+                value={filterClient}
+                onChange={e => onFilterClientChange(e.target.value)}
+              >
+                <option value="">All Businesses</option>
+                {clients.map(c => (
+                  <option key={c._id || c.id} value={c._id || c.id}>
+                    {c.businessName || c.name || c.email}
+                  </option>
+                ))}
+              </select>
+            )}
             <select
               className="al-select"
-              value={filterClient}
-              onChange={e => onFilterClientChange(e.target.value)}
+              value={filterAction}
+              onChange={e => onFilterActionChange(e.target.value)}
             >
-              <option value="">All Businesses</option>
-              {clients.map(c => (
-                <option key={c._id || c.id} value={c._id || c.id}>
-                  {c.businessName || c.name || c.email}
-                </option>
+              {ACTION_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
-          )}
+          </div>
 
-          {/* Action filter */}
-          <select
-            className="al-select"
-            value={filterAction}
-            onChange={e => onFilterActionChange(e.target.value)}
-          >
-            {ACTION_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+          {/* Row 3 — Date range + Clear */}
+          <div className="al-filters-row3">
+            <input
+              className="al-date-input"
+              type="date"
+              title="From date"
+              value={filterDateFrom}
+              onChange={e => onFilterDateFromChange(e.target.value)}
+            />
+            <span className="al-date-sep">–</span>
+            <input
+              className="al-date-input"
+              type="date"
+              title="To date"
+              value={filterDateTo}
+              onChange={e => onFilterDateToChange(e.target.value)}
+            />
+            {hasFilters && (
+              <button className="al-clear-btn" onClick={onClearFilters}>
+                <i className="ti ti-x" style={{ fontSize: 12 }} />
+                Clear
+              </button>
+            )}
+          </div>
 
-          {/* Date from */}
-          <input
-            className="al-date-input"
-            type="date"
-            title="From date"
-            value={filterDateFrom}
-            onChange={e => onFilterDateFromChange(e.target.value)}
-          />
-          <span className="al-date-sep">–</span>
-          {/* Date to */}
-          <input
-            className="al-date-input"
-            type="date"
-            title="To date"
-            value={filterDateTo}
-            onChange={e => onFilterDateToChange(e.target.value)}
-          />
-
-          {/* Clear filters */}
-          {hasFilters && (
-            <button className="al-clear-btn" onClick={onClearFilters}>
-              <i className="ti ti-x" style={{ fontSize: 12 }} />
-              Clear
+          {/* Row 4 — Export */}
+          <div className="al-filters-row4">
+            <button
+              className="al-export-btn"
+              onClick={handleExport}
+              disabled={logs.length === 0}
+            >
+              <i className="ti ti-download" style={{ fontSize: 13 }} />
+              Export CSV
             </button>
-          )}
-
-          {/* Export */}
-          <button
-            className="al-export-btn"
-            onClick={handleExport}
-            disabled={logs.length === 0}
-            style={{ marginLeft: 'auto' }}
-          >
-            <i className="ti ti-download" style={{ fontSize: 13 }} />
-            Export CSV
-          </button>
+          </div>
         </div>
+
+        {/* ── Table body ── */}
 
         {/* ── Table body ── */}
         {loading ? (
@@ -329,7 +365,8 @@ export default function ActivityLogTable({
             </p>
           </div>
         ) : (
-          <table className="al-table">
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '0 0 14px 14px' }}>
+          <table className="al-table" style={{ minWidth: 580 }}>
             <thead className="al-thead">
               <tr>
                 <th>Action</th>
@@ -431,6 +468,7 @@ export default function ActivityLogTable({
               })}
             </tbody>
           </table>
+          </div>
         )}
 
         {/* ── Pagination ── */}
@@ -441,7 +479,7 @@ export default function ActivityLogTable({
                 ? `Showing page ${page} of ${totalPages} · ${totalCount.toLocaleString()} total records`
                 : `Page ${page} of ${totalPages}`}
             </span>
-            <div className="al-page-btns">
+            <div className="al-page-btns" style={{ display: 'flex', gap: 6 }}>
               <button
                 className="al-page-btn"
                 onClick={onPrev}
@@ -450,9 +488,8 @@ export default function ActivityLogTable({
                 <i className="ti ti-chevron-left" style={{ fontSize: 13 }} />
                 Prev
               </button>
-              <span className="al-page-num">{page}</span>
               <button
-                className="al-page-btn"
+                className="al-page-btn next-btn"
                 onClick={onNext}
                 disabled={page >= totalPages}
               >
