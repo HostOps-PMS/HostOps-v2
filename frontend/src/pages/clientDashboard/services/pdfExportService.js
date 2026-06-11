@@ -33,7 +33,6 @@ const C = {
   subtext:    [106, 139, 122],
   border:     [216, 235, 224],
   gray:       [248, 250, 248],
-  // ── Stat-card accent colors ─────────────────────────────────────────────
   blue:       [37,  99,  235],
   blueLight:  [219, 230, 252],
   red:        [203, 68,  54],
@@ -102,46 +101,42 @@ function drawFooter(doc, pageNum, pageCount, period, pageWidth) {
  * @param {number} pageWidth
  */
 function drawPageHeader(doc, businessName, propertyName, period, pageWidth) {
-  // ── Full dark header band ────────────────────────────────────────────────
   doc.setFillColor(C.dark[0], C.dark[1], C.dark[2]);
   doc.rect(0, 0, pageWidth, HEADER_H, 'F');
 
-  // ── Green bottom border of header ────────────────────────────────────────
   doc.setFillColor(C.green[0], C.green[1], C.green[2]);
-  doc.rect(0, HEADER_H, pageWidth, 1, 'F');
+  doc.rect(0, HEADER_H, pageWidth, 1.5, 'F');
 
-  // ── Left green pill — logo ───────────────────────────────────────────────
-  doc.setFillColor(C.green[0], C.green[1], C.green[2]);
-  doc.roundedRect(12, 6, 22, 10, 2, 2, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(C.dark[0], C.dark[1], C.dark[2]);
-  doc.text('HOSTOPS', 23, 12.5, { align: 'center' });
-
-  // ── Title ─────────────────────────────────────────────────────────────────
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
+  doc.setFontSize(8);
   doc.setTextColor(C.white[0], C.white[1], C.white[2]);
-  doc.text('Analytics Report', 40, 13);
+  doc.text('HOSTOPS', 14, 10);
 
-  // ── Separator dot ────────────────────────────────────────────────────────
-  doc.setFillColor(C.green[0], C.green[1], C.green[2]);
-  doc.circle(118, 11, 1, 'F');
-
-  // ── Business name ─────────────────────────────────────────────────────────
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
+  doc.setFontSize(7);
   doc.setTextColor(C.muted[0], C.muted[1], C.muted[2]);
-  doc.text(businessName || 'Dashboard', 123, 13);
+  doc.text('Analytics', 14, 16);
 
-  // ── Right side — period + generated ──────────────────────────────────────
+  doc.setDrawColor(C.muted[0], C.muted[1], C.muted[2]);
+  doc.setLineWidth(0.3);
+  doc.line(38, 6, 38, 20);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(C.white[0], C.white[1], C.white[2]);
+  doc.text('PERFORMANCE ANALYTICS REPORT', 43, 11);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(C.muted[0], C.muted[1], C.muted[2]);
+  doc.text((businessName || 'Dashboard').toUpperCase(), 43, 18);
+
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  doc.setTextColor(C.green[0], C.green[1], C.green[2]);
-  doc.text(fmtDate(period.from) + '  -  ' + fmtDate(period.to), pageWidth - 18, 10, { align: 'right' });
   doc.setTextColor(C.muted[0], C.muted[1], C.muted[2]);
+  doc.text('Period: ' + fmtDate(period.from) + ' — ' + fmtDate(period.to), pageWidth - 14, 10, { align: 'right' });
   doc.setFontSize(6.5);
-  doc.text('Generated ' + new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }), pageWidth - 18, 17, { align: 'right' });
+  doc.text('Generated ' + new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }), pageWidth - 14, 17, { align: 'right' });
 }
 
 /**
@@ -270,15 +265,293 @@ function drawBusinessProfile(doc, businessName, propertyName, x, y, w, imgDataUr
   return y + cardH + 4;
 }
 
-function drawSectionLabel(doc, label, y, pageWidth, margin) {
+function drawSummaryCard(doc, businessName, propertyName, imgDataUrl, channelEntries, stats, y, pageWidth, margin) {
+  const x      = margin;
+  const w      = pageWidth - margin * 2;
+  const cardH  = CONTENT_BOTTOM - y - 1;
+  const hdrH   = 14;
+  const pad    = 7;
+
+  const revenue      = stats.revenue       || stats.totalRevenue      || 0;
+  const bookingCount = stats.bookings      || stats.totalBookings      || 0;
+  const cancels      = stats.cancellations || stats.totalCancellations || 0;
+  const nightsAff    = stats.nightsAffected|| stats.cancelledNights    || 0;
+  const bookedN      = stats.bookedNights  || stats.totalNights        || 0;
+  const occupancy    = stats.occupancyRate || stats.occupancy          || 0;
+
+  // ── Shadow + white card ───────────────────────────────────────────────────
+  doc.setFillColor(C.border[0], C.border[1], C.border[2]);
+  doc.roundedRect(x + 0.8, y + 1, w, cardH, 3, 3, 'F');
+  doc.setFillColor(C.white[0], C.white[1], C.white[2]);
+  doc.roundedRect(x, y, w, cardH, 3, 3, 'F');
+  doc.setDrawColor(C.border[0], C.border[1], C.border[2]);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(x, y, w, cardH, 3, 3, 'S');
+
+  // ── Dark header band ──────────────────────────────────────────────────────
   doc.setFillColor(C.dark[0], C.dark[1], C.dark[2]);
-  doc.roundedRect(margin, y, pageWidth - margin * 2, 9, 1.5, 1.5, 'F');
+  doc.roundedRect(x, y, w, hdrH, 3, 3, 'F');
+  doc.rect(x, y + hdrH - 5, w, 5, 'F');
+
+  // Green left accent
   doc.setFillColor(C.green[0], C.green[1], C.green[2]);
-  doc.rect(margin, y, 3.5, 9, 'F');
+  doc.rect(x, y, 3, hdrH, 'F');
+
+  // Green bottom border of header
+  doc.setFillColor(C.green[0], C.green[1], C.green[2]);
+  doc.rect(x, y + hdrH, w, 0.8, 'F');
+
+  // Business name in header
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
+  doc.setFontSize(10);
   doc.setTextColor(C.white[0], C.white[1], C.white[2]);
-  doc.text(label.toUpperCase(), margin + 8, y + 6.2);
+  const safeName = (businessName || 'Dashboard').slice(0, 35);
+  doc.text(safeName, x + 8, y + 9);
+
+  // Subtitle
+  const nameW = doc.getStringUnitWidth(safeName) * 10 / doc.internal.scaleFactor;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6);
+  doc.setTextColor(C.green[0], C.green[1], C.green[2]);
+  doc.text('PERFORMANCE DASHBOARD', x + 10 + nameW, y + 9);
+
+  // Property badge in header
+  if (propertyName) {
+    const bx  = x + 12 + nameW + 38;
+    const bw  = Math.min(45, propertyName.length * 1.6 + 8);
+    doc.setFillColor(C.greenMid[0], C.greenMid[1], C.greenMid[2]);
+    doc.roundedRect(bx, y + 4, bw, 6, 1.5, 1.5, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(C.greenLight[0], C.greenLight[1], C.greenLight[2]);
+    doc.text(propertyName.slice(0, 22), bx + bw / 2, y + 8.2, { align: 'center' });
+  }
+
+  // Generated date in header right
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(C.muted[0], C.muted[1], C.muted[2]);
+  doc.text(
+    'Generated ' + new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }),
+    x + w - 5, y + 9, { align: 'right' }
+  );
+
+  // ── Body: 3 columns ───────────────────────────────────────────────────────
+  const bodyY  = y + hdrH + 0.8 + 2;
+  const bodyH  = cardH - hdrH - 0.8 - 2;
+  const col1W  = w * 0.20;
+  const col2W  = w * 0.26;
+  const col3W  = w * 0.54;
+  const col1X  = x;
+  const col2X  = x + col1W;
+  const col3X  = x + col1W + col2W;
+
+  // Column dividers
+  doc.setDrawColor(C.border[0], C.border[1], C.border[2]);
+  doc.setLineWidth(0.25);
+  doc.line(col2X, bodyY + 3, col2X, bodyY + bodyH - 3);
+  doc.line(col3X, bodyY + 3, col3X, bodyY + bodyH - 3);
+
+  // ────────────────────────────────────────────────────────────────────────
+  // COL 1 — Business Profile
+  // ────────────────────────────────────────────────────────────────────────
+  let cy = bodyY + pad;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(C.green[0], C.green[1], C.green[2]);
+  doc.text('BUSINESS PROFILE', col1X + pad, cy);
+  cy += 2.5;
+  doc.setDrawColor(C.border[0], C.border[1], C.border[2]);
+  doc.setLineWidth(0.2);
+  doc.line(col1X + pad, cy, col2X - pad, cy);
+  cy += 5;
+
+  // Property image
+  const imgW = col1W - pad * 2;
+  const imgH = imgW * 0.78;
+  doc.setFillColor(C.greenLight[0], C.greenLight[1], C.greenLight[2]);
+  doc.roundedRect(col1X + pad, cy, imgW, imgH, 2, 2, 'F');
+  doc.setDrawColor(C.border[0], C.border[1], C.border[2]);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(col1X + pad, cy, imgW, imgH, 2, 2, 'S');
+
+  if (imgDataUrl) {
+    try {
+      const props = doc.getImageProperties(imgDataUrl);
+      const nw = props.width || 4, nh = props.height || 3;
+      const sc = Math.min((imgW - 3) / nw, (imgH - 3) / nh);
+      const dw = nw * sc, dh = nh * sc;
+      doc.addImage(imgDataUrl, 'JPEG',
+        col1X + pad + (imgW - dw) / 2,
+        cy + (imgH - dh) / 2,
+        dw, dh, '', 'FAST');
+    } catch (_) {}
+  } else {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(C.subtext[0], C.subtext[1], C.subtext[2]);
+    doc.text('No image', col1X + pad + imgW / 2, cy + imgH / 2 + 1, { align: 'center' });
+  }
+  cy += imgH + 5;
+
+  // Business name below image
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(C.text[0], C.text[1], C.text[2]);
+  doc.text((businessName || 'Dashboard').slice(0, 18), col1X + pad, cy);
+  cy += 5;
+
+  if (propertyName) {
+    const bw2 = Math.min(col1W - pad * 2, propertyName.length * 1.6 + 8);
+    doc.setFillColor(C.greenLight[0], C.greenLight[1], C.greenLight[2]);
+    doc.roundedRect(col1X + pad, cy, bw2, 6, 1.5, 1.5, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(C.greenMid[0], C.greenMid[1], C.greenMid[2]);
+    doc.text(propertyName.slice(0, 18), col1X + pad + bw2 / 2, cy + 4.2, { align: 'center' });
+  }
+
+  // ────────────────────────────────────────────────────────────────────────
+  // COL 2 — Key Metrics
+  // ────────────────────────────────────────────────────────────────────────
+  cy = bodyY + pad;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(C.green[0], C.green[1], C.green[2]);
+  doc.text('KEY METRICS', col2X + pad, cy);
+  cy += 2.5;
+  doc.setDrawColor(C.border[0], C.border[1], C.border[2]);
+  doc.setLineWidth(0.2);
+  doc.line(col2X + pad, cy, col3X - pad, cy);
+  cy += 4;
+
+  const metrics = [
+    { label: 'TOTAL REVENUE',   value: fmtMoney(revenue),    color: C.green },
+    { label: 'BOOKINGS',        value: String(bookingCount),  color: C.blue  },
+    { label: 'CANCELLATIONS',   value: String(cancels),       color: C.red   },
+    { label: 'OCCUPANCY RATE',  value: occupancy + '%',       color: C.green },
+    { label: 'NIGHTS BOOKED',   value: String(bookedN),       color: C.text  },
+    { label: 'NIGHTS AFFECTED', value: String(nightsAff),     color: C.red   },
+  ];
+
+  const metricRowH = (bodyH - pad * 2 - 10) / metrics.length;
+
+  metrics.forEach((m, i) => {
+    const ry = cy + i * metricRowH;
+    if (i % 2 === 0) {
+      doc.setFillColor(C.gray[0], C.gray[1], C.gray[2]);
+      doc.roundedRect(col2X + pad, ry - 1, col3X - col2X - pad * 2, metricRowH - 0.5, 1.5, 1.5, 'F');
+    }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(C.subtext[0], C.subtext[1], C.subtext[2]);
+    doc.text(m.label, col2X + pad + 2, ry + 3.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(m.color[0], m.color[1], m.color[2]);
+    doc.text(m.value, col2X + pad + 2, ry + metricRowH - 2);
+  });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // COL 3 — Platform Breakdown
+  // ────────────────────────────────────────────────────────────────────────
+  cy = bodyY + pad;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(C.green[0], C.green[1], C.green[2]);
+  doc.text('PLATFORM BREAKDOWN', col3X + pad, cy);
+  cy += 2.5;
+  doc.setDrawColor(C.border[0], C.border[1], C.border[2]);
+  doc.setLineWidth(0.2);
+  doc.line(col3X + pad, cy, x + w - pad, cy);
+  cy += 5;
+
+  const totalRev = channelEntries.reduce((s, e) => s + (e[1].revenue || 0), 0);
+  const cw       = col3W - pad * 2;
+  const wCh      = cw * 0.30;
+  const wRv      = cw * 0.32;
+  const wBk      = cw * 0.12;
+  const wNt      = cw * 0.12;
+  const wSh      = cw * 0.14;
+  const xCh      = col3X + pad;
+  const xRv      = xCh + wCh;
+  const xBk      = xRv + wRv;
+  const xNt      = xBk + wBk;
+  const xSh      = xNt + wNt;
+
+  // Table header row
+  doc.setFillColor(C.dark[0], C.dark[1], C.dark[2]);
+  doc.roundedRect(col3X + pad, cy - 3, cw, 8, 1.5, 1.5, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(C.white[0], C.white[1], C.white[2]);
+  doc.text('Channel',  xCh + 2, cy + 2);
+  doc.text('Revenue',  xRv + 2, cy + 2);
+  doc.text('Bk',       xBk + 2, cy + 2);
+  doc.text('Nts',      xNt + 2, cy + 2);
+  doc.text('Share',    xSh + wSh - 2, cy + 2, { align: 'right' });
+  cy += 8;
+
+  const tblRowH = 9;
+  channelEntries.forEach(([ch, v], ri) => {
+    const ry    = cy + ri * tblRowH;
+    const share = totalRev > 0 ? ((v.revenue || 0) / totalRev * 100).toFixed(1) : '0.0';
+
+    if (ri % 2 === 1) {
+      doc.setFillColor(C.greenLight[0], C.greenLight[1], C.greenLight[2]);
+      doc.rect(col3X + pad, ry - 3.5, cw, tblRowH, 'F');
+    }
+    doc.setDrawColor(C.border[0], C.border[1], C.border[2]);
+    doc.setLineWidth(0.15);
+    doc.line(col3X + pad, ry + tblRowH - 3.5, col3X + pad + cw, ry + tblRowH - 3.5);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(C.text[0], C.text[1], C.text[2]);
+    doc.text(String(ch), xCh + 2, ry + 2);
+
+    doc.setTextColor(C.green[0], C.green[1], C.green[2]);
+    doc.text(fmtMoney(v.revenue || 0), xRv + 2, ry + 2);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(C.text[0], C.text[1], C.text[2]);
+    doc.text(String(v.bookings || 0), xBk + 2, ry + 2);
+    doc.text(String(v.nights   || 0), xNt + 2, ry + 2);
+
+    doc.setTextColor(C.subtext[0], C.subtext[1], C.subtext[2]);
+    doc.text(share + '%', xSh + wSh - 2, ry + 2, { align: 'right' });
+  });
+
+  // Total row
+  const totalRowY = cy + channelEntries.length * tblRowH + 1;
+  doc.setFillColor(C.dark[0], C.dark[1], C.dark[2]);
+  doc.roundedRect(col3X + pad, totalRowY - 3.5, cw, 9, 1.5, 1.5, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(C.white[0], C.white[1], C.white[2]);
+  doc.text('TOTAL', xCh + 2, totalRowY + 2);
+  doc.setTextColor(C.green[0], C.green[1], C.green[2]);
+  doc.text(fmtMoney(totalRev), xRv + 2, totalRowY + 2);
+}
+
+function drawSectionLabel(doc, label, y, pageWidth, margin) {
+  doc.setDrawColor(C.border[0], C.border[1], C.border[2]);
+  doc.setLineWidth(0.4);
+  doc.line(margin, y + 4.5, pageWidth - margin, y + 4.5);
+
+  doc.setFillColor(C.white[0], C.white[1], C.white[2]);
+  doc.rect(margin, y, 60, 9, 'F');
+
+  doc.setFillColor(C.green[0], C.green[1], C.green[2]);
+  doc.rect(margin, y + 1.5, 2.5, 6, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(C.dark[0], C.dark[1], C.dark[2]);
+  doc.text(label.toUpperCase(), margin + 6, y + 7);
   return y + 13;
 }
 
@@ -399,14 +672,17 @@ function drawStatCards(doc, cards, y, pageWidth, margin) {
 function drawPlatformBreakdown(doc, channelEntries, x, y, w) {
   const totalRev = channelEntries.reduce((s, e) => s + (e[1].revenue || 0), 0);
 
-  // ── Title bar ─────────────────────────────────────────────────────────────
-  doc.setFillColor(C.dark[0], C.dark[1], C.dark[2]);
+// ── Title bar ─────────────────────────────────────────────────────────────
+  doc.setFillColor(C.gray[0], C.gray[1], C.gray[2]);
   doc.roundedRect(x, y, w, 8, 1.5, 1.5, 'F');
+  doc.setDrawColor(C.border[0], C.border[1], C.border[2]);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(x, y, w, 8, 1.5, 1.5, 'S');
   doc.setFillColor(C.green[0], C.green[1], C.green[2]);
-  doc.rect(x, y, 3, 8, 'F');
+  doc.rect(x, y, 2.5, 8, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
-  doc.setTextColor(C.white[0], C.white[1], C.white[2]);
+  doc.setTextColor(C.dark[0], C.dark[1], C.dark[2]);
   doc.text('PLATFORM BREAKDOWN', x + 6, y + 5.5);
 
   // ── Column geometry ───────────────────────────────────────────────────────
@@ -610,25 +886,15 @@ export async function exportDashboardPDF(dashState, user) {
   // ── 1) Stat cards — full width, TOP (fixed row of 4) ──────────────────────
   y = drawStatCards(doc, kpiCards, y, pageWidth, margin);
 
-  // ── 2) Two columns: business profile (left) | platform breakdown (right) ──
+// ── 2) Full-width summary card ────────────────────────────────────────────
   const channelEntries = Object.entries(byChannel);
-  const totalW = pageWidth - margin * 2;
-  const colGap = 6;
-  const leftW  = (totalW - colGap) * 0.40;   // business profile
-  const rightW = (totalW - colGap) * 0.60;   // platform breakdown
-  const leftX  = margin;
-  const rightX = margin + leftW + colGap;
-
-  const leftBottom  = drawBusinessProfile(doc, businessName, propertyName, leftX, y, leftW, propertyImageDataUrl);
-  const rightBottom = drawPlatformBreakdown(doc, channelEntries, rightX, y, rightW);
-
-  y = Math.max(leftBottom, rightBottom) + 4;
+  drawSummaryCard(doc, businessName, propertyName, propertyImageDataUrl, channelEntries, stats, y, pageWidth, margin);
 
   // ── BOOKINGS TABLE ────────────────────────────────────────────────────────
-  if (bookings.length > 0) {
-    // Make sure there's enough room for the section label + at least one table row.
-    // If not, add a new page. CONTENT_TOP is the safe start Y after the header.
-    if (y + 40 > CONTENT_BOTTOM) { doc.addPage(); y = CONTENT_TOP; }
+if (bookings.length > 0) {
+    doc.addPage();
+    drawPageHeader(doc, businessName, propertyName, period, pageWidth);
+    y = CONTENT_TOP;
     y = drawSectionLabel(doc, 'Bookings (' + bookings.length + ')', y, pageWidth, margin);
 
     const bookingRows = bookings.map(b => [
