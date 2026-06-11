@@ -507,14 +507,15 @@ const [showResetConfirm, setShowResetConfirm] = useState(false);
       {/* Reset Confirm Modal */}
       {showResetConfirm && (
         <div
-          onClick={(e) => e.target === e.currentTarget && setShowResetConfirm(false)}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowResetConfirm(false); }}
+          onTouchEnd={(e) => e.stopPropagation()}
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(12,28,20,0.45)",
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
-            zIndex: 10200,
+            background: "rgba(12,28,20,0.72)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            zIndex: 99999,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
