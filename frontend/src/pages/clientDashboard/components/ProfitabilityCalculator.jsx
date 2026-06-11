@@ -645,13 +645,15 @@ function getTheme(dark) {
     accent, danger, text, textMuted,
 
     card: {
-      background: cardBg, border: `1px solid ${border}`,
-      borderRadius: 16, padding: "clamp(16px, 4vw, 28px)",
-      color: text, fontFamily: "inherit",
-      maxHeight: "85vh",
-      overflowY: "auto",
-      width: "100%",
-    },
+    background: cardBg, border: `1px solid ${border}`,
+    borderRadius: 16, padding: "clamp(16px, 4vw, 28px)",
+    color: text, fontFamily: "inherit",
+    maxHeight: "85vh",
+    overflowY: "auto",
+    WebkitOverflowScrolling: "touch",
+    overscrollBehavior: "contain",
+    width: "100%",
+  },
     header: {
       display: "flex", justifyContent: "space-between", alignItems: "flex-start",
       flexWrap: "wrap", gap: 16, marginBottom: 20,
