@@ -999,7 +999,7 @@ export default function PropertyMap({ mapLocations, loading }) {
   // ── Leaflet map ────────────────────────────────────────────────
   const mapContainerRef = useRef(null);
   useLeafletMap(mapContainerRef, mapPoints, markerMapRef, focusedAptId, mapStyle);
-  useLeafletMap(modalMapContainerRef, mapPoints, modalMarkerMapRef, focusedAptId, mapStyle);
+  useLeafletMap(isModalOpen ? modalMapContainerRef : { current: null }, mapPoints, modalMarkerMapRef, focusedAptId, mapStyle);
 
   // ── Dropdown options ───────────────────────────────────────────
   const propertyOptions = useMemo(() => {
@@ -1058,7 +1058,7 @@ export default function PropertyMap({ mapLocations, loading }) {
                 if (modalMapContainerRef.current) {
                   window.dispatchEvent(new Event('resize'));
                 }
-              }, 100);
+              }, 350);
             }}
             style={{
               padding: '6px 12px',
@@ -1681,121 +1681,155 @@ export default function PropertyMap({ mapLocations, loading }) {
         </div>
       )}
     <style>{`
-        @media (max-width: 768px) {
-
-          .db-table-card__head {
-            flex-direction: column !important;
-            align-items: flex-start !important;
-            padding: 12px 14px !important;
-            gap: 10px !important;
-          }
-          .db-table-card__head > div:last-child {
-            width: 100% !important;
-            display: flex !important;
-            flex-wrap: wrap !important;
-            gap: 6px !important;
-          }
-          .db-table-card__head > div:last-child select,
-          .db-table-card__head > div:last-child button {
-            flex: 1 !important;
-            min-width: 120px !important;
-            max-width: 100% !important;
-            font-size: .72rem !important;
-          }
-
-          .pm-map-wrapper {
-            flex-direction: column !important;
-            height: auto !important;
-            border-radius: 0 0 12px 12px !important;
-          }
-          .pm-map-container {
-            height: 320px !important;
-            min-height: 320px !important;
-            width: 100% !important;
-            flex: none !important;
-          }
-          .pm-legend-container {
-            width: 100% !important;
-            max-height: 260px !important;
-            border-left: none !important;
-            border-top: 1px solid var(--color-border) !important;
-            padding: 10px 12px !important;
-          }
-
-          .pm-modal-overlay {
-            padding: 0 !important;
-            align-items: flex-end !important;
-          }
-          .pm-modal-inner {
-            width: 100vw !important;
-            height: 92dvh !important;
-            max-width: 100vw !important;
-            border-radius: 16px 16px 0 0 !important;
-            margin: 0 !important;
-          }
-            width: 100vw !important;
-            height: 100dvh !important;
-            max-width: 100vw !important;
-            border-radius: 0 !important;
-            margin: 0 !important;
-          }
-          .pm-modal-head {
-            flex-direction: column !important;
-            align-items: flex-start !important;
-            padding: 10px 14px !important;
-            gap: 8px !important;
-          }
-          .pm-modal-head > div:last-child {
-            width: 100% !important;
-            display: flex !important;
-            flex-wrap: wrap !important;
-            gap: 6px !important;
-          }
-          .pm-modal-head > div:last-child select,
-          .pm-modal-head > div:last-child button {
-            flex: 1 !important;
-            min-width: 100px !important;
-            max-width: 100% !important;
-            font-size: .72rem !important;
-          }
-          .pm-modal-body {
-            flex-direction: column !important;
-            overflow-y: auto !important;
-          }
-          .pm-modal-map {
-            height: 300px !important;
-            min-height: 300px !important;
-            flex: none !important;
-            width: 100% !important;
-          }
-          .pm-modal-panel {
-            width: 100% !important;
-            border-left: none !important;
-            border-top: 1px solid var(--color-border) !important;
-            min-height: 300px !important;
-            flex: 1 !important;
-          }
-
-          /* ── Card: add side breathing room ── */
-          .db-table-card {
-            margin: 0 12px !important;
-            border-radius: 16px !important;
-          }
-
-          /* ── Modal overlay: side padding so it doesn't touch edges ── */
-          .pm-modal-overlay {
-            padding: 0 !important;
-            align-items: flex-end !important;
-          }
-          .pm-modal-inner {
-            width: calc(100vw - 24px) !important;
-            height: 92dvh !important;
-            max-width: calc(100vw - 24px) !important;
-            border-radius: 16px 16px 0 0 !important;
-            margin: 0 12px !important;
-          }
+      /* ── DESKTOP modal ── */
+      @media (min-width: 769px) {
+        .pm-modal-overlay {
+          padding: 32px !important;
+          align-items: center !important;
+          justify-content: center !important;
         }
-      `}</style>
+        .pm-modal-inner {
+          width: 88vw !important;
+          max-width: 1200px !important;
+          height: 86vh !important;
+          border-radius: 16px !important;
+          margin: 0 auto !important;
+          display: flex !important;
+          flex-direction: column !important;
+          position: relative !important;
+        }
+        .pm-modal-head {
+          flex-direction: row !important;
+          align-items: center !important;
+          justify-content: space-between !important;
+          padding: 12px 20px !important;
+          flex-shrink: 0 !important;
+          flex-wrap: nowrap !important;
+          min-height: 56px !important;
+          gap: 12px !important;
+        }
+        .pm-modal-head > div:first-child {
+          flex-shrink: 0 !important;
+        }
+        .pm-modal-head > div:last-child {
+          display: flex !important;
+          align-items: center !important;
+          gap: 8px !important;
+          flex-wrap: nowrap !important;
+          flex-shrink: 0 !important;
+        }
+        .pm-modal-body {
+          flex-direction: row !important;
+          flex: 1 !important;
+          overflow: hidden !important;
+          min-height: 0 !important;
+          display: flex !important;
+        }
+        .pm-modal-map {
+          flex: 1 !important;
+          height: 100% !important;
+          min-height: unset !important;
+          min-width: 0 !important;
+          position: relative !important;
+          overflow: hidden !important;
+        }
+        .pm-modal-panel {
+          width: 300px !important;
+          min-width: 300px !important;
+          max-width: 300px !important;
+          border-left: 1px solid var(--color-border) !important;
+          border-top: none !important;
+          height: 100% !important;
+          overflow: hidden !important;
+          display: flex !important;
+          flex-direction: column !important;
+          flex-shrink: 0 !important;
+        }
+      }
+
+      /* ── MOBILE modal ── */
+      @media (max-width: 768px) {
+        .db-table-card__head {
+          flex-direction: column !important;
+          align-items: flex-start !important;
+          padding: 12px 14px !important;
+          gap: 10px !important;
+        }
+        .db-table-card__head > div:last-child {
+          width: 100% !important;
+          display: flex !important;
+          flex-wrap: wrap !important;
+          gap: 6px !important;
+        }
+        .db-table-card__head > div:last-child select,
+        .db-table-card__head > div:last-child button {
+          flex: 1 !important;
+          min-width: 120px !important;
+          font-size: .72rem !important;
+        }
+        .pm-map-wrapper {
+          flex-direction: column !important;
+          height: auto !important;
+        }
+        .pm-map-container {
+          height: 300px !important;
+          min-height: 300px !important;
+          width: 100% !important;
+          flex: none !important;
+        }
+        .pm-legend-container {
+          width: 100% !important;
+          max-height: 240px !important;
+          border-left: none !important;
+          border-top: 1px solid var(--color-border) !important;
+        }
+        .pm-modal-overlay {
+          padding: 0 !important;
+          align-items: flex-end !important;
+        }
+        .pm-modal-inner {
+          width: 100vw !important;
+          height: 92dvh !important;
+          max-width: 100vw !important;
+          border-radius: 16px 16px 0 0 !important;
+          margin: 0 !important;
+        }
+        .pm-modal-head {
+          flex-direction: column !important;
+          align-items: flex-start !important;
+          padding: 10px 14px !important;
+          gap: 8px !important;
+        }
+        .pm-modal-head > div:last-child {
+          width: 100% !important;
+          flex-wrap: wrap !important;
+          gap: 6px !important;
+        }
+        .pm-modal-head > div:last-child select,
+        .pm-modal-head > div:last-child button {
+          flex: 1 !important;
+          min-width: 100px !important;
+          font-size: .72rem !important;
+        }
+        .pm-modal-body {
+          flex-direction: column !important;
+          overflow-y: auto !important;
+        }
+        .pm-modal-map {
+          height: 300px !important;
+          min-height: 300px !important;
+          flex: none !important;
+          width: 100% !important;
+        }
+        .pm-modal-panel {
+          width: 100% !important;
+          border-left: none !important;
+          border-top: 1px solid var(--color-border) !important;
+          min-height: 280px !important;
+          flex: 1 !important;
+        }
+      }
+    `}</style>
     </div>
   );
 }

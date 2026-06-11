@@ -167,6 +167,24 @@ export default function DateFilterBar() {
             display: block !important;
           }
         }
+        .dfb-custom-row .dfb-apply-btn,
+        .dfb-custom-pop .dfb-apply-btn,
+        button.dfb-apply-btn {
+          background-color: #26a676 !important;
+          background: #26a676 !important;
+          color: #ffffff !important;
+          opacity: 1 !important;
+          -webkit-appearance: none !important;
+          appearance: none !important;
+          border: none !important;
+          box-shadow: none !important;
+          filter: none !important;
+        }
+        .dfb-apply-btn:disabled {
+          background-color: #26a676 !important;
+          background: #26a676 !important;
+          opacity: 1 !important;
+        }
       `}</style>
 
       <div className="dfb-outer" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -284,10 +302,12 @@ export default function DateFilterBar() {
               <div style={{
                 display: 'flex', alignItems: 'center',
                 justifyContent: 'space-between', marginBottom: 10,
+                gap: 8,
               }}>
                 <div style={{
                   fontSize: '.7rem', fontWeight: 700, color: '#9ab8a9',
                   letterSpacing: '.5px', textTransform: 'uppercase',
+                  flex: 1,
                 }}>
                   Custom date range
                 </div>
@@ -295,7 +315,22 @@ export default function DateFilterBar() {
                   onClick={() => setShowCustomPop(false)}
                   style={{
                     border: 'none',
-                    background: 'transparent',
+                    background: '#f0f5f2',
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    cursor: 'pointer',
+                    color: '#9ab8a9',
+                    fontSize: 13,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    padding: 0,
+                    outline: 'none',
+                    WebkitAppearance: 'none',
+                    appearance: 'none',
+                    flex: 'none',
                     cursor: 'pointer',
                     color: '#9ab8a9',
                     fontSize: '.75rem',
@@ -305,12 +340,13 @@ export default function DateFilterBar() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    width: 18,
-                    height: 18,
+                    width: 20,
+                    height: 20,
                     flexShrink: 0,
                     outline: 'none',
                     appearance: 'none',
                     WebkitAppearance: 'none',
+                    borderRadius: '50%',
                   }}
                 >✕</button>
               </div>
@@ -320,18 +356,18 @@ export default function DateFilterBar() {
                 <input
                   type="date" value={customFrom}
                   onChange={e => setCustomFrom(e.target.value)}
-                  style={{ padding: '9px 12px', border: '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box', minHeight: 44, display: 'block', WebkitAppearance: 'none', appearance: 'none', backgroundColor: '#fff' }}
+                style={{ padding: '9px 12px', border: '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box', minHeight: 44, display: 'block', backgroundColor: '#fff', colorScheme: 'light' }}
                 />
                 <label style={{ fontSize: '.75rem', color: '#6a8b7c', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>To</label>
                 <input
                   type="date" value={customTo}
                   onChange={e => setCustomTo(e.target.value)}
-                  style={{ padding: '9px 12px', border: '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box', minHeight: 44, display: 'block', WebkitAppearance: 'none', appearance: 'none', backgroundColor: '#fff' }}
+                  style={{ padding: '9px 12px', border: '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box', minHeight: 44, display: 'block', backgroundColor: '#fff', colorScheme: 'light' }}
                 />
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => setShowCustomPop(false)} style={{ flex: 1, padding: '9px', background: '#f0f5f2', color: '#2a4e3c', border: 'none', borderRadius: 9, fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
-                <button onClick={applyCustom} style={{ flex: 1, padding: '9px', background: '#26a676', color: '#fff', border: 'none', borderRadius: 9, fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 700, cursor: 'pointer' }}>Apply</button>
+                <button onClick={() => setShowCustomPop(false)} className="dfb-cancel-btn" style={{ flex: 1, padding: '9px', background: '#f0f5f2', color: '#2a4e3c', border: 'none', borderRadius: 9, fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+                <button onClick={applyCustom} className="dfb-apply-btn" style={{ flex: '1 1 0', padding: '10px', color: '#fff', border: 'none', borderRadius: 9, fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 700, cursor: 'pointer', WebkitAppearance: 'none', appearance: 'none', minHeight: 40 }}>Apply</button>
               </div>
             </div>
           )}
