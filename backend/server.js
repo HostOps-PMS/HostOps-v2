@@ -147,8 +147,11 @@ app.use('/auth/reset-password',   authLimiter);
 app.use((req, res, next) => {
   const isAuthRoute     = req.path.startsWith('/auth');
   const isSensitiveAuth = req.path === '/auth/refresh' || req.path === '/auth/logout';
+  // Image proxy is public — <img> tags cannot send x-api-key headers.
+  // Security is handled inside imageProxy.js (DB lookup + Cloudinary whitelist).
+  const isImageProxy    = req.path.startsWith('/api/image/property/');
 
-  if (isAuthRoute && !isSensitiveAuth) return next();
+  if ((isAuthRoute && !isSensitiveAuth) || isImageProxy) return next();
   requireApiKey(req, res, next);
 });
 
