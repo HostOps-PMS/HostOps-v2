@@ -185,6 +185,17 @@ export default function DateFilterBar() {
           background: #26a676 !important;
           opacity: 1 !important;
         }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+          opacity: 0 !important;
+          position: absolute !important;
+          right: 0 !important;
+          width: 40px !important;
+          height: 100% !important;
+          cursor: pointer !important;
+        }
+        input[type="date"] {
+          position: relative !important;
+        }
       `}</style>
 
       <div className="dfb-outer" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -356,13 +367,13 @@ export default function DateFilterBar() {
                 <input
                   type="date" value={customFrom}
                   onChange={e => setCustomFrom(e.target.value)}
-                style={{ padding: '9px 12px', border: '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box', minHeight: 44, display: 'block', backgroundColor: '#fff', colorScheme: 'light' }}
+                  style={{ padding: '9px 12px', border: '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box', minHeight: 44, display: 'block', backgroundColor: '#fff', colorScheme: 'light', WebkitAppearance: 'none', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236a8b7c' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', paddingRight: 40, WebkitCalendarPickerIndicator: 'none' }}
                 />
                 <label style={{ fontSize: '.75rem', color: '#6a8b7c', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>To</label>
                 <input
                   type="date" value={customTo}
                   onChange={e => setCustomTo(e.target.value)}
-                  style={{ padding: '9px 12px', border: '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box', minHeight: 44, display: 'block', backgroundColor: '#fff', colorScheme: 'light' }}
+     style={{ padding: '9px 12px', border: '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box', minHeight: 44, display: 'block', backgroundColor: '#fff', colorScheme: 'light', WebkitAppearance: 'none', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236a8b7c' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', paddingRight: 40, WebkitCalendarPickerIndicator: 'none' }}
                 />
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
