@@ -254,11 +254,24 @@ export async function getRates(user, { apartmentIds, start, end }) {
 
 // ─────────────────────────────────────────────────────────────────
 // INBOX
+//
+// FIX: Smoobu's /threads endpoint only returns reservations that have
+// at least one message. Reservations with NO messages are never listed
+// there — so guests who haven't messaged yet were invisible in the inbox.
+//
+// Solution: fetch BOTH sources in parallel and merge them:
+//   1. /threads            → reservations with existing messages
+//   2. /reservations (recent window) → ALL confirmed bookings
+//
+// Bookings that already have a thread are skipped (de-duped by reservationId).
+// Bookings with no thread get a synthetic "No messages yet" entry so they
+// always appear in the inbox and can be messaged first.
 // ─────────────────────────────────────────────────────────────────
 export async function getInbox(user, { limit = 250 } = {}) {
   const apiKey = getApiKeyForUser(user);
   const userId = getCacheUserId(user);
 
+  // ── 1. Fetch /threads (reservations with existing messages) ────────────────
   const allThreads = [];
   let page = 1;
   const PAGE_SIZE = 50;
@@ -284,44 +297,110 @@ export async function getInbox(user, { limit = 250 } = {}) {
     }
   } catch (e) {
     console.warn('Threads fetch failed:', e.message);
-    return { threads: [], totalUnread: 0 };
+    // Don't bail out entirely — fall through and still build inbox from bookings
   }
 
-  const sorted = allThreads
+  // ── 2. Fetch recent confirmed bookings (±1 year window) ────────────────────
+  // This is what surfaces guests who haven't messaged yet.
+  const today = new Date();
+  const oneYearAgo   = new Date(today); oneYearAgo.setFullYear(today.getFullYear() - 1);
+  const oneYearAhead = new Date(today); oneYearAhead.setFullYear(today.getFullYear() + 1);
+  const fmt = d => d.toISOString().slice(0, 10);
+
+  let allBookingsForInbox = [];
+  try {
+    const { bookings } = await smoobuRequestAllPages(
+      `/reservations?from=${fmt(oneYearAgo)}&to=${fmt(oneYearAhead)}`,
+      apiKey,
+      userId,
+      { showCancellation: false } // only confirmed; cancelled guests can't be messaged
+    );
+    allBookingsForInbox = bookings;
+  } catch (e) {
+    console.warn('Bookings fetch for inbox merge failed:', e.message);
+  }
+
+  // ── 3. Build a Set of reservationIds that already have a thread ────────────
+  const threadedIds = new Set(
+    allThreads
+      .map(t => t.booking?.id)
+      .filter(Boolean)
+      .map(String)
+  );
+
+  // ── 4. Map /threads to the normalised shape ────────────────────────────────
+  const totalUnread = allThreads.reduce((sum, t) => sum + (t.unread_messages || 0), 0);
+
+  const threadItems = allThreads.map(t => {
+    const msg = t.latest_message || {};
+    return {
+      reservationId: t.booking?.id,
+      guestName:     t.booking?.guest_name || 'Guest',
+      // FIX: expose apartmentId (numeric) alongside property name so
+      // applyPropertyFilter in dashboard.js can match by ID (reliable)
+      // instead of relying solely on name matching (fragile if names differ
+      // by whitespace, casing, or have duplicates across Smoobu accounts).
+      apartmentId:   t.apartment?.id ?? null,
+      property:      t.apartment?.name || '',
+      channel:       t.channel?.name || t.booking?.channel?.name || 'Direct',
+      arrival:       t.booking?.arrival   ? String(t.booking.arrival).slice(0, 10)   : null,
+      departure:     t.booking?.departure ? String(t.booking.departure).slice(0, 10) : null,
+      latestMessage: {
+        body:      msg.text_content || msg.html_content || '',
+        subject:   msg.subject || '',
+        createdAt: msg.created_at || null,
+        fromGuest: msg.type === 1 || msg.direction === 'incoming',
+      },
+      unread:      t.unread_messages || 0,
+      bookingType: t.booking?.type || null,
+      hasThread:   true,
+    };
+  });
+
+  // ── 5. Build synthetic entries for bookings with NO thread ─────────────────
+  // These are confirmed guests who haven't messaged yet (or whose thread
+  // wasn't returned by /threads — e.g. very old threads or API limitations).
+  const bookingOnlyItems = allBookingsForInbox
+    .filter(b =>
+      !b['is-blocked-booking'] &&
+      b.type !== 'cancellation' &&
+      b['guest-name'] &&
+      !threadedIds.has(String(b.id))
+    )
+    .map(b => ({
+      reservationId: b.id,
+      guestName:     b['guest-name'] || 'Guest',
+      apartmentId:   b.apartment?.id ?? null,
+      property:      b.apartment?.name || '',
+      channel:       b.channel?.name || 'Direct',
+      arrival:       b.arrival   ? String(b.arrival).slice(0, 10)   : null,
+      departure:     b.departure ? String(b.departure).slice(0, 10) : null,
+      latestMessage: {
+        body:      '',          // no messages yet
+        subject:   '',
+        createdAt: b['created-at'] || b.arrival || null,
+        fromGuest: false,       // no message from guest — show as "no reply needed"
+      },
+      unread:      0,
+      bookingType: b.type || null,
+      hasThread:   false,       // UI can use this to show "No messages yet" badge
+    }));
+
+  // ── 6. Merge, sort newest-first, cap at limit ──────────────────────────────
+  // Sort key: for threaded items use the latest message date;
+  //           for booking-only items use the booking arrival date.
+  const merged = [...threadItems, ...bookingOnlyItems]
     .sort((a, b) => {
-      const aDate = a.latest_message?.created_at;
-      const bDate = b.latest_message?.created_at;
+      const aDate = a.latestMessage?.createdAt || a.arrival || '';
+      const bDate = b.latestMessage?.createdAt || b.arrival || '';
       return new Date(bDate || 0) - new Date(aDate || 0);
     })
     .slice(0, limit);
 
-  const totalUnread = allThreads.reduce((sum, t) => sum + (t.unread_messages || 0), 0);
-
   return {
-    threads: sorted.map(t => {
-      const msg = t.latest_message || {};
-      return {
-        reservationId: t.booking?.id,
-        guestName:     (t.booking?.guest_name) || 'Guest',
-        // FIX: expose apartmentId (numeric) alongside property name so
-        // applyPropertyFilter in dashboard.js can match by ID (reliable)
-        // instead of relying solely on name matching (fragile if names differ
-        // by whitespace, casing, or have duplicates across Smoobu accounts).
-        apartmentId:   t.apartment?.id ?? null,
-        property:      t.apartment?.name || '',
-        channel:       t.channel?.name || t.booking?.channel?.name || 'Direct',
-        latestMessage: {
-          body:        msg.text_content || msg.html_content || '',
-          subject:     msg.subject || '',
-          createdAt:   msg.created_at || null,
-          fromGuest:   msg.type === 1 || msg.direction === 'incoming',
-        },
-        unread:      t.unread_messages || 0,
-        bookingType: t.booking?.type || null,
-      };
-    }),
+    threads:      merged,
     totalUnread,
-    totalThreads: allThreads.length,
+    totalThreads: merged.length,
   };
 }
 
