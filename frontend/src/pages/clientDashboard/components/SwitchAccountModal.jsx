@@ -131,14 +131,26 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
     if (!chosen) return;
     if (!canAccessProperty(chosen)) return;
 
+    // Capture the current ("from") property BEFORE overwriting storage —
+    // this is what gets passed to logActivity in Navbar so the switch log
+    // correctly records where the user switched FROM, not the new value.
+    const fromPropertyId   = safeStorage.getItem(PROP_ID_KEY)   || null;
+    const fromPropertyName = safeStorage.getItem(PROP_NAME_KEY) || null;
+
     // Write the same keys that DashboardContext reads so the "Active" badge
     // stays in sync with what the dashboard is actually displaying.
     safeStorage.setItem(PROP_ID_KEY, String(chosen._id));
     safeStorage.setItem(PROP_NAME_KEY, chosen.propertyName || "");
 
-    // Pass { id, name } so Navbar can call selectProperty() on DashboardContext,
-    // updating dashboard state immediately without a page reload.
-    if (onSwitch) onSwitch({ id: String(chosen._id), name: chosen.propertyName || "" });
+    // Pass { id, name, fromPropertyId, fromPropertyName } so Navbar can:
+    //   1. call selectProperty() on DashboardContext (id, name)
+    //   2. log the switch with correct from/to values (fromPropertyId/Name)
+    if (onSwitch) onSwitch({
+      id:               String(chosen._id),
+      name:             chosen.propertyName || "",
+      fromPropertyId,
+      fromPropertyName,
+    });
     onClose();
   }
 
