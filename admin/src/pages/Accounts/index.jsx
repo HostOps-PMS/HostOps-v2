@@ -163,9 +163,11 @@ function UnlockConfirmModal({ account, onClose, onUnlocked }) {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
-      zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      backdropFilter: 'blur(2px)', padding: 16,
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(12,28,20,0.45)',
+      backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 16,
     }}
       onClick={onClose}
     >

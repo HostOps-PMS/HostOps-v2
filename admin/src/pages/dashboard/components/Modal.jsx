@@ -64,7 +64,7 @@ export default function Modal({ type, data, onClose }) {
   const title    = isCreate ? 'New Record' : `Order #${data?.id}`;
 
   return (
-    <div className="db-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="db-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()} style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12,28,20,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
       <div className="db-modal">
         <div className="db-modal__head">
           <span className="db-modal__title">{title}</span>

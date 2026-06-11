@@ -55,7 +55,7 @@ export default function ImageCropModal({ imageUrl, initialCropData, onClose, onS
   const zoomPercent = Math.round(((zoom - 1) / 2) * 100);
 
   return (
-    <div className="db-modal-overlay" style={{ zIndex: 9999 }}>
+    <div className="db-modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12,28,20,0.55)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
       <div
         className="db-modal"
         style={{

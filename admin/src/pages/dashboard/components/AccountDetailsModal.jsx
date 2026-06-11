@@ -34,7 +34,7 @@ export default function AccountDetailsModal({ account, onClose }) {
   };
 
   return (
-    <div className="db-modal-overlay" onClick={onClose}>
+    <div className="db-modal-overlay" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12,28,20,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
       <div className="db-modal-content" onClick={e => e.stopPropagation()}>
         <header className="db-modal-header">
           <h2>Account Details</h2>
