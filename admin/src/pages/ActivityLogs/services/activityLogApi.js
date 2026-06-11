@@ -1,6 +1,6 @@
 // src/pages/ActivityLogs/services/activityLogApi.js
 
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const BASE = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
 
 function getHeaders() {
   const token = sessionStorage.getItem('hp_access_token');
