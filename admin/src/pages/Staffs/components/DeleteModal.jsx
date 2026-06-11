@@ -21,8 +21,10 @@ export default function DeleteModal({ staff, onClose, onDeleted }) {
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 1001,
-        background: 'rgba(0,0,0,0.5)',
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'rgba(12,28,20,0.45)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: 16,
       }}
