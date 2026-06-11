@@ -1007,36 +1007,41 @@ if (bookings.length > 0) {
                   /webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua);
 
   if (isIOS) {
-    // ── iOS: open PDF in a new tab via iframe ────────────────────────────
-    // data URI is the only reliable way to display a PDF inline on iOS Safari.
-    // We write a minimal HTML page with a full-screen <iframe> so the user
-    // can use Safari's native "Save to Files" / share sheet from the viewer.
-    const dataUrl = doc.output('datauristring');
-    let opened = false;
+    // ── iOS: open PDF via blob URL in a new tab ──────────────────────────
+    // Data URIs for PDFs are too large for iOS Safari iframes — they render
+    // as a blank/black page. Blob URLs are supported in Safari 14+ and work
+    // reliably. We open the blob URL directly so Safari's native PDF viewer
+    // picks it up and the user can use the share sheet to save to Files.
+    let blobUrl = null;
     try {
-      const newTab = window.open('', '_blank');
-      if (newTab) {
-        newTab.document.write(
-          '<!DOCTYPE html><html><head>' +
-          '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-          '<title>' + filename + '</title>' +
-          '<style>*{margin:0;padding:0}html,body{height:100%;overflow:hidden}' +
-          'iframe{position:fixed;top:0;left:0;width:100%;height:100%;border:none}</style>' +
-          '</head><body>' +
-          '<iframe src="' + dataUrl + '"></iframe>' +
-          '</body></html>'
-        );
-        newTab.document.close();
-        opened = true;
-      }
+      const blob = doc.output('blob');
+      blobUrl = URL.createObjectURL(blob);
     } catch (_) {
-      // window.open() threw (e.g. strict popup blocker) — fall through to modal
+      // Blob API unavailable — will fall through to data URI modal
     }
 
-    if (!opened) {
-      // ── iOS popup blocked: show in-page modal with tap-to-open link ──
-      // Never navigate away from the app — that loses all dashboard state.
-      _showPDFModal(dataUrl, filename);
+    let opened = false;
+    if (blobUrl) {
+      try {
+        const newTab = window.open(blobUrl, '_blank');
+        if (newTab) {
+          opened = true;
+          // Revoke after 60 s — enough time for Safari to load the PDF
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+        }
+      } catch (_) {
+        // window.open() threw (strict popup blocker) — fall through to modal
+      }
+
+      if (!opened) {
+        // Popup blocked: show in-page modal with a tap-to-open link
+        _showPDFModal(blobUrl, filename);
+        // Keep the blob alive long enough for the user to tap the link
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 300000);
+      }
+    } else {
+      // Blob API failed — last resort: data URI modal (no iframe, just a link)
+      _showPDFModal(doc.output('datauristring'), filename);
     }
 
   } else if (isMobile) {
