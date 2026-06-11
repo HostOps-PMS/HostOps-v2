@@ -4,7 +4,7 @@ import Sidebar from '../Sidebar';
 import { useActivityLogs } from './hooks/useActivityLogs';
 import ActivityLogTable from './components/ActivityLogTable';
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 15;
 
 export default function ActivityLogs() {
   const [search,         setSearch]         = useState('');
@@ -24,7 +24,7 @@ export default function ActivityLogs() {
     from:   filterDateFrom,
     to:     filterDateTo ? filterDateTo + 'T23:59:59' : '',
   });
-
+  
   // Client-side text search layered on top of server-side results
   const filtered = logs.filter(log => {
     if (!search) return true;
@@ -135,10 +135,10 @@ export default function ActivityLogs() {
             onFilterDateToChange={handleFilterDateToChange}
             onClearFilters={handleClearFilters}
             page={page}
-            totalPages={pagination.pages}
-            totalCount={pagination.total}
+            totalPages={pagination?.pages ?? 1}
+            totalCount={pagination?.total ?? 0}
             onPrev={() => setPage(p => Math.max(1, p - 1))}
-            onNext={() => setPage(p => Math.min(pagination.pages, p + 1))}
+            onNext={() => setPage(p => Math.min(pagination?.pages ?? 1, p + 1))}
           />
         </div>
       </div>
