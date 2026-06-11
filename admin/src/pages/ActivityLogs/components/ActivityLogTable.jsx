@@ -177,7 +177,7 @@ export default function ActivityLogTable({
   return (
     <>
       <style>{`
-        .al-table-wrap { background: #fff; border-radius: 14px; border: 1px solid #eaf3ee; overflow: hidden; box-shadow: 0 2px 8px rgba(12,28,20,0.05); box-sizing: border-box; width: 100%; }
+        .al-table-wrap { background: #fff; border-radius: 14px; border: 1px solid #eaf3ee; overflow: visible; box-shadow: 0 2px 8px rgba(12,28,20,0.05); box-sizing: border-box; width: 100%; }
         .al-filters { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #eaf3ee; align-items: center; }
         .al-search-wrap { position: relative; flex: 1; min-width: 160px; max-width: 260px; }
         @media (min-width: 641px) {
@@ -234,12 +234,10 @@ export default function ActivityLogTable({
         .al-detail-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 11px; border-radius: 7px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.15s; border: 1px solid #d4e8dd; background: #fff; color: #4a6b5a; }
         .al-detail-btn:hover { background: #f0f8f4; }
         .al-detail-btn.open { border-color: rgba(30,135,96,0.4); background: #eaf8f1; color: #1e8760; }
-        .al-pagination { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-top: 1px solid #eaf3ee; background: #f7faf8; flex-wrap: nowrap; gap: 8px; border-radius: 0 0 14px 14px; }
+        .al-pagination { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-top: 1px solid #eaf3ee; background: #f7faf8; flex-wrap: wrap; gap: 8px; border-radius: 0 0 14px 14px; overflow: visible; }
         .al-page-info { font-size: 12px; color: #9ab8a9; font-weight: 500; }
         .al-page-btns { display: flex; align-items: center; gap: 6px; }
         .al-page-btn { padding: 6px 14px; border-radius: 8px; border: 1.5px solid #d4e8dd; background: #fff; color: #0c1c14; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 5px; transition: all 0.15s; }
-.al-page-btn.next-btn { background: #0c1c14; color: #fff; border-color: #0c1c14; }
-.al-page-btn.next-btn:hover:not(:disabled) { background: #1e8760; border-color: #1e8760; color: #fff; }
         .al-page-btn:hover:not(:disabled) { background: #eaf8f1; border-color: #1e8760; color: #1e8760; }
         .al-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .al-page-num { padding: 6px 12px; border-radius: 8px; background: #0c1c14; color: #eaf5f0; font-size: 12px; font-weight: 700; }
@@ -365,7 +363,7 @@ export default function ActivityLogTable({
             </p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '0 0 14px 14px' }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           <table className="al-table" style={{ minWidth: 580 }}>
             <thead className="al-thead">
               <tr>
@@ -489,7 +487,7 @@ export default function ActivityLogTable({
                 Prev
               </button>
               <button
-                className="al-page-btn next-btn"
+                className="al-page-btn"
                 onClick={onNext}
                 disabled={page >= totalPages}
               >
