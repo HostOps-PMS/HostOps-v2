@@ -9,7 +9,7 @@ import React, {
 } from 'react';
 import safeStorage from './safeStorage';
 
-const HP_API_BASE = import.meta.env.VITE_API_BASE || 'https://hostpilot-smoobu.onrender.com';
+const HP_API_BASE = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
 
 const AuthContext = createContext(null);
 
