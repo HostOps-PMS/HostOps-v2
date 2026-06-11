@@ -217,13 +217,17 @@ function DatePresetBar({ activePreset, dateRange, onPresetChange, onCustomApply 
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: '100%' }}>
       <div style={{
         display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
         background: 'var(--color-surface-2, #f0f5f2)',
         borderRadius: 12,
         padding: 3,
         gap: 2,
+        width: '100%',
+        boxSizing: 'border-box',
       }}>
         {PRESETS.map(({ id, label }) => {
           const on = activePreset === id;
@@ -281,17 +285,29 @@ function DatePresetBar({ activePreset, dateRange, onPresetChange, onCustomApply 
 
               {/* Custom date popover */}
               {id === 'custom' && showCustomPop && (
+                <>
+                  {/* Blurred backdrop — mobile only */}
+                  <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 1199,
+                    backdropFilter: 'blur(4px)',
+                    WebkitBackdropFilter: 'blur(4px)',
+                    background: 'rgba(0,0,0,0.18)',
+                  }} onClick={() => setShowCustomPop(false)} />
                 <div style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 8px)',
-                  right: 0,
+                  position: 'fixed',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
                   background: 'var(--color-surface, #fff)',
                   border: '1.5px solid var(--color-border, #e3ede8)',
-                  borderRadius: 14,
-                  boxShadow: '0 8px 32px rgba(0,0,0,.12)',
-                  padding: '16px',
+                  borderRadius: 18,
+                  boxShadow: '0 16px 48px rgba(0,0,0,.18)',
+                  padding: '20px',
                   zIndex: 1200,
-                  minWidth: 280,
+                  width: 'min(320px, 90vw)',
+                  boxSizing: 'border-box',
                 }}>
                   <div style={{
                     fontSize: '.7rem', fontWeight: 700,
@@ -367,6 +383,7 @@ function DatePresetBar({ activePreset, dateRange, onPresetChange, onCustomApply 
                     </button>
                   </div>
                 </div>
+                </>
               )}
             </div>
           );
@@ -374,11 +391,14 @@ function DatePresetBar({ activePreset, dateRange, onPresetChange, onCustomApply 
       </div>
 
       {/* Display active range label */}
-      <span style={{ fontSize: '.72rem', color: 'var(--color-muted, #7a8c8e)', fontWeight: 500 }}>
-        {dateRange.from && dateRange.to && activePreset !== 'custom' && (
-          <>{fmtShort(dateRange.from)} – {fmtShort(dateRange.to)}</>
-        )}
-      </span>
+      {dateRange.from && dateRange.to && activePreset !== 'custom' && (
+        <span style={{
+          fontSize: '.72rem', color: 'var(--color-muted, #7a8c8e)', fontWeight: 500,
+          textAlign: 'center', width: '100%', display: 'block',
+        }}>
+          {fmtShort(dateRange.from)} – {fmtShort(dateRange.to)}
+        </span>
+      )}
     </div>
   );
 }
