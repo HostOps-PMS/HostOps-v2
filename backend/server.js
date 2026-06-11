@@ -20,7 +20,6 @@ import { requireApiKey } from './middleware/apiKeyAuth.js';
 import keyDiagnosticRoute from './routes/keyDiagnosticRoute.js';
 import smoobuApartmentsRoute   from './routes/smoobuApartments.js';
 import activityLogRoute        from './routes/activityLog.js';
-import imageProxyRoute          from './routes/imageProxy.js';
 
 // ── Secret rotation ───────────────────────────────────────────────
 // bootstrapSecrets() seeds JWT_SECRET_PREV/CURR/NEXT in .env if they
@@ -42,11 +41,7 @@ app.use((req, res, next) => {
 });
 
 // ── Security Headers (Helmet) ─────────────────────────────────────────────────
-// Images are proxied through /api/image/property/:userId/:propertyId.
-// The backend URL is added to imgSrc so the browser allows loading
-// images from our own API instead of directly from Cloudinary.
-const BACKEND_ORIGIN = process.env.API_BASE_URL || 'https://hostpilot-smoobu.onrender.com';
-
+const CLOUDINARY_HOSTNAME = 'https://res.cloudinary.com';
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -54,22 +49,10 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc:  ["'self'"],
         styleSrc:   ["'self'", "'unsafe-inline'"],
-        imgSrc: [
-          "'self'",
-          'data:',
-          'blob:',
-          // Backend image proxy — serves property images without exposing Cloudinary
-          BACKEND_ORIGIN,
-          // Cloudinary kept as fallback for other apps (admin dashboard, etc.)
-          'https://res.cloudinary.com',
-          // Map tiles
+        imgSrc:     ["'self'", 'data:', 'blob:', CLOUDINARY_HOSTNAME,
           'https://*.tile.openstreetmap.org',
-          // Login page slideshow
-          'https://images.unsplash.com',
         ],
-        connectSrc: [
-          "'self'",
-          BACKEND_ORIGIN,
+        connectSrc: ["'self'", CLOUDINARY_HOSTNAME,
           'https://*.tile.openstreetmap.org',
           'https://tile.openstreetmap.org',
         ],
@@ -78,13 +61,9 @@ app.use(
         frameSrc:   ["'none'"],
       },
     },
-    crossOriginEmbedderPolicy: false,
+    crossOriginEmbedderPolicy: true,
     crossOriginOpenerPolicy:   { policy: 'same-origin' },
-    // 'cross-origin' needed globally so the browser allows the frontend
-    // (go.hostops.online) to load images from the backend API
-    // (hostpilot-smoobu.onrender.com). The imageProxy route also sets
-    // this header explicitly per-response for clarity.
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginResourcePolicy: { policy: 'same-origin' },
     referrerPolicy:            { policy: 'strict-origin-when-cross-origin' },
     hsts: {
       maxAge:            31536000,
@@ -167,11 +146,8 @@ app.use('/auth/reset-password',   authLimiter);
 app.use((req, res, next) => {
   const isAuthRoute     = req.path.startsWith('/auth');
   const isSensitiveAuth = req.path === '/auth/refresh' || req.path === '/auth/logout';
-  // Image proxy is public — <img> tags cannot send x-api-key headers.
-  // Security is handled inside imageProxy.js (DB lookup + Cloudinary whitelist).
-  const isImageProxy    = req.path.startsWith('/api/image/property/');
 
-  if ((isAuthRoute && !isSensitiveAuth) || isImageProxy) return next();
+  if (isAuthRoute && !isSensitiveAuth) return next();
   requireApiKey(req, res, next);
 });
 
@@ -188,7 +164,6 @@ app.use('/api/accounts', smoobuApartmentsRoute);
 app.use('/api',  dashboardOverviewRoute);
 app.use('/api',  adminRecoveryRouter);
 app.use('/api', keyDiagnosticRoute);
-app.use('/api', imageProxyRoute);   // GET /api/image/property/:userId/:propertyId
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
