@@ -340,13 +340,18 @@ function SidebarButton({ icon, label, onClick, collapsed, danger }) {
 }
 
 /* ─── Main Sidebar ──────────────────────────────────────────────── */
-export default function Sidebar() {
+export default function Sidebar({ onExport, exportLoading = false, alerts = [] }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('hp_user') || '{}'); } catch { return {}; }
   });
+
+  const unreadCount = (alerts || []).filter(a => a.unread).length;
+  const mobileInitials = [currentUser.firstName, currentUser.lastName]
+    .filter(Boolean).map(n => n[0].toUpperCase()).join('') || 'U';
+  const [mobileNotifOpen, setMobileNotifOpen] = useState(false);
 
   const sidebarContent = (isMobile = false) => {
     const isCollapsed = collapsed && !isMobile;
@@ -603,6 +608,137 @@ export default function Sidebar() {
           </div>
           <span style={{ fontSize: 14, fontWeight: 700, color: '#111', letterSpacing: '-0.02em' }}>HostOps</span>
         </div>
+
+        <div style={{ flex: 1 }} />
+
+        {/* Notification bell — pinaka-right */}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <button
+            onClick={() => setMobileNotifOpen(prev => !prev)}
+            style={{
+              width: 34, height: 34, borderRadius: 10,
+              background: mobileNotifOpen ? '#e8f5e9' : '#f7f7f7',
+              border: mobileNotifOpen ? '0.5px solid #a5d6a7' : '0.5px solid rgba(0,0,0,0.08)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+              color: mobileNotifOpen ? '#1a9e6e' : '#888',
+              position: 'relative',
+              transition: 'background 0.15s, border 0.15s, color 0.15s',
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M10 2a6 6 0 00-6 6v3l-1.5 2H17.5L16 11V8a6 6 0 00-6-6z" />
+              <path d="M8.5 17a1.5 1.5 0 003 0" strokeLinecap="round" />
+            </svg>
+            {unreadCount > 0 && (
+              <span style={{
+                position: 'absolute', top: 5, right: 5,
+                width: 8, height: 8, borderRadius: '50%',
+                background: '#e53935', border: '1.5px solid #fff',
+              }} />
+            )}
+          </button>
+          {mobileNotifOpen && (
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                position: 'fixed',
+                top: 60, right: 12,
+                width: Math.min(340, window.innerWidth - 24),
+                background: '#fff',
+                borderRadius: 14,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.13)',
+                border: '0.5px solid rgba(0,0,0,0.08)',
+                zIndex: 9999,
+                overflow: 'hidden',
+                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+              }}
+            >
+              <div style={{ padding: '14px 16px', borderBottom: '0.5px solid rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>Notifications</span>
+                  {unreadCount > 0 && (
+                    <span style={{ background: '#1a9e6e', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 20, padding: '1px 7px' }}>
+                      {unreadCount}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setMobileNotifOpen(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: 11 }}
+                >
+                  Close
+                </button>
+              </div>
+              <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                {alerts.length === 0 ? (
+                  <div style={{ padding: '32px 0', textAlign: 'center', fontSize: 12, color: '#aaa' }}>
+                    No alerts right now
+                  </div>
+                ) : (
+                  alerts.map((alert, i) => (
+                    <div key={alert.id ?? i} style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 10,
+                      padding: '11px 16px',
+                      borderBottom: '0.5px solid rgba(0,0,0,0.05)',
+                      background: alert.unread ? '#f0faf6' : '#fff',
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: alert.unread ? 600 : 500, color: '#111', lineHeight: 1.4 }}>
+                          {alert.title}
+                        </div>
+                        {alert.desc && (
+                          <div style={{ fontSize: 11, color: '#888', marginTop: 2, lineHeight: 1.4 }}>
+                            {alert.desc}
+                          </div>
+                        )}
+                        {alert.clientName && (
+                          <div style={{ fontSize: 10, color: '#1a9e6e', marginTop: 2, fontWeight: 500 }}>
+                            {alert.clientName}
+                          </div>
+                        )}
+                      </div>
+                      {alert.unread && (
+                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#1a9e6e', flexShrink: 0, marginTop: 4 }} />
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={onExport}
+          disabled={exportLoading}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '7px 12px',
+            background: exportLoading ? '#e0e0e0' : '#1a9e6e',
+            color: exportLoading ? '#aaa' : '#fff',
+            border: 'none', borderRadius: 8,
+            cursor: exportLoading ? 'not-allowed' : 'pointer',
+            fontSize: 12, fontWeight: 600,
+            fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+          }}
+        >
+          {exportLoading ? (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+              style={{ animation: 'pdf-spin 0.8s linear infinite' }}>
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M3 16h14" strokeLinecap="round" />
+            </svg>
+          )}
+          {exportLoading ? 'Exporting...' : 'Export PDF'}
+        </button>
       </div>
 
       {/* Mobile drawer */}

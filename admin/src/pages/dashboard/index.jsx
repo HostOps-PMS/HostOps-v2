@@ -83,7 +83,11 @@ export default function Dashboard() {
 
   return (
     <div className="db-layout">
-      <Sidebar />
+      <Sidebar
+        onExport={handleExport}
+        exportLoading={exportLoading || statsLoading}
+        alerts={overview?.alerts ?? []}
+      />
 
       <div className="db-main">
         {/*

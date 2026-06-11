@@ -410,8 +410,8 @@ export default function TopBar({ onAction, onExport, exportLoading = false, aler
     <header style={{
       display: 'flex',
       alignItems: 'center',
-      gap: 16,
-      padding: '10px 24px',
+      gap: 10,
+      padding: '10px 16px',
       background: '#fff',
       borderBottom: '0.5px solid rgba(0,0,0,0.08)',
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
@@ -419,19 +419,18 @@ export default function TopBar({ onAction, onExport, exportLoading = false, aler
       top: 0,
       zIndex: 100,
       minHeight: 60,
+      flexWrap: 'wrap',
     }}>
 
       {/* Left — Welcome */}
-      <div style={{ flexShrink: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#111', letterSpacing: '-0.01em' }}>
+      <div style={{ flex: 1, minWidth: 120 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#111', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           Welcome back, {firstName}!
         </div>
-        <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>
+        <div style={{ fontSize: 11, color: '#aaa', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           Get a clear view of your real estate portfolio.
         </div>
       </div>
-
-      <div style={{ flex: 1 }} />
 
       {/* Right — Actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
