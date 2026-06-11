@@ -1602,11 +1602,20 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                                 Property: {entry.meta?.propertyName || entry.meta?.propertyId}
                               </div>
                             )}
-                            {isSwitchProp && entry.meta?.toPropertyName && (
-                              <div style={{ fontSize: 11, color: "#3b82f6", marginTop: 2, fontWeight: 600 }}>
-                                {entry.meta?.fromPropertyName
-                                  ? `${entry.meta.fromPropertyName} → ${entry.meta.toPropertyName}`
-                                  : `→ ${entry.meta.toPropertyName}`}
+                            {isSwitchProp && (entry.meta?.fromPropertyName || entry.meta?.toPropertyName || entry.meta?.fromPropertyId || entry.meta?.toPropertyId) && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: '#9ab8a9', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 32, flexShrink: 0 }}>From</span>
+                                  <span style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', background: '#f3f4f6', borderRadius: 5, padding: '1px 7px', border: '1px solid #e5e7eb' }}>
+                                    {entry.meta?.fromPropertyName || entry.meta?.fromPropertyId || <span style={{ color: '#9ab8a9', fontStyle: 'italic' }}>None</span>}
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 32, flexShrink: 0 }}>To</span>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', background: '#eff6ff', borderRadius: 5, padding: '1px 7px', border: '1px solid #bfdbfe' }}>
+                                    {entry.meta?.toPropertyName || entry.meta?.toPropertyId || '—'}
+                                  </span>
+                                </div>
                               </div>
                             )}
                             {isLogout && entry.meta?.propertyName && (

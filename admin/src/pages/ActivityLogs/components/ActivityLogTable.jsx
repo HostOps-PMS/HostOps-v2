@@ -1,674 +1,468 @@
 // src/pages/ActivityLogs/components/ActivityLogTable.jsx
-import { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 
-/* ─── Tiny helpers ───────────────────────────────────────────────── */
-function formatDate(iso) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US', {
+// ── Action helpers ────────────────────────────────────────────────────────────
+const ACTION_LABELS = {
+  login:                   'Logged in',
+  logout:                  'Logged out',
+  password_changed:        'Password changed',
+  pin_changed:             'PIN changed',
+  opened_account_settings: 'Opened account settings',
+  exported_pdf:            'Exported PDF report',
+  changed_date_filter:     'Changed date filter',
+  filtered_by_channel:     'Filtered by channel',
+  switched_calendar_view:  'Switched calendar view',
+  opened_message_thread:   'Opened message thread',
+  switched_property:       'Switched property',
+};
+
+const ACTION_OPTIONS = [
+  { value: '',                         label: 'All Actions' },
+  { value: 'login',                    label: 'Login' },
+  { value: 'logout',                   label: 'Logout' },
+  { value: 'password_changed',         label: 'Password Changed' },
+  { value: 'pin_changed',              label: 'PIN Changed' },
+  { value: 'switched_property',        label: 'Switched Property' },
+  { value: 'opened_account_settings',  label: 'Account Settings Opened' },
+  { value: 'exported_pdf',             label: 'Exported PDF' },
+];
+
+function getActionMeta(action) {
+  switch (action) {
+    case 'login':
+      return { icon: 'ti-login',           color: '#1e8760', bg: '#eaf8f1', badge: 'Login' };
+    case 'logout':
+      return { icon: 'ti-logout',          color: '#c13515', bg: '#fff0ee', badge: 'Logout' };
+    case 'password_changed':
+      return { icon: 'ti-lock',            color: '#f59e0b', bg: '#fffbeb', badge: 'Security' };
+    case 'pin_changed':
+      return { icon: 'ti-password',        color: '#8b5cf6', bg: '#f5f3ff', badge: 'Security' };
+    case 'switched_property':
+      return { icon: 'ti-arrows-exchange', color: '#3b82f6', bg: '#eff6ff', badge: 'Switch' };
+    case 'exported_pdf':
+      return { icon: 'ti-file-export',     color: '#0891b2', bg: '#ecfeff', badge: 'Export' };
+    case 'opened_account_settings':
+      return { icon: 'ti-settings',        color: '#6b7280', bg: '#f3f4f6', badge: 'Settings' };
+    default:
+      return { icon: 'ti-info-circle',     color: '#9ab8a9', bg: '#f7faf8', badge: 'Event' };
+  }
+}
+
+// ── Expanded row detail ───────────────────────────────────────────────────────
+function ExpandedDetail({ entry }) {
+  const time = new Date(entry.createdAt || entry.timestamp).toLocaleString('en-PH', {
     month: 'short', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
   });
-}
 
-function formatDateTime(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    + ' · '
-    + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-}
+  const pb = entry.performedBy || {};
+  const performedByName = [pb.firstName, pb.lastName].filter(Boolean).join(' ') || pb.email || '—';
+  const performedByRole = pb.staffRole || pb.role || 'client';
 
-function RoleBadge({ role, staffRole }) {
-  const display = staffRole || role || 'unknown';
-  const styles = {
-    admin:       { bg: '#fff0f6', color: '#c026d3', dot: '#e879f9' },
-    client:      { bg: '#eff6ff', color: '#2563eb', dot: '#60a5fa' },
-    staff:       { bg: '#f0fdf4', color: '#16a34a', dot: '#4ade80' },
-    team_leader: { bg: '#fff7ed', color: '#ea580c', dot: '#fb923c' },
-  };
-  const s = styles[role] || { bg: '#f3f4f6', color: '#6b7280', dot: '#9ca3af' };
+  const rows = [
+    { label: 'Timestamp',        value: time },
+    entry.businessName && { label: 'Business Account', value: entry.businessName },
+    (pb.firstName || pb.email) && {
+      label: 'Performed By',
+      value: `${performedByName} (${performedByRole})`,
+    },
+    // For switched_property: show From and To as separate rows
+    entry.action === 'switched_property' && (entry.meta?.fromPropertyName || entry.meta?.fromPropertyId) && {
+      label: 'Switched From',
+      value: entry.meta.fromPropertyName || entry.meta.fromPropertyId,
+      color: '#6b7280',
+      badge: true,
+    },
+    entry.action === 'switched_property' && (entry.meta?.toPropertyName || entry.meta?.toPropertyId) && {
+      label: 'Switched To',
+      value: entry.meta.toPropertyName || entry.meta.toPropertyId,
+      color: '#1d4ed8',
+      highlight: true,
+    },
+    // For non-switch entries, show generic property
+    entry.action !== 'switched_property' && entry.meta?.propertyName && {
+      label: 'Property', value: entry.meta.propertyName,
+    },
+    entry.ipAddress && { label: 'IP Address', value: entry.ipAddress },
+  ].filter(Boolean);
+
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      fontSize: '0.72rem', fontWeight: 600,
-      padding: '3px 10px', borderRadius: 999,
-      background: s.bg, color: s.color,
-    }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot }} />
-      {display}
-    </span>
+    <td
+      colSpan={5}
+      style={{
+        padding: '0 16px 14px 56px',
+        background: '#f7fbf9',
+        borderBottom: '1px solid #eaf3ee',
+      }}
+    >
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: '10px 32px',
+        paddingTop: 10,
+      }}>
+        {rows.map((r, i) => (
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{
+              fontSize: 10, fontWeight: 700,
+              color: r.highlight ? '#3b82f6' : '#9ab8a9',
+              textTransform: 'uppercase', letterSpacing: '0.06em',
+            }}>
+              {r.label}
+            </span>
+            <span style={{
+              fontSize: 12, fontWeight: r.highlight ? 700 : 600,
+              color: r.color || '#0c1c14',
+              background: r.highlight ? '#eff6ff' : r.badge ? '#f3f4f6' : 'transparent',
+              borderRadius: r.highlight || r.badge ? 5 : 0,
+              padding: r.highlight || r.badge ? '1px 7px' : 0,
+              border: r.highlight ? '1px solid #bfdbfe' : r.badge ? '1px solid #e5e7eb' : 'none',
+              display: 'inline-block',
+            }}>
+              {r.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </td>
   );
 }
 
-function ActionBadge({ action }) {
-  const lower = (action || '').toLowerCase();
-  let bg = '#f3f4f6', color = '#374151';
-  if (lower.includes('login'))   { bg = '#e0f2fe'; color = '#0369a1'; }
-  if (lower.includes('logout'))  { bg = '#fef3c7'; color = '#92400e'; }
-  if (lower.includes('create'))  { bg = '#d1fae5'; color = '#065f46'; }
-  if (lower.includes('update') || lower.includes('edit')) { bg = '#ede9fe'; color = '#5b21b6'; }
-  if (lower.includes('delete'))  { bg = '#fee2e2'; color = '#b91c1c'; }
-  if (lower.includes('view'))    { bg = '#f0f9ff'; color = '#0c4a6e'; }
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center',
-      fontSize: '0.72rem', fontWeight: 700,
-      padding: '3px 10px', borderRadius: 999,
-      background: bg, color,
-      whiteSpace: 'nowrap',
-    }}>
-      {action}
-    </span>
-  );
-}
-
-/* ─── Main component ─────────────────────────────────────────────── */
+// ── Main component ────────────────────────────────────────────────────────────
 export default function ActivityLogTable({
-  logs,
-  clients,
-  loading,
-  error,
-  search,
-  filterClient,
-  filterAction,
-  filterDateFrom,
-  filterDateTo,
+  logs = [],
+  clients = [],
+  loading = false,
+  search = '',
+  filterClient = '',
+  filterAction = '',
+  filterDateFrom = '',
+  filterDateTo = '',
   onSearchChange,
   onFilterClientChange,
   onFilterActionChange,
   onFilterDateFromChange,
   onFilterDateToChange,
   onClearFilters,
-  page,
-  totalPages,
-  totalCount,
+  page = 1,
+  totalPages = 1,
+  totalCount = 0,
   onPrev,
   onNext,
 }) {
-  const [activeTab, setActiveTab]             = useState('All');
-  const [showClientDropdown, setShowClientDropdown] = useState(false);
-  const [clientSearch, setClientSearch]       = useState('');
-  const [showActionDropdown, setShowActionDropdown] = useState(false);
+  const [expandedRow, setExpandedRow] = useState(null);
 
-  const tabScrollRef                          = useRef(null);
-  const clientDropdownRef                     = useRef(null);
-  const actionDropdownRef                     = useRef(null);
-  const [tabScrollLeft, setTabScrollLeft]     = useState(0);
-  const [tabScrollable, setTabScrollable]     = useState(false);
+  const hasFilters = search || filterClient || filterAction || filterDateFrom || filterDateTo;
 
-  // Close dropdowns on outside click
-  useEffect(() => {
-    function handleClick(e) {
-      if (clientDropdownRef.current && !clientDropdownRef.current.contains(e.target)) {
-        setShowClientDropdown(false);
-        setClientSearch('');
-      }
-      if (actionDropdownRef.current && !actionDropdownRef.current.contains(e.target)) {
-        setShowActionDropdown(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
-
-  function handleTabScroll() {
-    const el = tabScrollRef.current;
-    if (!el) return;
-    setTabScrollLeft(el.scrollLeft);
-    setTabScrollable(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  // ── CSV export ──────────────────────────────────────────────────────────────
+  function handleExport() {
+    const rows = logs.map((e) => {
+      const label = ACTION_LABELS[e.action] || e.action;
+      const time  = new Date(e.createdAt || e.timestamp).toLocaleString('en-PH', {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit', hour12: true,
+      });
+      const pb   = e.performedBy || {};
+      const name = [pb.firstName, pb.lastName].filter(Boolean).join(' ') || pb.email || '—';
+      return `"${label}","${e.businessName || '—'}","${name}","${time}","${e.ipAddress || ''}"`;
+    });
+    const csv  = ['Action,Business,Performed By,Date & Time,IP Address', ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `activity-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
-  useEffect(() => {
-    const el = tabScrollRef.current;
-    if (!el) return;
-    setTabScrollable(el.scrollWidth > el.clientWidth);
-  }, []);
-
-  // Derive unique action types from current logs for dropdown
-  const allActionTypes = [...new Set(logs.map(l => l.action).filter(Boolean))].sort();
-
-  const TAB_ICONS = {
-    All: (
-      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M3 5h14M3 10h14M3 15h14" strokeLinecap="round" />
-      </svg>
-    ),
-    Logins: (
-      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M10 3v7m0 0l-3-3m3 3l3-3" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M5 17h10" strokeLinecap="round" />
-      </svg>
-    ),
-    Changes: (
-      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M4 13l3 3 9-9" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  };
-
-  const tabCounts = {
-    All:     logs.length,
-    Logins:  logs.filter(l => l.action?.toLowerCase().includes('login') || l.action?.toLowerCase().includes('logout')).length,
-    Changes: logs.filter(l => {
-      const a = l.action?.toLowerCase() || '';
-      return a.includes('create') || a.includes('update') || a.includes('delete') || a.includes('edit');
-    }).length,
-  };
-
-  const tabs = [
-    { label: 'All',     count: tabCounts.All },
-    { label: 'Logins',  count: tabCounts.Logins },
-    { label: 'Changes', count: tabCounts.Changes },
-  ];
-
-  const tabFiltered = activeTab === 'All' ? logs
-    : activeTab === 'Logins'
-      ? logs.filter(l => l.action?.toLowerCase().includes('login') || l.action?.toLowerCase().includes('logout'))
-      : logs.filter(l => {
-          const a = l.action?.toLowerCase() || '';
-          return a.includes('create') || a.includes('update') || a.includes('delete') || a.includes('edit');
-        });
-
-  const hasActiveFilters = filterClient || filterAction || filterDateFrom || filterDateTo || search;
-
-  const clientMap = Object.fromEntries(clients.map(c => [c._id, c]));
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+    <>
+      <style>{`
+        .al-table-wrap { background: #fff; border-radius: 14px; border: 1px solid #eaf3ee; overflow: hidden; box-shadow: 0 2px 8px rgba(12,28,20,0.05); }
+        .al-filters { display: flex; flex-wrap: wrap; gap: 10px; padding: 16px 20px; border-bottom: 1px solid #eaf3ee; align-items: center; }
+        .al-search-wrap { position: relative; flex: 1; min-width: 180px; max-width: 280px; }
+        .al-search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: #9ab8a9; pointer-events: none; display: flex; }
+        .al-search-input { width: 100%; padding: 8px 12px 8px 34px; border: 1.5px solid #d4e8dd; border-radius: 9px; font-size: 13px; color: #0c1c14; background: #f7faf8; outline: none; box-sizing: border-box; font-family: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
+        .al-search-input:focus { border-color: #1e8760; box-shadow: 0 0 0 3px rgba(30,135,96,0.09); background: #fff; }
+        .al-select { padding: 8px 12px; border: 1.5px solid #d4e8dd; border-radius: 9px; font-size: 13px; color: #0c1c14; background: #f7faf8; outline: none; cursor: pointer; font-family: inherit; transition: border-color 0.15s; }
+        .al-select:focus { border-color: #1e8760; }
+        .al-date-input { padding: 8px 10px; border: 1.5px solid #d4e8dd; border-radius: 9px; font-size: 13px; color: #0c1c14; background: #f7faf8; outline: none; font-family: inherit; transition: border-color 0.15s; }
+        .al-date-input:focus { border-color: #1e8760; }
+        .al-clear-btn { padding: 7px 14px; border: 1.5px solid #fca5a5; border-radius: 9px; background: #fff5f5; color: #c13515; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 5px; transition: background 0.15s; white-space: nowrap; }
+        .al-clear-btn:hover { background: #fee2e2; }
+        .al-export-btn { margin-left: auto; padding: 7px 14px; border: 1.5px solid #d4e8dd; border-radius: 9px; background: #eaf8f1; color: #1e8760; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 5px; transition: background 0.15s; white-space: nowrap; }
+        .al-export-btn:hover { background: #d1f5e6; }
+        .al-export-btn:disabled { background: #f7faf8; color: #9ab8a9; border-color: #e5ede8; cursor: not-allowed; }
+        .al-table { width: 100%; border-collapse: collapse; }
+        .al-thead th { padding: 10px 16px; text-align: left; font-size: 10px; font-weight: 700; color: #9ab8a9; text-transform: uppercase; letter-spacing: 0.07em; background: #f7faf8; border-bottom: 1px solid #eaf3ee; white-space: nowrap; }
+        .al-row { border-bottom: 1px solid #f0f7f3; transition: background 0.1s; }
+        .al-row:last-child { border-bottom: none; }
+        .al-row:hover > td { background: #f7fbf9; }
+        .al-row.expanded > td { background: #f7fbf9; }
+        .al-td { padding: 11px 16px; font-size: 13px; color: #0c1c14; vertical-align: middle; }
+        .al-action-cell { display: flex; align-items: center; gap: 9px; }
+        .al-icon-circle { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .al-badge { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 20px; font-size: 10px; font-weight: 700; border: 1px solid; white-space: nowrap; }
+        .al-detail-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 11px; border-radius: 7px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.15s; border: 1px solid #d4e8dd; background: #fff; color: #4a6b5a; }
+        .al-detail-btn:hover { background: #f0f8f4; }
+        .al-detail-btn.open { border-color: rgba(30,135,96,0.4); background: #eaf8f1; color: #1e8760; }
+        .al-pagination { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-top: 1px solid #eaf3ee; background: #f7faf8; flex-wrap: wrap; gap: 8px; }
+        .al-page-info { font-size: 12px; color: #9ab8a9; font-weight: 500; }
+        .al-page-btns { display: flex; align-items: center; gap: 6px; }
+        .al-page-btn { padding: 6px 14px; border-radius: 8px; border: 1.5px solid #d4e8dd; background: #fff; color: #0c1c14; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 5px; transition: all 0.15s; }
+        .al-page-btn:hover:not(:disabled) { background: #eaf8f1; border-color: #1e8760; color: #1e8760; }
+        .al-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .al-page-num { padding: 6px 12px; border-radius: 8px; background: #0c1c14; color: #eaf5f0; font-size: 12px; font-weight: 700; }
+        .al-empty { padding: 52px 20px; text-align: center; }
+        .al-loading { padding: 52px 20px; text-align: center; color: #9ab8a9; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        @keyframes al-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .al-spinner { animation: al-spin 0.8s linear infinite; }
+        .al-date-sep { font-size: 12px; color: #9ab8a9; font-weight: 500; }
+      `}</style>
 
-      {/* ── Tab bar + stats ──────────────────────────────────────── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 0, flexWrap: 'nowrap', gap: 10, paddingBottom: 0,
-        overflow: 'hidden', position: 'relative',
-      }}>
-        {tabScrollLeft > 0 && (
-          <div style={{
-            position: 'absolute', left: 0, top: 0, bottom: 0, zIndex: 10,
-            display: 'flex', alignItems: 'center',
-            background: 'linear-gradient(to right, #f0f4f0 60%, transparent)',
-            paddingRight: 8, paddingLeft: 2, pointerEvents: 'none',
-          }}>
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5">
-              <path d="M13 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-        )}
-        {tabScrollable && (
-          <div style={{
-            position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 10,
-            display: 'flex', alignItems: 'center',
-            background: 'linear-gradient(to left, #f0f4f0 60%, transparent)',
-            paddingLeft: 8, paddingRight: 2, pointerEvents: 'none',
-          }}>
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5">
-              <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-        )}
-        <div
-          ref={tabScrollRef}
-          onScroll={handleTabScroll}
-          style={{
-            display: 'flex', alignItems: 'flex-end', gap: 0,
-            background: 'transparent',
-            padding: '0', marginBottom: '-1px',
-            overflowX: 'auto', WebkitOverflowScrolling: 'touch',
-            scrollbarWidth: 'none', msOverflowStyle: 'none',
-          }}>
-          {tabs.map(tab => {
-            const isActive = activeTab === tab.label;
-            return (
-              <button
-                key={tab.label}
-                onClick={() => setActiveTab(tab.label)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 7,
-                  padding: '9px 18px 10px',
-                  border: '1px solid',
-                  borderColor: isActive ? '#e8ecf0' : 'transparent',
-                  borderBottom: isActive ? '1px solid #fff' : 'none',
-                  borderRadius: '10px 10px 0 0',
-                  background: isActive ? '#fff' : 'transparent',
-                  marginBottom: '-1px',
-                  cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
-                  color: isActive ? '#10b981' : '#9ca3af',
-                  transition: 'color 0.15s', whiteSpace: 'nowrap',
-                  position: 'relative', zIndex: isActive ? 2 : 0,
-                }}
-              >
-                {TAB_ICONS[tab.label]}
-                {tab.label}
-                <span style={{
-                  fontSize: '0.72rem', fontWeight: 700,
-                  padding: '1px 7px', borderRadius: 999,
-                  background: isActive ? '#d1fae5' : 'transparent',
-                  color: isActive ? '#10b981' : '#b0b7c3',
-                }}>
-                  {tab.count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <div className="al-table-wrap">
 
-      {/* ── Filter bar + table container ─────────────────────────── */}
-      <div style={{
-        background: '#fff', borderRadius: '0 12px 12px 12px',
-        border: '1px solid #e8ecf0', overflow: 'visible',
-        paddingBottom: 4, position: 'relative',
-      }}>
+        {/* ── Filters bar ── */}
+        <div className="al-filters">
 
-        {/* Filter row */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '12px 16px 14px', borderBottom: '1px solid #f0f2f5',
-          flexWrap: 'wrap', rowGap: 8,
-        }}>
-
-          {/* Search input */}
-          <div style={{ position: 'relative', flex: 1, minWidth: 140, maxWidth: 280 }}>
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2"
-              style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-              <circle cx="9" cy="9" r="6" /><path d="M15 15l-3.5-3.5" strokeLinecap="round" />
-            </svg>
+          {/* Search */}
+          <div className="al-search-wrap">
+            <span className="al-search-icon">
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="9" cy="9" r="7" />
+                <path d="M15 15l3 3" strokeLinecap="round" />
+              </svg>
+            </span>
             <input
+              className="al-search-input"
+              type="text"
+              placeholder="Search by name, email, action…"
               value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search name, email, action…"
-              style={{
-                width: '100%', boxSizing: 'border-box',
-                padding: '7px 12px 7px 32px',
-                borderRadius: 8, border: '1px solid #e5e7eb',
-                fontSize: '0.83rem', outline: 'none', background: '#fafafa',
-                color: '#1a202c',
-              }}
+              onChange={e => onSearchChange(e.target.value)}
             />
           </div>
 
-          <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto', whiteSpace: 'nowrap', flexShrink: 0 }}>
-            {totalCount} log{totalCount !== 1 ? 's' : ''}
-          </span>
+          {/* Client filter */}
+          {clients.length > 0 && (
+            <select
+              className="al-select"
+              value={filterClient}
+              onChange={e => onFilterClientChange(e.target.value)}
+            >
+              <option value="">All Businesses</option>
+              {clients.map(c => (
+                <option key={c._id || c.id} value={c._id || c.id}>
+                  {c.businessName || c.name || c.email}
+                </option>
+              ))}
+            </select>
+          )}
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexShrink: 0 }}>
+          {/* Action filter */}
+          <select
+            className="al-select"
+            value={filterAction}
+            onChange={e => onFilterActionChange(e.target.value)}
+          >
+            {ACTION_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
 
-            {/* Business filter */}
-            <div ref={clientDropdownRef} style={{ position: 'relative', flexShrink: 0 }}>
-              <div
-                onClick={() => setShowClientDropdown(v => !v)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '7px 10px 7px 12px',
-                  borderRadius: 8, border: '1px solid #e5e7eb',
-                  background: filterClient ? '#f0fdf4' : '#fff',
-                  cursor: 'pointer', fontSize: '0.83rem',
-                  color: filterClient ? '#059669' : '#374151',
-                  fontWeight: filterClient ? 600 : 500,
-                  userSelect: 'none', whiteSpace: 'nowrap',
-                  maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis',
-                }}
-              >
-                <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="2" y="3" width="16" height="14" rx="2" />
-                  <path d="M2 7h16" strokeLinecap="round" />
-                </svg>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {filterClient
-                    ? (clients.find(c => c._id === filterClient)?.businessName || 'Business')
-                    : 'All Businesses'}
-                </span>
-                <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
-                  <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
+          {/* Date from */}
+          <input
+            className="al-date-input"
+            type="date"
+            title="From date"
+            value={filterDateFrom}
+            onChange={e => onFilterDateFromChange(e.target.value)}
+          />
+          <span className="al-date-sep">–</span>
+          {/* Date to */}
+          <input
+            className="al-date-input"
+            type="date"
+            title="To date"
+            value={filterDateTo}
+            onChange={e => onFilterDateToChange(e.target.value)}
+          />
 
-              {showClientDropdown && (
-                <div style={{
-                  position: 'absolute', top: 'calc(100% + 4px)', left: 0,
-                  zIndex: 300, background: '#fff',
-                  border: '1.5px solid #e2e8f0', borderRadius: 10,
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                  minWidth: 210, overflow: 'hidden',
-                  display: 'flex', flexDirection: 'column', maxHeight: 280,
-                }}>
-                  <div style={{ padding: '8px 10px', borderBottom: '1px solid #f0f0f0' }}>
-                    <input
-                      autoFocus
-                      value={clientSearch}
-                      onChange={e => setClientSearch(e.target.value)}
-                      placeholder="Search business…"
-                      style={{
-                        width: '100%', boxSizing: 'border-box',
-                        padding: '6px 10px', borderRadius: 6,
-                        border: '1.5px solid #e2e8f0', fontSize: '0.83rem',
-                        outline: 'none', background: '#fafafa',
-                      }}
-                      onClick={e => e.stopPropagation()}
-                    />
-                  </div>
-                  <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-                    <div
-                      onClick={() => { onFilterClientChange(''); setShowClientDropdown(false); setClientSearch(''); }}
-                      style={{
-                        padding: '9px 14px', cursor: 'pointer', fontSize: '0.875rem',
-                        background: !filterClient ? '#f0fdf4' : 'transparent',
-                        color: !filterClient ? '#059669' : '#374151',
-                        fontWeight: !filterClient ? 600 : 400,
-                        borderBottom: '1px solid #f7f7f7',
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      }}
-                    >
-                      All Businesses
-                      {!filterClient && (
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="2,6 5,9 10,3" />
-                        </svg>
-                      )}
-                    </div>
-                    {clients
-                      .filter(c => c && c._id && c.businessName)
-                      .filter(c => !clientSearch || c.businessName?.toLowerCase().includes(clientSearch.toLowerCase()))
-                      .map(c => (
-                        <div
-                          key={c._id}
-                          onClick={() => { onFilterClientChange(c._id); setShowClientDropdown(false); setClientSearch(''); }}
-                          style={{
-                            padding: '9px 14px', cursor: 'pointer', fontSize: '0.875rem',
-                            background: filterClient === c._id ? '#f0fdf4' : 'transparent',
-                            color: filterClient === c._id ? '#059669' : '#374151',
-                            fontWeight: filterClient === c._id ? 600 : 400,
-                            borderBottom: '1px solid #f7f7f7',
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                          }}
-                        >
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {c.businessName}
-                          </span>
-                          {filterClient === c._id && (
-                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                              <polyline points="2,6 5,9 10,3" />
-                            </svg>
-                          )}
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-            </div>
+          {/* Clear filters */}
+          {hasFilters && (
+            <button className="al-clear-btn" onClick={onClearFilters}>
+              <i className="ti ti-x" style={{ fontSize: 12 }} />
+              Clear
+            </button>
+          )}
 
-            {/* Action filter */}
-            <div ref={actionDropdownRef} style={{ position: 'relative', flexShrink: 0 }}>
-              <div
-                onClick={() => setShowActionDropdown(v => !v)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '7px 10px 7px 12px',
-                  borderRadius: 8, border: '1px solid #e5e7eb',
-                  background: filterAction ? '#f0f4ff' : '#fff',
-                  cursor: 'pointer', fontSize: '0.83rem',
-                  color: filterAction ? '#3b5fc0' : '#374151',
-                  fontWeight: filterAction ? 600 : 500,
-                  userSelect: 'none', whiteSpace: 'nowrap',
-                }}
-              >
-                <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M3 5h14M6 10h8M9 15h2" strokeLinecap="round" />
-                </svg>
-                {filterAction || 'All Actions'}
-                <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
-                  <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-
-              {showActionDropdown && (
-                <div style={{
-                  position: 'absolute', top: 'calc(100% + 4px)', left: 0,
-                  zIndex: 300, background: '#fff',
-                  border: '1.5px solid #e2e8f0', borderRadius: 10,
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                  minWidth: 190, overflow: 'hidden',
-                  display: 'flex', flexDirection: 'column', maxHeight: 280,
-                }}>
-                  <div style={{ maxHeight: 240, overflowY: 'auto' }}>
-                    <div
-                      onClick={() => { onFilterActionChange(''); setShowActionDropdown(false); }}
-                      style={{
-                        padding: '9px 14px', cursor: 'pointer', fontSize: '0.875rem',
-                        background: !filterAction ? '#f0f4ff' : 'transparent',
-                        color: !filterAction ? '#3b5fc0' : '#374151',
-                        fontWeight: !filterAction ? 600 : 400,
-                        borderBottom: '1px solid #f7f7f7',
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      }}
-                    >
-                      All Actions
-                      {!filterAction && (
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#3b5fc0" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="2,6 5,9 10,3" />
-                        </svg>
-                      )}
-                    </div>
-                    {allActionTypes.map(a => (
-                      <div
-                        key={a}
-                        onClick={() => { onFilterActionChange(a); setShowActionDropdown(false); }}
-                        style={{
-                          padding: '9px 14px', cursor: 'pointer', fontSize: '0.875rem',
-                          background: filterAction === a ? '#f0f4ff' : 'transparent',
-                          color: filterAction === a ? '#3b5fc0' : '#374151',
-                          fontWeight: filterAction === a ? 600 : 400,
-                          borderBottom: '1px solid #f7f7f7',
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        }}
-                      >
-                        {a}
-                        {filterAction === a && (
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#3b5fc0" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="2,6 5,9 10,3" />
-                          </svg>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Date from */}
-            <div style={{ position: 'relative', flexShrink: 0 }}>
-              <input
-                type="date"
-                value={filterDateFrom}
-                onChange={e => onFilterDateFromChange(e.target.value)}
-                style={{
-                  padding: '7px 10px',
-                  borderRadius: 8, border: '1px solid #e5e7eb',
-                  fontSize: '0.83rem', color: filterDateFrom ? '#374151' : '#9ca3af',
-                  background: filterDateFrom ? '#fefce8' : '#fff',
-                  cursor: 'pointer', outline: 'none',
-                }}
-                title="From date"
-              />
-            </div>
-
-            {/* Date to */}
-            <div style={{ position: 'relative', flexShrink: 0 }}>
-              <input
-                type="date"
-                value={filterDateTo}
-                onChange={e => onFilterDateToChange(e.target.value)}
-                style={{
-                  padding: '7px 10px',
-                  borderRadius: 8, border: '1px solid #e5e7eb',
-                  fontSize: '0.83rem', color: filterDateTo ? '#374151' : '#9ca3af',
-                  background: filterDateTo ? '#fefce8' : '#fff',
-                  cursor: 'pointer', outline: 'none',
-                }}
-                title="To date"
-              />
-            </div>
-
-            {/* Clear filters */}
-            {hasActiveFilters && (
-              <button
-                onClick={onClearFilters}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                  padding: '7px 12px', borderRadius: 8,
-                  border: '1px solid #fecaca', background: '#fff5f5',
-                  fontSize: '0.82rem', fontWeight: 600, color: '#dc2626',
-                  cursor: 'pointer', whiteSpace: 'nowrap',
-                }}
-              >
-                <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M5 5l10 10M15 5L5 15" />
-                </svg>
-                Clear
-              </button>
-            )}
-          </div>
+          {/* Export */}
+          <button
+            className="al-export-btn"
+            onClick={handleExport}
+            disabled={logs.length === 0}
+            style={{ marginLeft: 'auto' }}
+          >
+            <i className="ti ti-download" style={{ fontSize: 13 }} />
+            Export CSV
+          </button>
         </div>
 
-        {/* ── Table ───────────────────────────────────────────────── */}
+        {/* ── Table body ── */}
         {loading ? (
-          <div style={{ padding: 48, textAlign: 'center', color: '#a0aec0', fontSize: '0.875rem' }}>
+          <div className="al-loading">
+            <i className="ti ti-loader-2 al-spinner" style={{ fontSize: 18 }} />
             Loading activity logs…
           </div>
-        ) : tabFiltered.length === 0 ? (
-          <div style={{ padding: 48, textAlign: 'center', color: '#a0aec0', fontSize: '0.875rem' }}>
-            {totalCount === 0 ? 'No activity logs found.' : 'No results match your filters.'}
+        ) : logs.length === 0 ? (
+          <div className="al-empty">
+            <div style={{
+              width: 52, height: 52, borderRadius: '50%',
+              background: '#f0f8f4', display: 'inline-flex',
+              alignItems: 'center', justifyContent: 'center', marginBottom: 12,
+            }}>
+              <i className="ti ti-clipboard-list" style={{ fontSize: 24, color: '#9ab8a9' }} />
+            </div>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#0c1c14', margin: '0 0 4px' }}>
+              No activity logs found
+            </p>
+            <p style={{ fontSize: 13, color: '#9ab8a9', margin: 0 }}>
+              {hasFilters ? 'Try adjusting your filters.' : 'No actions have been recorded yet.'}
+            </p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid #f0f2f5' }}>
-                  {['Performed By', 'Business', 'Action', 'Role', 'Date & Time'].map(h => (
-                    <th key={h} style={{
-                      padding: '10px 16px',
-                      textAlign: 'left', fontSize: '0.72rem', fontWeight: 700,
-                      color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase',
-                      whiteSpace: 'nowrap', background: 'transparent',
-                    }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {tabFiltered.map((log, i) => {
-                  const pb = log.performedBy || {};
-                  const name = [pb.firstName, pb.lastName].filter(Boolean).join(' ') || pb.email || '—';
+          <table className="al-table">
+            <thead className="al-thead">
+              <tr>
+                <th>Action</th>
+                <th>Business</th>
+                <th>Performed By</th>
+                <th>Date & Time</th>
+                <th style={{ textAlign: 'center' }}>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((entry, i) => {
+                const meta       = getActionMeta(entry.action);
+                const label      = ACTION_LABELS[entry.action] || entry.action;
+                const isExpanded = expandedRow === i;
+                const pb         = entry.performedBy || {};
+                const name       = [pb.firstName, pb.lastName].filter(Boolean).join(' ') || pb.email || '—';
+                const role       = pb.staffRole || pb.role || 'client';
+                const bizName    = entry.businessName || pb.businessName || '—';
+                const time       = new Date(entry.createdAt || entry.timestamp).toLocaleString('en-PH', {
+                  month: 'short', day: 'numeric', year: 'numeric',
+                  hour: 'numeric', minute: '2-digit', hour12: true,
+                });
 
-                  return (
-                    <>
-                      <tr
-                        key={log._id}
-                        style={{
-                          borderBottom: i < tabFiltered.length - 1 ? '1px solid #f7f8fa' : 'none',
-                          background: 'transparent',
-                          borderLeft: '3px solid transparent',
-                          transition: 'background 0.1s',
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.background = '#fafbff'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                      >
-                        {/* Performed by */}
-                        <td style={{ padding: '12px 16px', minWidth: 160 }}>
-                          <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
-                            {name}
+                return (
+                  <React.Fragment key={entry._id || i}>
+                    <tr className={`al-row${isExpanded ? ' expanded' : ''}`}>
+
+                      {/* Action */}
+                      <td className="al-td">
+                        <div className="al-action-cell">
+                          <div
+                            className="al-icon-circle"
+                            style={{ background: meta.bg, border: `1.5px solid ${meta.color}22` }}
+                          >
+                            <i className={`ti ${meta.icon}`} style={{ fontSize: 14, color: meta.color }} />
                           </div>
-                          {pb.email && name !== pb.email && (
-                            <div style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: 2 }}>{pb.email}</div>
-                          )}
-                        </td>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: '#0c1c14' }}>{label}</div>
+                            <span
+                              className="al-badge"
+                              style={{
+                                background: meta.bg,
+                                color: meta.color,
+                                borderColor: `${meta.color}33`,
+                                marginTop: 3,
+                              }}
+                            >
+                              {meta.badge}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
 
-                        {/* Business */}
-                        <td style={{ padding: '12px 16px', fontSize: '0.83rem', color: '#4a5568', minWidth: 130 }}>
-                          {log.businessName || <span style={{ color: '#d1d5db' }}>—</span>}
-                        </td>
+                      {/* Business */}
+                      <td className="al-td" style={{ color: bizName === '—' ? '#9ab8a9' : '#0c1c14' }}>
+                        {bizName}
+                      </td>
 
-                        {/* Action */}
-                        <td style={{ padding: '12px 16px', minWidth: 140 }}>
-                          <ActionBadge action={log.action} />
-                        </td>
+                      {/* Performed By */}
+                      <td className="al-td">
+                        <div style={{ fontWeight: 500 }}>{name}</div>
+                        <div style={{ fontSize: 11, color: '#9ab8a9', marginTop: 1, textTransform: 'capitalize' }}>
+                          {role}
+                        </div>
+                      </td>
 
-                        {/* Role */}
-                        <td style={{ padding: '12px 16px' }}>
-                          <RoleBadge role={pb.role} staffRole={pb.staffRole} />
-                        </td>
+                      {/* Date */}
+                      <td className="al-td" style={{ whiteSpace: 'nowrap', color: '#4a6b5a', fontSize: 12 }}>
+                        {time}
+                      </td>
 
-                        {/* Date & Time */}
-                        <td style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
-                          {formatDateTime(log.createdAt)}
-                        </td>
+                      {/* Details toggle */}
+                      <td className="al-td" style={{ textAlign: 'center' }}>
+                        <button
+                          className={`al-detail-btn${isExpanded ? ' open' : ''}`}
+                          onClick={() => setExpandedRow(isExpanded ? null : i)}
+                        >
+                          <i
+                            className="ti ti-chevron-down"
+                            style={{
+                              fontSize: 11,
+                              transition: 'transform 0.2s',
+                              transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                            }}
+                          />
+                          {isExpanded ? 'Hide' : 'Details'}
+                        </button>
+                      </td>
+                    </tr>
 
-
+                    {/* Expanded detail row */}
+                    {isExpanded && (
+                      <tr className="al-row expanded">
+                        <ExpandedDetail entry={entry} />
                       </tr>
-
-
-                    </>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
         )}
 
-        {/* ── Pagination ───────────────────────────────────────────── */}
-        {!loading && totalPages > 1 && (
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '12px 20px', borderTop: '1px solid #f0f2f5',
-          }}>
-            <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
-              {page}/{totalPages} · {totalCount} {totalCount === 1 ? 'log' : 'logs'}
+        {/* ── Pagination ── */}
+        {!loading && logs.length > 0 && (
+          <div className="al-pagination">
+            <span className="al-page-info">
+              {totalCount > 0
+                ? `Showing page ${page} of ${totalPages} · ${totalCount.toLocaleString()} total records`
+                : `Page ${page} of ${totalPages}`}
             </span>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="al-page-btns">
               <button
+                className="al-page-btn"
                 onClick={onPrev}
-                disabled={page === 1}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '6px 14px', borderRadius: 8,
-                  border: '1px solid #e5e7eb',
-                  background: page === 1 ? '#f9fafb' : '#fff',
-                  color: page === 1 ? '#d1d5db' : '#374151',
-                  fontSize: '0.82rem', fontWeight: 600,
-                  cursor: page === 1 ? 'not-allowed' : 'pointer',
-                }}
-                onMouseEnter={e => { if (page !== 1) e.currentTarget.style.background = '#f3f4f6'; }}
-                onMouseLeave={e => { if (page !== 1) e.currentTarget.style.background = '#fff'; }}
+                disabled={page <= 1}
               >
-                <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M13 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <i className="ti ti-chevron-left" style={{ fontSize: 13 }} />
                 Prev
               </button>
+              <span className="al-page-num">{page}</span>
               <button
+                className="al-page-btn"
                 onClick={onNext}
-                disabled={page === totalPages}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '6px 14px', borderRadius: 8,
-                  border: '1px solid #e5e7eb',
-                  background: page === totalPages ? '#f9fafb' : '#fff',
-                  color: page === totalPages ? '#d1d5db' : '#374151',
-                  fontSize: '0.82rem', fontWeight: 600,
-                  cursor: page === totalPages ? 'not-allowed' : 'pointer',
-                }}
-                onMouseEnter={e => { if (page !== totalPages) e.currentTarget.style.background = '#f3f4f6'; }}
-                onMouseLeave={e => { if (page !== totalPages) e.currentTarget.style.background = '#fff'; }}
+                disabled={page >= totalPages}
               >
                 Next
-                <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <i className="ti ti-chevron-right" style={{ fontSize: 13 }} />
               </button>
             </div>
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }
