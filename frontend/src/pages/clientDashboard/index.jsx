@@ -230,7 +230,7 @@ console.log("profitOpen:", profitOpen);
             gap: 6px !important;
           }
           /* each pill button */
-          .db-date-filter button {
+          .db-date-filter button:not(.dfb-apply-btn):not(.dfb-cancel-btn) {
             flex: 1 !important;
             min-width: 60px !important;
             font-size: .72rem !important;
