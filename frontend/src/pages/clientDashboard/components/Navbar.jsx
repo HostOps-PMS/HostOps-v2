@@ -7,6 +7,7 @@ import { exportDashboardPDF } from "../services/pdfExportService";
 import AccountSettingsModal from "./AccountSettingsModal";
 import SwitchAccountModal from "./SwitchAccountModal";
 import { useActivityLog } from "../hooks/useActivityLog";
+import safeStorage from "../../safeStorage";
 
 function getUserData(auth) {
   let fromStore = auth.getUser();
@@ -199,6 +200,14 @@ export default function Navbar() {
   }, []);
 
   const handleLogout = async () => {
+    // Log logout before clearing session — the token is still valid here.
+    // Fire-and-forget; never block logout on log failure.
+    try {
+      logActivity('logout', {
+        propertyId:   safeStorage.getItem('hp_selected_property_id')   || null,
+        propertyName: safeStorage.getItem('hp_selected_property_name') || null,
+      });
+    } catch { /* ignore */ }
     await logoutUser();
     clear();
     window.location.href = "/";
@@ -674,7 +683,18 @@ export default function Navbar() {
         <SwitchAccountModal
           isOpen={switchAccountOpen}
           onClose={() => setSwitchAccountOpen(false)}
-          onSwitch={({ id, name }) => { selectProperty(id, name); setSwitchAccountOpen(false); }}
+          onSwitch={({ id, name }) => {
+            const fromId   = safeStorage.getItem('hp_selected_property_id')   || null;
+            const fromName = safeStorage.getItem('hp_selected_property_name') || null;
+            logActivity('switched_property', {
+              fromPropertyId:   fromId,
+              fromPropertyName: fromName,
+              toPropertyId:     id,
+              toPropertyName:   name,
+            });
+            selectProperty(id, name);
+            setSwitchAccountOpen(false);
+          }}
         />
       </>
     );
@@ -880,7 +900,18 @@ export default function Navbar() {
       <SwitchAccountModal
         isOpen={switchAccountOpen}
         onClose={() => setSwitchAccountOpen(false)}
-        onSwitch={({ id, name }) => { selectProperty(id, name); setSwitchAccountOpen(false); }}
+        onSwitch={({ id, name }) => {
+            const fromId   = safeStorage.getItem('hp_selected_property_id')   || null;
+            const fromName = safeStorage.getItem('hp_selected_property_name') || null;
+            logActivity('switched_property', {
+              fromPropertyId:   fromId,
+              fromPropertyName: fromName,
+              toPropertyId:     id,
+              toPropertyName:   name,
+            });
+            selectProperty(id, name);
+            setSwitchAccountOpen(false);
+          }}
       />
     </>
   );

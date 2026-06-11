@@ -428,6 +428,12 @@ export default function InboxPage() {
                     let preview = stripHtml(thread.latestMessage?.body || "");
                     if (preview.length > 60) preview = preview.slice(0, 60) + "…";
 
+                    // hasThread: false = booking exists but no messages yet
+                    const noThread = thread.hasThread === false;
+                    const arrivalLabel = thread.arrival
+                      ? `Arriving ${thread.arrival}`
+                      : null;
+
                     return (
                       <div
                         key={idx}
@@ -440,6 +446,7 @@ export default function InboxPage() {
                           background: isSelected ? selBg : "transparent",
                           borderLeft: isSelected ? "3px solid #26a676" : "3px solid transparent",
                           transition: "background 0.12s",
+                          opacity: noThread ? 0.82 : 1,
                         }}
                         onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = hoverBg; }}
                         onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
@@ -458,20 +465,24 @@ export default function InboxPage() {
                               {thread.guestName || "Guest"}
                             </span>
                             <span style={{ fontSize: "10px", color: textSub, flexShrink: 0, marginLeft: 6 }}>
-                              {timeAgo(thread.latestMessage?.createdAt)}
+                              {noThread
+                                ? (arrivalLabel || "No messages")
+                                : timeAgo(thread.latestMessage?.createdAt)}
                             </span>
                           </div>
                           <div style={{ fontSize: "11px", color: textSub, marginBottom: 2 }}>
                             {thread.property || ""}{thread.property ? " · " : ""}{ch}
                           </div>
-                          <div style={{ fontSize: "11.5px", color: fromGuest ? (dark ? "#e07c2a" : "#b85c00") : textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <div style={{ fontSize: "11.5px", color: fromGuest ? (dark ? "#e07c2a" : "#b85c00") : (noThread ? (dark ? "#4d8a6a" : "#9ab8a9") : textSub), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {fromGuest && <span style={{ marginRight: 3 }}>⚠</span>}
-                            {preview || "No preview"}
+                            {noThread
+                              ? <span style={{ fontStyle: "italic" }}>No messages yet — send the first message</span>
+                              : (preview || "No preview")}
                           </div>
                         </div>
 
-                        {/* Unread dot */}
-                        {fromGuest && (
+                        {/* Unread dot — only for threads with actual unread messages from guest */}
+                        {fromGuest && !noThread && (
                           <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#e07c2a", flexShrink: 0 }} />
                         )}
                       </div>
@@ -530,10 +541,16 @@ export default function InboxPage() {
                 </div>
                 <div style={{
                   padding: "4px 12px", borderRadius: 100, fontSize: "11px", fontWeight: 700,
-                  background: selected.latestMessage?.fromGuest ? "#fff4e8" : "#e8f7f0",
-                  color: selected.latestMessage?.fromGuest ? "#e07c2a" : "#26a676",
+                  background: selected.hasThread === false
+                    ? (dark ? "#1a2e20" : "#f0faf5")
+                    : selected.latestMessage?.fromGuest ? "#fff4e8" : "#e8f7f0",
+                  color: selected.hasThread === false
+                    ? (dark ? "#4d8a6a" : "#7a9e8c")
+                    : selected.latestMessage?.fromGuest ? "#e07c2a" : "#26a676",
                 }}>
-                  {selected.latestMessage?.fromGuest ? "⚠ Awaiting reply" : "↳ Replied"}
+                  {selected.hasThread === false
+                    ? "💬 No messages yet"
+                    : selected.latestMessage?.fromGuest ? "⚠ Awaiting reply" : "↳ Replied"}
                 </div>
               </div>
 
@@ -550,8 +567,19 @@ export default function InboxPage() {
                   </div>
                 )}
                 {!loadingMsgs && !msgError && messages.length === 0 && (
-                  <div style={{ textAlign: "center", color: textSub, fontSize: "13px", paddingTop: 40 }}>
-                    No messages yet.
+                  <div style={{ textAlign: "center", color: textSub, fontSize: "13px", paddingTop: 40, lineHeight: 1.8 }}>
+                    {selected.hasThread === false
+                      ? (
+                        <>
+                          <div style={{ fontSize: "28px", marginBottom: 8 }}>💬</div>
+                          <div style={{ fontWeight: 600, color: textMain, marginBottom: 4 }}>No messages yet</div>
+                          <div style={{ fontSize: "12px" }}>
+                            {selected.guestName || "This guest"} hasn't sent a message.<br />
+                            You can send the first message below.
+                          </div>
+                        </>
+                      )
+                      : "No messages yet."}
                   </div>
                 )}
                 {!loadingMsgs && !msgError && messages.map((m, i) => (

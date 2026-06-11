@@ -770,7 +770,10 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
         setShowPw({ current: false, next: false, confirm: false });
         verifiedTokenRef.current = null;
 
-        logActivity('password_changed');
+        logActivity('password_changed', {
+          method: 'settings_modal',
+          propertyId:   null, // password change is account-level, not property-scoped
+        });
 
         // Show success modal
         setSuccessContext("password");
@@ -792,7 +795,10 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
         setShowPin({ current: false, next: false, confirm: false });
         verifiedTokenRef.current = null;
 
-        logActivity('pin_changed');
+        logActivity('pin_changed', {
+          method: 'settings_modal',
+          propertyId:   null, // PIN change is account-level, not property-scoped
+        });
 
         // Show success modal
         setSuccessContext("pin");
@@ -1492,14 +1498,17 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                     onClick={() => {
                       const rows = activityLog.map((e) => {
                         const actionLabels = {
-                          login: 'Logged in',
-                          password_changed: 'Password changed',
-                          opened_account_settings: 'Opened account settings',
-                          exported_pdf: 'Exported PDF report',
-                          changed_date_filter: 'Changed date filter',
-                          filtered_by_channel: 'Filtered by channel',
-                          switched_calendar_view: 'Switched calendar view',
-                          opened_message_thread: 'Opened message thread',
+                          login:                    'Logged in',
+                          logout:                   'Logged out',
+                          password_changed:         'Password changed',
+                          pin_changed:              'PIN changed',
+                          opened_account_settings:  'Opened account settings',
+                          exported_pdf:             'Exported PDF report',
+                          changed_date_filter:      'Changed date filter',
+                          filtered_by_channel:      'Filtered by channel',
+                          switched_calendar_view:   'Switched calendar view',
+                          opened_message_thread:    'Opened message thread',
+                          switched_property:        'Switched property',
                         };
                         const label = actionLabels[e.action] || e.action;
                         const time = new Date(e.createdAt || e.timestamp).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
@@ -1542,12 +1551,35 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "340px", overflowY: "auto", paddingRight: 2 }}>
                     {filtered.map((entry, i) => {
-                      const isLogin = entry.action === "login";
-                      const isPwChange = entry.action === "password_changed";
-                      const icon = isLogin ? "ti-login" : isPwChange ? "ti-lock" : "ti-info-circle";
-                      const iconColor = isLogin ? "#1e8760" : isPwChange ? "#f59e0b" : "#9ab8a9";
-                      const iconBg = isLogin ? "#eaf8f1" : isPwChange ? "#fffbeb" : "#f7faf8";
-                      const label = isLogin ? "Logged in" : isPwChange ? "Password changed" : entry.action;
+                      const isLogin      = entry.action === "login";
+                      const isLogout     = entry.action === "logout";
+                      const isPwChange   = entry.action === "password_changed";
+                      const isPinChange  = entry.action === "pin_changed";
+                      const isSwitchProp = entry.action === "switched_property";
+                      const icon = isLogin      ? "ti-login"
+                                 : isLogout     ? "ti-logout"
+                                 : isPwChange   ? "ti-lock"
+                                 : isPinChange  ? "ti-password"
+                                 : isSwitchProp ? "ti-arrows-exchange"
+                                 : "ti-info-circle";
+                      const iconColor = isLogin      ? "#1e8760"
+                                      : isLogout     ? "#c13515"
+                                      : isPwChange   ? "#f59e0b"
+                                      : isPinChange  ? "#8b5cf6"
+                                      : isSwitchProp ? "#3b82f6"
+                                      : "#9ab8a9";
+                      const iconBg    = isLogin      ? "#eaf8f1"
+                                      : isLogout     ? "#fff0ee"
+                                      : isPwChange   ? "#fffbeb"
+                                      : isPinChange  ? "#f5f3ff"
+                                      : isSwitchProp ? "#eff6ff"
+                                      : "#f7faf8";
+                      const label = isLogin      ? "Logged in"
+                                  : isLogout     ? "Logged out"
+                                  : isPwChange   ? "Password changed"
+                                  : isPinChange  ? "PIN changed"
+                                  : isSwitchProp ? "Switched property"
+                                  : entry.action;
                       const time = new Date(entry.createdAt || entry.timestamp).toLocaleString("en-PH", {
                         month: "short", day: "numeric", year: "numeric",
                         hour: "numeric", minute: "2-digit", hour12: true,
@@ -1565,6 +1597,23 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                                 By: {[entry.performedBy.firstName, entry.performedBy.lastName].filter(Boolean).join(" ") || entry.performedBy.email} ({entry.performedBy.role || "client"})
                               </div>
                             )}
+                            {isLogin && entry.meta?.propertyId && (
+                              <div style={{ fontSize: 11, color: "#1e8760", marginTop: 2, fontWeight: 600 }}>
+                                Property: {entry.meta?.propertyName || entry.meta?.propertyId}
+                              </div>
+                            )}
+                            {isSwitchProp && entry.meta?.toPropertyName && (
+                              <div style={{ fontSize: 11, color: "#3b82f6", marginTop: 2, fontWeight: 600 }}>
+                                {entry.meta?.fromPropertyName
+                                  ? `${entry.meta.fromPropertyName} → ${entry.meta.toPropertyName}`
+                                  : `→ ${entry.meta.toPropertyName}`}
+                              </div>
+                            )}
+                            {isLogout && entry.meta?.propertyName && (
+                              <div style={{ fontSize: 11, color: "#b0c8ba", marginTop: 2 }}>
+                                While on: {entry.meta.propertyName}
+                              </div>
+                            )}
                             {entry.ipAddress && (
                               <div style={{ fontSize: 11, color: "#b0c8ba", marginTop: 2 }}>
                                 IP: {entry.ipAddress}
@@ -1572,7 +1621,12 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                             )}
                           </div>
                           <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 20, background: iconBg, color: iconColor, flexShrink: 0, alignSelf: "flex-start" }}>
-                            {isLogin ? "Login" : isPwChange ? "Security" : "Event"}
+                            {isLogin      ? "Login"
+                             : isLogout    ? "Logout"
+                             : isPwChange  ? "Security"
+                             : isPinChange ? "Security"
+                             : isSwitchProp ? "Switch"
+                             : "Event"}
                           </span>
                         </div>
                       );

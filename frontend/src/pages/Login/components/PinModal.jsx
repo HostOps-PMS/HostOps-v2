@@ -294,9 +294,10 @@ export default function PinModal({
           body: JSON.stringify({
             action: 'login',
             meta:   {
-              method:     'pin',
-              propertyId: selectedPropertyId || null,
-              role:       data.user?.role || (isStaff ? 'staff' : 'client'),
+              method:       'pin',
+              propertyId:   selectedPropertyId || null,
+              propertyName: safeStorage.getItem('hp_selected_property_name') || null,
+              role:         data.user?.role || (isStaff ? 'staff' : 'client'),
             },
           }),
         }).catch(() => { /* ignore log errors silently */ });
