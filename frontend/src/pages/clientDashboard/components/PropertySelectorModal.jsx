@@ -31,8 +31,15 @@ function propColor(name = '') {
 // Property card
 function PropertyCard({ property, selected, onClick }) {
   const [hov, setHov] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const color = propColor(property.name);
-  const isActive = selected || hov;
+
+  // Build proxy URL from userId + propertyId stored on the property object.
+  // Falls back to letter initial if either ID is missing or image fails to load.
+  const proxyUrl = property.userId && property.propertyDbId
+    ? `${import.meta.env.VITE_API_URL || ''}/api/image/property/${property.userId}/${property.propertyDbId}`
+    : null;
+  const showImage = proxyUrl && !imgError;
 
   return (
     <div
@@ -52,7 +59,7 @@ function PropertyCard({ property, selected, onClick }) {
         boxShadow: selected ? `0 0 0 3px ${color}30` : (hov ? '0 2px 8px rgba(0,0,0,.06)' : 'none'),
       }}
     >
-      {/* Color dot / initial */}
+      {/* Property thumbnail — proxy image with letter-initial fallback */}
       <div style={{
         width: 42,
         height: 42,
@@ -66,9 +73,25 @@ function PropertyCard({ property, selected, onClick }) {
         fontWeight: 800,
         fontFamily: T.fontDisplay,
         flexShrink: 0,
+        overflow: 'hidden',
         transition: 'all .15s',
       }}>
-        {(property.name || '?')[0].toUpperCase()}
+        {showImage ? (
+          <img
+            src={proxyUrl}
+            alt={property.name}
+            onError={() => setImgError(true)}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              display: 'block',
+              borderRadius: 10,
+            }}
+          />
+        ) : (
+          (property.name || '?')[0].toUpperCase()
+        )}
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -199,6 +222,23 @@ export default function PropertySelectorModal({ onSelect }) {
   const [pendingId, setPendingId]     = useState(undefined); // undefined = not chosen yet
   const [confirming, setConfirming]   = useState(false);
 
+  // The auth user object (from login response / localStorage) contains the
+  // user's MongoDB _id and their properties array with MongoDB _ids.
+  // We use these to build proxy URLs by matching Smoobu apartment id → DB _id.
+  const authUser = (() => {
+    try {
+      const CANDIDATE_KEYS = ['hp_user', 'user', 'auth_user', 'currentUser', 'hostpilot_user'];
+      for (const key of CANDIDATE_KEYS) {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        if (parsed && (parsed._id || parsed.email)) return parsed;
+        if (parsed?.user && (parsed.user._id || parsed.user.email)) return parsed.user;
+      }
+      return null;
+    } catch { return null; }
+  })();
+
   // Fetch the user's property list
   useEffect(() => {
     let cancelled = false;
@@ -211,7 +251,21 @@ export default function PropertySelectorModal({ onSelect }) {
         if (!res?.ok) throw new Error('Failed to load properties');
         const data = await res.json();
         if (!cancelled) {
-          setProperties(data.apartments || []);
+          // Cross-reference each Smoobu apartment with the auth user's DB properties
+          // to get the MongoDB _id needed to build the image proxy URL.
+          // Matching strategy: propertyName (Smoobu "name") vs DB "propertyName".
+          const dbProps = authUser?.properties || [];
+          const apartments = (data.apartments || []).map(apt => {
+            const match = dbProps.find(
+              p => p.propertyName?.trim().toLowerCase() === apt.name?.trim().toLowerCase()
+            );
+            return {
+              ...apt,
+              propertyDbId: match?._id || null,
+              userId:       authUser?._id || null,
+            };
+          });
+          setProperties(apartments);
           // Default selection: null = All Properties
           setPendingId(null);
         }
