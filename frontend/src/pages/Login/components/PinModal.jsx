@@ -275,6 +275,35 @@ export default function PinModal({
         safeStorage.setItem('hp_selected_property_id', String(selectedPropertyId));
       }
 
+      // ── Log the login action ──────────────────────────────────────────────
+      // Activity logging is done here (after PIN verification) because
+      // this is the final step where we know the exact account type:
+      //   - staff       → isStaff=true, role resolved by backend from JWT
+      //   - client      → isStaff=false, role=client
+      //   - team_leader → isStaff=false, role=team_leader
+      // Fire-and-forget — we don't block navigation on log failure.
+      try {
+        const logToken = data.accessToken || auth.getToken();
+        fetch(`${API_BASE}/api/activity-log`, {
+          method:  'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key':    import.meta.env.VITE_API_KEY || '',
+            Authorization:  `Bearer ${logToken}`,
+          },
+          body: JSON.stringify({
+            action: 'login',
+            meta:   {
+              method:     'pin',
+              propertyId: selectedPropertyId || null,
+              role:       data.user?.role || (isStaff ? 'staff' : 'client'),
+            },
+          }),
+        }).catch(() => { /* ignore log errors silently */ });
+      } catch {
+        // Never block login flow on log failure
+      }
+
       showMsg('Access granted. Redirecting…', 'success');
       setTimeout(() => navigate('/dashboard', { replace: true }), 800);
     } catch {
