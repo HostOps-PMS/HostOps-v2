@@ -169,11 +169,13 @@
               background var(--transition);
   caret-color: var(--color-brand);
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 .am-otp-box::-webkit-inner-spin-button,
 .am-otp-box::-webkit-outer-spin-button {
   -webkit-appearance: none;
+appearance: none;
   margin: 0;
 }
 
