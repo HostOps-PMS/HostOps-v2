@@ -714,5 +714,25 @@ export async function exportDashboardPDF(dashState, user) {
     drawFooter(doc, i, pageCount, period, pageWidth);
   }
 
-  doc.save('hostops-report_' + (period.from || 'all') + '_' + (period.to || 'all') + '.pdf');
+  const filename = 'hostops-report_' + (period.from || 'all') + '_' + (period.to || 'all') + '.pdf';
+
+  // iOS Safari does not support blob download via <a> tag.
+  // Detect iOS and open as data URL in the same tab instead.
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  if (isIOS) {
+    const dataUrl = doc.output('datauristring');
+    const newTab = window.open('');
+    if (newTab) {
+      newTab.document.write(
+        '<html><head><title>' + filename + '</title></head>' +
+        '<body style="margin:0"><iframe src="' + dataUrl + '" width="100%" height="100%" style="border:none;position:fixed;top:0;left:0"></iframe></body></html>'
+      );
+      newTab.document.close();
+    } else {
+      // Popup blocked — fallback: navigate current tab
+      window.location.href = dataUrl;
+    }
+  } else {
+    doc.save(filename);
+  }
 }
