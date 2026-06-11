@@ -4,7 +4,74 @@ import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { encrypt, decrypt } from './encryption.js';
 
+// ── Rotating Secret Helpers ──────────────────────────────────────
+// Three secrets rotate every hour: PREV → CURR → NEXT.
+// Tokens are always SIGNED with CURR.
+// Verification tries CURR first, then PREV and NEXT as fallback.
+//
+// This means a stolen token is useless within ≤1 hour — once the
+// hourly rotation script runs, that secret slot becomes PREV, then
+// on the next rotation it's gone entirely. A token captured right
+// before a rotation has at most ~1h of residual validity.
+//
+// ENV VARS REQUIRED (set by scripts/rotateSecrets.js):
+//   JWT_SECRET_PREV   — previous hour's signing secret
+//   JWT_SECRET_CURR   — current hour's signing secret  (used to sign)
+//   JWT_SECRET_NEXT   — next hour's signing secret     (pre-generated)
+//
+// LEGACY FALLBACK:
+//   If JWT_SECRET_CURR is missing we fall back to JWT_ACCESS_SECRET
+//   so existing deployments don't break before they run the rotation
+//   script for the first time.
 
+function getSigningSecret() {
+  const secret = process.env.JWT_SECRET_CURR || process.env.JWT_ACCESS_SECRET;
+  if (!secret) throw new Error('No JWT signing secret configured (JWT_SECRET_CURR or JWT_ACCESS_SECRET)');
+  return secret;
+}
+
+function getVerificationSecrets() {
+  // Order matters: try CURR first (happy path, ~99% of calls),
+  // then PREV (tokens issued just before a rotation), then NEXT
+  // (tokens issued slightly ahead of a rotation, edge case).
+  const secrets = [
+    process.env.JWT_SECRET_CURR,
+    process.env.JWT_SECRET_PREV,
+    process.env.JWT_SECRET_NEXT,
+    // Legacy fallback — kept so tokens signed before the rotation
+    // system was enabled still work until they naturally expire.
+    process.env.JWT_ACCESS_SECRET,
+  ].filter(Boolean); // remove undefined/empty slots
+
+  if (secrets.length === 0) {
+    throw new Error('No JWT verification secrets configured');
+  }
+
+  return [...new Set(secrets)]; // deduplicate (e.g. if CURR === JWT_ACCESS_SECRET)
+}
+
+// Attempt jwt.verify against each secret in order.
+// Returns the decoded payload from the first secret that succeeds.
+// Throws the LAST error if all secrets fail (preserves TokenExpiredError etc.).
+function verifyWithRotation(raw) {
+  const secrets = getVerificationSecrets();
+  let lastErr;
+
+  for (const secret of secrets) {
+    try {
+      return jwt.verify(raw, secret);
+    } catch (err) {
+      lastErr = err;
+      // TokenExpiredError means the signature DID match — the token is
+      // just old. No point trying other secrets; surface the real error.
+      if (err.name === 'TokenExpiredError') throw err;
+    }
+  }
+
+  throw lastErr;
+}
+
+// ── Encryption helpers (re-exports for convenience) ─────────────
 export function encryptToken(rawJwt) {
   return encrypt(rawJwt);
 }
@@ -19,12 +86,12 @@ export function decryptToken(blob) {
 export function signAccessToken(user) {
   return jwt.sign(
     {
-      jti:   uuidv4(),          // unique token ID for per-token revocation
+      jti:   uuidv4(),
       sub:   user._id.toString(),
       email: user.email,
       role:  user.role,
     },
-    process.env.JWT_ACCESS_SECRET,
+    getSigningSecret(),
     { expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m' }
   );
 }
@@ -40,19 +107,23 @@ export function signStaffAccessToken(staff) {
       email:    staff.email,
       role:     'staff',
     },
-    process.env.JWT_ACCESS_SECRET,
+    getSigningSecret(),
     { expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m' }
   );
 }
 
-// verifyAccessToken: decrypts the blob first, then verifies the JWT.
+// verifyAccessToken: decrypts the blob first, then verifies the JWT
+// against all three rotating secrets.
 // All callers (middleware/auth.js) must use this — never jwt.verify() directly.
 export function verifyAccessToken(tokenOrBlob) {
-  const raw = decryptToken(tokenOrBlob);   // no-op if already plain (isEncrypted guard)
-  return jwt.verify(raw, process.env.JWT_ACCESS_SECRET);
+  const raw = decryptToken(tokenOrBlob); // no-op if already plain (isEncrypted guard)
+  return verifyWithRotation(raw);
 }
 
 // ── Refresh tokens (long-lived, stored in DB) ───────────────────
+// Refresh tokens use their own separate secret (JWT_REFRESH_SECRET)
+// and are NOT part of the access-token rotation — they are long-lived
+// and verified once at /auth/refresh, where the DB row is also checked.
 export function signRefreshToken(user) {
   return jwt.sign(
     {
@@ -79,7 +150,7 @@ export function signStaffRefreshToken(staff) {
   );
 }
 
-// ── Client Account tokens ─────────────────────────────────────────
+// ── Client Account tokens ────────────────────────────────────────
 export function signClientAccountAccessToken(account) {
   return jwt.sign(
     {
@@ -90,7 +161,7 @@ export function signClientAccountAccessToken(account) {
       email:           account.email,
       role:            'clientAccount',
     },
-    process.env.JWT_ACCESS_SECRET,
+    getSigningSecret(),
     { expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m' }
   );
 }
@@ -114,7 +185,7 @@ export function verifyRefreshToken(tokenOrBlob) {
   return jwt.verify(raw, process.env.JWT_REFRESH_SECRET);
 }
 
-// ── Compute expiry Date object for refresh token ────────────────
+// ── Compute expiry Date object for refresh token ─────────────────
 export function refreshTokenExpiry() {
   const raw = process.env.JWT_REFRESH_EXPIRES || '7d';
   const ms = parseDuration(raw);
