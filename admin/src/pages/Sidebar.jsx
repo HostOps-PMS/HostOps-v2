@@ -63,6 +63,16 @@ const NAV_ITEMS = [
     label: 'Accounts',
     to: '/accounts',
   },
+  {
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M9 3H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4" strokeLinecap="round" />
+        <path d="M14 2l4 4-7 7H7v-4l7-7z" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+    label: 'Activity Logs',
+    to: '/activity-logs',
+  },
 ];
 
 const SettingsIcon = () => (
