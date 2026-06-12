@@ -7,7 +7,6 @@ import TeamLeaderModal from './components/TeamLeaderModal';
 import DeleteModal from './components/DeleteModal';
 import TeamLeaderTable from './components/TeamLeaderTable';
 import { exportTeamLeadersPdf } from './utils/exportTeamLeadersPdf';
-import { exportTeamLeadersPdf } from './utils/exportTeamLeadersPdf';
 
 export default function TeamLeaders() {
   const [search, setSearch]             = useState('');
@@ -38,39 +37,14 @@ export default function TeamLeaders() {
     setPage(1);
   }
 
+  /* ── Export PDF — exports all filtered records, not just current page ── */
   const [exportLoading, setExportLoading] = useState(false);
 
-  async function handleExport() {
+  const handleExport = async () => {
     if (exportLoading || loading) return;
     setExportLoading(true);
     try {
       await exportTeamLeadersPdf({ teamLeaders: filtered, clients, search });
-    } finally {
-      setExportLoading(false);
-    }
-  }
-
-  function handleSaved() {
-    setModal(null);
-    refetch();
-  }
-
-  function handleDeleted() {
-    setModal(null);
-    refetch();
-  }
-
-  /* ── Export PDF — always exports ALL filtered records, not just current page ── */
-  const [exportLoading, setExportLoading] = useState(false);
-
-  const handleExport = () => {
-    if (exportLoading || loading) return;
-    setExportLoading(true);
-    try {
-      exportTeamLeadersPdf({
-        teamLeaders: filtered,
-        search,
-      });
     } catch (err) {
       console.error('[exportTeamLeadersPdf] failed:', err);
     } finally {
@@ -91,10 +65,19 @@ export default function TeamLeaders() {
     </svg>
   );
 
+  function handleSaved() {
+    setModal(null);
+    refetch();
+  }
+
+  function handleDeleted() {
+    setModal(null);
+    refetch();
+  }
+
   return (
     <div className="db-layout">
-      {/* Pass handleExport to Sidebar so mobile top bar shows Export PDF on this page */}
-      <Sidebar onExport={handleExport} exportLoading={exportLoading} />
+      <Sidebar />
 
       <div className="db-main">
         <TopBar
@@ -137,7 +120,7 @@ export default function TeamLeaders() {
               <p className="cl-content__sub">Manage team leader accounts and assignments</p>
             </div>
 
-            {/* Export PDF button — desktop/tablet */}
+            {/* Export PDF button */}
             <button
               onClick={handleExport}
               disabled={exportLoading || loading}

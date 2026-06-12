@@ -47,13 +47,18 @@ export default function ProtectedRoute({ children }) {
     }
   }, [auth.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (status === 'checking') {
-    return <FetchingOverlay isVisible message="Verifying session…" />;
-  }
-
   if (status === 'denied') {
     return <Navigate to="/" replace state={{ from: location }} />;
   }
 
-  return children;
+  // Keep the overlay in the React tree so it can play its fade-out animation
+  // while the dashboard mounts and begins its own loading overlay.
+  // When status flips to 'ok', isVisible=false triggers the exit animation
+  // and children render simultaneously — producing a smooth crossfade.
+  return (
+    <>
+      <FetchingOverlay isVisible={status === 'checking'} message="Verifying session…" />
+      {status === 'ok' ? children : null}
+    </>
+  );
 }

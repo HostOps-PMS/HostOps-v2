@@ -410,9 +410,9 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
             {/* ── Individual property items ── */}
             {!loading && !fetchError && properties.map((property, index) => {
               const propId    = String(property._id);
-              const selected  = isSelected(propId);
               const active    = isCurrentlyActive(propId);
-              const disabled  = !canAccessProperty(property);
+              const selected  = !active && isSelected(propId);
+              const disabled  = active || !canAccessProperty(property);
 
               return (
                 <button
@@ -422,30 +422,48 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                   disabled={disabled}
                   style={{
                     animationDelay: `${(index + 1) * 40}ms`,
-                    opacity: disabled ? 0.5 : 1,
-                    cursor: disabled ? "not-allowed" : "pointer",
+                    opacity: active ? 1 : disabled ? 0.5 : 1,
+                    cursor: active ? "default" : disabled ? "not-allowed" : "pointer",
                   }}
-                  title={disabled ? "You do not have access to this property" : ""}
+                  title={active ? "You are currently on this property" : disabled ? "You do not have access to this property" : ""}
                 >
-                  {/* Property icon */}
+                  {/* Property icon / photo */}
                   <div
                     style={{
                       width: 36,
                       height: 36,
                       borderRadius: 10,
-                      background: selected ? "#1e8760" : disabled ? "#f0f4f2" : "#eaf3ee",
+                      background: selected ? "#1e8760" : active ? "#eaf3ee" : disabled ? "#f0f4f2" : "#eaf3ee",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       flexShrink: 0,
+                      overflow: "hidden",
                       transition: "background 0.15s",
                     }}
                   >
+                    {property.propertyPicture ? (
+                      <img
+                        src={property.propertyPicture}
+                        alt={property.propertyName}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          borderRadius: 10,
+                        }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                          e.currentTarget.nextSibling.style.display = "flex";
+                        }}
+                      />
+                    ) : null}
                     <i
                       className="ti ti-home"
                       style={{
                         fontSize: 16,
-                        color: selected ? "#fff" : disabled ? "#9ab8a9" : "#6a8b7c",
+                        color: selected ? "#fff" : (active || disabled) ? "#9ab8a9" : "#6a8b7c",
+                        display: property.propertyPicture ? "none" : "flex",
                       }}
                       aria-hidden="true"
                     />
@@ -458,7 +476,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                         style={{
                           fontSize: 13,
                           fontWeight: 700,
-                          color: disabled ? "#9ab8a9" : "#0c1c14",
+                          color: (active || disabled) ? "#9ab8a9" : "#0c1c14",
                           margin: 0,
                           whiteSpace: "nowrap",
                           overflow: "hidden",
@@ -467,7 +485,6 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                       >
                         {property.propertyName}
                       </p>
-                      {/* "Active" badge — shown when this is the currently live property */}
                       {active && (
                         <span
                           style={{
@@ -484,7 +501,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                           Active
                         </span>
                       )}
-                      {disabled && (
+                      {!active && disabled && (
                          <span
                          style={{
                            fontSize: 10,
@@ -505,7 +522,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                     <p
                       style={{
                         fontSize: 11,
-                        color: disabled ? "#b8d4c4" : "#9ab8a9",
+                        color: (active || disabled) ? "#b8d4c4" : "#9ab8a9",
                         margin: "2px 0 0",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
@@ -523,7 +540,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                       aria-hidden="true"
                     />
                   )}
-                  {disabled && (
+                  {!active && disabled && (
                     <i
                       className="ti ti-lock"
                       style={{ fontSize: 18, color: "#9ab8a9", flexShrink: 0 }}

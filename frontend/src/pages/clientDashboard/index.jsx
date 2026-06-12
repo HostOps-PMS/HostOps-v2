@@ -21,7 +21,7 @@ import "./globals.css";
 
 export default function DashboardPage() {
   const { dashState, dark } = useDashboard();
-  const { loadData, banner, isLoading } = useDashboardData();
+  const { loadData, banner } = useDashboardData();
 
   // ── First-login password change ──────────────────────────────────────────────
   // Set by LoginForm when the backend returns mustChangePassword: true.
@@ -144,9 +144,9 @@ console.log("profitOpen:", profitOpen);
   return (
     <div style={{ background: "#f4f6f5", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
 
-      {/* ── Initial data load overlay ── */}
+      {/* ── Data load / date-filter refetch overlay ── */}
       <FetchingOverlay
-        isVisible={isLoading && !dashState.rawData && !dashState.isSwitching}
+        isVisible={dashState.isLoading && !dashState.isSwitching}
         message="Loading dashboard…"
       />
 
