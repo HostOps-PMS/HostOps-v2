@@ -6,6 +6,7 @@ import { useTeamLeaders } from './hooks/useTeamLeaders';
 import TeamLeaderModal from './components/TeamLeaderModal';
 import DeleteModal from './components/DeleteModal';
 import TeamLeaderTable from './components/TeamLeaderTable';
+import { exportTeamLeadersPdf } from './utils/exportTeamLeadersPdf';
 
 export default function TeamLeaders() {
   const [search, setSearch]             = useState('');
@@ -15,7 +16,7 @@ export default function TeamLeaders() {
 
   const { teamLeaders, clients, loading, error, refetch } = useTeamLeaders();
 
-  /* ── Alerts + Activity from dashboard overview (same source as Dashboard/Clients/Staffs) ── */
+  /* ── Alerts + Activity from dashboard overview ── */
   const { overview, loading: notifLoading } = useStats();
 
   const filtered = teamLeaders.filter((tl) => {
@@ -46,13 +47,43 @@ export default function TeamLeaders() {
     refetch();
   }
 
+  /* ── Export PDF — always exports ALL filtered records, not just current page ── */
+  const [exportLoading, setExportLoading] = useState(false);
+
+  const handleExport = () => {
+    if (exportLoading || loading) return;
+    setExportLoading(true);
+    try {
+      exportTeamLeadersPdf({
+        teamLeaders: filtered,
+        search,
+      });
+    } catch (err) {
+      console.error('[exportTeamLeadersPdf] failed:', err);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const exportBtnIcon = exportLoading ? (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+      style={{ animation: 'tl-pdf-spin 0.8s linear infinite' }}>
+      <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+      <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+    </svg>
+  ) : (
+    <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 16h14" strokeLinecap="round" />
+    </svg>
+  );
+
   return (
     <div className="db-layout">
-      <Sidebar />
+      {/* Pass handleExport to Sidebar so mobile top bar shows Export PDF on this page */}
+      <Sidebar onExport={handleExport} exportLoading={exportLoading} />
 
       <div className="db-main">
-        {/* TopBar — same component as Dashboard/Clients/Staffs, fed with live alerts + activities.
-            No onExport/showExport passed, so the Export PDF button stays hidden here. */}
         <TopBar
           alerts={overview?.alerts ?? []}
           activities={overview?.recentActivities ?? []}
@@ -92,6 +123,31 @@ export default function TeamLeaders() {
               <h1 className="cl-content__title">Team Leaders</h1>
               <p className="cl-content__sub">Manage team leader accounts and assignments</p>
             </div>
+
+            {/* Export PDF button — desktop/tablet */}
+            <button
+              onClick={handleExport}
+              disabled={exportLoading || loading}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7,
+                padding: '9px 18px',
+                background: (exportLoading || loading) ? '#e0e0e0' : '#1a9e6e',
+                color: (exportLoading || loading) ? '#aaa' : '#fff',
+                border: 'none', borderRadius: 10,
+                cursor: (exportLoading || loading) ? 'not-allowed' : 'pointer',
+                fontSize: '0.875rem', fontWeight: 600,
+                letterSpacing: '0.01em', whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+                boxShadow: (exportLoading || loading) ? 'none' : '0 2px 8px rgba(26,158,110,0.18)',
+              }}
+              onMouseEnter={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#158a5e'; }}
+              onMouseLeave={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#1a9e6e'; }}
+              title="Export all team leaders as PDF"
+            >
+              {exportBtnIcon}
+              {exportLoading ? 'Exporting…' : 'Export PDF'}
+            </button>
+            <style>{`@keyframes tl-pdf-spin { to { transform: rotate(360deg); } }`}</style>
           </header>
 
           {error && (

@@ -6,6 +6,7 @@ import { useStaffs } from './hooks/useStaffs';
 import StaffModal from './components/StaffModal';
 import DeleteModal from './components/DeleteModal';
 import StaffTable from './components/StaffTable';
+import { exportStaffsPdf } from './utils/exportStaffsPdf';
 
 export default function Staffs() {
   const [filterClient, setFilterClient] = useState('');
@@ -16,7 +17,7 @@ export default function Staffs() {
 
   const { staffs, clients, loading, error, propertyMap, reload } = useStaffs(filterClient);
 
-  /* ── Alerts + Activity from dashboard overview (same source as Dashboard/Clients) ── */
+  /* ── Alerts + Activity from dashboard overview ── */
   const { overview, loading: notifLoading } = useStats();
 
   const filtered = staffs.filter((s) => {
@@ -47,13 +48,58 @@ export default function Staffs() {
     reload();
   }
 
+  /* ── Export PDF — always exports ALL filtered records, not just current page ── */
+  const [exportLoading, setExportLoading] = useState(false);
+
+  const handleExport = () => {
+    if (exportLoading || loading) return;
+    setExportLoading(true);
+    try {
+      exportStaffsPdf({
+        staffs: filtered,
+        search,
+        filterClient,
+      });
+    } catch (err) {
+      console.error('[exportStaffsPdf] failed:', err);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  /* ── Shared Export PDF button styles ── */
+  const exportBtnStyle = {
+    display: 'inline-flex', alignItems: 'center', gap: 7,
+    padding: '9px 18px',
+    background: (exportLoading || loading) ? '#e0e0e0' : '#1a9e6e',
+    color: (exportLoading || loading) ? '#aaa' : '#fff',
+    border: 'none', borderRadius: 10,
+    cursor: (exportLoading || loading) ? 'not-allowed' : 'pointer',
+    fontSize: '0.875rem', fontWeight: 600,
+    letterSpacing: '0.01em', whiteSpace: 'nowrap',
+    transition: 'background 0.15s',
+    boxShadow: (exportLoading || loading) ? 'none' : '0 2px 8px rgba(26,158,110,0.18)',
+  };
+
+  const exportBtnIcon = exportLoading ? (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+      style={{ animation: 'st-pdf-spin 0.8s linear infinite' }}>
+      <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+      <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+    </svg>
+  ) : (
+    <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 16h14" strokeLinecap="round" />
+    </svg>
+  );
+
   return (
     <div className="db-layout">
-      <Sidebar />
+      {/* Pass handleExport to Sidebar so mobile top bar shows Export PDF on this page */}
+      <Sidebar onExport={handleExport} exportLoading={exportLoading} />
 
       <div className="db-main">
-        {/* TopBar — same component as Dashboard/Clients, fed with live alerts + activities.
-            No onExport/showExport passed, so the Export PDF button stays hidden here. */}
         <TopBar
           alerts={overview?.alerts ?? []}
           activities={overview?.recentActivities ?? []}
@@ -93,6 +139,20 @@ export default function Staffs() {
               <h1 className="cl-content__title">Staffs</h1>
               <p className="cl-content__sub">Manage staff accounts and their property access</p>
             </div>
+
+            {/* Export PDF button — desktop/tablet (hidden on mobile via Sidebar's mobile bar) */}
+            <button
+              onClick={handleExport}
+              disabled={exportLoading || loading}
+              style={exportBtnStyle}
+              onMouseEnter={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#158a5e'; }}
+              onMouseLeave={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#1a9e6e'; }}
+              title="Export all staff as PDF"
+            >
+              {exportBtnIcon}
+              {exportLoading ? 'Exporting…' : 'Export PDF'}
+            </button>
+            <style>{`@keyframes st-pdf-spin { to { transform: rotate(360deg); } }`}</style>
           </header>
 
           {error && (

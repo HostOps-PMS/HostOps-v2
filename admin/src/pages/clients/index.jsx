@@ -65,11 +65,17 @@ export default function Clients() {
      This means the export reflects BOTH the search filter (from this
      component) AND the active tab filter (from ClientsTable).
   ── */
-  const visibleClientsRef = useRef({ clients: filtered, activeTab: 'All' });
+const visibleClientsRef = useRef({ clients: filtered, activeTab: 'All' });
+  const allFilteredRef = useRef(filtered);
 
-  const handleVisibleClientsChange = useCallback((clients, activeTab) => {
-    visibleClientsRef.current = { clients, activeTab };
-  }, []);
+const handleVisibleClientsChange = useCallback((visibleClients, activeTab) => {
+    // Apply same tab filter to ALL filtered records (not just current page)
+    let allForTab = filtered;
+    if (activeTab === 'Verified')   allForTab = filtered.filter(c => !c.mustChangePassword && !c.mustChangePin);
+    if (activeTab === 'Partial')    allForTab = filtered.filter(c => (c.mustChangePassword && !c.mustChangePin) || (!c.mustChangePassword && c.mustChangePin));
+    if (activeTab === 'Unverified') allForTab = filtered.filter(c => c.mustChangePassword && c.mustChangePin);
+    visibleClientsRef.current = { clients: allForTab, activeTab };
+  }, [filtered]);
 
   const [exportLoading, setExportLoading] = useState(false);
 
