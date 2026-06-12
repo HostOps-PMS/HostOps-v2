@@ -139,9 +139,14 @@ export default function Clients() {
                   <path d="M3 16h14" strokeLinecap="round" />
                 </svg>
               )}
-              {exportLoading ? 'Exporting…' : 'Export PDF'}
+              <span className="cl-export-label">{exportLoading ? 'Exporting…' : 'Export PDF'}</span>
             </button>
-            <style>{`@keyframes cl-pdf-spin { to { transform: rotate(360deg); } }`}</style>
+            <style>{`
+            @keyframes cl-pdf-spin { to { transform: rotate(360deg); } }
+            @media (max-width: 768px) {
+              .cl-export-label { display: none; }
+            }
+          `}</style>
           </header>
 
           {/* Error banner */}
