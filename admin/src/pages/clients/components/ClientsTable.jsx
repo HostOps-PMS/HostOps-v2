@@ -97,7 +97,7 @@ function isUnverified(client) {
   return client.mustChangePassword && client.mustChangePin;
 }
 
-export default function ClientsTable({ clients, loading, onRowClick, search, onSearchChange, onAddClient, onRefresh, page, totalPages, totalCount, onPrev, onNext }) {
+export default function ClientsTable({ clients, loading, onRowClick, search, onSearchChange, onAddClient, onRefresh, page, totalPages, totalCount, onPrev, onNext, onVisibleClientsChange }) {
   const [activeTab, setActiveTab] = useState('All');
   const [selected, setSelected] = useState([]);
   const tabScrollRef = useRef(null);
@@ -129,6 +129,12 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
     : activeTab === 'Verified' ? clients.filter(isVerified)
     : activeTab === 'Partial' ? clients.filter(isPartial)
     : clients.filter(isUnverified);
+
+  // Notify parent of the currently visible rows so export always
+  // reflects the active tab + search combination.
+  useEffect(() => {
+    if (onVisibleClientsChange) onVisibleClientsChange(tabFiltered, activeTab);
+  }, [tabFiltered, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allChecked =
     tabFiltered.length > 0 && tabFiltered.every((c) => selected.includes(c._id));

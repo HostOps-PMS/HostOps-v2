@@ -15,12 +15,13 @@ import { useDashboard } from "./context/DashboardContext";
 import { useDashboardData } from "./hooks/useDashboardData";
 import Footer from "./components/Footer";
 import ProfitabilityCalculator from "./components/ProfitabilityCalculator";
+import FetchingOverlay from "./components/FetchingOverlay";
 import safeStorage from "../safeStorage";
 import "./globals.css";
 
 export default function DashboardPage() {
   const { dashState, dark } = useDashboard();
-  const { loadData, banner } = useDashboardData();
+  const { loadData, banner, isLoading } = useDashboardData();
 
   // ── First-login password change ──────────────────────────────────────────────
   // Set by LoginForm when the backend returns mustChangePassword: true.
@@ -142,6 +143,20 @@ console.log("profitOpen:", profitOpen);
 
   return (
     <div style={{ background: "#f4f6f5", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+
+      {/* ── Initial data load overlay ── */}
+      <FetchingOverlay
+        isVisible={isLoading && !dashState.rawData && !dashState.isSwitching}
+        message="Loading dashboard…"
+      />
+
+      {/* ── Property-switching overlay ── */}
+      <FetchingOverlay
+        isVisible={dashState.isSwitching}
+        message="Switching property…"
+        subMessage={dashState.selectedPropertyName || null}
+      />
+
       {/* First-login modal: blocking overlay shown until password is set */}
       {showFirstLoginModal && (
         <FirstLoginModal onComplete={handlePasswordChanged} />

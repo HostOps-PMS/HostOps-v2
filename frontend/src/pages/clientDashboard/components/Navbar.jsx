@@ -43,6 +43,9 @@ export default function Navbar() {
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [switchAccountOpen, setSwitchAccountOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [switchConfirmOpen, setSwitchConfirmOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -199,7 +202,14 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
+    setDropOpen(false);
+    setMenuOpen(false);
+    setLogoutModalOpen(true);
+  };
+
+  const confirmLogout = async () => {
+    setIsLoggingOut(true);
     // Log logout before clearing session — the token is still valid here.
     // Fire-and-forget; never block logout on log failure.
     try {
@@ -211,6 +221,11 @@ export default function Navbar() {
     await logoutUser();
     clear();
     window.location.href = "/";
+  };
+
+  const cancelLogout = () => {
+    if (isLoggingOut) return;
+    setLogoutModalOpen(false);
   };
 
   const { logActivity } = useActivityLog();
@@ -225,6 +240,11 @@ export default function Navbar() {
   function openSwitchAccount() {
     setDropOpen(false);
     setMenuOpen(false);
+    setSwitchConfirmOpen(true);
+  }
+
+  function confirmSwitchAccount() {
+    setSwitchConfirmOpen(false);
     setSwitchAccountOpen(true);
   }
 
@@ -288,6 +308,195 @@ export default function Navbar() {
     const btn = document.getElementById('__hostops_export_err_close');
     if (btn) btn.addEventListener('click', close);
   }
+
+  // ── External links: open hostops domains in a new tab ─────────────────────
+  // Any <a href> pointing to go.hostops.online or hostops.online should open
+  // in a new tab with noopener/noreferrer for security.
+  useEffect(() => {
+    const HOSTOPS_ORIGINS = ['https://go.hostops.online', 'https://hostops.online'];
+    function handleAnchorClick(e) {
+      const anchor = e.target.closest('a[href]');
+      if (!anchor) return;
+      const href = anchor.getAttribute('href') || '';
+      const isExternal = HOSTOPS_ORIGINS.some(
+        (origin) => href.startsWith(origin) || href.startsWith(origin + '/')
+      );
+      if (isExternal && anchor.target !== '_blank') {
+        e.preventDefault();
+        window.open(href, '_blank', 'noopener,noreferrer');
+      }
+    }
+    document.addEventListener('click', handleAnchorClick);
+    return () => document.removeEventListener('click', handleAnchorClick);
+  }, []);
+
+  // ── Logout confirmation modal ──────────────────────────────────────────────
+  // ── Shared confirm-modal keyframes (injected once) ────────────────────────
+  const ConfirmModalStyles = (
+    <style>{`
+      @keyframes hp-overlay-in {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+      @keyframes hp-card-in {
+        from { opacity: 0; transform: translateY(24px) scale(0.97); }
+        to   { opacity: 1; transform: translateY(0)    scale(1);    }
+      }
+      @keyframes hp-spin {
+        to { transform: rotate(360deg); }
+      }
+    `}</style>
+  );
+
+  const LogoutModal = logoutModalOpen ? (
+    <>
+      {ConfirmModalStyles}
+      <div
+        style={{
+          position: 'fixed', inset: 0, zIndex: 99999,
+          background: 'rgba(12,28,20,0.55)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '24px',
+          animation: 'hp-overlay-in 0.22s ease forwards',
+        }}
+        onClick={(e) => { if (e.target === e.currentTarget) cancelLogout(); }}
+      >
+        <div style={{
+          background: dark ? '#1a2e20' : '#fff',
+          border: `1px solid ${dark ? '#1e3a2a' : '#e3ede8'}`,
+          borderRadius: '20px',
+          padding: '32px 28px 28px',
+          maxWidth: '340px',
+          width: '100%',
+          boxShadow: '0 32px 80px rgba(12,28,20,0.28)',
+          textAlign: 'center',
+          animation: 'hp-card-in 0.28s cubic-bezier(0.34,1.56,0.64,1) forwards',
+        }}>
+          {/* Icon circle */}
+          <div style={{
+            width: '56px', height: '56px',
+            borderRadius: '50%',
+            background: dark ? '#2a1515' : '#fff0ee',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 20px',
+            border: `1.5px solid ${dark ? '#4a2020' : '#ffd5ce'}`,
+          }}>
+            {isLoggingOut ? (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                stroke="#c13515" strokeWidth="2.5" strokeLinecap="round"
+                style={{ animation: 'hp-spin 0.7s linear infinite' }}>
+                <path d="M12 2a10 10 0 0 1 10 10" />
+              </svg>
+            ) : (
+              <i className="ti ti-logout" style={{ fontSize: '22px', color: '#c13515' }} />
+            )}
+          </div>
+
+          <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: '16px',
+            color: dark ? '#eaf5f0' : '#0c1c14', margin: '0 0 8px' }}>
+            {isLoggingOut ? 'Signing out…' : 'Sign out?'}
+          </p>
+          <p style={{ fontSize: '13px', color: dark ? '#9ab8a9' : '#6a8b7c',
+            lineHeight: 1.6, margin: '0 0 24px' }}>
+            {isLoggingOut
+              ? 'Please wait while we securely sign you out.'
+              : "You'll be signed out of your HostOps account."}
+          </p>
+
+          {!isLoggingOut && (
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={cancelLogout} style={{
+                flex: 1, padding: '11px 0', borderRadius: '10px',
+                border: `1px solid ${dark ? '#1e3a2a' : '#d4e8dd'}`,
+                background: dark ? '#132a1e' : '#f3f9f5',
+                color: dark ? '#9ab8a9' : '#4a7a62',
+                fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+              }}>Cancel</button>
+              <button onClick={confirmLogout} style={{
+                flex: 1, padding: '11px 0', borderRadius: '10px',
+                border: 'none', background: '#c13515', color: '#fff',
+                fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+              }}>
+                <i className="ti ti-logout" style={{ fontSize: '14px' }} />
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  ) : null;
+
+  const SwitchConfirmModal = switchConfirmOpen ? (
+    <>
+      {ConfirmModalStyles}
+      <div
+        style={{
+          position: 'fixed', inset: 0, zIndex: 99999,
+          background: 'rgba(12,28,20,0.55)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '24px',
+          animation: 'hp-overlay-in 0.22s ease forwards',
+        }}
+        onClick={(e) => { if (e.target === e.currentTarget) setSwitchConfirmOpen(false); }}
+      >
+        <div style={{
+          background: dark ? '#1a2e20' : '#fff',
+          border: `1px solid ${dark ? '#1e3a2a' : '#e3ede8'}`,
+          borderRadius: '20px',
+          padding: '32px 28px 28px',
+          maxWidth: '340px',
+          width: '100%',
+          boxShadow: '0 32px 80px rgba(12,28,20,0.28)',
+          textAlign: 'center',
+          animation: 'hp-card-in 0.28s cubic-bezier(0.34,1.56,0.64,1) forwards',
+        }}>
+          {/* Icon circle */}
+          <div style={{
+            width: '56px', height: '56px',
+            borderRadius: '50%',
+            background: dark ? '#132a1e' : '#eaf8f1',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 20px',
+            border: `1.5px solid ${dark ? '#1e3a2a' : '#b7e4cf'}`,
+          }}>
+            <i className="ti ti-arrows-exchange" style={{ fontSize: '22px', color: '#1e8760' }} />
+          </div>
+
+          <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: '16px',
+            color: dark ? '#eaf5f0' : '#0c1c14', margin: '0 0 8px' }}>
+            Switch account?
+          </p>
+          <p style={{ fontSize: '13px', color: dark ? '#9ab8a9' : '#6a8b7c',
+            lineHeight: 1.6, margin: '0 0 24px' }}>
+            You'll be switching to a different HostOps account. Your current session stays active.
+          </p>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={() => setSwitchConfirmOpen(false)} style={{
+              flex: 1, padding: '11px 0', borderRadius: '10px',
+              border: `1px solid ${dark ? '#1e3a2a' : '#d4e8dd'}`,
+              background: dark ? '#132a1e' : '#f3f9f5',
+              color: dark ? '#9ab8a9' : '#4a7a62',
+              fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+            }}>Cancel</button>
+            <button onClick={confirmSwitchAccount} style={{
+              flex: 1, padding: '11px 0', borderRadius: '10px',
+              border: 'none', background: '#1e8760', color: '#fff',
+              fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+            }}>
+              <i className="ti ti-arrows-exchange" style={{ fontSize: '14px' }} />
+              Continue
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  ) : null;
 
   const t = {
     navbar: {
@@ -736,6 +945,8 @@ export default function Navbar() {
             setSwitchAccountOpen(false);
           }}
         />
+        {LogoutModal}
+        {SwitchConfirmModal}
       </>
     );
   }
@@ -954,6 +1165,8 @@ export default function Navbar() {
             setSwitchAccountOpen(false);
           }}
       />
+      {LogoutModal}
+      {SwitchConfirmModal}
     </>
   );
 }
