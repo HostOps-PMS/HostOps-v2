@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 
+import { NotificationsProvider } from './context/NotificationsContext';
 import LoginPage     from './pages/Login';
 import Dashboard     from './pages/dashboard';
 import Clients       from './pages/clients';
@@ -135,6 +136,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <NotificationsProvider>
       {!authorized && (
         <AuthorizationModal onAuthorized={handleAuthorized} />
       )}
@@ -227,6 +229,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
+      </NotificationsProvider>
     </BrowserRouter>
   );
 }
