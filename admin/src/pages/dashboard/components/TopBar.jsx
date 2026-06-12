@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useNotifications } from '../../../context/NotificationsContext';
 
 // ─────────────────────────────────────────────────────────────────
 // Helpers
@@ -146,10 +147,13 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
     <div
       onClick={e => e.stopPropagation()}
       style={{
-        position: 'absolute',
-        top: 'calc(100% + 10px)',
-        right: 0,
-        width: 360,
+        position: 'fixed',
+        top: 60,
+        right: 8,
+        left: 8,
+        maxWidth: 360,
+        marginLeft: 'auto',
+        width: 'auto',
         background: '#fff',
         borderRadius: 14,
         boxShadow: '0 8px 32px rgba(0,0,0,0.13), 0 1.5px 6px rgba(0,0,0,0.07)',
@@ -380,9 +384,17 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
 // ─────────────────────────────────────────────────────────────────
 // TopBar
 // ─────────────────────────────────────────────────────────────────
-export default function TopBar({ onAction, onExport, exportLoading = false, alerts = [], activities = [], notifLoading = false, showExport = false }) {
+export default function TopBar({ onAction, onExport, exportLoading = false, alerts, activities, notifLoading, showExport = false }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef(null);
+
+  // Fallback to global NotificationsContext when no props are explicitly
+  // passed — this is what makes the bell work on every page, not just
+  // the Dashboard (which fetches its own overview and passes props down).
+  const notifContext       = useNotifications();
+  const resolvedAlerts     = alerts     ?? notifContext.alerts;
+  const resolvedActivities = activities ?? notifContext.activities;
+  const resolvedLoading    = notifLoading ?? notifContext.loading;
 
   const currentUser = (() => {
     try { return JSON.parse(sessionStorage.getItem('hp_user') || '{}'); } catch { return {}; }
@@ -395,7 +407,7 @@ export default function TopBar({ onAction, onExport, exportLoading = false, aler
 
 const location = useLocation();
   const isDashboard = location.pathname === '/dashboard' || location.pathname === '/dashboard/';
-  const unreadCount = (alerts || []).filter(a => a.unread).length;
+  const unreadCount = (resolvedAlerts || []).filter(a => a.unread).length;
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -514,9 +526,9 @@ const location = useLocation();
 
           {notifOpen && (
             <NotificationDropdown
-              alerts={alerts}
-              activities={activities}
-              loading={notifLoading}
+              alerts={resolvedAlerts}
+              activities={resolvedActivities}
+              loading={resolvedLoading}
               onClose={() => setNotifOpen(false)}
             />
           )}
