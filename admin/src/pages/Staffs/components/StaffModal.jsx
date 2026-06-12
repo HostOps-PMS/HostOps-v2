@@ -414,24 +414,26 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
               <label style={labelStyle}>First Name *</label>
               <input
                 value={form.firstName}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, firstName: e.target.value }))
-                }
+                onChange={(e) => { const val = e.target.value; if (/^[a-zA-Z\s.'-]*$/.test(val)) setForm((f) => ({ ...f, firstName: val })); }}
                 required
-                style={inputStyle}
+                style={{ ...inputStyle, ...(form.firstName && /[^a-zA-Z\s.'-]/.test(form.firstName) ? { borderColor: '#ef4444' } : {}) }}
                 placeholder="Juan"
               />
+              {form.firstName && /[^a-zA-Z\s.'-]/.test(form.firstName) && (
+                <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Letters only.</span>
+              )}
             </div>
             <div>
               <label style={labelStyle}>Last Name</label>
               <input
                 value={form.lastName}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, lastName: e.target.value }))
-                }
-                style={inputStyle}
+                onChange={(e) => { const val = e.target.value; if (/^[a-zA-Z\s.'-]*$/.test(val)) setForm((f) => ({ ...f, lastName: val })); }}
+                style={{ ...inputStyle, ...(form.lastName && /[^a-zA-Z\s.'-]/.test(form.lastName) ? { borderColor: '#ef4444' } : {}) }}
                 placeholder="Dela Cruz"
               />
+              {form.lastName && /[^a-zA-Z\s.'-]/.test(form.lastName) && (
+                <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Letters only.</span>
+              )}
             </div>
           </div>
 
@@ -441,14 +443,15 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
             <input
               type="email"
               value={form.email}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, email: e.target.value }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
               required
               disabled={isEdit}
-              style={{ ...inputStyle, cursor: isEdit ? "not-allowed" : "text" }}
+              style={{ ...inputStyle, cursor: isEdit ? 'not-allowed' : 'text', ...(!isEdit && form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) ? { borderColor: '#ef4444' } : {}) }}
               placeholder="staff@example.com"
             />
+            {!isEdit && form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) && (
+              <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Enter a valid email (e.g. staff@example.com).</span>
+            )}
           </div>
 
           {/* PIN */}
@@ -509,6 +512,12 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
               ))}
             </div>
           </div>
+          {form.pin && form.pin.length > 0 && form.pin.length < 6 && (
+            <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 6, display: 'block' }}>⚠ PIN must be exactly 6 digits ({form.pin.length}/6).</span>
+          )}
+          {form.pin && form.pin.length === 6 && (
+            <span style={{ color: '#26a676', fontSize: '.72rem', fontWeight: 600, marginTop: 6, display: 'block' }}>✓ PIN is valid.</span>
+          )}
 
           {/* Properties */}
           <div style={{ marginBottom: 20 }}>
