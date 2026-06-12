@@ -6,6 +6,7 @@ import UnlockModal        from './components/UnlockModal';
 import { useAccounts, useFilteredAccounts } from './hooks/useAccounts';
 import { useStats }       from '../dashboard/hooks/useStats';
 import { exportAccountsPdf } from './utils/exportAccountsPdf';
+import FetchingOverlay       from '../components/FetchingOverlay';
 import './index.css';
 
 const PAGE_SIZE = 10;
@@ -55,6 +56,7 @@ export default function AccountsPage() {
 
   return (
     <div className="db-layout">
+      <FetchingOverlay isVisible={loading} message="Loading accounts…" />
       <Sidebar />
 
       <div className="db-main">

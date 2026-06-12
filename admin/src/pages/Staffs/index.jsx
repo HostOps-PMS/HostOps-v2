@@ -7,6 +7,7 @@ import StaffModal from './components/StaffModal';
 import DeleteModal from './components/DeleteModal';
 import StaffTable from './components/StaffTable';
 import { exportStaffsPdf } from './utils/exportStaffsPdf';
+import FetchingOverlay    from '../components/FetchingOverlay';
 
 export default function Staffs() {
   const [filterClient, setFilterClient] = useState('');
@@ -62,6 +63,7 @@ export default function Staffs() {
 
   return (
     <div className="db-layout">
+      <FetchingOverlay isVisible={loading} message="Loading staffs…" />
       <Sidebar />
 
       <div className="db-main">

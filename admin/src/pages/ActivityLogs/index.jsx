@@ -5,6 +5,7 @@ import TopBar from '../dashboard/components/TopBar';
 import { useStats } from '../dashboard/hooks/useStats';
 import { useActivityLogs } from './hooks/useActivityLogs';
 import ActivityLogTable from './components/ActivityLogTable';
+import FetchingOverlay  from '../components/FetchingOverlay';
 
 const PAGE_SIZE = 15;
 
@@ -80,6 +81,7 @@ export default function ActivityLogs() {
 
   return (
     <div className="db-layout">
+      <FetchingOverlay isVisible={loading} message="Loading activity logs…" />
       <Sidebar />
 
       <div className="db-main">
