@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import AccountSettingsModal from './dashboard/components/AccountSettingsModal';
 import { logoutUser } from './authorization/services/authService';
+import HostOpsLogo from '../assets/HostOpsLOGO.png';
 
 /* ─── Nav data ───────────────────────────────────────────────────── */
 // Businesses has a sub-item: Staffs
@@ -91,9 +92,7 @@ const LogoutIcon = () => (
 );
 
 const LogoIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-    <path d="M9 2L15 5.5V12.5L9 16L3 12.5V5.5L9 2Z" fill="white" />
-  </svg>
+  <img src={HostOpsLogo} alt="HostOps" style={{ width: 34, height: 34, objectFit: 'contain' }} />
 );
 
 const ChevronLeft = ({ collapsed }) => (
@@ -393,12 +392,14 @@ export default function Sidebar({ onExport, exportLoading = false, alerts = [] }
           <div style={{
             width: 32,
             height: 32,
-            background: '#1a9e6e',
+            background: '#fff',
             borderRadius: 9,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
+            overflow: 'hidden',
+            border: '0.5px solid rgba(0,0,0,0.08)',
           }}>
             <LogoIcon />
           </div>
@@ -603,7 +604,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts = [] }
           </svg>
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 28, height: 28, background: '#1a9e6e', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 28, height: 28, background: '#fff', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '0.5px solid rgba(0,0,0,0.08)' }}>
             <LogoIcon />
           </div>
           <span style={{ fontSize: 14, fontWeight: 700, color: '#111', letterSpacing: '-0.02em' }}>HostOps</span>
