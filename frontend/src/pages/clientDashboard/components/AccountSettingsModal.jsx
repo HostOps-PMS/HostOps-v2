@@ -681,8 +681,8 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       setPwStatus("error");
       return;
     }
-    if (!newPassword || newPassword.length < 8) {
-      setPwErrorMsg("New password must be at least 8 characters.");
+    if (!newPassword || newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
+      setPwErrorMsg("Password must be 8+ characters with 1 uppercase, 1 number, and 1 special character.");
       setPwStatus("error");
       return;
     }
@@ -1298,13 +1298,15 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
               const hasUpper = /[A-Z]/.test(pw);
               const hasNumber = /[0-9]/.test(pw);
               const hasLength = pw.length >= 8;
-              const strength = [hasUpper, hasNumber, hasLength].filter(Boolean).length;
-              const strengthLabel = pw.length === 0 ? "" : strength === 1 ? "Weak" : strength === 2 ? "Fair" : "Strong";
-              const strengthColor = strength === 1 ? "#c13515" : strength === 2 ? "#f59e0b" : "#1e8760";
+              const hasSpecial = /[^A-Za-z0-9]/.test(pw);
+              const strength = [hasUpper, hasNumber, hasLength, hasSpecial].filter(Boolean).length;
+              const strengthLabel = pw.length === 0 ? "" : strength <= 2 ? "Weak" : strength === 3 ? "Fair" : "Strong";
+              const strengthColor = strength <= 2 ? "#c13515" : strength === 3 ? "#f59e0b" : "#1e8760";
               const checks = [
-                { label: "At least 1 uppercase", ok: hasUpper },
+                { label: "At least 1 uppercase letter", ok: hasUpper },
                 { label: "At least 1 number", ok: hasNumber },
                 { label: "At least 8 characters", ok: hasLength },
+                { label: "At least 1 special character (!@#$...)", ok: hasSpecial },
               ];
 
               return (
@@ -1357,7 +1359,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                   {pw.length > 0 && (
                     <div style={{ marginBottom: 12 }}>
                       <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
-                        {[1, 2, 3].map((s) => (
+                        {[1, 2, 3, 4].map((s) => (
                           <div key={s} style={{ flex: 1, height: 4, borderRadius: 4, background: s <= strength ? strengthColor : "#e3ede8", transition: "background 0.2s" }} />
                         ))}
                       </div>
@@ -1391,6 +1393,8 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
             {/* ── PIN TAB ── */}
             {activeTab === "pin" && (() => {
               const pin = pinForm.newPin;
+              const confirmPin = pinForm.confirmPin;
+              const pinMismatch = confirmPin.length > 0 && pin !== confirmPin;
               const hasLength = pin.length === 6;
               const strength = hasLength ? 3 : (pin.length > 0 ? 1 : 0);
               const strengthLabel = pin.length === 0 ? "" : strength < 3 ? "Too short" : "Looks good!";
@@ -1407,7 +1411,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                       Current PIN <span style={{ color: "#c13515" }}>*</span>
                     </label>
                     <div style={styles.pwInputWrap}>
-                      <input id="acc-currentPin" className="acc-pw-input" style={styles.pwInput} type={showPin.current ? "text" : "password"} inputMode="numeric" name="currentPin" value={pinForm.currentPin} onChange={handlePinChange} placeholder="Enter current PIN" />
+                      <input id="acc-currentPin" className="acc-pw-input" style={styles.pwInput} type={showPin.current ? "text" : "password"} inputMode="numeric" pattern="[0-9]*" name="currentPin" value={pinForm.currentPin} onChange={handlePinChange} placeholder="Enter current PIN" onKeyDown={(e) => { if (!/[0-9]/.test(e.key) && !['Backspace','Delete','Tab','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault(); }} />
                       <button type="button" className="acc-eye-btn" style={styles.eyeBtn} onClick={() => setShowPin((p) => ({ ...p, current: !p.current }))} tabIndex={-1}>
                         <i className={showPin.current ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
                       </button>
@@ -1420,7 +1424,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                       New PIN <span style={{ color: "#c13515" }}>*</span>
                     </label>
                     <div style={styles.pwInputWrap}>
-                      <input id="acc-newPin" className="acc-pw-input" style={styles.pwInput} type={showPin.next ? "text" : "password"} inputMode="numeric" name="newPin" value={pinForm.newPin} onChange={handlePinChange} placeholder="6 digits" />
+                      <input id="acc-newPin" className="acc-pw-input" style={styles.pwInput} type={showPin.next ? "text" : "password"} inputMode="numeric" pattern="[0-9]*" name="newPin" value={pinForm.newPin} onChange={handlePinChange} placeholder="6 digits" onKeyDown={(e) => { if (!/[0-9]/.test(e.key) && !['Backspace','Delete','Tab','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault(); }} />
                       <button type="button" className="acc-eye-btn" style={styles.eyeBtn} onClick={() => setShowPin((p) => ({ ...p, next: !p.next }))} tabIndex={-1}>
                         <i className={showPin.next ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
                       </button>
@@ -1438,11 +1442,17 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                       )}
                     </div>
                     <div style={styles.pwInputWrap}>
-                      <input id="acc-confirmPin" className="acc-pw-input" style={styles.pwInput} type={showPin.confirm ? "text" : "password"} inputMode="numeric" name="confirmPin" value={pinForm.confirmPin} onChange={handlePinChange} placeholder="Re-enter new PIN" />
+                      <input id="acc-confirmPin" className="acc-pw-input" style={styles.pwInput} type={showPin.confirm ? "text" : "password"} inputMode="numeric" pattern="[0-9]*" name="confirmPin" value={pinForm.confirmPin} onChange={handlePinChange} placeholder="Re-enter new PIN" onKeyDown={(e) => { if (!/[0-9]/.test(e.key) && !['Backspace','Delete','Tab','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault(); }} />
                       <button type="button" className="acc-eye-btn" style={styles.eyeBtn} onClick={() => setShowPin((p) => ({ ...p, confirm: !p.confirm }))} tabIndex={-1}>
                         <i className={showPin.confirm ? "ti ti-eye-off" : "ti ti-eye"} aria-hidden="true" />
                       </button>
                     </div>
+                    {pinMismatch && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, marginTop: 6 }}>
+                        <i className="ti ti-alert-circle" style={{ color: "#c13515", fontSize: 15 }} aria-hidden="true" />
+                        <span style={{ color: "#c13515" }}>PINs do not match.</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Strength bar */}
@@ -1461,6 +1471,14 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Confirm PIN mismatch warning */}
+                  {pinForm.confirmPin.length > 0 && pinForm.newPin !== pinForm.confirmPin && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, marginTop: 4 }}>
+                      <i className="ti ti-alert-circle" style={{ color: "#c13515", fontSize: 15 }} aria-hidden="true" />
+                      <span style={{ color: "#c13515" }}>PINs do not match.</span>
                     </div>
                   )}
 
