@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Sidebar from '../Sidebar';
-import TopBar from '../Dashboard/components/TopBar';
-import { useStats } from '../Dashboard/hooks/useStats';
+import TopBar from '../dashboard/components/TopBar';
+import { useStats } from '../dashboard/hooks/useStats';
 import { useStaffs } from './hooks/useStaffs';
 import StaffModal from './components/StaffModal';
 import DeleteModal from './components/DeleteModal';
