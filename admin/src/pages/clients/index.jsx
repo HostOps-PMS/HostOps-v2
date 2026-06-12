@@ -2,12 +2,12 @@ import { useState, useMemo, useRef, useCallback } from 'react';
 import './clients.css';
 
 import Sidebar           from '../Sidebar';
-import TopBar            from '../Dashboard/components/TopBar';
+import TopBar            from '../dashboard/components/TopBar';
 import ClientsTable      from './components/ClientsTable';
 import ClientModal          from './components/ClientModal';
 import AddClientModal       from './components/AddClientModal';
 import { useClients }       from './hooks/useClients';
-import { useStats }         from '../Dashboard/hooks/useStats';
+import { useStats }         from '../dashboard/hooks/useStats';
 import { exportClientsPdf } from './utils/exportClientsPdf';
 
 export default function Clients() {
