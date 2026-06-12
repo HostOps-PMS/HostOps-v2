@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import Sidebar from '../Sidebar';
 import TopBar from '../dashboard/components/TopBar';
-import { useStats } from '../dashboard/hooks/useStats';
 import { useStaffs } from './hooks/useStaffs';
 import StaffModal from './components/StaffModal';
 import DeleteModal from './components/DeleteModal';
@@ -16,9 +15,6 @@ export default function Staffs() {
   const [modal, setModal]               = useState(null); // null | { type: 'create'|'edit'|'delete', staff? }
 
   const { staffs, clients, loading, error, propertyMap, reload } = useStaffs(filterClient);
-
-  /* ── Alerts + Activity from dashboard overview (same source as Dashboard/Clients) ── */
-  const { overview, loading: notifLoading } = useStats();
 
   const filtered = staffs.filter((s) => {
     if (!search) return true;
@@ -67,11 +63,7 @@ export default function Staffs() {
       <div className="db-main">
         {/* TopBar — same component as Dashboard/Clients, fed with live alerts + activities.
             No onExport/showExport passed, so the Export PDF button stays hidden here. */}
-        <TopBar
-          alerts={overview?.alerts ?? []}
-          activities={overview?.recentActivities ?? []}
-          notifLoading={notifLoading}
-        />
+        <TopBar />
 
         <div className="cl-content">
           {/* Modals */}

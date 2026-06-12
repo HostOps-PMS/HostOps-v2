@@ -4,7 +4,6 @@ import TopBar             from '../dashboard/components/TopBar';
 import AccountsTable      from './components/AccountsTable';
 import UnlockModal        from './components/UnlockModal';
 import { useAccounts, useFilteredAccounts } from './hooks/useAccounts';
-import { useStats }       from '../dashboard/hooks/useStats';
 import { exportAccountsPdf } from './utils/exportAccountsPdf';
 import './index.css';
 
@@ -36,8 +35,6 @@ export default function AccountsPage() {
     combined, tab, search, page, pageSize: PAGE_SIZE,
   });
 
-  const { overview, loading: notifLoading } = useStats();
-
   const [exportLoading, setExportLoading] = useState(false);
 
   async function handleExport() {
@@ -58,11 +55,7 @@ export default function AccountsPage() {
       <Sidebar />
 
       <div className="db-main">
-        <TopBar
-          alerts={overview?.alerts ?? []}
-          activities={overview?.recentActivities ?? []}
-          notifLoading={notifLoading}
-        />
+        <TopBar />
 
         <div className="cl-content">
           <header className="cl-content__header" style={{ marginBottom: 28 }}>

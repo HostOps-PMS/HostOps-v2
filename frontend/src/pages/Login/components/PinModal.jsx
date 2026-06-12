@@ -396,7 +396,7 @@ export default function PinModal({
           gap:            '16px',
           padding:        '8px 0',
         }}>
-          {/* Ripple rings + lock icon — rings start at lock-circle size and scale to container size */}
+          {/* Ripple rings + lock icon */}
           <div style={{
             position:       'relative',
             width:          '180px',
@@ -405,16 +405,19 @@ export default function PinModal({
             alignItems:     'center',
             justifyContent: 'center',
             flexShrink:     0,
+            overflow:       'hidden',
           }}>
             {[0, 1.2, 2.4].map((delay, i) => (
               <div key={i} style={{
                 position:     'absolute',
                 top:          '50%',
                 left:         '50%',
+                marginTop:    '-44px',
+                marginLeft:   '-44px',
                 width:        '88px',
                 height:       '88px',
                 borderRadius: '50%',
-                border:       '1.5px solid rgba(185, 28, 28, 0.45)',
+                border:       '1.5px solid rgba(185, 28, 28, 0.4)',
                 animation:    `lock-ripple-slow 3.6s ease-out ${delay}s infinite`,
               }} />
             ))}
@@ -470,19 +473,20 @@ export default function PinModal({
           <div style={{
             background:   '#fffbeb',
             border:       '1px solid #fde68a',
-            borderRadius: '12px',
-            padding:      '11px 14px',
+            borderLeft:   '3px solid #f59e0b',
+            borderRadius: '10px',
+            padding:      '10px 14px',
             width:        '100%',
             boxSizing:    'border-box',
             animation:    'tip-fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1)',
-            boxShadow:    '0 1px 6px rgba(234,179,8,0.08)',
+            textAlign:    'left',
           }}>
-            <div style={{ display: 'flex', gap: '9px', alignItems: 'flex-start', textAlign: 'left' }}>
-              <span style={{ fontSize: '14px', lineHeight: '1.5', flexShrink: 0 }}>💡</span>
-              <p style={{ margin: 0, fontSize: '12px', color: '#78350f', lineHeight: '1.7' }}>
-                <strong>PIN Tip: </strong>{PIN_TIPS[tipIndex]}
-              </p>
-            </div>
+            <p style={{ margin: '0 0 2px', fontSize: '10px', fontWeight: '700', color: '#b45309', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              PIN Tip
+            </p>
+            <p style={{ margin: 0, fontSize: '12px', color: '#78350f', lineHeight: '1.65' }}>
+              {PIN_TIPS[tipIndex]}
+            </p>
           </div>
         </div>
 
@@ -522,8 +526,8 @@ export default function PinModal({
         {/* ── Keyframes for permanent lock screen ── */}
         <style>{`
           @keyframes lock-ripple-slow {
-            0%   { transform: translate(-50%, -50%) scale(1);    opacity: 0.55; }
-            100% { transform: translate(-50%, -50%) scale(2.05); opacity: 0;    }
+            0%   { transform: scale(1);    opacity: 0.55; }
+            100% { transform: scale(2.05); opacity: 0;    }
           }
           @keyframes tip-fade-up {
             from { opacity: 0; transform: translateY(12px); }
@@ -551,7 +555,7 @@ export default function PinModal({
             gap:            '18px',
             padding:        '12px 0 8px',
           }}>
-            {/* Ripple rings + lock icon — rings start at lock-circle size and scale to container size */}
+            {/* Ripple rings + lock icon */}
             <div style={{
               position:       'relative',
               width:          '180px',
@@ -560,16 +564,19 @@ export default function PinModal({
               alignItems:     'center',
               justifyContent: 'center',
               flexShrink:     0,
+              overflow:       'hidden',
             }}>
               {[0, 0.9, 1.8].map((delay, i) => (
                 <div key={i} style={{
                   position:     'absolute',
                   top:          '50%',
                   left:         '50%',
+                  marginTop:    '-44px',
+                  marginLeft:   '-44px',
                   width:        '88px',
                   height:       '88px',
                   borderRadius: '50%',
-                  border:       '1.5px solid rgba(220, 38, 38, 0.5)',
+                  border:       '1.5px solid rgba(220, 38, 38, 0.45)',
                   animation:    `lock-ripple 2.7s ease-out ${delay}s infinite`,
                 }} />
               ))}
@@ -598,19 +605,20 @@ export default function PinModal({
             <div style={{
               background:   '#fffbeb',
               border:       '1px solid #fde68a',
-              borderRadius: '14px',
-              padding:      '12px 14px',
+              borderLeft:   '3px solid #f59e0b',
+              borderRadius: '10px',
+              padding:      '10px 14px',
               width:        '100%',
               boxSizing:    'border-box',
               animation:    'tip-fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1)',
-              boxShadow:    '0 1px 6px rgba(234,179,8,0.1)',
+              textAlign:    'left',
             }}>
-              <div style={{ display: 'flex', gap: '9px', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '15px', lineHeight: '1.4', flexShrink: 0 }}>💡</span>
-                <p style={{ margin: 0, fontSize: '12.5px', color: '#78350f', lineHeight: '1.7' }}>
-                  <strong>PIN Tip: </strong>{PIN_TIPS[tipIndex]}
-                </p>
-              </div>
+              <p style={{ margin: '0 0 2px', fontSize: '10px', fontWeight: '700', color: '#b45309', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                PIN Tip
+              </p>
+              <p style={{ margin: 0, fontSize: '12.5px', color: '#78350f', lineHeight: '1.65' }}>
+                {PIN_TIPS[tipIndex]}
+              </p>
             </div>
           </div>
         </>
@@ -786,8 +794,8 @@ export default function PinModal({
           90%       { transform: translateX(3px); }
         }
         @keyframes lock-ripple {
-          0%   { transform: translate(-50%, -50%) scale(1);    opacity: 0.6; }
-          100% { transform: translate(-50%, -50%) scale(2.05); opacity: 0;   }
+          0%   { transform: scale(1);    opacity: 0.6; }
+          100% { transform: scale(2.05); opacity: 0;   }
         }
         @keyframes tip-fade-up {
           from { opacity: 0; transform: translateY(12px); }
