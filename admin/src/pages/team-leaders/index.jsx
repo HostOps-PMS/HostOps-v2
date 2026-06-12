@@ -16,7 +16,7 @@ export default function TeamLeaders() {
 
   const { teamLeaders, clients, loading, error, refetch } = useTeamLeaders();
 
-  /* ── Alerts + Activity from dashboard overview (same source as Dashboard/Clients/Staffs) ── */
+  /* ── Alerts + Activity from dashboard overview ── */
   const { overview, loading: notifLoading } = useStats();
 
   const filtered = teamLeaders.filter((tl) => {
@@ -37,17 +37,33 @@ export default function TeamLeaders() {
     setPage(1);
   }
 
+  /* ── Export PDF — exports all filtered records, not just current page ── */
   const [exportLoading, setExportLoading] = useState(false);
 
-  async function handleExport() {
+  const handleExport = async () => {
     if (exportLoading || loading) return;
     setExportLoading(true);
     try {
       await exportTeamLeadersPdf({ teamLeaders: filtered, clients, search });
+    } catch (err) {
+      console.error('[exportTeamLeadersPdf] failed:', err);
     } finally {
       setExportLoading(false);
     }
-  }
+  };
+
+  const exportBtnIcon = exportLoading ? (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+      style={{ animation: 'tl-pdf-spin 0.8s linear infinite' }}>
+      <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+      <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+    </svg>
+  ) : (
+    <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 16h14" strokeLinecap="round" />
+    </svg>
+  );
 
   function handleSaved() {
     setModal(null);
@@ -61,11 +77,9 @@ export default function TeamLeaders() {
 
   return (
     <div className="db-layout">
-      <Sidebar />
+      <Sidebar onExport={handleExport} exportLoading={exportLoading} />
 
       <div className="db-main">
-        {/* TopBar — same component as Dashboard/Clients/Staffs, fed with live alerts + activities.
-            No onExport/showExport passed, so the Export PDF button stays hidden here. */}
         <TopBar
           alerts={overview?.alerts ?? []}
           activities={overview?.recentActivities ?? []}
@@ -105,6 +119,8 @@ export default function TeamLeaders() {
               <h1 className="cl-content__title">Team Leaders</h1>
               <p className="cl-content__sub">Manage team leader accounts and assignments</p>
             </div>
+
+            {/* Export PDF button */}
             <button
               onClick={handleExport}
               disabled={exportLoading || loading}
@@ -122,20 +138,9 @@ export default function TeamLeaders() {
               }}
               onMouseEnter={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#158a5e'; }}
               onMouseLeave={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#1a9e6e'; }}
-              title="Export visible team leaders as PDF"
+              title="Export all team leaders as PDF"
             >
-              {exportLoading ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
-                  style={{ animation: 'tl-pdf-spin 0.8s linear infinite' }}>
-                  <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-                  <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M3 16h14" strokeLinecap="round" />
-                </svg>
-              )}
+              {exportBtnIcon}
               {exportLoading ? 'Exporting…' : 'Export PDF'}
             </button>
             <style>{`@keyframes tl-pdf-spin { to { transform: rotate(360deg); } }`}</style>
