@@ -1062,9 +1062,12 @@ router.post('/send-change-password-otp', requireAuth, async (req, res, next) => 
 // ─────────────────────────────────────────────────────────────────
 // PIN lockout helpers
 // ─────────────────────────────────────────────────────────────────
-const PIN_LOCK_DURATIONS      = { 3: 60000, 4: 180000, 5: 900000, 6: 3600000 };
+// Lock durations by attempt count: 3→1min, 4→3min, 5→1hr, 6→1day
+const PIN_LOCK_DURATIONS      = { 3: 60_000, 4: 180_000, 5: 3_600_000, 6: 86_400_000 };
 const PIN_FIRST_LOCK_AT       = 3;
 const PIN_PERMANENT_THRESHOLD = 7;
+// If 48 hrs pass with no wrong attempt, the escalation counter resets.
+// Permanent locks are never auto-cleared — only an admin can lift those.
 const PIN_ATTEMPT_RESET_MS    = 48 * 60 * 60 * 1000;
 
 function getPinLockDuration(attempts) {
@@ -1072,19 +1075,24 @@ function getPinLockDuration(attempts) {
 }
 
 async function evaluatePinLockState(doc, now, contactNote) {
+  // Permanent lock — never touched by the auto-reset
+  if (doc.pinPermanentlyLocked) {
+    return { status: 423, body: { error: `Your account has been locked. Please contact your ${contactNote}.`, permanentlyLocked: true } };
+  }
+
+  // Auto-restore: if 48 hrs have passed since the last wrong attempt, reset escalation
   if (doc.lastPinFailAt && (now.getTime() - doc.lastPinFailAt.getTime()) >= PIN_ATTEMPT_RESET_MS) {
     doc.pinAttempts    = 0;
     doc.pinLockedUntil = null;
     doc.lastPinFailAt  = null;
     await doc.save();
   }
-  if (doc.pinPermanentlyLocked) {
-    return { status: 423, body: { error: `Your account has been locked. Please contact your ${contactNote}.`, permanentlyLocked: true } };
-  }
+
   if (doc.pinLockedUntil && doc.pinLockedUntil > now) {
     return { status: 423, body: { error: 'Too many incorrect PIN attempts. Please try again later.', lockedUntil: doc.pinLockedUntil.toISOString() } };
   }
   if (doc.pinLockedUntil && doc.pinLockedUntil <= now) {
+    // Lock expired — clear the timestamp but preserve pinAttempts so escalation continues
     doc.pinLockedUntil = null;
     await doc.save();
   }

@@ -104,6 +104,24 @@ function MessageBubble({ msg, dark }) {
   );
 }
 
+const DOT_COLORS = ["#a8dfc8", "#6cc9a0", "#26a676", "#1a8060", "#0f5e43"];
+
+function LoadingDots() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", paddingTop: 80, paddingBottom: 40 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {DOT_COLORS.map((color, i) => (
+          <div
+            key={i}
+            className="loading-dot"
+            style={{ background: color, animationDelay: `${i * 0.12}s` }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function InboxPage() {
   const { dashState, dark } = useDashboard();
   const { loadData } = useDashboardData();
@@ -593,30 +611,29 @@ export default function InboxPage() {
 
               {/* Messages */}
               <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "14px 12px" : "24px 28px" }}>
-                {loadingMsgs && (
-                  <div style={{ textAlign: "center", color: textSub, fontSize: "13px", paddingTop: 40 }}>
-                    Loading messages…
-                  </div>
-                )}
+                {loadingMsgs && <LoadingDots />}
                 {msgError && !loadingMsgs && (
                   <div style={{ textAlign: "center", color: "#e84545", fontSize: "13px", paddingTop: 40 }}>
                     ⚠ {msgError}
                   </div>
                 )}
                 {!loadingMsgs && !msgError && messages.length === 0 && (
-                  <div style={{ textAlign: "center", color: textSub, fontSize: "13px", paddingTop: 40, lineHeight: 1.8 }}>
-                    {selected.hasThread === false
-                      ? (
-                        <>
-                          <div style={{ fontSize: "28px", marginBottom: 8 }}>💬</div>
-                          <div style={{ fontWeight: 600, color: textMain, marginBottom: 4 }}>No messages yet</div>
-                          <div style={{ fontSize: "12px" }}>
-                            {selected.guestName || "This guest"} hasn't sent a message.<br />
-                            You can send the first message below.
-                          </div>
-                        </>
-                      )
-                      : "No messages yet."}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", paddingTop: 60, paddingBottom: 40 }}>
+                    <svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="36" cy="36" r="34" fill={dark ? "#1a2e20" : "#edf7f2"} />
+                      <path d="M20 26C20 24.3431 21.3431 23 23 23H49C50.6569 23 52 24.3431 52 26V42C52 43.6569 50.6569 45 49 45H39.5L33 51V45H23C21.3431 45 20 43.6569 20 42V26Z" fill={dark ? "#26a676" : "#26a676"} opacity="0.18"/>
+                      <path d="M22 26C22 25.4477 22.4477 25 23 25H49C49.5523 25 50 25.4477 50 26V42C50 42.5523 49.5523 43 49 43H38.5L33 48V43H23C22.4477 43 22 42.5523 22 42V26Z" fill={dark ? "#26a676" : "#26a676"} opacity="0.55"/>
+                      <circle cx="30" cy="34" r="2.2" fill="white" opacity="0.9"/>
+                      <circle cx="36" cy="34" r="2.2" fill="white" opacity="0.9"/>
+                      <circle cx="42" cy="34" r="2.2" fill="white" opacity="0.9"/>
+                    </svg>
+                    <div style={{ fontWeight: 700, color: textMain, marginTop: 18, marginBottom: 6, fontSize: "15px", letterSpacing: "-0.01em" }}>
+                      No messages yet
+                    </div>
+                    <div style={{ fontSize: "12.5px", color: textSub, textAlign: "center", lineHeight: 1.75, maxWidth: 270 }}>
+                      {selected.guestName || "This guest"} hasn't sent a message yet.<br />
+                      You can send the first message below.
+                    </div>
                   </div>
                 )}
                 {!loadingMsgs && !msgError && messages.map((m, i) => (
