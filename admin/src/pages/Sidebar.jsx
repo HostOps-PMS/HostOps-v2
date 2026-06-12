@@ -352,7 +352,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts = [] }
     .filter(Boolean).map(n => n[0].toUpperCase()).join('') || 'U';
   const [mobileNotifOpen, setMobileNotifOpen] = useState(false);
   const location = useLocation();
-  const isDashboard = location.pathname === '/dashboard' || location.pathname === '/dashboard/';
+  const isDashboard = true; // show Export PDF on any page that passes onExport
 
   const sidebarContent = (isMobile = false) => {
     const isCollapsed = collapsed && !isMobile;
