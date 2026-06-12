@@ -48,7 +48,9 @@ router.get('/clients/:clientId/staff-properties', requireAdminOrTeamLeader, asyn
 // ─────────────────────────────────────────────────────────────────
 router.get('/staffs', requireAdminOrTeamLeader, async (req, res, next) => {
   try {
-    const filter = {};
+    const showArchived = req.query.archived === 'true';
+    const filter = { isArchive: showArchived ? true : { $ne: true } };
+
     if (req.user.role === 'team_leader') {
       filter.clientId = req.user.serverId;
     } else if (req.query.clientId) {
@@ -195,6 +197,46 @@ router.patch('/staffs/:id', requireAdminOrTeamLeader, async (req, res, next) => 
     if (err.name === 'CastError') {
       return res.status(400).json({ error: 'Invalid staff ID' });
     }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// PATCH /api/staffs/:id/archive
+// Admin soft-archives a staff account (isArchive = true).
+// ─────────────────────────────────────────────────────────────────
+router.patch('/staffs/:id/archive', requireAdminOrTeamLeader, async (req, res, next) => {
+  try {
+    const staff = await Staff.findById(req.params.id);
+    if (!staff) return res.status(404).json({ error: 'Staff not found' });
+    if (req.user.role === 'team_leader' && String(staff.clientId) !== String(req.user.serverId)) {
+      return res.status(403).json({ error: 'Unauthorized to archive this staff member' });
+    }
+    staff.isArchive = true;
+    await staff.save();
+    res.json({ message: 'Staff archived.', staff: staff.toJSON() });
+  } catch (err) {
+    if (err.name === 'CastError') return res.status(400).json({ error: 'Invalid staff ID' });
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// PATCH /api/staffs/:id/unarchive
+// Admin restores a staff account from archive (isArchive = false).
+// ─────────────────────────────────────────────────────────────────
+router.patch('/staffs/:id/unarchive', requireAdminOrTeamLeader, async (req, res, next) => {
+  try {
+    const staff = await Staff.findById(req.params.id);
+    if (!staff) return res.status(404).json({ error: 'Staff not found' });
+    if (req.user.role === 'team_leader' && String(staff.clientId) !== String(req.user.serverId)) {
+      return res.status(403).json({ error: 'Unauthorized to unarchive this staff member' });
+    }
+    staff.isArchive = false;
+    await staff.save();
+    res.json({ message: 'Staff unarchived.', staff: staff.toJSON() });
+  } catch (err) {
+    if (err.name === 'CastError') return res.status(400).json({ error: 'Invalid staff ID' });
     next(err);
   }
 });

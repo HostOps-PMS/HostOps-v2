@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(node -e \"import\\('./backend/routes/auth.js'\\).then\\(\\(\\) => console.log\\('auth.js OK'\\)\\).catch\\(e => console.error\\('auth.js ERROR:', e.message\\)\\)\")"
+    ]
+  }
+}

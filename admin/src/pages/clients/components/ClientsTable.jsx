@@ -97,7 +97,7 @@ function isUnverified(client) {
   return client.mustChangePassword && client.mustChangePin;
 }
 
-export default function ClientsTable({ clients, loading, onRowClick, search, onSearchChange, onAddClient, onRefresh, page, totalPages, totalCount, onPrev, onNext, onVisibleClientsChange }) {
+export default function ClientsTable({ clients, loading, onRowClick, search, onSearchChange, onAddClient, onRefresh, onArchive, page, totalPages, totalCount, onPrev, onNext, onVisibleClientsChange }) {
   const [activeTab, setActiveTab] = useState('All');
   const tabScrollRef = useRef(null);
   const [tabScrollLeft, setTabScrollLeft] = useState(0);
@@ -295,7 +295,7 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #f0f2f5' }}>
-                  {['Business', 'Role', 'Status', 'Last Login', 'Joined'].map((h) => (
+                  {['Business', 'Role', 'Status', 'Last Login', 'Joined', ''].map((h) => (
                     <th key={h} style={{
                       padding: '10px 16px',
                       textAlign: 'left', fontSize: '0.72rem', fontWeight: 700,
@@ -362,6 +362,24 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
                       {/* Joined */}
                       <td style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
                         {formatDate(client.createdAt)}
+                      </td>
+
+                      {/* Archive action */}
+                      <td style={{ padding: '12px 16px 12px 8px', whiteSpace: 'nowrap' }}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onArchive && onArchive(client); }}
+                          style={{
+                            padding: '5px 12px', borderRadius: 6,
+                            border: '1px solid #fbbf24', background: '#fffbeb',
+                            fontSize: '0.78rem', fontWeight: 600, color: '#92400e', cursor: 'pointer',
+                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                          }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="2" y="6" width="16" height="11" rx="1.5"/><path d="M2 6l2-3h12l2 3" strokeLinecap="round" strokeLinejoin="round"/><path d="M8 11h4" strokeLinecap="round"/>
+                          </svg>
+                          Archive
+                        </button>
                       </td>
                     </tr>
                   );

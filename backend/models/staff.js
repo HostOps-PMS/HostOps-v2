@@ -66,6 +66,8 @@ const staffSchema = new mongoose.Schema({
   pinLockedUntil:       { type: Date,     default: null },
   pinPermanentlyLocked: { type: Boolean,  default: false },
 
+  isArchive: { type: Boolean, default: false },
+
   lastLoginAt: { type: Date },
 
   // ── OTP for password-change verification ─────────────────────────

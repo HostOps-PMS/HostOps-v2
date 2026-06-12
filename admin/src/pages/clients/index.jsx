@@ -8,6 +8,8 @@ import ClientModal          from './components/ClientModal';
 import AddClientModal       from './components/AddClientModal';
 import { useClients }       from './hooks/useClients';
 import { exportClientsPdf } from './utils/exportClientsPdf';
+import { archiveClient } from './services/clientsService';
+import ArchiveConfirmModal from '../components/ArchiveConfirmModal';
 
 export default function Clients() {
   /* ── View-client modal ── */
@@ -45,6 +47,24 @@ export default function Clients() {
   function handleSearchChange(val) {
     setSearch(val);
     setPage(1);
+  }
+
+  /* ── Archive confirm modal ── */
+  const [archiveTarget, setArchiveTarget] = useState(null);
+  const [archiving, setArchiving]         = useState(false);
+
+  async function confirmArchive() {
+    if (!archiveTarget) return;
+    setArchiving(true);
+    try {
+      await archiveClient(archiveTarget._id);
+      refetch();
+      setArchiveTarget(null);
+    } catch (err) {
+      console.error('[archiveClient]', err);
+    } finally {
+      setArchiving(false);
+    }
   }
 
   /* ── Handle client updated from modal ── */
@@ -160,6 +180,7 @@ export default function Clients() {
             onSearchChange={handleSearchChange}
             onAddClient={() => setShowAddClient(true)}
             onRefresh={refetch}
+            onArchive={setArchiveTarget}
             page={page}
             totalPages={totalPages}
             totalCount={filtered.length}
@@ -184,6 +205,17 @@ export default function Clients() {
         <AddClientModal
           onClose={() => setShowAddClient(false)}
           onSuccess={() => { setShowAddClient(false); refetch(); }}
+        />
+      )}
+
+      {/* Archive confirmation modal */}
+      {archiveTarget && (
+        <ArchiveConfirmModal
+          mode="archive"
+          name={archiveTarget.businessName || archiveTarget.email}
+          loading={archiving}
+          onConfirm={confirmArchive}
+          onClose={() => !archiving && setArchiveTarget(null)}
         />
       )}
     </div>

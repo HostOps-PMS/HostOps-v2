@@ -6,6 +6,8 @@ import TeamLeaderModal from './components/TeamLeaderModal';
 import DeleteModal from './components/DeleteModal';
 import TeamLeaderTable from './components/TeamLeaderTable';
 import { exportTeamLeadersPdf } from './utils/exportTeamLeadersPdf';
+import { archiveClient } from '../clients/services/clientsService';
+import ArchiveConfirmModal from '../components/ArchiveConfirmModal';
 
 export default function TeamLeaders() {
   const [search, setSearch]             = useState('');
@@ -69,6 +71,23 @@ export default function TeamLeaders() {
   function handleDeleted() {
     setModal(null);
     refetch();
+  }
+
+  const [archiveTarget, setArchiveTarget] = useState(null);
+  const [archiving, setArchiving]         = useState(false);
+
+  async function confirmArchiveTeamLeader() {
+    if (!archiveTarget) return;
+    setArchiving(true);
+    try {
+      await archiveClient(archiveTarget._id);
+      refetch();
+      setArchiveTarget(null);
+    } catch (err) {
+      console.error('[archiveTeamLeader]', err);
+    } finally {
+      setArchiving(false);
+    }
   }
 
   return (
@@ -163,6 +182,7 @@ export default function TeamLeaders() {
             onSearchChange={handleSearchChange}
             onEdit={(tl) => setModal({ type: 'edit', teamLeader: tl })}
             onDelete={(tl) => setModal({ type: 'delete', teamLeader: tl })}
+            onArchive={setArchiveTarget}
             onNew={() => setModal({ type: 'create' })}
             page={page}
             totalPages={totalPages}
@@ -172,6 +192,16 @@ export default function TeamLeaders() {
           />
         </div>
       </div>
+
+      {archiveTarget && (
+        <ArchiveConfirmModal
+          mode="archive"
+          name={archiveTarget.businessName || archiveTarget.email}
+          loading={archiving}
+          onConfirm={confirmArchiveTeamLeader}
+          onClose={() => !archiving && setArchiveTarget(null)}
+        />
+      )}
     </div>
   );
 }
