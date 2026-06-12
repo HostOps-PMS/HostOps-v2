@@ -1,8 +1,9 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AccountSettingsModal from './dashboard/components/AccountSettingsModal';
 import { logoutUser } from './authorization/services/authService';
 import HostOpsLogo from '../assets/HostOpsLOGO.png';
+import { useNotifications } from '../context/NotificationsContext';
 
 /* ─── Nav data ───────────────────────────────────────────────────── */
 // Businesses has a sub-item: Staffs
@@ -339,7 +340,7 @@ function SidebarButton({ icon, label, onClick, collapsed, danger }) {
 }
 
 /* ─── Main Sidebar ──────────────────────────────────────────────── */
-export default function Sidebar({ onExport, exportLoading = false, alerts = [] }) {
+export default function Sidebar({ onExport, exportLoading = false, alerts }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -347,11 +348,25 @@ export default function Sidebar({ onExport, exportLoading = false, alerts = [] }
     try { return JSON.parse(sessionStorage.getItem('hp_user') || '{}'); } catch { return {}; }
   });
 
-  const unreadCount = (alerts || []).filter(a => a.unread).length;
+  const notifContext = useNotifications();
+  const resolvedAlerts     = alerts ?? notifContext.alerts;
+  const resolvedActivities = notifContext.activities;
+  const resolvedLoading    = notifContext.loading;
+
+  const unreadCount = (resolvedAlerts || []).filter(a => a.unread).length;
   const mobileInitials = [currentUser.firstName, currentUser.lastName]
     .filter(Boolean).map(n => n[0].toUpperCase()).join('') || 'U';
-  const [mobileNotifOpen, setMobileNotifOpen] = useState(false);
+  const [mobileNotifOpen,  setMobileNotifOpen]  = useState(false);
+  const [mobileActiveTab,  setMobileActiveTab]  = useState('alerts');
+  const [mobileReadIds,    setMobileReadIds]    = useState(new Set());
   const location = useLocation();
+
+  // Refetch when the mobile panel is opened and data is empty
+  useEffect(() => {
+    if (mobileNotifOpen && resolvedAlerts.length === 0 && !resolvedLoading) {
+      notifContext.refetch();
+    }
+  }, [mobileNotifOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const isDashboard = location.pathname === '/dashboard' || location.pathname === '/dashboard/';
 
   const sidebarContent = (isMobile = false) => {
@@ -646,67 +661,171 @@ export default function Sidebar({ onExport, exportLoading = false, alerts = [] }
               onClick={e => e.stopPropagation()}
               style={{
                 position: 'fixed',
-                top: 60, right: 12,
-                width: Math.min(340, window.innerWidth - 24),
+                top: 60, right: 8, left: 8,
+                maxWidth: 360,
+                marginLeft: 'auto',
                 background: '#fff',
                 borderRadius: 14,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.13)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.13), 0 1.5px 6px rgba(0,0,0,0.07)',
                 border: '0.5px solid rgba(0,0,0,0.08)',
                 zIndex: 9999,
                 overflow: 'hidden',
                 fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
               }}
             >
-              <div style={{ padding: '14px 16px', borderBottom: '0.5px solid rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>Notifications</span>
-                  {unreadCount > 0 && (
-                    <span style={{ background: '#1a9e6e', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 20, padding: '1px 7px' }}>
-                      {unreadCount}
-                    </span>
-                  )}
+              {/* Header */}
+              <div style={{ padding: '14px 16px 0', borderBottom: '0.5px solid rgba(0,0,0,0.07)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>Notifications</span>
+                    {unreadCount > 0 && (
+                      <span style={{ background: '#1a9e6e', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 20, padding: '1px 7px', lineHeight: '16px' }}>
+                        {unreadCount}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setMobileReadIds(new Set((resolvedAlerts || []).map(a => a.id)))}
+                    style={{ fontSize: 11, color: '#aaa', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  >
+                    Mark all read
+                  </button>
                 </div>
+
+                {/* Tabs */}
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {[
+                    { key: 'alerts',     label: 'Alerts',   count: (resolvedAlerts     || []).length },
+                    { key: 'activities', label: 'Activity', count: (resolvedActivities || []).length },
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setMobileActiveTab(tab.key)}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: mobileActiveTab === tab.key ? 600 : 400,
+                        color: mobileActiveTab === tab.key ? '#1a9e6e' : '#888',
+                        background: 'none', border: 'none',
+                        borderBottom: mobileActiveTab === tab.key ? '2px solid #1a9e6e' : '2px solid transparent',
+                        padding: '4px 10px 8px',
+                        cursor: 'pointer',
+                        borderRadius: '4px 4px 0 0',
+                        display: 'flex', alignItems: 'center', gap: 5,
+                      }}
+                    >
+                      {tab.label}
+                      {tab.count > 0 && (
+                        <span style={{ fontSize: 10, color: mobileActiveTab === tab.key ? '#1a9e6e' : '#aaa', fontWeight: 500 }}>
+                          {tab.count}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Content */}
+              <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+                {resolvedLoading ? (
+                  <div style={{ padding: '28px 0', textAlign: 'center', fontSize: 11, color: '#bbb' }}>Loading...</div>
+                ) : mobileActiveTab === 'alerts' ? (
+                  (resolvedAlerts || []).length === 0 ? (
+                    <div style={{ padding: '36px 0', textAlign: 'center', fontSize: 12, color: '#aaa' }}>No alerts right now</div>
+                  ) : (
+                    (resolvedAlerts || []).map((alert, i) => {
+                      const isRead = mobileReadIds.has(alert.id) || !alert.unread;
+                      return (
+                        <div key={alert.id ?? i} style={{
+                          display: 'flex', alignItems: 'flex-start', gap: 10,
+                          padding: '11px 16px',
+                          borderBottom: '0.5px solid rgba(0,0,0,0.05)',
+                          background: isRead ? '#fff' : '#f0faf6',
+                        }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: isRead ? 500 : 600, color: '#111', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {alert.title}
+                            </div>
+                            {alert.desc && (
+                              <div style={{ fontSize: 11, color: '#888', marginTop: 1, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                {alert.desc}
+                              </div>
+                            )}
+                            {alert.clientName && (
+                              <div style={{ fontSize: 10, color: '#1a9e6e', marginTop: 3, fontWeight: 500 }}>
+                                {alert.clientName}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                            {!isRead && (
+                              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#1a9e6e', marginLeft: 'auto', marginTop: 5 }} />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )
+                ) : (
+                  (resolvedActivities || []).length === 0 ? (
+                    <div style={{ padding: '36px 0', textAlign: 'center', fontSize: 12, color: '#aaa' }}>No recent activity</div>
+                  ) : (
+                    (resolvedActivities || []).map((act, i) => {
+                      const parts    = (act.actor || '').trim().split(/\s+/);
+                      const initials = parts.length >= 2
+                        ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+                        : (parts[0] || '?').slice(0, 2).toUpperCase();
+                      const COLORS = ['#1a9e6e','#2196f3','#9c27b0','#f44336','#ff9800','#00bcd4'];
+                      let hash = 0;
+                      for (let c = 0; c < (act.actor || '').length; c++) hash = (act.actor || '').charCodeAt(c) + ((hash << 5) - hash);
+                      const bg = COLORS[Math.abs(hash) % COLORS.length];
+                      return (
+                        <div key={act.id ?? i} style={{
+                          display: 'flex', alignItems: 'flex-start', gap: 10,
+                          padding: '11px 16px',
+                          borderBottom: '0.5px solid rgba(0,0,0,0.05)',
+                        }}>
+                          <div style={{ width: 34, height: 34, borderRadius: 10, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                            {initials}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 500, color: '#111', lineHeight: 1.4 }}>
+                              <span style={{ fontWeight: 600 }}>{act.actor}</span>
+                              {' '}<span style={{ color: '#555' }}>{act.action}</span>
+                              {act.target && <span style={{ color: '#1a9e6e', fontWeight: 600 }}> {act.target}</span>}
+                            </div>
+                            {act.time && (
+                              <div style={{ fontSize: 10, color: '#bbb', marginTop: 2 }}>
+                                {(() => {
+                                  const diff = Math.floor((Date.now() - new Date(act.time)) / 1000);
+                                  if (diff < 60) return 'just now';
+                                  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+                                  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+                                  return `${Math.floor(diff / 86400)}d ago`;
+                                })()}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )
+                )}
+              </div>
+
+              {/* Footer */}
+              <div style={{ padding: '10px 16px', borderTop: '0.5px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <button
                   onClick={() => setMobileNotifOpen(false)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: 11 }}
+                  style={{ fontSize: 11, color: '#1a9e6e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0 }}
+                >
+                  View all in dashboard
+                </button>
+                <button
+                  onClick={() => setMobileNotifOpen(false)}
+                  style={{ fontSize: 11, color: '#aaa', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                 >
                   Close
                 </button>
-              </div>
-              <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-                {alerts.length === 0 ? (
-                  <div style={{ padding: '32px 0', textAlign: 'center', fontSize: 12, color: '#aaa' }}>
-                    No alerts right now
-                  </div>
-                ) : (
-                  alerts.map((alert, i) => (
-                    <div key={alert.id ?? i} style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 10,
-                      padding: '11px 16px',
-                      borderBottom: '0.5px solid rgba(0,0,0,0.05)',
-                      background: alert.unread ? '#f0faf6' : '#fff',
-                    }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: alert.unread ? 600 : 500, color: '#111', lineHeight: 1.4 }}>
-                          {alert.title}
-                        </div>
-                        {alert.desc && (
-                          <div style={{ fontSize: 11, color: '#888', marginTop: 2, lineHeight: 1.4 }}>
-                            {alert.desc}
-                          </div>
-                        )}
-                        {alert.clientName && (
-                          <div style={{ fontSize: 10, color: '#1a9e6e', marginTop: 2, fontWeight: 500 }}>
-                            {alert.clientName}
-                          </div>
-                        )}
-                      </div>
-                      {alert.unread && (
-                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#1a9e6e', flexShrink: 0, marginTop: 4 }} />
-                      )}
-                    </div>
-                  ))
-                )}
               </div>
             </div>
           )}
