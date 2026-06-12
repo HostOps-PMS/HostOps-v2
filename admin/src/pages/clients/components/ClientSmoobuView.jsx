@@ -403,6 +403,98 @@ function DatePresetBar({ activePreset, dateRange, onPresetChange, onCustomApply 
   );
 }
 
+// ── Image carousel ───────────────────────────────────────────────
+function ImageCarousel({ images, alt }) {
+  const [idx, setIdx] = useState(0);
+
+  if (!images?.length) {
+    return (
+      <div style={{
+        width: '100%', aspectRatio: '16/9',
+        background: 'var(--color-surface-2, #f0f7f4)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
+          stroke="var(--color-primary, #26a676)" strokeWidth="1"
+          strokeLinecap="round" strokeLinejoin="round" style={{ opacity: .4 }}>
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      </div>
+    );
+  }
+
+  const prev = (e) => { e.stopPropagation(); setIdx(i => (i - 1 + images.length) % images.length); };
+  const next = (e) => { e.stopPropagation(); setIdx(i => (i + 1) % images.length); };
+
+  return (
+    <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', overflow: 'hidden', background: '#111' }}>
+      <img
+        key={idx}
+        src={images[idx].url}
+        alt={`${alt} ${idx + 1}`}
+        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+      />
+
+      {images.length > 1 && (
+        <>
+          <button onClick={prev} style={{
+            position: 'absolute', left: 7, top: '50%', transform: 'translateY(-50%)',
+            width: 28, height: 28, borderRadius: '50%',
+            background: 'rgba(0,0,0,.48)', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', backdropFilter: 'blur(4px)',
+          }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+
+          <button onClick={next} style={{
+            position: 'absolute', right: 7, top: '50%', transform: 'translateY(-50%)',
+            width: 28, height: 28, borderRadius: '50%',
+            background: 'rgba(0,0,0,.48)', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', backdropFilter: 'blur(4px)',
+          }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+
+          <div style={{
+            position: 'absolute', bottom: 7, left: '50%', transform: 'translateX(-50%)',
+            display: 'flex', gap: 4, alignItems: 'center',
+          }}>
+            {images.map((_, i) => (
+              <button
+                key={i}
+                onClick={(e) => { e.stopPropagation(); setIdx(i); }}
+                style={{
+                  width: i === idx ? 16 : 6, height: 6, borderRadius: 99,
+                  background: i === idx ? '#fff' : 'rgba(255,255,255,.5)',
+                  border: 'none', cursor: 'pointer', padding: 0,
+                  transition: 'all .2s',
+                }}
+              />
+            ))}
+          </div>
+
+          <div style={{
+            position: 'absolute', top: 7, right: 9,
+            fontSize: '.65rem', fontWeight: 700,
+            background: 'rgba(0,0,0,.48)', color: '#fff',
+            borderRadius: 99, padding: '2px 7px',
+            backdropFilter: 'blur(4px)',
+          }}>
+            {idx + 1}/{images.length}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Expandable property list ────────────────────────────────────
 function ExpandablePropertyList({ properties }) {
   const [expandedId, setExpandedId] = useState(null);
@@ -478,26 +570,10 @@ function ExpandablePropertyList({ properties }) {
               </svg>
             </div>
 
-            {/* Expanded: full image */}
+            {/* Expanded: image carousel */}
             {isOpen && (
               <div style={{ borderTop: '1px solid var(--color-border, #e5e9ec)' }}>
-                {p.picture ? (
-                  <img src={p.picture} alt={p.name}
-                    style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} />
-                ) : (
-                  <div style={{
-                    width: '100%', aspectRatio: '16/9',
-                    background: 'var(--color-surface-2, #f0f7f4)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
-                      stroke="var(--color-primary, #26a676)" strokeWidth="1"
-                      strokeLinecap="round" strokeLinejoin="round" style={{ opacity: .4 }}>
-                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                      <polyline points="9 22 9 12 15 12 15 22" />
-                    </svg>
-                  </div>
-                )}
+                <ImageCarousel images={p.images} alt={p.name} />
                 {p.type && (
                   <div style={{ padding: '8px 12px', fontSize: '.75rem', color: 'var(--color-muted, #7a8c8e)', fontWeight: 500 }}>
                     {p.type}
@@ -596,10 +672,10 @@ export default function ClientSmoobuView({ client, property, onClose }) {
   const cancellations = stats.cancellations ?? 0;
   const cancelledNights = stats.cancelledNights ?? 0;
 
-  const properties = (data?.properties ?? []).map(p => ({
-    ...p,
-    picture: apartmentPhotos[String(p.id)]?.[0]?.url ?? p.picture ?? null,
-  }));
+  const properties = (data?.properties ?? []).map(p => {
+    const imgs = apartmentPhotos[String(p.id)] ?? [];
+    return { ...p, picture: imgs[0]?.url ?? p.picture ?? null, images: imgs };
+  });
   const byChannel = data?.byChannel ?? {};
 
   const recentBookings = (data?.bookings ?? [])
