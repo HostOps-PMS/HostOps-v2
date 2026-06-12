@@ -39,7 +39,6 @@ export default function TeamLeaderTable({
 }) {
   const clientMap = Object.fromEntries(clients.map((c) => [c._id, c]));
 
-  const [selected, setSelected] = useState([]);
   const [activeTab, setActiveTab] = useState('All');
   const tabScrollRef = useRef(null);
   const [tabScrollLeft, setTabScrollLeft] = useState(0);
@@ -70,20 +69,6 @@ export default function TeamLeaderTable({
       : activeTab === 'Active'
       ? filtered.filter((tl) => tl.isActive)
       : filtered.filter((tl) => !tl.isActive);
-
-  const allChecked =
-    tabFiltered.length > 0 && tabFiltered.every((tl) => selected.includes(tl._id));
-
-  function toggleAll() {
-    if (allChecked) setSelected([]);
-    else setSelected(tabFiltered.map((tl) => tl._id));
-  }
-
-  function toggleOne(id) {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -233,14 +218,6 @@ export default function TeamLeaderTable({
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #f0f2f5' }}>
-                  <th style={{ padding: '10px 16px 10px 20px', width: 36 }}>
-                    <input
-                      type="checkbox"
-                      checked={allChecked}
-                      onChange={toggleAll}
-                      style={{ width: 15, height: 15, accentColor: '#3b5fc0', cursor: 'pointer' }}
-                    />
-                  </th>
                   {['Team Leader', 'Assigned Server', 'Created', ''].map((h) => (
                     <th key={h} style={{
                       padding: '10px 16px',
@@ -256,29 +233,19 @@ export default function TeamLeaderTable({
               <tbody>
                 {tabFiltered.map((tl, i) => {
                   const client = clientMap[tl.serverId?._id || tl.serverId];
-                  const isSelected = selected.includes(tl._id);
                   return (
                     <tr
                       key={tl._id}
                       style={{
                         borderBottom: i < tabFiltered.length - 1 ? '1px solid #f7f8fa' : 'none',
-                        background: isSelected ? '#f8f9ff' : 'transparent',
-                        borderLeft: isSelected ? '3px solid #3b5fc0' : '3px solid transparent',
+                        background: 'transparent',
                         transition: 'background 0.1s',
                         cursor: 'pointer',
-                      }}onClick={() => onRowClick && onRowClick(tl)}
-                      onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = '#fafbff'; }}
-                      onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+                      }}
+                      onClick={() => onRowClick && onRowClick(tl)}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#fafbff'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                     >
-                      <td style={{ padding: '12px 16px 12px 20px', width: 36 }}>
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleOne(tl._id)}
-                          style={{ width: 15, height: 15, accentColor: '#3b5fc0', cursor: 'pointer' }}
-                        />
-                      </td>
-
                       {/* Team Leader name + email */}
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>

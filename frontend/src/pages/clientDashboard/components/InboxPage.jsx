@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
+import FetchingOverlay from "./FetchingOverlay";
 import { useDashboard } from "../context/DashboardContext";
 import { useDashboardData } from "../hooks/useDashboardData";
 import { useAuth } from "../../AuthContext";
@@ -138,6 +139,8 @@ export default function InboxPage() {
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState(false);
+  const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+  const [pinAccessGranted, setPinAccessGranted] = useState(false);
   const msgEndRef = useRef(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [showThread, setShowThread] = useState(false);
@@ -151,17 +154,26 @@ export default function InboxPage() {
   const STAFF_PIN = "1234";
 
   function handlePinSubmit() {
-    if (pinInput === STAFF_PIN) {
-      setStaffUnlocked(true);
-      setPinModalOpen(false);
-      setPinInput("");
-      setPinError(false);
-      // Auto-lock after 30 mins (only applies to PIN-unlocked client users)
-      setTimeout(() => setStaffUnlocked(false), 30 * 60 * 1000);
-    } else {
-      setPinError(true);
-      setPinInput("");
-    }
+    if (!pinInput) return;
+    setIsVerifyingPin(true);
+    setPinError(false);
+
+    setTimeout(() => {
+      setIsVerifyingPin(false);
+      if (pinInput === STAFF_PIN) {
+        setPinAccessGranted(true);
+        setTimeout(() => {
+          setPinAccessGranted(false);
+          setPinModalOpen(false);
+          setPinInput("");
+          setStaffUnlocked(true);
+          setTimeout(() => setStaffUnlocked(false), 30 * 60 * 1000);
+        }, 1000);
+      } else {
+        setPinError(true);
+        setPinInput("");
+      }
+    }, 800);
   }
 
   // ── Load data on mount, scoped to the currently selected property ──────────
@@ -191,6 +203,14 @@ export default function InboxPage() {
     // fall back to dashState.from / dashState.to inside loadData.
     loadData(undefined, undefined, smoobuApartmentId);
   }, []); // eslint-disable-line
+
+  // When the user switches property from inside InboxPage, show the overlay
+  // then redirect to the dashboard so its useEffect fires and loads fresh data.
+  useEffect(() => {
+    if (!dashState.isSwitching) return;
+    const t = setTimeout(() => navigate("/dashboard"), 300);
+    return () => clearTimeout(t);
+  }, [dashState.isSwitching]); // eslint-disable-line
 
   const inbox = dashState.rawData?.inbox || [];
   const totalUnread = dashState.rawData?.totalUnread || 0;
@@ -273,6 +293,23 @@ export default function InboxPage() {
 
   return (
     <div style={{ height: "100vh", background: bg, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <FetchingOverlay
+        isVisible={dashState.isSwitching}
+        message="Switching property…"
+        subMessage={dashState.selectedPropertyName || null}
+      />
+      <FetchingOverlay
+        isVisible={isVerifyingPin}
+        message="Verifying PIN…"
+        subMessage="Please wait a moment"
+      />
+      <FetchingOverlay
+        isVisible={pinAccessGranted}
+        success
+        message="Access Granted"
+        subMessage="Replies are now unlocked"
+      />
+
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
         <Navbar />
       </div>
@@ -621,7 +658,8 @@ export default function InboxPage() {
                             fontSize: "11px", color: "#e84545", background: "none",
                             border: "none", cursor: "pointer", fontWeight: 600,
                           }}>
-                            🔒 Lock
+                            <i className="ti ti-lock" style={{ fontSize: "11px", marginRight: 3 }} />
+                            Lock
                           </button>
                         )}
                       </div>
@@ -695,7 +733,14 @@ export default function InboxPage() {
                     border: `1px solid ${border}`,
                     display: "flex", flexDirection: "column", alignItems: "center", gap: 16,
                   }}>
-                    <div style={{ fontSize: "32px" }}>🔐</div>
+                    <div style={{
+                      width: 52, height: 52, borderRadius: "50%",
+                      background: dark ? "#1a3528" : "#eaf8f1",
+                      border: `1.5px solid ${dark ? "#1e3a2a" : "#b7e4cf"}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <i className="ti ti-lock" style={{ fontSize: "22px", color: "#26a676" }} />
+                    </div>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontWeight: 800, fontSize: "15px", color: textMain, marginBottom: 4 }}>
                         Staff Access Required
@@ -725,7 +770,7 @@ export default function InboxPage() {
 
                     {pinError && (
                       <div style={{ fontSize: "12px", color: "#e84545", fontWeight: 600 }}>
-                        ❌ Incorrect PIN — try again
+                        Incorrect PIN — try again
                       </div>
                     )}
 
@@ -742,6 +787,7 @@ export default function InboxPage() {
                       </button>
                       <button
                         onClick={handlePinSubmit}
+                        disabled={isVerifyingPin}
                         style={{
                           flex: 1, padding: "9px", borderRadius: "8px",
                           border: "none", background: "#26a676",

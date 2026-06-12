@@ -425,13 +425,10 @@ const location = useLocation();
       flexWrap: 'wrap',
     }}>
 
-      {/* Left — Welcome */}
+      {/* Left — Title */}
       <div style={{ flex: 1, minWidth: 120 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#111', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          Welcome back, {firstName}!
-        </div>
-        <div style={{ fontSize: 11, color: '#aaa', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          Get a clear view of your real estate portfolio.
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#111', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          Admin Dashboard
         </div>
       </div>
 

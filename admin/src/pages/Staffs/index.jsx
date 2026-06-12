@@ -6,6 +6,7 @@ import { useStaffs } from './hooks/useStaffs';
 import StaffModal from './components/StaffModal';
 import DeleteModal from './components/DeleteModal';
 import StaffTable from './components/StaffTable';
+import { exportStaffsPdf } from './utils/exportStaffsPdf';
 
 export default function Staffs() {
   const [filterClient, setFilterClient] = useState('');
@@ -35,6 +36,18 @@ export default function Staffs() {
   function handleSearchChange(val) {
     setSearch(val);
     setPage(1);
+  }
+
+  const [exportLoading, setExportLoading] = useState(false);
+
+  async function handleExport() {
+    if (exportLoading || loading) return;
+    setExportLoading(true);
+    try {
+      await exportStaffsPdf({ staffs: filtered, clients, propertyMap, filterClient, search });
+    } finally {
+      setExportLoading(false);
+    }
   }
 
   function handleSaved() {
@@ -93,6 +106,40 @@ export default function Staffs() {
               <h1 className="cl-content__title">Staffs</h1>
               <p className="cl-content__sub">Manage staff accounts and their property access</p>
             </div>
+            <button
+              onClick={handleExport}
+              disabled={exportLoading || loading}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7,
+                padding: '9px 18px',
+                background: (exportLoading || loading) ? '#e0e0e0' : '#1a9e6e',
+                color: (exportLoading || loading) ? '#aaa' : '#fff',
+                border: 'none', borderRadius: 10,
+                cursor: (exportLoading || loading) ? 'not-allowed' : 'pointer',
+                fontSize: '0.875rem', fontWeight: 600,
+                letterSpacing: '0.01em', whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+                boxShadow: (exportLoading || loading) ? 'none' : '0 2px 8px rgba(26,158,110,0.18)',
+              }}
+              onMouseEnter={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#158a5e'; }}
+              onMouseLeave={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#1a9e6e'; }}
+              title="Export visible staffs as PDF"
+            >
+              {exportLoading ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+                  style={{ animation: 'st-pdf-spin 0.8s linear infinite' }}>
+                  <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                  <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M3 16h14" strokeLinecap="round" />
+                </svg>
+              )}
+              {exportLoading ? 'Exporting…' : 'Export PDF'}
+            </button>
+            <style>{`@keyframes st-pdf-spin { to { transform: rotate(360deg); } }`}</style>
           </header>
 
           {error && (
