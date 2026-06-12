@@ -7,6 +7,7 @@ import TeamLeaderModal from './components/TeamLeaderModal';
 import DeleteModal from './components/DeleteModal';
 import TeamLeaderTable from './components/TeamLeaderTable';
 import { exportTeamLeadersPdf } from './utils/exportTeamLeadersPdf';
+import { exportTeamLeadersPdf } from './utils/exportTeamLeadersPdf';
 
 export default function TeamLeaders() {
   const [search, setSearch]             = useState('');
@@ -35,6 +36,18 @@ export default function TeamLeaders() {
   function handleSearchChange(val) {
     setSearch(val);
     setPage(1);
+  }
+
+  const [exportLoading, setExportLoading] = useState(false);
+
+  async function handleExport() {
+    if (exportLoading || loading) return;
+    setExportLoading(true);
+    try {
+      await exportTeamLeadersPdf({ teamLeaders: filtered, clients, search });
+    } finally {
+      setExportLoading(false);
+    }
   }
 
   function handleSaved() {

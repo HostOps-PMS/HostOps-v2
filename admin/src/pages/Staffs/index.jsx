@@ -7,6 +7,7 @@ import StaffModal from './components/StaffModal';
 import DeleteModal from './components/DeleteModal';
 import StaffTable from './components/StaffTable';
 import { exportStaffsPdf } from './utils/exportStaffsPdf';
+import { exportStaffsPdf } from './utils/exportStaffsPdf';
 
 export default function Staffs() {
   const [filterClient, setFilterClient] = useState('');
@@ -36,6 +37,18 @@ export default function Staffs() {
   function handleSearchChange(val) {
     setSearch(val);
     setPage(1);
+  }
+
+  const [exportLoading, setExportLoading] = useState(false);
+
+  async function handleExport() {
+    if (exportLoading || loading) return;
+    setExportLoading(true);
+    try {
+      await exportStaffsPdf({ staffs: filtered, clients, propertyMap, filterClient, search });
+    } finally {
+      setExportLoading(false);
+    }
   }
 
   function handleSaved() {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { changePassword } from '../../Login/services/authservice';
 import safeStorage from '../../safeStorage';
+import FetchingOverlay from './FetchingOverlay';
 
 // Inline password validation — mirrors the rules in src/utils/validators.js
 function validateNewPassword(password) {
@@ -69,79 +70,83 @@ export default function FirstLoginModal({ onComplete }) {
   };
 
   return (
-    /* Backdrop — non-dismissible (no onClick on backdrop) */
-    <div style={styles.backdrop}>
-      <div style={styles.modal}>
-        {/* Icon */}
-        <div style={styles.iconWrap}>
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
-            stroke="#26a676" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
-        </div>
+    <>
+      <FetchingOverlay
+        isVisible={loading}
+        message="Verifying password…"
+        subMessage="Please wait a moment"
+      />
+      <FetchingOverlay
+        isVisible={success}
+        message="Password set successfully!"
+        subMessage="Loading your dashboard…"
+      />
 
-        <h2 style={styles.heading}>Set your password</h2>
-        <p style={styles.sub}>
-          Your account was created with a temporary password. Please set a new
-          password to activate your account.
-        </p>
+      {!loading && !success && (
+        <div style={styles.backdrop}>
+          <div style={styles.modal}>
+            {/* Icon */}
+            <div style={styles.iconWrap}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+                stroke="#26a676" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </div>
 
-        {success ? (
-          <div style={styles.successBox}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-              stroke="#26a676" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            <span>Password set! Loading your dashboard…</span>
+            <h2 style={styles.heading}>Set your password</h2>
+            <p style={styles.sub}>
+              Your account was created with a temporary password. Please set a new
+              password to activate your account.
+            </p>
+
+            <form onSubmit={handleSubmit} autoComplete="off">
+              <div style={styles.field}>
+                <label style={styles.label}>Temporary password</label>
+                <input
+                  style={styles.input}
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={currentPassword}
+                  onChange={(e) => { setCurrentPassword(e.target.value); setError(''); }}
+                />
+              </div>
+
+              <div style={styles.field}>
+                <label style={styles.label}>New password</label>
+                <input
+                  style={styles.input}
+                  type="password"
+                  required
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => { setNewPassword(e.target.value); setError(''); }}
+                />
+              </div>
+
+              <div style={styles.field}>
+                <label style={styles.label}>Confirm new password</label>
+                <input
+                  style={styles.input}
+                  type="password"
+                  required
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setError(''); }}
+                />
+              </div>
+
+              {error && <p style={styles.error}>{error}</p>}
+
+              <button style={styles.btn} type="submit">
+                Set Password &amp; Continue
+              </button>
+            </form>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} autoComplete="off">
-            <div style={styles.field}>
-              <label style={styles.label}>Temporary password</label>
-              <input
-                style={styles.input}
-                type="password"
-                required
-                autoComplete="current-password"
-                value={currentPassword}
-                onChange={(e) => { setCurrentPassword(e.target.value); setError(''); }}
-              />
-            </div>
-
-            <div style={styles.field}>
-              <label style={styles.label}>New password</label>
-              <input
-                style={styles.input}
-                type="password"
-                required
-                autoComplete="new-password"
-                value={newPassword}
-                onChange={(e) => { setNewPassword(e.target.value); setError(''); }}
-              />
-            </div>
-
-            <div style={styles.field}>
-              <label style={styles.label}>Confirm new password</label>
-              <input
-                style={styles.input}
-                type="password"
-                required
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(e) => { setConfirmPassword(e.target.value); setError(''); }}
-              />
-            </div>
-
-            {error && <p style={styles.error}>{error}</p>}
-
-            <button style={styles.btn} type="submit" disabled={loading}>
-              {loading ? 'Saving…' : 'Set Password & Continue'}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -233,17 +238,5 @@ const styles = {
     marginTop: '4px',
     letterSpacing: '0.02em',
     transition: 'opacity 0.2s',
-  },
-  successBox: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '10px',
-    padding: '20px',
-    background: '#eaf8f1',
-    borderRadius: '12px',
-    color: '#1e8760',
-    fontWeight: 600,
-    fontSize: '0.9rem',
   },
 };

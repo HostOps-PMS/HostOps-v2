@@ -79,20 +79,15 @@ const handleVisibleClientsChange = useCallback((visibleClients, activeTab) => {
 
   const [exportLoading, setExportLoading] = useState(false);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (exportLoading || loading) return;
     setExportLoading(true);
     try {
       const { clients: visibleClients, activeTab } = visibleClientsRef.current;
-      exportClientsPdf({
-        clients:   visibleClients,
-        activeTab,
-        search,
-      });
+      await exportClientsPdf({ clients: visibleClients, activeTab, search });
     } catch (err) {
       console.error('[exportClientsPdf] failed:', err);
     } finally {
-      // exportClientsPdf is synchronous (opens print dialog); reset immediately
       setExportLoading(false);
     }
   };

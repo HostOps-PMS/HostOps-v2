@@ -17,8 +17,8 @@ export default function AccountsPage() {
   const [search,       setSearch]       = useState('');
   const [page,         setPage]         = useState(1);
   const [unlockTarget, setUnlockTarget] = useState(null);
+  const [exportLoading, setExportLoading] = useState(false);
 
-  /* ── Alerts + Activity from dashboard overview ── */
   const { overview, loading: notifLoading } = useStats();
 
   const now         = new Date();
@@ -41,9 +41,6 @@ export default function AccountsPage() {
 
   function handleTabChange(id) { setTab(id); setPage(1); }
   function handleSearch(val)   { setSearch(val); setPage(1); }
-
-  /* ── Export PDF — exports ALL filtered records across all pages ── */
-  const [exportLoading, setExportLoading] = useState(false);
 
   const handleExport = () => {
     if (exportLoading || loading) return;
@@ -76,7 +73,6 @@ export default function AccountsPage() {
 
   return (
     <div className="db-layout">
-      {/* Pass handleExport to Sidebar so mobile top bar shows Export PDF on this page */}
       <Sidebar onExport={handleExport} exportLoading={exportLoading} />
 
       <div className="db-main">
@@ -93,7 +89,6 @@ export default function AccountsPage() {
               <p className="cl-content__sub">All platform users and staffs — PIN lockout status, attempts, and access control.</p>
             </div>
 
-            {/* Export PDF button — desktop/tablet */}
             <button
               onClick={handleExport}
               disabled={exportLoading || loading}
