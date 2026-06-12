@@ -387,7 +387,7 @@ export default function ActivityLogTable({
           .al-filters-row1, .al-filters-row2, .al-filters-row3, .al-filters-row4 { display: contents !important; }
           .al-filters-row1 .al-search-wrap { flex: 1 1 160px; min-width: 0; max-width: none !important; width: auto !important; }
           .al-select { flex: 1 1 120px; min-width: 0; }
-          .al-date-input { flex: 1 1 110px; min-width: 0; }
+          .al-date-input { flex: 1 1 110px; min-width: 90px; max-width: 160px; }
           .al-export-btn { margin-left: auto !important; flex-shrink: 0; width: auto !important; }
           .al-clear-btn { flex-shrink: 0; }
         }
@@ -396,14 +396,14 @@ export default function ActivityLogTable({
           .al-filters-row1 { display: flex !important; width: 100%; padding: 10px 12px 8px; box-sizing: border-box; }
           .al-filters-row2 { display: flex !important; width: 100%; padding: 0 12px 8px; box-sizing: border-box; gap: 8px; flex-wrap: nowrap; }
           .al-filters-row2 select { flex: 1; min-width: 0; max-width: 50%; }
-          .al-filters-row3 { display: flex !important; width: 100%; padding: 0 12px 8px; box-sizing: border-box; gap: 6px; align-items: center; flex-wrap: nowrap; }
-          .al-filters-row3 .al-date-input { flex: 1; min-width: 0; max-width: calc(50% - 16px); }
+          .al-filters-row3 { display: flex !important; width: 100%; padding: 0 12px 8px; box-sizing: border-box; gap: 6px; align-items: center; flex-wrap: wrap; }
+          .al-filters-row3 .al-date-input { flex: 1 1 0; min-width: 0; width: 0; }
           .al-filters-row4 { display: flex !important; width: 100%; padding: 0 12px 12px; box-sizing: border-box; }
           .al-search-wrap { max-width: 100% !important; flex: 1; }
           .al-select { flex: 1; font-size: 12px; min-width: 0; }
           .al-date-input { flex: 1; font-size: 12px; min-width: 0; }
           .al-date-sep { flex-shrink: 0; }
-          .al-clear-btn { flex-shrink: 0; padding: 7px 10px; }
+          .al-clear-btn { flex-shrink: 0; padding: 7px 10px; margin-left: auto; }
           .al-export-btn { margin-left: 0 !important; width: 100%; justify-content: center; }
           .al-pagination { flex-direction: column; align-items: flex-start; gap: 10px; }
           .al-page-btns { justify-content: flex-end; }
@@ -416,7 +416,9 @@ export default function ActivityLogTable({
         .al-search-input:focus { border-color: #1e8760; box-shadow: 0 0 0 3px rgba(30,135,96,0.09); background: #fff; }
         .al-select { padding: 8px 12px; border: 1.5px solid #d4e8dd; border-radius: 9px; font-size: 13px; color: #0c1c14; background: #f7faf8; outline: none; cursor: pointer; font-family: inherit; transition: border-color 0.15s; }
         .al-select:focus { border-color: #1e8760; }
-        .al-date-input { padding: 8px 10px; border: 1.5px solid #d4e8dd; border-radius: 9px; font-size: 13px; color: #0c1c14; background: #f7faf8; outline: none; font-family: inherit; transition: border-color 0.15s; }
+        .al-date-input { padding: 8px 10px; border: 1.5px solid #d4e8dd; border-radius: 9px; font-size: 13px; color: #0c1c14; background: #f7faf8; outline: none; font-family: inherit; transition: border-color 0.15s; -webkit-appearance: textfield; appearance: textfield; min-height: 38px; }
+        .al-date-input::-webkit-date-and-time-value { text-align: left; }
+        .al-date-input::-webkit-calendar-picker-indicator { opacity: 1; cursor: pointer; filter: invert(40%) sepia(20%) saturate(500%) hue-rotate(100deg); }
         .al-date-input:focus { border-color: #1e8760; }
         .al-clear-btn { padding: 7px 14px; border: 1.5px solid #fca5a5; border-radius: 9px; background: #fff5f5; color: #c13515; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 5px; transition: background 0.15s; white-space: nowrap; }
         .al-clear-btn:hover { background: #fee2e2; }
