@@ -335,6 +335,11 @@ function DatePresetBar({ activePreset, dateRange, onPresetChange, onCustomApply 
                         outline: 'none',
                         width: '100%',
                         boxSizing: 'border-box',
+                        WebkitAppearance: 'none',
+                        appearance: 'none',
+                        minHeight: 42,
+                        display: 'block',
+                        background: 'var(--color-surface, #fff)',
                       }}
                     />
                     <label style={{ fontSize: '.75rem', color: 'var(--color-muted, #6a8b7c)', fontWeight: 600 }}>
@@ -354,6 +359,11 @@ function DatePresetBar({ activePreset, dateRange, onPresetChange, onCustomApply 
                         outline: 'none',
                         width: '100%',
                         boxSizing: 'border-box',
+                        WebkitAppearance: 'none',
+                        appearance: 'none',
+                        minHeight: 42,
+                        display: 'block',
+                        background: 'var(--color-surface, #fff)',
                       }}
                     />
                   </div>
@@ -1253,6 +1263,16 @@ export default function ClientSmoobuView({ client, property, onClose }) {
 
         {/* ── Mobile responsive styles ── */}
         <style>{`
+          input[type="date"]::-webkit-date-and-time-value {
+            text-align: left;
+            min-height: 1.2em;
+          }
+          input[type="date"]::-webkit-calendar-picker-indicator {
+            opacity: 1;
+            cursor: pointer;
+            color: var(--color-primary, #26a676);
+            filter: invert(40%) sepia(60%) saturate(400%) hue-rotate(120deg);
+          }
           @media (max-width: 768px) {
             .smoobu-body {
               flex-direction: column-reverse !important;
