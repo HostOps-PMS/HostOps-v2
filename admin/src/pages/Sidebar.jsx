@@ -351,6 +351,8 @@ export default function Sidebar({ onExport, exportLoading = false, alerts = [] }
   const mobileInitials = [currentUser.firstName, currentUser.lastName]
     .filter(Boolean).map(n => n[0].toUpperCase()).join('') || 'U';
   const [mobileNotifOpen, setMobileNotifOpen] = useState(false);
+  const location = useLocation();
+  const isDashboard = location.pathname === '/dashboard' || location.pathname === '/dashboard/';
 
   const sidebarContent = (isMobile = false) => {
     const isCollapsed = collapsed && !isMobile;
@@ -710,7 +712,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts = [] }
           )}
         </div>
 
-        <button
+        {isDashboard && onExport && <button
           onClick={onExport}
           disabled={exportLoading}
           style={{
@@ -739,7 +741,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts = [] }
             </svg>
           )}
           {exportLoading ? 'Exporting...' : 'Export PDF'}
-        </button>
+        </button>}
       </div>
 
       {/* Mobile drawer */}
