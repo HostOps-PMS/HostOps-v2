@@ -31,8 +31,17 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
   const [appealReason, setAppealReason]         = useState('');
   const [appealLoading, setAppealLoading]       = useState(false);
   const [appealSubmitted, setAppealSubmitted]   = useState(false);
+  const [hasPendingAppeal, setHasPendingAppeal] = useState(false);
 
   const API_BASE = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
+
+  // When the disabled screen appears, check if this email already has a pending appeal.
+  React.useEffect(() => {
+    if (isDisabled && email.trim()) {
+      const key = `hp_pending_req_${email.trim().toLowerCase()}_disabled`;
+      setHasPendingAppeal(!!sessionStorage.getItem(key));
+    }
+  }, [isDisabled, email]);
 
   const handleAppealSubmit = async () => {
     if (!appealReason.trim() || appealReason.trim().length < 10) return;
@@ -51,6 +60,9 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
           requestType: 'account_disabled',
         }),
       });
+      const key = `hp_pending_req_${email.trim().toLowerCase()}_disabled`;
+      sessionStorage.setItem(key, '1');
+      setHasPendingAppeal(true);
       setAppealSubmitted(true);
     } catch {
       setAppealSubmitted(true);
@@ -256,14 +268,29 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
         </div>
 
         <div>
-          <button
-            type="button"
-            className="lp-btn"
-            onClick={() => setShowAppealModal(true)}
-            style={{ width: '100%', marginBottom: '8px' }}
-          >
-            Contact Administrator
-          </button>
+          {hasPendingAppeal ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center',
+              padding: '10px 16px', borderRadius: 10,
+              background: '#f0fdf4', border: '1px solid #6ee7b7',
+              fontSize: '13px', fontWeight: 600, color: '#059669',
+              marginBottom: '8px',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+              </svg>
+              Appeal submitted — pending admin review
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="lp-btn"
+              onClick={() => setShowAppealModal(true)}
+              style={{ width: '100%', marginBottom: '8px' }}
+            >
+              Contact Administrator
+            </button>
+          )}
           <button
             type="button"
             className="lp-link"
