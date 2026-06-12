@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import AccountSettingsModal from './dashboard/components/AccountSettingsModal';
 import { logoutUser } from './authorization/services/authService';
+import HostOpsLogo from '../assets/HostOpsLOGO.png';
 
 /* ─── Nav data ───────────────────────────────────────────────────── */
 // Businesses has a sub-item: Staffs
@@ -91,9 +92,7 @@ const LogoutIcon = () => (
 );
 
 const LogoIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-    <path d="M9 2L15 5.5V12.5L9 16L3 12.5V5.5L9 2Z" fill="white" />
-  </svg>
+  <img src={HostOpsLogo} alt="HostOps" style={{ width: 34, height: 34, objectFit: 'contain' }} />
 );
 
 const ChevronLeft = ({ collapsed }) => (
@@ -352,6 +351,8 @@ export default function Sidebar({ onExport, exportLoading = false, alerts = [] }
   const mobileInitials = [currentUser.firstName, currentUser.lastName]
     .filter(Boolean).map(n => n[0].toUpperCase()).join('') || 'U';
   const [mobileNotifOpen, setMobileNotifOpen] = useState(false);
+  const location = useLocation();
+  const isDashboard = location.pathname === '/dashboard' || location.pathname === '/dashboard/';
 
   const sidebarContent = (isMobile = false) => {
     const isCollapsed = collapsed && !isMobile;
@@ -393,12 +394,14 @@ export default function Sidebar({ onExport, exportLoading = false, alerts = [] }
           <div style={{
             width: 32,
             height: 32,
-            background: '#1a9e6e',
+            background: '#fff',
             borderRadius: 9,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
+            overflow: 'hidden',
+            border: '0.5px solid rgba(0,0,0,0.08)',
           }}>
             <LogoIcon />
           </div>
@@ -603,7 +606,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts = [] }
           </svg>
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 28, height: 28, background: '#1a9e6e', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 28, height: 28, background: '#fff', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '0.5px solid rgba(0,0,0,0.08)' }}>
             <LogoIcon />
           </div>
           <span style={{ fontSize: 14, fontWeight: 700, color: '#111', letterSpacing: '-0.02em' }}>HostOps</span>
@@ -709,38 +712,36 @@ export default function Sidebar({ onExport, exportLoading = false, alerts = [] }
           )}
         </div>
 
-        {onExport && (
-          <button
-            onClick={onExport}
-            disabled={exportLoading}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '7px 12px',
-              background: exportLoading ? '#e0e0e0' : '#1a9e6e',
-              color: exportLoading ? '#aaa' : '#fff',
-              border: 'none', borderRadius: 8,
-              cursor: exportLoading ? 'not-allowed' : 'pointer',
-              fontSize: 12, fontWeight: 600,
-              fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-            }}
-          >
-            {exportLoading ? (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
-                style={{ animation: 'pdf-spin 0.8s linear infinite' }}>
-                <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-                <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
-              </svg>
-            ) : (
-              <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M3 16h14" strokeLinecap="round" />
-              </svg>
-            )}
-            {exportLoading ? 'Exporting...' : 'Export PDF'}
-          </button>
-        )}
+        {isDashboard && onExport && <button
+          onClick={onExport}
+          disabled={exportLoading}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '7px 12px',
+            background: exportLoading ? '#e0e0e0' : '#1a9e6e',
+            color: exportLoading ? '#aaa' : '#fff',
+            border: 'none', borderRadius: 8,
+            cursor: exportLoading ? 'not-allowed' : 'pointer',
+            fontSize: 12, fontWeight: 600,
+            fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+          }}
+        >
+          {exportLoading ? (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+              style={{ animation: 'pdf-spin 0.8s linear infinite' }}>
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M3 16h14" strokeLinecap="round" />
+            </svg>
+          )}
+          {exportLoading ? 'Exporting...' : 'Export PDF'}
+        </button>}
       </div>
 
       {/* Mobile drawer */}

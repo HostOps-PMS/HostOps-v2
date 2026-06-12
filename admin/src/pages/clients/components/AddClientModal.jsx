@@ -74,8 +74,8 @@ export default function AddClientModal({ onClose, onSuccess }) {
       setError('Business name, email, and password are required.');
       return;
     }
-    if (form.password.length < 8) {
-      setError('Password must be at least 8 characters.');
+    if (form.password && (form.password.length < 8 || !/[A-Z]/.test(form.password) || !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password))) {
+      setError('Password must be at least 8 characters, include 1 uppercase letter, and 1 special character.');
       return;
     }
     if (!/^\d{6}$/.test(form.pin)) {
@@ -208,7 +208,16 @@ export default function AddClientModal({ onClose, onSuccess }) {
               onChange={setField('password')} maxLength={128} className="cl-edit-input"
               style={{ width: '100%', paddingRight: 40, ...(form.password && form.password.length < 8 ? { borderColor: '#ef4444' } : {}) }} />
             {form.password && form.password.length < 8 && (
-              <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Password must be at least 8 characters.</span>
+              <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ At least 8 characters.</span>
+            )}
+            {form.password && form.password.length >= 8 && !/[A-Z]/.test(form.password) && (
+              <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Must include at least 1 uppercase letter.</span>
+            )}
+            {form.password && form.password.length >= 8 && /[A-Z]/.test(form.password) && !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) && (
+              <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Must include at least 1 special character (e.g. @, #, !).</span>
+            )}
+            {form.password && form.password.length >= 8 && /[A-Z]/.test(form.password) && /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) && (
+              <span style={{ color: '#26a676', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>✓ Strong password.</span>
             )}
                 <button type="button" onClick={() => setShowPass((v) => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', padding: 0, display: 'grid', placeItems: 'center' }} title={showPass ? 'Hide password' : 'Show password'}>
                   {showPass ? (
