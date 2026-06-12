@@ -46,6 +46,10 @@ export function DashboardProvider({ children }) {
     // is blocked — the in-memory store is read consistently.
     showPropertySelector: !restoredProp.id,
     isSwitching: false,
+    // true on first mount so the dashboard's FetchingOverlay appears
+    // immediately — closing the gap between the ProtectedRoute overlay
+    // ("Verifying session…") and the first data fetch overlay.
+    isLoading: true,
   });
 
   const [dark, setDark] = useState(false);
