@@ -51,11 +51,11 @@ router.use(requireAuth);
 // ─────────────────────────────────────────────────────────────────
 router.get('/clients', requireAdminOrTeamLeader, async (req, res, next) => {
   try {
-    // Team leaders are scoped to a single client (the one they are assigned to).
-    // Admins get the full list.
+    const showArchived = req.query.archived === 'true';
+
     const filter = req.user.role === 'team_leader'
       ? { _id: req.user.serverId }
-      : {};
+      : { isArchive: showArchived ? true : { $ne: true } };
 
     const clients = await User.find(filter)
       .select('-password -verifyToken -verifyTokenExpiry -resetToken -resetTokenExpiry -__v')
@@ -620,6 +620,44 @@ router.patch('/clients/:id', requireAdmin, async (req, res, next) => {
     if (err.name === 'CastError') {
       return res.status(400).json({ error: 'Invalid client ID' });
     }
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// PATCH /api/clients/:id/archive
+// Admin soft-archives a client (isArchive = true).
+// ─────────────────────────────────────────────────────────────────
+router.patch('/clients/:id/archive', requireAdmin, async (req, res, next) => {
+  try {
+    const client = await User.findByIdAndUpdate(
+      req.params.id,
+      { isArchive: true },
+      { new: true }
+    );
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    res.json({ message: 'Client archived.', client: client.toJSON() });
+  } catch (err) {
+    if (err.name === 'CastError') return res.status(400).json({ error: 'Invalid client ID' });
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// PATCH /api/clients/:id/unarchive
+// Admin restores a client from archive (isArchive = false).
+// ─────────────────────────────────────────────────────────────────
+router.patch('/clients/:id/unarchive', requireAdmin, async (req, res, next) => {
+  try {
+    const client = await User.findByIdAndUpdate(
+      req.params.id,
+      { isArchive: false },
+      { new: true }
+    );
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    res.json({ message: 'Client unarchived.', client: client.toJSON() });
+  } catch (err) {
+    if (err.name === 'CastError') return res.status(400).json({ error: 'Invalid client ID' });
     next(err);
   }
 });

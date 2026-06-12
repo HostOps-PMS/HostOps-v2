@@ -29,6 +29,7 @@ export default function TeamLeaderTable({
   onSearchChange,
   onEdit,
   onDelete,
+  onArchive,
   onNew,
   onRowClick,
   page,
@@ -282,6 +283,20 @@ export default function TeamLeaderTable({
                             Edit
                           </button>
                           <button
+                            onClick={(e) => { e.stopPropagation(); onArchive && onArchive(tl); }}
+                            style={{
+                              padding: '5px 12px', borderRadius: 6,
+                              border: '1px solid #fbbf24', background: '#fffbeb',
+                              fontSize: '0.78rem', fontWeight: 600, color: '#92400e', cursor: 'pointer',
+                              display: 'inline-flex', alignItems: 'center', gap: 5,
+                            }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                              <rect x="2" y="6" width="16" height="11" rx="1.5"/><path d="M2 6l2-3h12l2 3" strokeLinecap="round" strokeLinejoin="round"/><path d="M8 11h4" strokeLinecap="round"/>
+                            </svg>
+                            Archive
+                          </button>
+                          <button
                             onClick={(e) => { e.stopPropagation(); onDelete(tl); }}
                             style={{
                               padding: '5px 14px', borderRadius: 6,
@@ -290,14 +305,6 @@ export default function TeamLeaderTable({
                             }}
                           >
                             Delete
-                          </button>
-                          <button style={{
-                            padding: '5px 8px', borderRadius: 6,
-                            border: '1px solid #e5e7eb', background: '#fff',
-                            fontSize: '0.9rem', color: '#9ca3af', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center',
-                          }}>
-                            ···
                           </button>
                         </div>
                       </td>

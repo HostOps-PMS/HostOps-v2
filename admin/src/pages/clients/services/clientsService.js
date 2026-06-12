@@ -42,8 +42,16 @@ async function request(path, options = {}) {
  * Returns all registered users (admin-only endpoint).
  * @returns {Promise<User[]>}
  */
-export async function getClients() {
-  return request('/api/clients');
+export async function getClients({ archived = false } = {}) {
+  return request(`/api/clients${archived ? '?archived=true' : ''}`);
+}
+
+export async function archiveClient(id) {
+  return request(`/api/clients/${id}/archive`, { method: 'PATCH' });
+}
+
+export async function unarchiveClient(id) {
+  return request(`/api/clients/${id}/unarchive`, { method: 'PATCH' });
 }
 
 /**
@@ -303,6 +311,8 @@ const clientsService = {
   createClient,
   updateClient,
   deleteClient,
+  archiveClient,
+  unarchiveClient,
   getClientProperties,
   createClientProperty,
   updateClientProperty,
