@@ -91,6 +91,23 @@ html, body {
 @keyframes pulse {
   0%, 100% { opacity: 1; } 50% { opacity: .4; }
 }
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.3; }
+}
+.msg-skeleton {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+@keyframes dot-bounce {
+  0%, 60%, 100% { transform: translateY(0); box-shadow: 0 4px 10px rgba(38,166,118,0.25); }
+  30% { transform: translateY(-14px); box-shadow: 0 14px 18px rgba(38,166,118,0.15); }
+}
+.loading-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  animation: dot-bounce 1.2s ease-in-out infinite;
+}
 
 /* ── HP cal toolbar ─────────────────────────────────────────────────── */
 .hp-cal-wrap { background: #fff; border-radius: 16px; border: 1px solid #e3ede8; overflow: hidden; }

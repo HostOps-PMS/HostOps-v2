@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 
 const STORAGE_KEY = "hp_profitability_v2";
 
@@ -592,6 +592,30 @@ const [showResetConfirm, setShowResetConfirm] = useState(false);
 }
 
 function Field({ t, label, hint, icon, value, onChange, currency, disabled, showOverride, overrideActive, onToggleOverride }) {
+  const [rawValue, setRawValue] = useState(() => (value ? String(value) : ""));
+  const prevRef = useRef(value);
+
+  useEffect(() => {
+    const parsed = parseFloat(rawValue) || 0;
+    if (value !== prevRef.current && Math.abs(value - parsed) > 1e-9) {
+      setRawValue(value ? String(value) : "");
+    }
+    prevRef.current = value;
+  }, [value]);
+
+  const handleChange = (e) => {
+    if (disabled) return;
+    let raw = e.target.value;
+    raw = raw.replace(/[^0-9.]/g, "");
+    const dotIndex = raw.indexOf(".");
+    if (dotIndex !== -1) {
+      raw = raw.slice(0, dotIndex + 1) + raw.slice(dotIndex + 1).replace(/\./g, "");
+    }
+    if (raw.replace(".", "").length > 15) return;
+    setRawValue(raw);
+    onChange(raw === "" || raw === "." ? 0 : parseFloat(raw) || 0);
+  };
+
   return (
     <div>
       <div style={t.fieldHeader}>
@@ -613,10 +637,10 @@ function Field({ t, label, hint, icon, value, onChange, currency, disabled, show
       <div style={{ ...t.inputWrap, ...(disabled ? t.inputWrapDisabled : {}) }}>
         {currency && <span style={t.currency}>₱</span>}
         <input
-          type="number"
-          min="0"
-          value={value || ""}
-          onChange={(e) => onChange(e.target.value)}
+          type="text"
+          inputMode="decimal"
+          value={rawValue}
+          onChange={handleChange}
           placeholder="0"
           disabled={disabled}
           style={{ ...t.input, ...(disabled ? t.inputDisabled : {}) }}
