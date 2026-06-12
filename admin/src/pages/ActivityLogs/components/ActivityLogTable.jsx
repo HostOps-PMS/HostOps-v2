@@ -213,6 +213,111 @@ function ExpandedDetail({ entry }) {
   );
 }
 
+// ── Searchable dropdown ───────────────────────────────────────────────────────
+function AlDropdown({ value, onChange, options, disabled }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = React.useRef(null);
+
+  React.useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false); setSearch('');
+      }
+    }
+    if (open) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  const filtered = options.filter(o =>
+    !search || o.label.toLowerCase().includes(search.toLowerCase())
+  );
+  const selected = options.find(o => o.value === value);
+
+  return (
+    <div ref={ref} style={{ position: 'relative', flex: '1 1 120px', minWidth: 0 }}>
+      <div
+        onClick={() => { if (!disabled) setOpen(v => !v); }}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+          padding: '8px 10px 8px 12px',
+          border: '1.5px solid #d4e8dd', borderRadius: 9,
+          background: value ? '#eaf8f1' : '#f7faf8',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          fontSize: 13, fontWeight: value ? 600 : 400,
+          color: value ? '#1e8760' : '#0c1c14',
+          userSelect: 'none', whiteSpace: 'nowrap',
+          opacity: disabled ? 0.6 : 1,
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+          {selected?.label || options[0]?.label || '—'}
+        </span>
+        <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0,
+          zIndex: 9999, background: '#fff',
+          border: '1.5px solid #d4e8dd', borderRadius: 10,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          minWidth: 200, maxWidth: 280,
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}>
+          <div style={{ padding: '8px 10px', borderBottom: '1px solid #eaf3ee' }}>
+            <input
+              autoFocus
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search…"
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '6px 10px', borderRadius: 6,
+                border: '1.5px solid #d4e8dd', fontSize: 12,
+                outline: 'none', background: '#f7faf8', fontFamily: 'inherit',
+              }}
+              onClick={e => e.stopPropagation()}
+            />
+          </div>
+          <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+            {filtered.map(o => (
+              <div
+                key={o.value}
+                onClick={() => { onChange(o.value); setOpen(false); setSearch(''); }}
+                style={{
+                  padding: '9px 14px', cursor: 'pointer', fontSize: 13,
+                  background: value === o.value ? '#eaf8f1' : 'transparent',
+                  color: value === o.value ? '#1e8760' : '#0c1c14',
+                  fontWeight: value === o.value ? 600 : 400,
+                  borderBottom: '1px solid #f0f7f3',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                }}
+                onMouseEnter={e => { if (value !== o.value) e.currentTarget.style.background = '#f7fbf9'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = value === o.value ? '#eaf8f1' : 'transparent'; }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.label}</span>
+                {value === o.value && (
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#1e8760" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                    <polyline points="2,6 5,9 10,3"/>
+                  </svg>
+                )}
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <div style={{ padding: '12px 14px', fontSize: 12, color: '#9ab8a9', textAlign: 'center' }}>
+                No results
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function ActivityLogTable({
   logs = [],
@@ -373,28 +478,20 @@ export default function ActivityLogTable({
           {/* Row 2 — Client + Action filters */}
           <div className="al-filters-row2">
             {clients.length > 0 && (
-              <select
-                className="al-select"
+              <AlDropdown
                 value={filterClient}
-                onChange={e => onFilterClientChange(e.target.value)}
-              >
-                <option value="">All Businesses</option>
-                {clients.map(c => (
-                  <option key={c._id || c.id} value={c._id || c.id}>
-                    {c.businessName || c.name || c.email}
-                  </option>
-                ))}
-              </select>
+                onChange={onFilterClientChange}
+                options={[
+                  { value: '', label: 'All Businesses' },
+                  ...clients.map(c => ({ value: c._id || c.id, label: c.businessName || c.name || c.email })),
+                ]}
+              />
             )}
-            <select
-              className="al-select"
+            <AlDropdown
               value={filterAction}
-              onChange={e => onFilterActionChange(e.target.value)}
-            >
-              {ACTION_OPTIONS.map(o => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+              onChange={onFilterActionChange}
+              options={ACTION_OPTIONS}
+            />
           </div>
 
           {/* Row 3 — Date range + Clear */}
