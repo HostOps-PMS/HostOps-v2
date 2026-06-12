@@ -32,6 +32,14 @@ const recoveryRequestSchema = new mongoose.Schema(
       default: 'user',
     },
 
+    // Distinguishes PIN lockout recovery from disabled-account appeals.
+    requestType: {
+      type:    String,
+      enum:    ['pin_recovery', 'account_disabled'],
+      default: 'pin_recovery',
+      index:   true,
+    },
+
     // Free-text reason entered by the user explaining why they were locked out.
     reason: {
       type:     String,
