@@ -601,6 +601,8 @@ function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId, mapS
 // clickable so admins can upload images for the apartment.
 function PhotoCarousel({ images = [], altText = '', onAddPhoto = null, uploading = false, canAdd = false }) {
   const [idx, setIdx] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const touchStartX = useRef(null);
   const valid = images.filter((img) => img && img.url);
 
   // Keep index in range when the image list shrinks/grows
@@ -649,13 +651,89 @@ function PhotoCarousel({ images = [], altText = '', onAddPhoto = null, uploading
         key={valid[safeIdx].url}
         src={valid[safeIdx].url}
         alt={altText}
+        onClick={() => setLightboxOpen(true)}
         style={{
           width: '100%', height: '100%',
           objectFit: 'cover', display: 'block',
           transition: 'opacity 0.2s',
+          cursor: 'zoom-in',
         }}
         loading="lazy"
       />
+      {lightboxOpen && (
+        <div
+          onClick={() => setLightboxOpen(false)}
+          onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+          onTouchEnd={(e) => {
+            if (touchStartX.current === null) return;
+            const diff = e.changedTouches[0].clientX - touchStartX.current;
+            touchStartX.current = null;
+            if (Math.abs(diff) < 40) return;
+            e.stopPropagation();
+            if (diff < 0) setIdx((i) => (i + 1) % valid.length);
+            else          setIdx((i) => (i - 1 + valid.length) % valid.length);
+          }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 99999,
+            background: 'rgba(0,0,0,0.92)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <button
+            onClick={() => setLightboxOpen(false)}
+            style={{
+              position: 'absolute', top: 16, right: 16,
+              background: 'rgba(255,255,255,0.15)', border: 'none',
+              color: '#fff', fontSize: '1.2rem',
+              width: 36, height: 36, borderRadius: '50%',
+              cursor: 'pointer', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+            }}
+          >✕</button>
+          {valid.length > 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setIdx((i) => (i - 1 + valid.length) % valid.length); }}
+              style={{
+                position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)',
+                background: 'rgba(255,255,255,0.15)', border: 'none',
+                color: '#fff', fontSize: '1.4rem',
+                width: 44, height: 44, borderRadius: '50%',
+                cursor: 'pointer', display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
+              }}
+            >‹</button>
+          )}
+          <img
+            src={valid[safeIdx].url}
+            alt={altText}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '90vw', maxHeight: '90vh',
+              objectFit: 'contain', borderRadius: 8,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+            }}
+          />
+          {valid.length > 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setIdx((i) => (i + 1) % valid.length); }}
+              style={{
+                position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)',
+                background: 'rgba(255,255,255,0.15)', border: 'none',
+                color: '#fff', fontSize: '1.4rem',
+                width: 44, height: 44, borderRadius: '50%',
+                cursor: 'pointer', display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
+              }}
+            >›</button>
+          )}
+          <div style={{
+            position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+            color: 'rgba(255,255,255,0.7)', fontSize: '.8rem',
+          }}>
+            {safeIdx + 1} / {valid.length}
+          </div>
+        </div>
+      )}
       {/* Count badge */}
       <span style={{
         position: 'absolute', top: 8, right: 8,
@@ -999,7 +1077,7 @@ export default function PropertyMap({ mapLocations, loading }) {
   // ── Leaflet map ────────────────────────────────────────────────
   const mapContainerRef = useRef(null);
   useLeafletMap(mapContainerRef, mapPoints, markerMapRef, focusedAptId, mapStyle);
-  useLeafletMap(isModalOpen ? modalMapContainerRef : { current: null }, mapPoints, modalMarkerMapRef, focusedAptId, mapStyle);
+  useLeafletMap(modalMapContainerRef, mapPoints, modalMarkerMapRef, focusedAptId, mapStyle);
 
   // ── Dropdown options ───────────────────────────────────────────
   const propertyOptions = useMemo(() => {
@@ -1050,7 +1128,7 @@ export default function PropertyMap({ mapLocations, loading }) {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', paddingRight: 46 }}>
           <button
             onClick={() => {
               setIsModalOpen(true);
@@ -1307,6 +1385,7 @@ export default function PropertyMap({ mapLocations, loading }) {
               background: 'var(--color-surface)',
               flexWrap: 'wrap', gap: 10,
               minHeight: 56,
+              position: 'relative',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{
@@ -1377,13 +1456,15 @@ export default function PropertyMap({ mapLocations, loading }) {
                 <button
                   onClick={() => setIsModalOpen(false)}
                   style={{
+                    position: 'absolute', top: 10, right: 12,
                     border: '1px solid var(--color-border)',
                     background: 'var(--color-surface)',
                     fontSize: '1rem', cursor: 'pointer',
                     color: 'var(--color-muted)', lineHeight: 1,
-                    padding: '6px 10px', borderRadius: 8,
+                    width: 34, height: 34, borderRadius: 8,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     transition: 'background 0.15s',
+                    zIndex: 20,
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-2, #f3f4f6)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'var(--color-surface)'}
@@ -1415,7 +1496,7 @@ export default function PropertyMap({ mapLocations, loading }) {
 
               {/* Map style switcher — modal */}
               <div style={{
-                position: 'absolute', top: 80, left: 10, zIndex: 1000,
+                position: 'absolute', top: 10, left: 10, zIndex: 1000,
                 display: 'flex', borderRadius: 8, overflow: 'hidden',
                 border: '1px solid rgba(0,0,0,0.18)',
                 boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
