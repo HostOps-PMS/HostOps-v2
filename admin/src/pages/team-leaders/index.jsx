@@ -141,9 +141,14 @@ export default function TeamLeaders() {
               title="Export all team leaders as PDF"
             >
               {exportBtnIcon}
-              {exportLoading ? 'Exporting…' : 'Export PDF'}
+              <span className="tl-export-label">{exportLoading ? 'Exporting…' : 'Export PDF'}</span>
             </button>
-            <style>{`@keyframes tl-pdf-spin { to { transform: rotate(360deg); } }`}</style>
+            <style>{`
+              @keyframes tl-pdf-spin { to { transform: rotate(360deg); } }
+              @media (max-width: 768px) {
+                .tl-export-label { display: none; }
+              }
+            `}</style>
           </header>
 
           {error && (
