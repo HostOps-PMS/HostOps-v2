@@ -7,6 +7,7 @@ import DeleteModal from './components/DeleteModal';
 import StaffTable from './components/StaffTable';
 import { exportStaffsPdf } from './utils/exportStaffsPdf';
 import { archiveStaff } from './services/staffApi';
+import ArchiveConfirmModal from '../components/ArchiveConfirmModal';
 
 export default function Staffs() {
   const [filterClient, setFilterClient] = useState('');
@@ -57,12 +58,20 @@ export default function Staffs() {
     reload();
   }
 
-  async function handleArchiveStaff(staff) {
+  const [archiveTarget, setArchiveTarget] = useState(null);
+  const [archiving, setArchiving]         = useState(false);
+
+  async function confirmArchiveStaff() {
+    if (!archiveTarget) return;
+    setArchiving(true);
     try {
-      await archiveStaff(staff._id);
+      await archiveStaff(archiveTarget._id);
       reload();
+      setArchiveTarget(null);
     } catch (err) {
       console.error('[archiveStaff]', err);
+    } finally {
+      setArchiving(false);
     }
   }
 
@@ -172,7 +181,7 @@ export default function Staffs() {
             onFilterClientChange={(val) => { setFilterClient(val); setPage(1); }}
             onEdit={(s) => setModal({ type: 'edit', staff: s })}
             onDelete={(s) => setModal({ type: 'delete', staff: s })}
-            onArchive={handleArchiveStaff}
+            onArchive={setArchiveTarget}
             onNew={() => setModal({ type: 'create' })}
             page={page}
             totalPages={totalPages}
@@ -182,6 +191,16 @@ export default function Staffs() {
           />
         </div>
       </div>
+
+      {archiveTarget && (
+        <ArchiveConfirmModal
+          mode="archive"
+          name={`${archiveTarget.firstName || ''} ${archiveTarget.lastName || ''}`.trim() || archiveTarget.email}
+          loading={archiving}
+          onConfirm={confirmArchiveStaff}
+          onClose={() => !archiving && setArchiveTarget(null)}
+        />
+      )}
     </div>
   );
 }

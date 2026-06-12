@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getClients, unarchiveClient } from '../../clients/services/clientsService';
 import { fetchStaffs, unarchiveStaff } from '../../Staffs/services/staffApi';
+import ArchiveConfirmModal from '../../components/ArchiveConfirmModal';
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -28,7 +29,8 @@ export default function ArchivesSection({ tabs = [], activeTab, onTabChange }) {
   const [staffs, setStaffs]           = useState([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState('');
-  const [unarchiving, setUnarchiving] = useState(null);
+  const [unarchiveTarget, setUnarchiveTarget] = useState(null);
+  const [unarchiving, setUnarchiving]         = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,27 +52,21 @@ export default function ArchivesSection({ tabs = [], activeTab, onTabChange }) {
 
   useEffect(() => { load(); }, [load]);
 
-  async function handleUnarchiveClient(client) {
-    setUnarchiving(client._id);
+  async function confirmUnarchive() {
+    if (!unarchiveTarget) return;
+    setUnarchiving(true);
     try {
-      await unarchiveClient(client._id);
+      if (unarchiveTarget._subTab === 'staffs') {
+        await unarchiveStaff(unarchiveTarget._id);
+      } else {
+        await unarchiveClient(unarchiveTarget._id);
+      }
       load();
+      setUnarchiveTarget(null);
     } catch (e) {
-      console.error('[unarchiveClient]', e);
+      console.error('[unarchive]', e);
     } finally {
-      setUnarchiving(null);
-    }
-  }
-
-  async function handleUnarchiveStaff(staff) {
-    setUnarchiving(staff._id);
-    try {
-      await unarchiveStaff(staff._id);
-      load();
-    } catch (e) {
-      console.error('[unarchiveStaff]', e);
-    } finally {
-      setUnarchiving(null);
+      setUnarchiving(false);
     }
   }
 
@@ -90,9 +86,8 @@ export default function ArchivesSection({ tabs = [], activeTab, onTabChange }) {
     return r.businessName || r.email;
   }
 
-  async function handleUnarchive(r) {
-    if (subTab === 'staffs') return handleUnarchiveStaff(r);
-    return handleUnarchiveClient(r);
+  function handleUnarchive(r) {
+    setUnarchiveTarget({ ...r, _subTab: subTab });
   }
 
   return (
@@ -257,15 +252,12 @@ export default function ArchivesSection({ tabs = [], activeTab, onTabChange }) {
                     <td style={{ padding: '12px 16px 12px 8px', whiteSpace: 'nowrap' }}>
                       <button
                         onClick={() => handleUnarchive(r)}
-                        disabled={unarchiving === r._id}
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 5,
                           padding: '5px 12px', borderRadius: 6,
                           border: '1px solid #10b981', background: '#f0fdf4',
                           fontSize: '0.78rem', fontWeight: 600, color: '#059669',
-                          cursor: unarchiving === r._id ? 'not-allowed' : 'pointer',
-                          opacity: unarchiving === r._id ? 0.6 : 1,
-                          transition: 'opacity 0.15s',
+                          cursor: 'pointer',
                         }}
                       >
                         <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
@@ -273,7 +265,7 @@ export default function ArchivesSection({ tabs = [], activeTab, onTabChange }) {
                           <path d="M2 6l2-3h12l2 3" strokeLinecap="round" strokeLinejoin="round"/>
                           <path d="M8 11h4M10 9v4" strokeLinecap="round"/>
                         </svg>
-                        {unarchiving === r._id ? 'Restoring…' : 'Unarchive'}
+                        Unarchive
                       </button>
                     </td>
                   </tr>
@@ -283,6 +275,16 @@ export default function ArchivesSection({ tabs = [], activeTab, onTabChange }) {
           </div>
         )}
       </div>
+
+      {unarchiveTarget && (
+        <ArchiveConfirmModal
+          mode="unarchive"
+          name={getName(unarchiveTarget)}
+          loading={unarchiving}
+          onConfirm={confirmUnarchive}
+          onClose={() => !unarchiving && setUnarchiveTarget(null)}
+        />
+      )}
     </div>
   );
 }
