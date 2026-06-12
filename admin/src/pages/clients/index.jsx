@@ -8,6 +8,7 @@ import ClientModal          from './components/ClientModal';
 import AddClientModal       from './components/AddClientModal';
 import { useClients }       from './hooks/useClients';
 import { exportClientsPdf } from './utils/exportClientsPdf';
+import { archiveClient } from './services/clientsService';
 
 export default function Clients() {
   /* ── View-client modal ── */
@@ -45,6 +46,16 @@ export default function Clients() {
   function handleSearchChange(val) {
     setSearch(val);
     setPage(1);
+  }
+
+  /* ── Archive client ── */
+  async function handleArchiveClient(client) {
+    try {
+      await archiveClient(client._id);
+      refetch();
+    } catch (err) {
+      console.error('[archiveClient]', err);
+    }
   }
 
   /* ── Handle client updated from modal ── */
@@ -160,6 +171,7 @@ export default function Clients() {
             onSearchChange={handleSearchChange}
             onAddClient={() => setShowAddClient(true)}
             onRefresh={refetch}
+            onArchive={handleArchiveClient}
             page={page}
             totalPages={totalPages}
             totalCount={filtered.length}

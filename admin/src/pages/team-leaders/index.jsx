@@ -6,6 +6,7 @@ import TeamLeaderModal from './components/TeamLeaderModal';
 import DeleteModal from './components/DeleteModal';
 import TeamLeaderTable from './components/TeamLeaderTable';
 import { exportTeamLeadersPdf } from './utils/exportTeamLeadersPdf';
+import { archiveClient } from '../clients/services/clientsService';
 
 export default function TeamLeaders() {
   const [search, setSearch]             = useState('');
@@ -69,6 +70,15 @@ export default function TeamLeaders() {
   function handleDeleted() {
     setModal(null);
     refetch();
+  }
+
+  async function handleArchiveTeamLeader(tl) {
+    try {
+      await archiveClient(tl._id);
+      refetch();
+    } catch (err) {
+      console.error('[archiveTeamLeader]', err);
+    }
   }
 
   return (
@@ -163,6 +173,7 @@ export default function TeamLeaders() {
             onSearchChange={handleSearchChange}
             onEdit={(tl) => setModal({ type: 'edit', teamLeader: tl })}
             onDelete={(tl) => setModal({ type: 'delete', teamLeader: tl })}
+            onArchive={handleArchiveTeamLeader}
             onNew={() => setModal({ type: 'create' })}
             page={page}
             totalPages={totalPages}

@@ -2,10 +2,11 @@ import { useRef, useState, useEffect } from 'react';
 import AccountRow from './AccountRow';
 
 const TAB_ICONS = {
-  all:    <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h14M3 10h14M3 15h14" strokeLinecap="round"/></svg>,
-  users:  <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="10" cy="7" r="3"/><path d="M4 17c0-3.314 2.686-6 6-6s6 2.686 6 6" strokeLinecap="round"/></svg>,
-  staffs: <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="7" cy="7" r="3"/><path d="M1 17c0-3.314 2.686-6 6-6"/><circle cx="14" cy="7" r="3"/><path d="M13 11c3.314 0 6 2.686 6 6" strokeLinecap="round"/></svg>,
-  locked: <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="9" width="14" height="10" rx="2"/><path d="M7 9V6a3 3 0 016 0v3" strokeLinecap="round"/></svg>,
+  all:      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h14M3 10h14M3 15h14" strokeLinecap="round"/></svg>,
+  users:    <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="10" cy="7" r="3"/><path d="M4 17c0-3.314 2.686-6 6-6s6 2.686 6 6" strokeLinecap="round"/></svg>,
+  staffs:   <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="7" cy="7" r="3"/><path d="M1 17c0-3.314 2.686-6 6-6"/><circle cx="14" cy="7" r="3"/><path d="M13 11c3.314 0 6 2.686 6 6" strokeLinecap="round"/></svg>,
+  locked:   <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="9" width="14" height="10" rx="2"/><path d="M7 9V6a3 3 0 016 0v3" strokeLinecap="round"/></svg>,
+  archives: <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="6" width="16" height="11" rx="1.5"/><path d="M2 6l2-3h12l2 3" strokeLinecap="round" strokeLinejoin="round"/><path d="M8 11h4" strokeLinecap="round"/></svg>,
 };
 
 function TabBar({ tabs, activeTab, onTabChange }) {
@@ -41,12 +42,14 @@ function TabBar({ tabs, activeTab, onTabChange }) {
         {tabs.map(t => {
           const active = activeTab === t.id;
           return (
-            <button key={t.id} onClick={() => onTabChange(t.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 18px 10px', border: '1px solid', borderColor: active ? '#e8ecf0' : 'transparent', borderBottom: active ? '1px solid #fff' : 'none', borderRadius: '10px 10px 0 0', background: active ? '#fff' : 'transparent', marginBottom: '-1px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, color: active ? '#10b981' : '#9ca3af', transition: 'color 0.15s', whiteSpace: 'nowrap', position: 'relative', zIndex: active ? 2 : 0 }}>
+            <button key={t.id} onClick={() => onTabChange(t.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 18px 10px', border: '1px solid', borderColor: active ? '#e8ecf0' : 'transparent', borderBottom: active ? '1px solid #fff' : 'none', borderRadius: '10px 10px 0 0', background: active ? '#fff' : 'transparent', marginBottom: '-1px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, color: active ? (t.id === 'archives' ? '#f59e0b' : '#10b981') : '#9ca3af', transition: 'color 0.15s', whiteSpace: 'nowrap', position: 'relative', zIndex: active ? 2 : 0 }}>
               {TAB_ICONS[t.id]}
               {t.label}
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: t.warn ? (active ? '#fef2f2' : 'transparent') : (active ? '#d1fae5' : 'transparent'), color: t.warn ? (active ? '#dc2626' : '#f87171') : (active ? '#10b981' : '#b0b7c3') }}>
-                {t.count}
-              </span>
+              {t.count !== null && (
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: t.warn ? (active ? '#fef2f2' : 'transparent') : (active ? (t.id === 'archives' ? '#fef3c7' : '#d1fae5') : 'transparent'), color: t.warn ? (active ? '#dc2626' : '#f87171') : (active ? (t.id === 'archives' ? '#92400e' : '#10b981') : '#b0b7c3') }}>
+                  {t.count}
+                </span>
+              )}
             </button>
           );
         })}

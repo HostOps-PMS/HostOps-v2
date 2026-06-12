@@ -6,6 +6,7 @@ import StaffModal from './components/StaffModal';
 import DeleteModal from './components/DeleteModal';
 import StaffTable from './components/StaffTable';
 import { exportStaffsPdf } from './utils/exportStaffsPdf';
+import { archiveStaff } from './services/staffApi';
 
 export default function Staffs() {
   const [filterClient, setFilterClient] = useState('');
@@ -54,6 +55,15 @@ export default function Staffs() {
   function handleDeleted() {
     setModal(null);
     reload();
+  }
+
+  async function handleArchiveStaff(staff) {
+    try {
+      await archiveStaff(staff._id);
+      reload();
+    } catch (err) {
+      console.error('[archiveStaff]', err);
+    }
   }
 
   return (
@@ -162,6 +172,7 @@ export default function Staffs() {
             onFilterClientChange={(val) => { setFilterClient(val); setPage(1); }}
             onEdit={(s) => setModal({ type: 'edit', staff: s })}
             onDelete={(s) => setModal({ type: 'delete', staff: s })}
+            onArchive={handleArchiveStaff}
             onNew={() => setModal({ type: 'create' })}
             page={page}
             totalPages={totalPages}

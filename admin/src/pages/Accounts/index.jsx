@@ -3,6 +3,7 @@ import Sidebar            from '../Sidebar';
 import TopBar             from '../dashboard/components/TopBar';
 import AccountsTable      from './components/AccountsTable';
 import UnlockModal        from './components/UnlockModal';
+import ArchivesSection    from './components/ArchivesSection';
 import { useAccounts, useFilteredAccounts } from './hooks/useAccounts';
 import { exportAccountsPdf } from './utils/exportAccountsPdf';
 import './index.css';
@@ -25,10 +26,11 @@ export default function AccountsPage() {
   ).length;
 
   const tabs = [
-    { id: 'all',    label: 'All',        count: combined.length },
-    { id: 'users',  label: 'Users',      count: users.length },
-    { id: 'staffs', label: 'Staffs',     count: staffs.length },
-    { id: 'locked', label: 'PIN Issues', count: lockedCount, warn: lockedCount > 0 },
+    { id: 'all',      label: 'All',        count: combined.length },
+    { id: 'users',    label: 'Users',      count: users.length },
+    { id: 'staffs',   label: 'Staffs',     count: staffs.length },
+    { id: 'locked',   label: 'PIN Issues', count: lockedCount, warn: lockedCount > 0 },
+    { id: 'archives', label: 'Archives',   count: null },
   ];
 
   const { filtered, totalFiltered, totalPages } = useFilteredAccounts({
@@ -104,14 +106,18 @@ export default function AccountsPage() {
           `}</style>
           </header>
 
-          <AccountsTable
-            tabs={tabs} activeTab={tab} onTabChange={handleTabChange}
-            filtered={filtered} totalFiltered={totalFiltered} combined={combined}
-            loading={loading} error={error}
-            search={search} onSearchChange={handleSearch}
-            page={page} totalPages={totalPages} onPageChange={setPage}
-            onUnlock={setUnlockTarget} onRefresh={reload}
-          />
+          {tab === 'archives' ? (
+            <ArchivesSection onTabChange={handleTabChange} tabs={tabs} activeTab={tab} />
+          ) : (
+            <AccountsTable
+              tabs={tabs} activeTab={tab} onTabChange={handleTabChange}
+              filtered={filtered} totalFiltered={totalFiltered} combined={combined}
+              loading={loading} error={error}
+              search={search} onSearchChange={handleSearch}
+              page={page} totalPages={totalPages} onPageChange={setPage}
+              onUnlock={setUnlockTarget} onRefresh={reload}
+            />
+          )}
         </div>
       </div>
 

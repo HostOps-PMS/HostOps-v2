@@ -16,11 +16,29 @@ export function apiFetch(path, opts = {}) {
   });
 }
 
-export async function fetchStaffs(filterClient) {
-  const url = filterClient ? `/api/staffs?clientId=${filterClient}` : '/api/staffs';
+export async function fetchStaffs(filterClient, { archived = false } = {}) {
+  const params = new URLSearchParams();
+  if (filterClient) params.set('clientId', filterClient);
+  if (archived) params.set('archived', 'true');
+  const query = params.toString();
+  const url = `/api/staffs${query ? `?${query}` : ''}`;
   const res = await apiFetch(url);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to load staffs.');
+  return data;
+}
+
+export async function archiveStaff(id) {
+  const res = await apiFetch(`/api/staffs/${id}/archive`, { method: 'PATCH' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to archive staff.');
+  return data;
+}
+
+export async function unarchiveStaff(id) {
+  const res = await apiFetch(`/api/staffs/${id}/unarchive`, { method: 'PATCH' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to unarchive staff.');
   return data;
 }
 
