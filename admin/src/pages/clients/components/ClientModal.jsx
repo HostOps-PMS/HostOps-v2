@@ -295,8 +295,8 @@ export default function ClientModal({ client, onClose, onUpdated }) {
 
 
   async function handleSave() {
-    if (form.password && form.password.length < 8) {
-      setSaveError('Password must be at least 8 characters.');
+    if (form.password && (form.password.length < 8 || !/[A-Z]/.test(form.password) || !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password))) {
+      'Password must be at least 8 characters, include 1 uppercase letter, and 1 special character.'
       return;
     }
     if (form.pin && !/^\d{6}$/.test(form.pin)) {
@@ -609,7 +609,16 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                 value={form.password} onChange={handleChange} maxLength={128}
                 style={form.password && form.password.length < 8 ? { borderColor: '#ef4444' } : {}} />
               {form.password && form.password.length < 8 && (
-                <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Password must be at least 8 characters.</span>
+                <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ At least 8 characters.</span>
+              )}
+              {form.password && form.password.length >= 8 && !/[A-Z]/.test(form.password) && (
+                <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Must include at least 1 uppercase letter.</span>
+              )}
+              {form.password && form.password.length >= 8 && /[A-Z]/.test(form.password) && !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) && (
+                <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Must include at least 1 special character (e.g. @, #, !).</span>
+              )}
+              {form.password && form.password.length >= 8 && /[A-Z]/.test(form.password) && /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) && (
+                <span style={{ color: '#26a676', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>✓ Strong password.</span>
               )}
                 </div>
                 <div className="cl-modal-field">

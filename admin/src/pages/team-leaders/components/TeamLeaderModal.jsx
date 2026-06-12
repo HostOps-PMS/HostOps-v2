@@ -45,7 +45,15 @@ export default function TeamLeaderModal({ mode, teamLeader, clients, onClose, on
     setSaving(true);
     setError('');
 
-    try {
+try {
+      if (!isEdit) {
+        if (!form.password || form.password.length < 8 || !/[A-Z]/.test(form.password) || !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password)) {
+          setError('Password must be at least 8 characters, include 1 uppercase letter, and 1 special character.');
+          setSaving(false);
+          return;
+        }
+      }
+
       const body = {
         firstName: form.firstName,
         lastName:  form.lastName,
@@ -180,7 +188,7 @@ export default function TeamLeaderModal({ mode, teamLeader, clients, onClose, on
               <label style={labelStyle}>First Name *</label>
               <input
                 value={form.firstName}
-                onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                onChange={(e) => { const val = e.target.value; if (/^[a-zA-Z\s.'-]*$/.test(val)) setForm({ ...form, firstName: val }); }}
                 required
                 style={inputStyle}
                 placeholder="Juan"
@@ -190,7 +198,7 @@ export default function TeamLeaderModal({ mode, teamLeader, clients, onClose, on
               <label style={labelStyle}>Last Name</label>
               <input
                 value={form.lastName}
-                onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                onChange={(e) => { const val = e.target.value; if (/^[a-zA-Z\s.'-]*$/.test(val)) setForm({ ...form, lastName: val }); }}
                 style={inputStyle}
                 placeholder="Dela Cruz"
               />
@@ -205,9 +213,12 @@ export default function TeamLeaderModal({ mode, teamLeader, clients, onClose, on
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               required
               disabled={isEdit}
-              style={{ ...inputStyle, cursor: isEdit ? 'not-allowed' : 'text' }}
+              style={{ ...inputStyle, cursor: isEdit ? 'not-allowed' : 'text', ...(!isEdit && form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) ? { borderColor: '#ef4444' } : {}) }}
               placeholder="teamleader@example.com"
             />
+            {!isEdit && form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) && (
+              <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Enter a valid email (e.g. teamleader@example.com).</span>
+            )}
           </div>
 
           {!isEdit && (
@@ -220,10 +231,22 @@ export default function TeamLeaderModal({ mode, teamLeader, clients, onClose, on
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   required
                   minLength={8}
-                  style={{ ...inputStyle, paddingRight: 40 }}
+                  style={{ ...inputStyle, paddingRight: 40, ...(form.password && (form.password.length < 8 || !/[A-Z]/.test(form.password) || !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password)) ? { borderColor: '#ef4444' } : { borderColor: '#26a676' }) }}
                   placeholder="Min. 8 characters"
                   autoComplete="new-password"
                 />
+                {form.password && form.password.length < 8 && (
+                  <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ At least 8 characters.</span>
+                )}
+                {form.password && form.password.length >= 8 && !/[A-Z]/.test(form.password) && (
+                  <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Must include at least 1 uppercase letter.</span>
+                )}
+                {form.password && form.password.length >= 8 && /[A-Z]/.test(form.password) && !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) && (
+                  <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Must include at least 1 special character (e.g. @, #, !).</span>
+                )}
+                {form.password && form.password.length >= 8 && /[A-Z]/.test(form.password) && /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) && (
+                  <span style={{ color: '#26a676', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>✓ Strong password.</span>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowPassword(v => !v)}
