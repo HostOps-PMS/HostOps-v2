@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 
 // ─────────────────────────────────────────────────────────────────
 // Helpers
@@ -392,6 +393,8 @@ export default function TopBar({ onAction, onExport, exportLoading = false, aler
     .filter(Boolean).map(n => n[0].toUpperCase()).join('') || 'U';
   const firstName = currentUser.firstName || 'there';
 
+const location = useLocation();
+  const isDashboard = location.pathname === '/dashboard';
   const unreadCount = (alerts || []).filter(a => a.unread).length;
 
   // Close dropdown on outside click
@@ -439,7 +442,7 @@ export default function TopBar({ onAction, onExport, exportLoading = false, aler
             via showExport AND provides an onExport handler. This is what
             keeps it out of the TopBar on every page except the Dashboard,
             even if other pages happen to pass an onExport prop too. */}
-        {showExport && onExport && (
+        {isDashboard && onExport && (
           <>
             <button
               onClick={onExport}
