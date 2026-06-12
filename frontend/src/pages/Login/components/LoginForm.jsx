@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { loginUser } from '../services/authservice';
 import { useAuthSubmit } from '../hooks/useAuth';
 import { useAuth } from '../../AuthContext';
+import RecoveryModal from './RecoveryModal';
 
 const DISABLED_TIPS = [
   "Your account took an extended vacation — without filing the paperwork first.",
@@ -26,6 +27,37 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
   const [showPassword, setShowPassword] = useState(false);
   const [isDisabled, setIsDisabled] = useState(false);
   const [disabledTipIndex] = useState(() => Math.floor(Math.random() * DISABLED_TIPS.length));
+  const [showAppealModal, setShowAppealModal]   = useState(false);
+  const [appealReason, setAppealReason]         = useState('');
+  const [appealLoading, setAppealLoading]       = useState(false);
+  const [appealSubmitted, setAppealSubmitted]   = useState(false);
+
+  const API_BASE = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
+
+  const handleAppealSubmit = async () => {
+    if (!appealReason.trim() || appealReason.trim().length < 10) return;
+    if (!email.trim()) return;
+    setAppealLoading(true);
+    try {
+      await fetch(`${API_BASE}/auth/recovery-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': import.meta.env.VITE_API_KEY || '',
+        },
+        body: JSON.stringify({
+          email:       email.trim().toLowerCase(),
+          reason:      appealReason.trim(),
+          requestType: 'account_disabled',
+        }),
+      });
+      setAppealSubmitted(true);
+    } catch {
+      setAppealSubmitted(true);
+    } finally {
+      setAppealLoading(false);
+    }
+  };
 
   const { submit, loading } = useAuthSubmit(loginUser, {
     onSuccess: (data) => {
@@ -226,6 +258,14 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
         <div>
           <button
             type="button"
+            className="lp-btn"
+            onClick={() => setShowAppealModal(true)}
+            style={{ width: '100%', marginBottom: '8px' }}
+          >
+            Contact Administrator
+          </button>
+          <button
+            type="button"
             className="lp-link"
             onClick={() => { setIsDisabled(false); setEmail(''); setPassword(''); }}
             style={{ marginTop: '4px' }}
@@ -233,6 +273,22 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
             ← Try a different account
           </button>
         </div>
+
+        <RecoveryModal
+          show={showAppealModal}
+          email={email}
+          reason={appealReason}
+          onReasonChange={setAppealReason}
+          onSubmit={handleAppealSubmit}
+          onClose={() => { if (!appealLoading) { setShowAppealModal(false); if (appealSubmitted) setAppealReason(''); } }}
+          loading={appealLoading}
+          submitted={appealSubmitted}
+          title="Contact Administrator"
+          description="Explain why your account should be re-enabled. An administrator will review your appeal."
+          label="Why should your account be re-enabled?"
+          placeholder="e.g. I believe my account was disabled by mistake. I am still an active employee and need access to continue my work."
+          submitLabel="Submit Appeal"
+        />
 
         <style>{`
           @keyframes lf-ripple-slow {
