@@ -147,6 +147,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
   if (!client) return null;
 
   const [isEditing,        setIsEditing]        = useState(false);
+  const [showPassword,     setShowPassword]     = useState(false);
   const [smoobuProperty,   setSmoobuProperty]   = useState(null);
   const [saving,           setSaving]           = useState(false);
   const [saveError,        setSaveError]        = useState(null);
@@ -598,7 +599,31 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                 </div>
                 <div className="cl-modal-field">
                   <label className="cl-modal-field__label">New Password</label>
-                  <input name="password" type="password" className="cl-edit-input" placeholder="Leave blank to keep current password" value={form.password} onChange={handleChange} maxLength={128} />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      className="cl-edit-input"
+                      placeholder="Leave blank to keep current password"
+                      value={form.password}
+                      onChange={handleChange}
+                      maxLength={128}
+                      style={{ paddingRight: 40 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(v => !v)}
+                      style={{
+                        position: 'absolute', right: 10, top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none', border: 'none',
+                        cursor: 'pointer', color: 'var(--color-muted)',
+                        display: 'flex', alignItems: 'center', padding: 0,
+                      }}
+                    >
+                      <i className={`ti ${showPassword ? 'ti-eye-off' : 'ti-eye'}`} style={{ fontSize: 16 }} />
+                    </button>
+                  </div>
                 </div>
                 <div className="cl-modal-field">
                   <label className="cl-modal-field__label">New 6-Digit PIN</label>
