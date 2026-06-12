@@ -91,6 +91,17 @@ export default function PinModal({
   const [recoveryLoading, setRecoveryLoading]     = useState(false);
   const [recoverySubmitted, setRecoverySubmitted] = useState(false);
 
+  // ── One-shot pending flags — persist in sessionStorage so re-opening
+  //    the page doesn't reset the "already submitted" state.
+  const [hasPendingPinRecovery, setHasPendingPinRecovery] = useState(() => {
+    const e = (userData?.email || '').trim().toLowerCase();
+    return e ? !!sessionStorage.getItem(`hp_pending_req_${e}_pin`) : false;
+  });
+  const [hasPendingDisabledAppeal, setHasPendingDisabledAppeal] = useState(() => {
+    const e = (userData?.email || '').trim().toLowerCase();
+    return e ? !!sessionStorage.getItem(`hp_pending_req_${e}_disabled`) : false;
+  });
+
   const inputRefs = useRef([]);
   const countdownRef = useRef(null);
 
@@ -388,6 +399,10 @@ export default function PinModal({
 
       // We always show success to prevent email enumeration
       setRecoverySubmitted(true);
+      const key = `hp_pending_req_${email.trim().toLowerCase()}_${isDisabled ? 'disabled' : 'pin'}`;
+      sessionStorage.setItem(key, '1');
+      if (isDisabled) setHasPendingDisabledAppeal(true);
+      else            setHasPendingPinRecovery(true);
     } catch {
       setRecoverySubmitted(true); // still show success UI on network error
     } finally {
@@ -513,14 +528,29 @@ export default function PinModal({
         </div>
 
         <div>
-          <button
-            type="button"
-            className="lp-btn"
-            onClick={() => setShowRecoveryModal(true)}
-            style={{ width: '100%', marginBottom: '8px' }}
-          >
-            Contact Administrator
-          </button>
+          {hasPendingDisabledAppeal ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center',
+              padding: '10px 16px', borderRadius: 10,
+              background: '#f0fdf4', border: '1px solid #6ee7b7',
+              fontSize: '13px', fontWeight: 600, color: '#059669',
+              marginBottom: '8px',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+              </svg>
+              Appeal submitted — pending admin review
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="lp-btn"
+              onClick={() => setShowRecoveryModal(true)}
+              style={{ width: '100%', marginBottom: '8px' }}
+            >
+              Contact Administrator
+            </button>
+          )}
           <button
             type="button"
             className="lp-link"
@@ -676,14 +706,29 @@ export default function PinModal({
 
         {/* Buttons — bottom */}
         <div>
-          <button
-            type="button"
-            className="lp-btn"
-            onClick={() => setShowRecoveryModal(true)}
-            style={{ width: '100%', marginBottom: '8px' }}
-          >
-            Request Account Recovery
-          </button>
+          {hasPendingPinRecovery ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center',
+              padding: '10px 16px', borderRadius: 10,
+              background: '#f0fdf4', border: '1px solid #6ee7b7',
+              fontSize: '13px', fontWeight: 600, color: '#059669',
+              marginBottom: '8px',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+              </svg>
+              Request submitted — pending admin review
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="lp-btn"
+              onClick={() => setShowRecoveryModal(true)}
+              style={{ width: '100%', marginBottom: '8px' }}
+            >
+              Request Account Recovery
+            </button>
+          )}
 
           <button
             type="button"
