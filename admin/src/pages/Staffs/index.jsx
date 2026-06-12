@@ -7,18 +7,16 @@ import StaffModal from './components/StaffModal';
 import DeleteModal from './components/DeleteModal';
 import StaffTable from './components/StaffTable';
 import { exportStaffsPdf } from './utils/exportStaffsPdf';
-import { exportStaffsPdf } from './utils/exportStaffsPdf';
 
 export default function Staffs() {
   const [filterClient, setFilterClient] = useState('');
   const [search, setSearch]             = useState('');
   const [page,   setPage]               = useState(1);
   const PAGE_SIZE = 10;
-  const [modal, setModal]               = useState(null); // null | { type: 'create'|'edit'|'delete', staff? }
+  const [modal, setModal]               = useState(null);
+  const [exportLoading, setExportLoading] = useState(false);
 
   const { staffs, clients, loading, error, propertyMap, reload } = useStaffs(filterClient);
-
-  /* ── Alerts + Activity from dashboard overview ── */
   const { overview, loading: notifLoading } = useStats();
 
   const filtered = staffs.filter((s) => {
@@ -34,64 +32,20 @@ export default function Staffs() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  function handleSearchChange(val) {
-    setSearch(val);
-    setPage(1);
-  }
-
-  const [exportLoading, setExportLoading] = useState(false);
-
-  async function handleExport() {
-    if (exportLoading || loading) return;
-    setExportLoading(true);
-    try {
-      await exportStaffsPdf({ staffs: filtered, clients, propertyMap, filterClient, search });
-    } finally {
-      setExportLoading(false);
-    }
-  }
-
-  function handleSaved() {
-    setModal(null);
-    reload();
-  }
-
-  function handleDeleted() {
-    setModal(null);
-    reload();
-  }
-
-  /* ── Export PDF — always exports ALL filtered records, not just current page ── */
-  const [exportLoading, setExportLoading] = useState(false);
+  function handleSearchChange(val) { setSearch(val); setPage(1); }
+  function handleSaved()   { setModal(null); reload(); }
+  function handleDeleted() { setModal(null); reload(); }
 
   const handleExport = () => {
     if (exportLoading || loading) return;
     setExportLoading(true);
     try {
-      exportStaffsPdf({
-        staffs: filtered,
-        search,
-        filterClient,
-      });
+      exportStaffsPdf({ staffs: filtered, search, filterClient });
     } catch (err) {
       console.error('[exportStaffsPdf] failed:', err);
     } finally {
       setExportLoading(false);
     }
-  };
-
-  /* ── Shared Export PDF button styles ── */
-  const exportBtnStyle = {
-    display: 'inline-flex', alignItems: 'center', gap: 7,
-    padding: '9px 18px',
-    background: (exportLoading || loading) ? '#e0e0e0' : '#1a9e6e',
-    color: (exportLoading || loading) ? '#aaa' : '#fff',
-    border: 'none', borderRadius: 10,
-    cursor: (exportLoading || loading) ? 'not-allowed' : 'pointer',
-    fontSize: '0.875rem', fontWeight: 600,
-    letterSpacing: '0.01em', whiteSpace: 'nowrap',
-    transition: 'background 0.15s',
-    boxShadow: (exportLoading || loading) ? 'none' : '0 2px 8px rgba(26,158,110,0.18)',
   };
 
   const exportBtnIcon = exportLoading ? (
@@ -107,9 +61,21 @@ export default function Staffs() {
     </svg>
   );
 
+  const exportBtnStyle = {
+    display: 'inline-flex', alignItems: 'center', gap: 7,
+    padding: '9px 18px',
+    background: (exportLoading || loading) ? '#e0e0e0' : '#1a9e6e',
+    color: (exportLoading || loading) ? '#aaa' : '#fff',
+    border: 'none', borderRadius: 10,
+    cursor: (exportLoading || loading) ? 'not-allowed' : 'pointer',
+    fontSize: '0.875rem', fontWeight: 600,
+    letterSpacing: '0.01em', whiteSpace: 'nowrap',
+    transition: 'background 0.15s',
+    boxShadow: (exportLoading || loading) ? 'none' : '0 2px 8px rgba(26,158,110,0.18)',
+  };
+
   return (
     <div className="db-layout">
-      {/* Pass handleExport to Sidebar so mobile top bar shows Export PDF on this page */}
       <Sidebar onExport={handleExport} exportLoading={exportLoading} />
 
       <div className="db-main">
@@ -120,40 +86,21 @@ export default function Staffs() {
         />
 
         <div className="cl-content">
-          {/* Modals */}
           {modal?.type === 'create' && (
-            <StaffModal
-              mode="create"
-              clients={clients}
-              onClose={() => setModal(null)}
-              onSaved={handleSaved}
-            />
+            <StaffModal mode="create" clients={clients} onClose={() => setModal(null)} onSaved={handleSaved} />
           )}
           {modal?.type === 'edit' && (
-            <StaffModal
-              mode="edit"
-              staff={modal.staff}
-              clients={clients}
-              onClose={() => setModal(null)}
-              onSaved={handleSaved}
-            />
+            <StaffModal mode="edit" staff={modal.staff} clients={clients} onClose={() => setModal(null)} onSaved={handleSaved} />
           )}
           {modal?.type === 'delete' && (
-            <DeleteModal
-              staff={modal.staff}
-              onClose={() => setModal(null)}
-              onDeleted={handleDeleted}
-            />
+            <DeleteModal staff={modal.staff} onClose={() => setModal(null)} onDeleted={handleDeleted} />
           )}
 
-          {/* Page Header */}
           <header className="cl-content__header">
             <div>
               <h1 className="cl-content__title">Staffs</h1>
               <p className="cl-content__sub">Manage staff accounts and their property access</p>
             </div>
-
-            {/* Export PDF button — desktop/tablet (hidden on mobile via Sidebar's mobile bar) */}
             <button
               onClick={handleExport}
               disabled={exportLoading || loading}
