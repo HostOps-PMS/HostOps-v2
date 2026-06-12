@@ -77,7 +77,7 @@ export default function TeamLeaders() {
 
   return (
     <div className="db-layout">
-      <Sidebar onExport={handleExport} exportLoading={exportLoading} />
+      <Sidebar />
 
       <div className="db-main">
         <TopBar
