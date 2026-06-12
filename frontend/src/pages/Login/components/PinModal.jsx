@@ -6,6 +6,19 @@ import safeStorage from '../../safeStorage';
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://hostpilot-smoobu.onrender.com';
 const PIN_LENGTH = 6;
 
+const PIN_TIPS = [
+  "Try using a number that means something to you — like how many times you've done this.",
+  "Your PIN is not 123456. We know, because literally everyone uses that. Please try harder.",
+  "A password manager stores everything securely and has been patiently waiting for you to try it.",
+  "If you can remember your WiFi password (all 32 characters of it), you can definitely handle 6 digits.",
+  "A Post-it® note on your monitor isn't what security experts recommend. But here we are.",
+  "Consider your anniversary date — if you can remember that, PINs should be child's play.",
+  "Fun fact: Humans can hold up to 7 things in short-term memory. You only needed 6. We believe in you.",
+  "The number of times you've locked yourself out is now a very memorable PIN candidate.",
+  "Writing your PIN on your palm works great — until you wash your hands. (Please wash your hands.)",
+  "Plot twist: You actually know your PIN. It's just playing hard to get. Try again soon.",
+];
+
 // ─────────────────────────────────────────────────────────────────
 // PinModal
 //
@@ -52,6 +65,7 @@ export default function PinModal({
   const [lockedUntil, setLockedUntil]           = useState(null);
   const [permanentlyLocked, setPermanentlyLocked] = useState(false);
   const [lockSecondsLeft, setLockSecondsLeft]   = useState(0);
+  const [tipIndex, setTipIndex]                 = useState(() => Math.floor(Math.random() * PIN_TIPS.length));
 
   // ── Recovery modal state ──────────────────────────────────────────
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
@@ -91,6 +105,11 @@ export default function PinModal({
     tick(); // run immediately so display doesn't wait 1s
     countdownRef.current = setInterval(tick, 1000);
     return () => clearInterval(countdownRef.current);
+  }, [lockedUntil]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pick a fresh random tip each time a new lock starts
+  useEffect(() => {
+    if (lockedUntil) setTipIndex(Math.floor(Math.random() * PIN_TIPS.length));
   }, [lockedUntil]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auto-submit when all digits filled ──────────────────────────
@@ -367,63 +386,103 @@ export default function PinModal({
         <h1 className="lp-h1">Account Locked</h1>
 
         {/* Body — grows to fill space */}
-        <div
-          style={{
-            flex:          1,
-            display:       'flex',
-            flexDirection: 'column',
-            alignItems:    'center',
-            justifyContent:'center',
-            textAlign:     'center',
-            gap:           '16px',
-            padding:       '12px 0',
-          }}
-        >
-          {/* Lock icon */}
-          <div
-            style={{
-              width:          '60px',
-              height:         '60px',
+        <div style={{
+          flex:           1,
+          display:        'flex',
+          flexDirection:  'column',
+          alignItems:     'center',
+          justifyContent: 'center',
+          textAlign:      'center',
+          gap:            '16px',
+          padding:        '8px 0',
+        }}>
+          {/* Ripple rings + lock icon — rings start at lock-circle size and scale to container size */}
+          <div style={{
+            position:       'relative',
+            width:          '180px',
+            height:         '180px',
+            display:        'flex',
+            alignItems:     'center',
+            justifyContent: 'center',
+            flexShrink:     0,
+          }}>
+            {[0, 1.2, 2.4].map((delay, i) => (
+              <div key={i} style={{
+                position:     'absolute',
+                top:          '50%',
+                left:         '50%',
+                width:        '88px',
+                height:       '88px',
+                borderRadius: '50%',
+                border:       '1.5px solid rgba(185, 28, 28, 0.45)',
+                animation:    `lock-ripple-slow 3.6s ease-out ${delay}s infinite`,
+              }} />
+            ))}
+            <div style={{
+              width:          '88px',
+              height:         '88px',
               borderRadius:   '50%',
-              background:     '#fef2f2',
-              border:         '1.5px solid #fecaca',
+              background:     'linear-gradient(145deg, #fff1f2 0%, #ffe4e6 100%)',
+              border:         '2px solid #fca5a5',
               display:        'flex',
               alignItems:     'center',
               justifyContent: 'center',
-            }}
-          >
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="5" y="11" width="14" height="10" rx="2" stroke="#dc2626" strokeWidth="1.6"/>
-              <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="#dc2626" strokeWidth="1.6" strokeLinecap="round"/>
-              <circle cx="12" cy="16" r="1.2" fill="#dc2626"/>
-            </svg>
+              position:       'relative',
+              zIndex:         1,
+              boxShadow:      '0 4px 18px rgba(185,28,28,0.18)',
+            }}>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+                <rect x="5" y="11" width="14" height="10" rx="2" fill="#ffe4e6" stroke="#b91c1c" strokeWidth="1.7"/>
+                <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="#b91c1c" strokeWidth="1.7" strokeLinecap="round"/>
+                <circle cx="12" cy="16" r="1.5" fill="#b91c1c"/>
+              </svg>
+            </div>
           </div>
 
-          <p style={{ color: '#dc2626', fontWeight: '600', margin: 0, fontSize: '14px', lineHeight: '1.6', maxWidth: '300px' }}>
-            Your account has been permanently locked due to too many incorrect PIN attempts.
+          <p style={{ color: '#b91c1c', fontWeight: '600', margin: 0, fontSize: '13px', lineHeight: '1.5', maxWidth: '270px' }}>
+            Account permanently locked due to too many incorrect PIN attempts.
           </p>
 
           {/* Contact note */}
           <div style={{
             display:      'flex',
             alignItems:   'center',
-            gap:          '7px',
-            background:   '#fff0ee',
-            border:       '1px solid #ffd5ce',
-            borderRadius: '8px',
-            padding:      '8px 12px',
+            gap:          '8px',
+            background:   '#fff1f2',
+            border:       '1px solid #fecdd3',
+            borderRadius: '10px',
+            padding:      '9px 13px',
             width:        '100%',
             boxSizing:    'border-box',
             textAlign:    'left',
           }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-              <circle cx="12" cy="12" r="9" stroke="#c13515" strokeWidth="1.7"/>
-              <path d="M12 11v5" stroke="#c13515" strokeWidth="1.7" strokeLinecap="round"/>
-              <circle cx="12" cy="8" r="0.9" fill="#c13515"/>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="9" stroke="#dc2626" strokeWidth="1.7"/>
+              <path d="M12 11v5" stroke="#dc2626" strokeWidth="1.7" strokeLinecap="round"/>
+              <circle cx="12" cy="8" r="0.9" fill="#dc2626"/>
             </svg>
-            <span style={{ color: '#c13515', fontSize: '12.5px', lineHeight: '1.5' }}>
-              Please contact your {isStaff ? 'manager' : 'administrator'} to restore access.
+            <span style={{ color: '#991b1b', fontSize: '12px', lineHeight: '1.5' }}>
+              Contact your {isStaff ? 'manager' : 'administrator'} to restore access.
             </span>
+          </div>
+
+          {/* Humorous tip card */}
+          <div style={{
+            background:   '#fffbeb',
+            border:       '1px solid #fde68a',
+            borderRadius: '12px',
+            padding:      '11px 14px',
+            width:        '100%',
+            boxSizing:    'border-box',
+            animation:    'tip-fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1)',
+            boxShadow:    '0 1px 6px rgba(234,179,8,0.08)',
+          }}>
+            <div style={{ display: 'flex', gap: '9px', alignItems: 'flex-start', textAlign: 'left' }}>
+              <span style={{ fontSize: '14px', lineHeight: '1.5', flexShrink: 0 }}>💡</span>
+              <p style={{ margin: 0, fontSize: '12px', color: '#78350f', lineHeight: '1.7' }}>
+                <strong>PIN Tip: </strong>{PIN_TIPS[tipIndex]}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -459,95 +518,186 @@ export default function PinModal({
           loading={recoveryLoading}
           submitted={recoverySubmitted}
         />
+
+        {/* ── Keyframes for permanent lock screen ── */}
+        <style>{`
+          @keyframes lock-ripple-slow {
+            0%   { transform: translate(-50%, -50%) scale(1);    opacity: 0.55; }
+            100% { transform: translate(-50%, -50%) scale(2.05); opacity: 0;    }
+          }
+          @keyframes tip-fade-up {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0);    }
+          }
+        `}</style>
       </div>
     );
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '420px' }}>
-      {/* ── Header — always at the top ── */}
-      <h1 className="lp-h1">Enter PIN</h1>
-      <p className="lp-sub" style={{ marginBottom: '24px' }}>
-        {firstName ? `Hi ${firstName}! ` : ''}
-        Enter your email and {PIN_LENGTH}-digit PIN to continue.
-      </p>
+      {lockedUntil ? (
+        /* ── Temporary locked state — inputs hidden, animation + tip shown ── */
+        <>
+          <h1 className="lp-h1" style={{ marginBottom: '2px' }}>Locked Out</h1>
+          <p className="lp-sub" style={{ marginBottom: 0 }}>Too many incorrect PIN attempts.</p>
 
-      {/* ── Email field ── */}
-      <div className="lp-field" style={{ marginBottom: '28px' }}>
-        <label className="lp-label">Email</label>
-        <input
-          className="lp-input"
-          type="email"
-          autoComplete="email"
-          placeholder="your@email.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={loading || isLocked}
-        />
-      </div>
+          <div style={{
+            flex:           1,
+            display:        'flex',
+            flexDirection:  'column',
+            alignItems:     'center',
+            justifyContent: 'center',
+            gap:            '18px',
+            padding:        '12px 0 8px',
+          }}>
+            {/* Ripple rings + lock icon — rings start at lock-circle size and scale to container size */}
+            <div style={{
+              position:       'relative',
+              width:          '180px',
+              height:         '180px',
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: 'center',
+              flexShrink:     0,
+            }}>
+              {[0, 0.9, 1.8].map((delay, i) => (
+                <div key={i} style={{
+                  position:     'absolute',
+                  top:          '50%',
+                  left:         '50%',
+                  width:        '88px',
+                  height:       '88px',
+                  borderRadius: '50%',
+                  border:       '1.5px solid rgba(220, 38, 38, 0.5)',
+                  animation:    `lock-ripple 2.7s ease-out ${delay}s infinite`,
+                }} />
+              ))}
+              <div style={{
+                width:          '88px',
+                height:         '88px',
+                borderRadius:   '50%',
+                background:     'linear-gradient(145deg, #fff5f5 0%, #fee2e2 100%)',
+                border:         '2px solid #fca5a5',
+                display:        'flex',
+                alignItems:     'center',
+                justifyContent: 'center',
+                position:       'relative',
+                zIndex:         1,
+                boxShadow:      '0 4px 18px rgba(220,38,38,0.14)',
+              }}>
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+                  <rect x="5" y="11" width="14" height="10" rx="2" fill="#fee2e2" stroke="#dc2626" strokeWidth="1.7"/>
+                  <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="#dc2626" strokeWidth="1.7" strokeLinecap="round"/>
+                  <circle cx="12" cy="16" r="1.5" fill="#dc2626"/>
+                </svg>
+              </div>
+            </div>
 
-      {/* ── PIN digit inputs ── */}
-      <div
-        style={{
-          display:         'flex',
-          gap:             '10px',
-          justifyContent:  'center',
-          marginBottom:    '14px',
-          animation:       shake ? 'pin-shake 0.5s ease' : 'none',
-          opacity:         isLocked ? 0.35 : 1,
-          pointerEvents:   isLocked ? 'none' : 'auto',
-          transition:      'opacity 0.2s ease',
-          width:           '100%',
-        }}
-        onPaste={handlePaste}
-      >
-        {digits.map((digit, i) => (
-          <input
-            key={i}
-            ref={(el) => { inputRefs.current[i] = el; }}
-            type="password"
-            inputMode="numeric"
-            maxLength={1}
-            value={digit}
-            onChange={(e) => handleChange(i, e.target.value)}
-            onKeyDown={(e) => handleKeyDown(i, e)}
-            disabled={loading || isLocked}
-            style={{
-              width:          '46px',
-              height:         '54px',
-              borderRadius:   '12px',
-              border:         `2px solid ${digit ? '#26a676' : '#e3ede8'}`,
-              background:     digit ? '#eaf8f1' : '#f8fbf9',
-              fontSize:       '22px',
-              fontWeight:     '700',
-              textAlign:      'center',
-              color:          '#0c1c14',
-              outline:        'none',
-              transition:     'border-color 0.15s ease, background 0.15s ease, transform 0.12s ease',
-              transform:      digit ? 'scale(1.04)' : 'scale(1)',
-              cursor:         (loading || isLocked) ? 'not-allowed' : 'text',
-              fontFamily:     'inherit',
-            }}
-            aria-label={`PIN digit ${i + 1}`}
-          />
-        ))}
-      </div>
+            {/* Tip card */}
+            <div style={{
+              background:   '#fffbeb',
+              border:       '1px solid #fde68a',
+              borderRadius: '14px',
+              padding:      '12px 14px',
+              width:        '100%',
+              boxSizing:    'border-box',
+              animation:    'tip-fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1)',
+              boxShadow:    '0 1px 6px rgba(234,179,8,0.1)',
+            }}>
+              <div style={{ display: 'flex', gap: '9px', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '15px', lineHeight: '1.4', flexShrink: 0 }}>💡</span>
+                <p style={{ margin: 0, fontSize: '12.5px', color: '#78350f', lineHeight: '1.7' }}>
+                  <strong>PIN Tip: </strong>{PIN_TIPS[tipIndex]}
+                </p>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        /* ── Normal state — email + PIN inputs ── */
+        <>
+          <h1 className="lp-h1">Enter PIN</h1>
+          <p className="lp-sub" style={{ marginBottom: '24px' }}>
+            {firstName ? `Hi ${firstName}! ` : ''}
+            Enter your email and {PIN_LENGTH}-digit PIN to continue.
+          </p>
 
-      {/* ── Progress dots ── */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '20px' }}>
-        {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+          {/* ── Email field ── */}
+          <div className="lp-field" style={{ marginBottom: '28px' }}>
+            <label className="lp-label">Email</label>
+            <input
+              className="lp-input"
+              type="email"
+              autoComplete="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+
+          {/* ── PIN digit inputs ── */}
           <div
-            key={i}
             style={{
-              width:        i < filled ? '16px' : '6px',
-              height:       '6px',
-              borderRadius: '3px',
-              background:   i < filled ? '#26a676' : '#e3ede8',
-              transition:   'all 0.2s ease',
+              display:        'flex',
+              gap:            '10px',
+              justifyContent: 'center',
+              marginBottom:   '14px',
+              animation:      shake ? 'pin-shake 0.5s ease' : 'none',
+              width:          '100%',
             }}
-          />
-        ))}
-      </div>
+            onPaste={handlePaste}
+          >
+            {digits.map((digit, i) => (
+              <input
+                key={i}
+                ref={(el) => { inputRefs.current[i] = el; }}
+                type="password"
+                inputMode="numeric"
+                maxLength={1}
+                value={digit}
+                onChange={(e) => handleChange(i, e.target.value)}
+                onKeyDown={(e) => handleKeyDown(i, e)}
+                disabled={loading}
+                style={{
+                  width:        '46px',
+                  height:       '54px',
+                  borderRadius: '12px',
+                  border:       `2px solid ${digit ? '#26a676' : '#e3ede8'}`,
+                  background:   digit ? '#eaf8f1' : '#f8fbf9',
+                  fontSize:     '22px',
+                  fontWeight:   '700',
+                  textAlign:    'center',
+                  color:        '#0c1c14',
+                  outline:      'none',
+                  transition:   'border-color 0.15s ease, background 0.15s ease, transform 0.12s ease',
+                  transform:    digit ? 'scale(1.04)' : 'scale(1)',
+                  cursor:       loading ? 'not-allowed' : 'text',
+                  fontFamily:   'inherit',
+                }}
+                aria-label={`PIN digit ${i + 1}`}
+              />
+            ))}
+          </div>
+
+          {/* ── Progress dots ── */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '20px' }}>
+            {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  width:        i < filled ? '16px' : '6px',
+                  height:       '6px',
+                  borderRadius: '3px',
+                  background:   i < filled ? '#26a676' : '#e3ede8',
+                  transition:   'all 0.2s ease',
+                }}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
       {/* ── Buttons + error — pushed to bottom ── */}
       <div style={{ marginTop: 'auto' }}>
@@ -573,8 +723,8 @@ export default function PinModal({
             : 'Continue'}
         </button>
 
-        {/* ── Inline error — below button ── */}
-        {inlineError && (
+        {/* ── Inline error — hidden when locked (animation conveys the state) ── */}
+        {inlineError && !lockedUntil && (
           <div style={{
             background:   '#fff0ee',
             border:       '1px solid #ffd5ce',
@@ -624,7 +774,7 @@ export default function PinModal({
         submitted={recoverySubmitted}
       />
 
-      {/* ── Shake keyframes ── */}
+      {/* ── Keyframes ── */}
       <style>{`
         @keyframes pin-shake {
           0%, 100% { transform: translateX(0); }
@@ -634,6 +784,14 @@ export default function PinModal({
           60%       { transform: translateX(5px); }
           75%       { transform: translateX(-3px); }
           90%       { transform: translateX(3px); }
+        }
+        @keyframes lock-ripple {
+          0%   { transform: translate(-50%, -50%) scale(1);    opacity: 0.6; }
+          100% { transform: translate(-50%, -50%) scale(2.05); opacity: 0;   }
+        }
+        @keyframes tip-fade-up {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0);    }
         }
       `}</style>
     </div>
