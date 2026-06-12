@@ -281,7 +281,7 @@ router.post('/login', async (req, res, next) => {
     const staff = await Staff.findOne({ email: email.toLowerCase() });
     if (staff) {
       if (staff.isArchive) {
-        return res.status(403).json({ error: 'This account has been archived. Please contact your administrator.' });
+        return res.status(403).json({ error: 'This account has been disabled. Please contact your administrator.', accountDisabled: true });
       }
       if (!staff.isActive) {
         return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
@@ -312,7 +312,7 @@ router.post('/login', async (req, res, next) => {
     if (!userPasswordMatch) return res.status(401).json({ error: 'Invalid email or password' });
 
     if (user.isArchive) {
-      return res.status(403).json({ error: 'This account has been archived. Please contact your administrator.' });
+      return res.status(403).json({ error: 'This account has been disabled. Please contact your administrator.', accountDisabled: true });
     }
 
     const isAdminCreated = user.mustChangePassword === true;
@@ -394,7 +394,7 @@ router.post('/staff-login', async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     if (staff.isArchive) {
-      return res.status(403).json({ error: 'This account has been archived. Please contact your administrator.' });
+      return res.status(403).json({ error: 'This account has been disabled. Please contact your administrator.', accountDisabled: true });
     }
     if (!staff.isActive) {
       return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
@@ -441,7 +441,7 @@ router.post('/verify-login-otp', async (req, res, next) => {
 
     if (user) {
       if (user.isArchive) {
-        return res.status(403).json({ error: 'This account has been archived. Please contact your administrator.' });
+        return res.status(403).json({ error: 'This account has been disabled. Please contact your administrator.', accountDisabled: true });
       }
 
       user.loginOtp       = undefined;
@@ -557,7 +557,7 @@ router.post('/refresh', async (req, res, next) => {
     if (decoded.role === 'staff') {
       const staff = await Staff.findById(decoded.staffId || decoded.sub);
       if (!staff || !staff.isActive) return res.status(401).json({ error: 'Staff account not found or inactive' });
-      if (staff.isArchive) return res.status(401).json({ error: 'This account has been archived.' });
+      if (staff.isArchive) return res.status(401).json({ error: 'This account has been disabled.', accountDisabled: true });
 
       const rawNewAccess   = signStaffAccessToken(staff);
       const newRefreshToken = signStaffRefreshToken(staff);
@@ -588,7 +588,7 @@ router.post('/refresh', async (req, res, next) => {
     // ── Regular user refresh ──────────────────────────────────────
     const user = await User.findById(decoded.sub);
     if (!user) return res.status(401).json({ error: 'User not found' });
-    if (user.isArchive) return res.status(401).json({ error: 'This account has been archived.' });
+    if (user.isArchive) return res.status(401).json({ error: 'This account has been disabled.', accountDisabled: true });
 
     const rawNewAccess    = signAccessToken(user);
     const newRefreshToken = signRefreshToken(user);
@@ -1157,7 +1157,7 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
     // ── 1. Try Staff ───────────────────────────────────────────────
     const staff = await Staff.findOne({ email: normalizedEmail }).select('+pin +lastPinFailAt');
     if (staff) {
-      if (staff.isArchive) return res.status(403).json({ error: 'This account has been archived. Please contact your administrator.' });
+      if (staff.isArchive) return res.status(403).json({ error: 'This account has been disabled. Please contact your administrator.', accountDisabled: true });
       if (!staff.isActive) return res.status(403).json({ error: 'Your account has been deactivated.' });
 
       const staffBlock = await evaluatePinLockState(staff, now, 'manager');
@@ -1198,7 +1198,7 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
     // ── 2. Try User ────────────────────────────────────────────────
     const ownUser = await User.findOne({ email: normalizedEmail }).select('+pin +lastPinFailAt');
     if (!ownUser) return res.status(404).json({ error: 'Account not found.' });
-    if (ownUser.isArchive) return res.status(403).json({ error: 'This account has been archived. Please contact your administrator.' });
+    if (ownUser.isArchive) return res.status(403).json({ error: 'This account has been disabled. Please contact your administrator.', accountDisabled: true });
 
     const userBlock = await evaluatePinLockState(ownUser, now, 'administrator');
     if (userBlock) return res.status(userBlock.status).json(userBlock.body);

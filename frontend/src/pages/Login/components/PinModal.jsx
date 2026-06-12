@@ -19,6 +19,19 @@ const PIN_TIPS = [
   "Plot twist: You actually know your PIN. It's just playing hard to get. Try again soon.",
 ];
 
+const DISABLED_TIPS = [
+  "Your account took an extended vacation — without filing the paperwork first.",
+  "Error 403: Not all accounts are created equal. Yours has been temporarily demoted.",
+  "Your account called in sick and never came back. A true legend.",
+  "Plot twist: the system knows something you don't. Specifically, that you've been disabled.",
+  "Your account has entered its 'finding itself' phase. Please contact your administrator.",
+  "Someone pressed the big red button. Your account is now officially out of office.",
+  "Account status: disabled. Vibe status: unaffected (probably).",
+  "This isn't you, it's them. Well — actually it is them. Contact your admin to find out.",
+  "Your account is on a mandatory digital detox. Against its will.",
+  "Access revoked. In case you were wondering — yes, someone definitely noticed.",
+];
+
 // ─────────────────────────────────────────────────────────────────
 // PinModal
 //
@@ -66,6 +79,10 @@ export default function PinModal({
   const [permanentlyLocked, setPermanentlyLocked] = useState(false);
   const [lockSecondsLeft, setLockSecondsLeft]   = useState(0);
   const [tipIndex, setTipIndex]                 = useState(() => Math.floor(Math.random() * PIN_TIPS.length));
+
+  // ── Disabled account state ────────────────────────────────────────
+  const [isDisabled, setIsDisabled]             = useState(false);
+  const [disabledTipIndex, setDisabledTipIndex] = useState(() => Math.floor(Math.random() * DISABLED_TIPS.length));
 
   // ── Recovery modal state ──────────────────────────────────────────
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
@@ -234,6 +251,15 @@ export default function PinModal({
       const data = await res.json();
 
       if (!res.ok) {
+        // ── Disabled account ───────────────────────────────────────
+        if (data.accountDisabled) {
+          setIsDisabled(true);
+          setDisabledTipIndex(Math.floor(Math.random() * DISABLED_TIPS.length));
+          hideMsg();
+          clearDigits();
+          return;
+        }
+
         // ── Permanent lock ─────────────────────────────────────────
         if (data.permanentlyLocked) {
           setPermanentlyLocked(true);
@@ -376,6 +402,138 @@ export default function PinModal({
   const filled    = digits.filter(Boolean).length;
   const allFilled = filled === PIN_LENGTH;
   const isLocked  = permanentlyLocked || !!lockedUntil;
+
+  // ── Disabled account screen ──────────────────────────────────────
+  if (isDisabled) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '420px' }}>
+        <h1 className="lp-h1">Account Disabled</h1>
+
+        <div style={{
+          flex:           1,
+          display:        'flex',
+          flexDirection:  'column',
+          alignItems:     'center',
+          justifyContent: 'center',
+          textAlign:      'center',
+          gap:            '16px',
+          padding:        '8px 0',
+        }}>
+          {/* Ripple rings + ban icon */}
+          <div style={{
+            position:       'relative',
+            width:          '180px',
+            height:         '180px',
+            display:        'flex',
+            alignItems:     'center',
+            justifyContent: 'center',
+            flexShrink:     0,
+            overflow:       'hidden',
+          }}>
+            {[0, 1.2, 2.4].map((delay, i) => (
+              <div key={i} style={{
+                position:     'absolute',
+                top:          '50%',
+                left:         '50%',
+                marginTop:    '-44px',
+                marginLeft:   '-44px',
+                width:        '88px',
+                height:       '88px',
+                borderRadius: '50%',
+                border:       '1.5px solid rgba(185, 28, 28, 0.4)',
+                animation:    `lock-ripple-slow 3.6s ease-out ${delay}s infinite`,
+              }} />
+            ))}
+            <div style={{
+              width:          '88px',
+              height:         '88px',
+              borderRadius:   '50%',
+              background:     'linear-gradient(145deg, #fff1f2 0%, #ffe4e6 100%)',
+              border:         '2px solid #fca5a5',
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: 'center',
+              position:       'relative',
+              zIndex:         1,
+              boxShadow:      '0 4px 18px rgba(185,28,28,0.18)',
+            }}>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="9" fill="#ffe4e6" stroke="#b91c1c" strokeWidth="1.7"/>
+                <line x1="6.5" y1="6.5" x2="17.5" y2="17.5" stroke="#b91c1c" strokeWidth="1.7" strokeLinecap="round"/>
+              </svg>
+            </div>
+          </div>
+
+          <p style={{ color: '#b91c1c', fontWeight: '600', margin: 0, fontSize: '13px', lineHeight: '1.5', maxWidth: '270px' }}>
+            This account has been disabled by an administrator.
+          </p>
+
+          <div style={{
+            display:      'flex',
+            alignItems:   'center',
+            gap:          '8px',
+            background:   '#fff1f2',
+            border:       '1px solid #fecdd3',
+            borderRadius: '10px',
+            padding:      '9px 13px',
+            width:        '100%',
+            boxSizing:    'border-box',
+            textAlign:    'left',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="9" stroke="#dc2626" strokeWidth="1.7"/>
+              <path d="M12 11v5" stroke="#dc2626" strokeWidth="1.7" strokeLinecap="round"/>
+              <circle cx="12" cy="8" r="0.9" fill="#dc2626"/>
+            </svg>
+            <span style={{ color: '#991b1b', fontSize: '12px', lineHeight: '1.5' }}>
+              Contact your {isStaff ? 'manager' : 'administrator'} to restore access.
+            </span>
+          </div>
+
+          <div style={{
+            background:   '#fffbeb',
+            border:       '1px solid #fde68a',
+            borderLeft:   '3px solid #f59e0b',
+            borderRadius: '10px',
+            padding:      '10px 14px',
+            width:        '100%',
+            boxSizing:    'border-box',
+            animation:    'tip-fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1)',
+            textAlign:    'left',
+          }}>
+            <p style={{ margin: '0 0 2px', fontSize: '10px', fontWeight: '700', color: '#b45309', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Account Tip
+            </p>
+            <p style={{ margin: 0, fontSize: '12px', color: '#78350f', lineHeight: '1.65' }}>
+              {DISABLED_TIPS[disabledTipIndex]}
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <button
+            type="button"
+            className="lp-link"
+            onClick={onBack}
+            style={{ marginTop: '4px' }}
+          >
+            ← Back
+          </button>
+        </div>
+
+        <style>{`
+          @keyframes lock-ripple-slow {
+            0%   { transform: scale(1);    opacity: 0.55; }
+            100% { transform: scale(2.05); opacity: 0;    }
+          }
+          @keyframes tip-fade-up {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0);    }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   // ── Permanently locked screen ────────────────────────────────────
   if (permanentlyLocked) {
