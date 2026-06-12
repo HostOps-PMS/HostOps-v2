@@ -55,9 +55,9 @@ const staffSchema = new mongoose.Schema({
 
   // ── PIN lockout tracking ──────────────────────────────────────────
   //
-  // pinAttempts:          cumulative wrong-PIN count — persists until successful login or admin unlock.
-  //                       Escalation: 3→1min, 4→3min, 5→1hr, 6→1day, 7→permanent.
-  // lastPinFailAt:        timestamp of the most recent wrong attempt.
+  // pinAttempts:          cumulative wrong-PIN count. Escalation: 3→1min, 4→3min, 5→1hr, 6→1day, 7→permanent.
+  //                       Auto-resets to 0 if 48 hrs pass with no wrong attempt. Permanent lock is never auto-cleared.
+  // lastPinFailAt:        timestamp of the most recent wrong attempt (drives the 48-hr restore window).
   // pinLockedUntil:       time until which PIN entry is blocked (null = not locked)
   // pinPermanentlyLocked: true when attempts reach the final threshold —
   //                       only an admin can clear this via POST /api/accounts/unlock
