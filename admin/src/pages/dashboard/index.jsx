@@ -103,6 +103,7 @@ export default function Dashboard() {
           alerts={overview?.alerts ?? []}
           activities={overview?.recentActivities ?? []}
           notifLoading={statsLoading}
+          showExport={true}
         />
 
         <div className="db-content">

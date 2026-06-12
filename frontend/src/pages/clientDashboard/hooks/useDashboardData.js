@@ -18,11 +18,13 @@ export function useDashboardData() {
   const auth = useAuth();
   const { dashState, updateDashState } = useDashboard();
   const [banner, setBanner] = useState({ message: '', type: '' });
+  const [isLoading, setIsLoading] = useState(false);
   const loadingRef = useRef(false);
 
   const loadData = useCallback(async (fromOverride, toOverride, apartmentIdOverride) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
+    setIsLoading(true);
 
     const from = fromOverride ?? dashState.from;
     const to   = toOverride   ?? dashState.to;
@@ -66,8 +68,10 @@ export function useDashboardData() {
       setBanner({ message: 'Live data', type: 'live' });
     } finally {
       loadingRef.current = false;
+      setIsLoading(false);
+      updateDashState({ isSwitching: false });
     }
   }, [auth, dashState.from, dashState.to, dashState.selectedPropertyId, updateDashState]);
 
-  return { loadData, banner };
+  return { loadData, banner, isLoading };
 }

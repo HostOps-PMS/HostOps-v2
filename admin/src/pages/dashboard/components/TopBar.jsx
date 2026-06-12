@@ -379,7 +379,7 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
 // ─────────────────────────────────────────────────────────────────
 // TopBar
 // ─────────────────────────────────────────────────────────────────
-export default function TopBar({ onAction, onExport, exportLoading = false, alerts = [], activities = [], notifLoading = false }) {
+export default function TopBar({ onAction, onExport, exportLoading = false, alerts = [], activities = [], notifLoading = false, showExport = false }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef(null);
 
@@ -435,44 +435,51 @@ export default function TopBar({ onAction, onExport, exportLoading = false, aler
       {/* Right — Actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
 
-        {/* Export PDF button */}
-        <button
-          onClick={onExport}
-          disabled={exportLoading}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '8px 14px',
-            background: exportLoading ? '#e0e0e0' : '#1a9e6e',
-            color: exportLoading ? '#aaa' : '#fff',
-            border: 'none', borderRadius: 10,
-            cursor: exportLoading ? 'not-allowed' : 'pointer',
-            fontSize: 12, fontWeight: 600,
-            fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-            letterSpacing: '0.01em', whiteSpace: 'nowrap',
-            transition: 'background 0.15s, color 0.15s',
-          }}
-          title="Export dashboard as PDF"
-        >
-          {exportLoading ? (
-            /* Spinner */
-            <svg
-              width="13" height="13" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" strokeWidth="2.2"
-              style={{ animation: 'pdf-spin 0.8s linear infinite' }}
+        {/* Export PDF button — only rendered when the page explicitly opts in
+            via showExport AND provides an onExport handler. This is what
+            keeps it out of the TopBar on every page except the Dashboard,
+            even if other pages happen to pass an onExport prop too. */}
+        {showExport && onExport && (
+          <>
+            <button
+              onClick={onExport}
+              disabled={exportLoading}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 14px',
+                background: exportLoading ? '#e0e0e0' : '#1a9e6e',
+                color: exportLoading ? '#aaa' : '#fff',
+                border: 'none', borderRadius: 10,
+                cursor: exportLoading ? 'not-allowed' : 'pointer',
+                fontSize: 12, fontWeight: 600,
+                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                letterSpacing: '0.01em', whiteSpace: 'nowrap',
+                transition: 'background 0.15s, color 0.15s',
+              }}
+              title="Export dashboard as PDF"
             >
-              <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
-            </svg>
-          ) : (
-            /* Download icon */
-            <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M3 16h14" strokeLinecap="round" />
-            </svg>
-          )}
-          {exportLoading ? 'Exporting...' : 'Export PDF'}
-        </button>
-        <style>{`@keyframes pdf-spin { to { transform: rotate(360deg); } }`}</style>
+              {exportLoading ? (
+                /* Spinner */
+                <svg
+                  width="13" height="13" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" strokeWidth="2.2"
+                  style={{ animation: 'pdf-spin 0.8s linear infinite' }}
+                >
+                  <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                  <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+                </svg>
+              ) : (
+                /* Download icon */
+                <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M3 16h14" strokeLinecap="round" />
+                </svg>
+              )}
+              {exportLoading ? 'Exporting...' : 'Export PDF'}
+            </button>
+            <style>{`@keyframes pdf-spin { to { transform: rotate(360deg); } }`}</style>
+          </>
+        )}
 
         {/* Notification bell */}
         <div ref={notifRef} style={{ position: 'relative' }}>

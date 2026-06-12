@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import Sidebar from '../Sidebar';
+import TopBar from '../dashboard/components/TopBar';
+import { useStats } from '../dashboard/hooks/useStats';
 import { useStaffs } from './hooks/useStaffs';
 import StaffModal from './components/StaffModal';
 import DeleteModal from './components/DeleteModal';
@@ -13,6 +15,9 @@ export default function Staffs() {
   const [modal, setModal]               = useState(null); // null | { type: 'create'|'edit'|'delete', staff? }
 
   const { staffs, clients, loading, error, propertyMap, reload } = useStaffs(filterClient);
+
+  /* ── Alerts + Activity from dashboard overview (same source as Dashboard/Clients) ── */
+  const { overview, loading: notifLoading } = useStats();
 
   const filtered = staffs.filter((s) => {
     if (!search) return true;
@@ -47,27 +52,13 @@ export default function Staffs() {
       <Sidebar />
 
       <div className="db-main">
-        {/* TopBar */}
-        <header className="db-topbar">
-          <div className="db-topbar__search">
-            <span className="db-topbar__search-icon">
-              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="9" cy="9" r="7" />
-                <path d="M15 15l3 3" strokeLinecap="round" />
-              </svg>
-            </span>
-            <input type="text" placeholder="Search…" />
-          </div>
-          <div className="db-topbar__actions">
-            <button className="db-topbar__icon-btn" title="Notifications">
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M10 2a6 6 0 00-6 6v3l-1.5 2H17.5L16 11V8a6 6 0 00-6-6z" />
-                <path d="M8.5 17a1.5 1.5 0 003 0" strokeLinecap="round" />
-              </svg>
-            </button>
-            <div className="db-topbar__avatar" title="Admin User">A</div>
-          </div>
-        </header>
+        {/* TopBar — same component as Dashboard/Clients, fed with live alerts + activities.
+            No onExport/showExport passed, so the Export PDF button stays hidden here. */}
+        <TopBar
+          alerts={overview?.alerts ?? []}
+          activities={overview?.recentActivities ?? []}
+          notifLoading={notifLoading}
+        />
 
         <div className="cl-content">
           {/* Modals */}
