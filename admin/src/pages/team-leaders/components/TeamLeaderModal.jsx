@@ -36,8 +36,9 @@ export default function TeamLeaderModal({ mode, teamLeader, clients, onClose, on
     serverId:  teamLeader?.serverId?._id || teamLeader?.serverId || '',
   });
 
-  const [saving, setSaving] = useState(false);
-  const [error, setError]   = useState('');
+  const [saving, setSaving]           = useState(false);
+  const [error, setError]             = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -212,16 +213,31 @@ export default function TeamLeaderModal({ mode, teamLeader, clients, onClose, on
           {!isEdit && (
             <div style={{ marginBottom: 14 }}>
               <label style={labelStyle}>Password *</label>
-              <input
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                required
-                minLength={8}
-                style={inputStyle}
-                placeholder="Min. 8 characters"
-                autoComplete="new-password"
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  required
+                  minLength={8}
+                  style={{ ...inputStyle, paddingRight: 40 }}
+                  placeholder="Min. 8 characters"
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  style={{
+                    position: 'absolute', right: 10, top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none', border: 'none',
+                    cursor: 'pointer', color: '#9ca3af',
+                    display: 'flex', alignItems: 'center', padding: 0,
+                  }}
+                >
+                  <i className={`ti ${showPassword ? 'ti-eye-off' : 'ti-eye'}`} style={{ fontSize: 16 }} />
+                </button>
+              </div>
             </div>
           )}
 
