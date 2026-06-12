@@ -13,8 +13,26 @@ const WAIT_HINTS = [
   "Calculating how rich you are. One sec.",
 ];
 
-function pickHint() {
-  return WAIT_HINTS[Math.floor(Math.random() * WAIT_HINTS.length)];
+function shuffled(length) {
+  const arr = Array.from({ length }, (_, i) => i);
+  for (let i = length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+let hintQueue = [];
+let iconQueue = [];
+
+function nextHint() {
+  if (!hintQueue.length) hintQueue = shuffled(WAIT_HINTS.length);
+  return WAIT_HINTS[hintQueue.pop()];
+}
+
+function nextIconIdx() {
+  if (!iconQueue.length) iconQueue = shuffled(LOADING_ICONS.length);
+  return iconQueue.pop();
 }
 
 const EXIT_MS  = 220;
@@ -193,9 +211,6 @@ function starPoints(cx, cy, r) {
   return points.join(" ");
 }
 
-function pickIcon() {
-  return Math.floor(Math.random() * LOADING_ICONS.length);
-}
 
 export default function FetchingOverlay({
   isVisible,
@@ -205,15 +220,15 @@ export default function FetchingOverlay({
 }) {
   const [rendered, setRendered] = useState(isVisible);
   const [exiting,  setExiting]  = useState(false);
-const [hint,     setHint]     = useState(pickHint);
-  const [iconIdx,  setIconIdx]  = useState(pickIcon);
+const [hint,     setHint]     = useState(nextHint);
+  const [iconIdx,  setIconIdx]  = useState(nextIconIdx);
   const exitTimer = useRef(null);
 
   useEffect(() => {
     if (isVisible) {
       clearTimeout(exitTimer.current);
-      setHint(pickHint());
-      setIconIdx(pickIcon());
+      setHint(nextHint());
+      setIconIdx(nextIconIdx());
       setRendered(true);
       setExiting(false);
     } else {

@@ -88,7 +88,7 @@ export default function Dashboard() {
       <Sidebar
         onExport={handleExport}
         exportLoading={exportLoading || statsLoading}
-        alerts={overview?.alerts ?? []}
+        alerts={overview?.alerts}
       />
 
       <div className="db-main">
@@ -102,8 +102,8 @@ export default function Dashboard() {
           onAction={() => openModal('create')}
           onExport={handleExport}
           exportLoading={exportLoading || statsLoading}
-          alerts={overview?.alerts ?? []}
-          activities={overview?.recentActivities ?? []}
+          alerts={overview?.alerts}
+          activities={overview?.recentActivities}
           notifLoading={statsLoading}
           showExport={true}
         />

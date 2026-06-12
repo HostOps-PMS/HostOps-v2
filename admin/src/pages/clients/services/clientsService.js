@@ -274,6 +274,20 @@ export async function getClientSmoobuData(clientId, propertyId, { from, to } = {
 }
 
 /**
+ * POST /api/accounts/apartment-photos/bulk
+ * Fetches stored photos for multiple apartments in one DB query.
+ *
+ * @param {(string|number)[]} apartmentIds
+ * @returns {Promise<{ photos: { [apartmentId: string]: { id: string|null, url: string }[] } }>}
+ */
+export async function getApartmentPhotosBulk(apartmentIds) {
+  return request('/api/accounts/apartment-photos/bulk', {
+    method: 'POST',
+    body: JSON.stringify({ apartmentIds: apartmentIds.map(String) }),
+  });
+}
+
+/**
  * GET /api/exchange-rate
  * Fetches the exchange rate from the backend proxy.
  *
@@ -296,6 +310,7 @@ const clientsService = {
   syncPropertySubProperties,
   deleteClientProperty,
   getClientSmoobuData,
+  getApartmentPhotosBulk,
   getExchangeRate,
 };
 export default clientsService;

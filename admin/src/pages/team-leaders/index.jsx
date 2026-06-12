@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import Sidebar from '../Sidebar';
 import TopBar from '../dashboard/components/TopBar';
-import { useStats } from '../dashboard/hooks/useStats';
 import { useTeamLeaders } from './hooks/useTeamLeaders';
 import TeamLeaderModal from './components/TeamLeaderModal';
 import DeleteModal from './components/DeleteModal';
@@ -15,9 +14,6 @@ export default function TeamLeaders() {
   const [modal, setModal]               = useState(null); // null | { type: 'create'|'edit'|'delete', teamLeader? }
 
   const { teamLeaders, clients, loading, error, refetch } = useTeamLeaders();
-
-  /* ── Alerts + Activity from dashboard overview ── */
-  const { overview, loading: notifLoading } = useStats();
 
   const filtered = teamLeaders.filter((tl) => {
     if (!search) return true;
@@ -80,11 +76,7 @@ export default function TeamLeaders() {
       <Sidebar />
 
       <div className="db-main">
-        <TopBar
-          alerts={overview?.alerts ?? []}
-          activities={overview?.recentActivities ?? []}
-          notifLoading={notifLoading}
-        />
+        <TopBar />
 
         <div className="cl-content">
           {/* Modals */}
