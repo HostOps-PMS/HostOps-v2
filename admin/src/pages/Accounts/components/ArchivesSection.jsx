@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getClients, unarchiveClient } from '../../clients/services/clientsService';
 import { fetchStaffs, unarchiveStaff } from '../../Staffs/services/staffApi';
+import { fetchDisabledAppeals, resolveAppeal } from '../services/recoveryRequestsApi';
 import ArchiveConfirmModal from '../../components/ArchiveConfirmModal';
 
 function formatDate(iso) {
@@ -32,17 +33,23 @@ export default function ArchivesSection({ tabs = [], activeTab, onTabChange }) {
   const [unarchiveTarget, setUnarchiveTarget] = useState(null);
   const [unarchiving, setUnarchiving]         = useState(false);
 
+  const [appeals, setAppeals]           = useState([]);
+  const [expandedAppeal, setExpandedAppeal] = useState(null);
+  const [appealAction, setAppealAction]   = useState(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [clients, archivedStaffs] = await Promise.all([
+      const [clients, archivedStaffs, pendingAppeals] = await Promise.all([
         getClients({ archived: true }),
         fetchStaffs('', { archived: true }),
+        fetchDisabledAppeals().catch(() => []),
       ]);
       setBusinesses(clients.filter(c => c.role === 'client'));
       setLeaders(clients.filter(c => c.role === 'team_leader'));
       setStaffs(archivedStaffs);
+      setAppeals(pendingAppeals);
     } catch (e) {
       setError(e.message || 'Failed to load archived records.');
     } finally {
@@ -69,6 +76,24 @@ export default function ArchivesSection({ tabs = [], activeTab, onTabChange }) {
       setUnarchiving(false);
     }
   }
+
+  async function handleAppealAction(appeal, action) {
+    setAppealAction(appeal._id);
+    try {
+      await resolveAppeal(appeal._id, {
+        status:        action === 'approve' ? 'resolved' : 'dismissed',
+        enableAccount: action === 'approve',
+      });
+      load();
+      setExpandedAppeal(null);
+    } catch (e) {
+      console.error('[appealAction]', e);
+    } finally {
+      setAppealAction(null);
+    }
+  }
+
+  const appealsByEmail = Object.fromEntries(appeals.map(a => [a.email, a]));
 
   const counts = {
     businesses: businesses.length,
@@ -213,10 +238,10 @@ export default function ArchivesSection({ tabs = [], activeTab, onTabChange }) {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 540 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #f0f2f5' }}>
-                  {['Name', 'Email', 'Archived On', ''].map(h => (
+                  {['Name', 'Email', 'Disabled On', 'Appeal', ''].map(h => (
                     <th key={h} style={{
                       padding: '10px 16px', textAlign: 'left',
                       fontSize: '0.72rem', fontWeight: 700, color: '#9ca3af',
@@ -228,48 +253,138 @@ export default function ArchivesSection({ tabs = [], activeTab, onTabChange }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r, i) => (
-                  <tr
-                    key={r._id}
-                    style={{
-                      borderBottom: i < rows.length - 1 ? '1px solid #f7f8fa' : 'none',
-                      background: 'transparent', transition: 'background 0.1s',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#fffbeb'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                  >
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>
-                        {getName(r)}
-                      </div>
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.83rem', color: '#6b7280' }}>
-                      {r.email}
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
-                      {formatDate(r.updatedAt)}
-                    </td>
-                    <td style={{ padding: '12px 16px 12px 8px', whiteSpace: 'nowrap' }}>
-                      <button
-                        onClick={() => handleUnarchive(r)}
+                {rows.map((r, i) => {
+                  const appeal   = appealsByEmail[r.email];
+                  const isExpanded = expandedAppeal === r.email;
+                  const isLast   = i === rows.length - 1;
+                  return (
+                    <>
+                      <tr
+                        key={r._id}
                         style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 5,
-                          padding: '5px 12px', borderRadius: 6,
-                          border: '1px solid #10b981', background: '#f0fdf4',
-                          fontSize: '0.78rem', fontWeight: 600, color: '#059669',
-                          cursor: 'pointer',
+                          borderBottom: (!isExpanded && !isLast) ? '1px solid #f7f8fa' : 'none',
+                          background: 'transparent', transition: 'background 0.1s',
                         }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#fffbeb'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                       >
-                        <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                          <rect x="2" y="6" width="16" height="11" rx="1.5"/>
-                          <path d="M2 6l2-3h12l2 3" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M8 11h4M10 9v4" strokeLinecap="round"/>
-                        </svg>
-                        Unarchive
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>
+                            {getName(r)}
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: '0.83rem', color: '#6b7280' }}>
+                          {r.email}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                          {formatDate(r.updatedAt)}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          {appeal ? (
+                            <button
+                              onClick={() => setExpandedAppeal(isExpanded ? null : r.email)}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 5,
+                                padding: '4px 10px', borderRadius: 20,
+                                border: '1px solid #f59e0b', background: isExpanded ? '#fef3c7' : '#fffbeb',
+                                fontSize: '0.75rem', fontWeight: 700, color: '#92400e',
+                                cursor: 'pointer', whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M18 10c0 4.418-3.582 8-8 8S2 14.418 2 10 5.582 2 10 2s8 3.582 8 8zm-7-4a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.414-1.415L11 9.586V6z" clipRule="evenodd"/>
+                              </svg>
+                              Pending Appeal
+                            </button>
+                          ) : (
+                            <span style={{ color: '#d1d5db', fontSize: '0.78rem' }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 16px 12px 8px', whiteSpace: 'nowrap' }}>
+                          <button
+                            onClick={() => handleUnarchive(r)}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 5,
+                              padding: '5px 12px', borderRadius: 6,
+                              border: '1px solid #10b981', background: '#f0fdf4',
+                              fontSize: '0.78rem', fontWeight: 600, color: '#059669',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                              <rect x="2" y="6" width="16" height="11" rx="1.5"/>
+                              <path d="M2 6l2-3h12l2 3" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M8 11h4M10 9v4" strokeLinecap="round"/>
+                            </svg>
+                            Enable
+                          </button>
+                        </td>
+                      </tr>
+
+                      {/* ── Expanded appeal detail row ── */}
+                      {isExpanded && appeal && (
+                        <tr key={`${r._id}-appeal`} style={{ borderBottom: !isLast ? '1px solid #f7f8fa' : 'none' }}>
+                          <td colSpan={5} style={{ padding: '0 16px 14px 16px' }}>
+                            <div style={{
+                              background: '#fffbeb',
+                              border: '1px solid #fde68a',
+                              borderLeft: '3px solid #f59e0b',
+                              borderRadius: 10,
+                              padding: '12px 16px',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <p style={{ margin: '0 0 4px', fontSize: '0.7rem', fontWeight: 700, color: '#b45309', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                                    Appeal Message
+                                  </p>
+                                  <p style={{ margin: '0 0 6px', fontSize: '0.85rem', color: '#78350f', lineHeight: '1.6', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                    {appeal.reason}
+                                  </p>
+                                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#a78234' }}>
+                                    Submitted {formatDate(appeal.createdAt)}
+                                  </p>
+                                </div>
+                                <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+                                  <button
+                                    onClick={() => handleAppealAction(appeal, 'approve')}
+                                    disabled={appealAction === appeal._id}
+                                    style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                                      padding: '6px 14px', borderRadius: 7,
+                                      border: '1px solid #10b981', background: '#f0fdf4',
+                                      fontSize: '0.78rem', fontWeight: 700, color: '#059669',
+                                      cursor: appealAction === appeal._id ? 'not-allowed' : 'pointer',
+                                      opacity: appealAction === appeal._id ? 0.6 : 1,
+                                    }}
+                                  >
+                                    <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2">
+                                      <path d="M4 10l4 4 8-8" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                    Approve & Enable
+                                  </button>
+                                  <button
+                                    onClick={() => handleAppealAction(appeal, 'dismiss')}
+                                    disabled={appealAction === appeal._id}
+                                    style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                                      padding: '6px 14px', borderRadius: 7,
+                                      border: '1px solid #e5e7eb', background: '#f9fafb',
+                                      fontSize: '0.78rem', fontWeight: 600, color: '#6b7280',
+                                      cursor: appealAction === appeal._id ? 'not-allowed' : 'pointer',
+                                      opacity: appealAction === appeal._id ? 0.6 : 1,
+                                    }}
+                                  >
+                                    Dismiss
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })}
               </tbody>
             </table>
           </div>
