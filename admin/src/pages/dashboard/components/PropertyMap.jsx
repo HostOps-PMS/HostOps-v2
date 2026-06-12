@@ -1215,7 +1215,7 @@ export default function PropertyMap({ mapLocations, loading }) {
           <div
             ref={mapContainerRef}
             className="pm-map-container"
-            style={{ flex: 1, minWidth: 0, zIndex: 0, overflow: 'hidden', position: 'relative' }}
+            style={{ flex: 1, minWidth: 0, zIndex: 0, overflow: 'hidden', position: 'relative', WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
           >
             {/* Map style switcher */}
             <div style={{
@@ -1360,13 +1360,15 @@ export default function PropertyMap({ mapLocations, loading }) {
             background: 'rgba(0,0,0,0.55)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 24,
+            WebkitOverflowScrolling: 'touch',
+            paddingBottom: 'env(safe-area-inset-bottom, 24px)',
           }}
         >
           <div className="pm-modal-inner" style={{
             background: 'var(--color-surface, #fff)',
             borderRadius: 16,
             width: '95vw', maxWidth: 1300,
-            height: '92vh',
+            height: '92dvh',
             display: 'flex', flexDirection: 'column',
             overflow: 'hidden',
             boxShadow: '0 32px 80px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.06)',
@@ -1468,7 +1470,7 @@ export default function PropertyMap({ mapLocations, loading }) {
               <div
                 ref={modalMapContainerRef}
                 className="pm-modal-map"
-                style={{ flex: 1, minWidth: 0, zIndex: 0, overflow: 'hidden', position: 'relative' }}
+                style={{ flex: 1, minWidth: 0, zIndex: 0, overflow: 'hidden', position: 'relative', WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
               >
                 {!isMapLoading && locations.length > 0 && plottable.length === 0 && (
                   <div style={{
@@ -1861,7 +1863,7 @@ export default function PropertyMap({ mapLocations, loading }) {
         }
         .pm-modal-inner {
           width: 100vw !important;
-          height: 92dvh !important;
+          height: calc(92dvh - env(safe-area-inset-bottom, 0px)) !important;
           max-width: 100vw !important;
           border-radius: 16px 16px 0 0 !important;
           margin: 0 !important;
