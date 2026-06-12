@@ -99,7 +99,6 @@ function isUnverified(client) {
 
 export default function ClientsTable({ clients, loading, onRowClick, search, onSearchChange, onAddClient, onRefresh, page, totalPages, totalCount, onPrev, onNext, onVisibleClientsChange }) {
   const [activeTab, setActiveTab] = useState('All');
-  const [selected, setSelected] = useState([]);
   const tabScrollRef = useRef(null);
   const [tabScrollLeft, setTabScrollLeft] = useState(0);
   const [tabScrollable, setTabScrollable] = useState(false);
@@ -135,20 +134,6 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
   useEffect(() => {
     if (onVisibleClientsChange) onVisibleClientsChange(tabFiltered, activeTab);
   }, [tabFiltered, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const allChecked =
-    tabFiltered.length > 0 && tabFiltered.every((c) => selected.includes(c._id));
-
-  function toggleAll() {
-    if (allChecked) setSelected([]);
-    else setSelected(tabFiltered.map((c) => c._id));
-  }
-
-  function toggleOne(id) {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -310,14 +295,6 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #f0f2f5' }}>
-                  <th style={{ padding: '10px 16px 10px 20px', width: 36 }}>
-                    <input
-                      type="checkbox"
-                      checked={allChecked}
-                      onChange={toggleAll}
-                      style={{ width: 15, height: 15, accentColor: '#10b981', cursor: 'pointer' }}
-                    />
-                  </th>
                   {['Business', 'Role', 'Status', 'Last Login', 'Joined'].map((h) => (
                     <th key={h} style={{
                       padding: '10px 16px',
@@ -332,33 +309,19 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
               </thead>
               <tbody>
                 {tabFiltered.map((client, i) => {
-                  const isSelected = selected.includes(client._id);
                   return (
                     <tr
                       key={client._id}
                       onClick={() => onRowClick(client)}
                       style={{
                         borderBottom: i < tabFiltered.length - 1 ? '1px solid #f7f8fa' : 'none',
-                        background: isSelected ? '#f0fdf4' : 'transparent',
-                        borderLeft: isSelected ? '3px solid #10b981' : '3px solid transparent',
+                        background: 'transparent',
                         transition: 'background 0.1s',
                         cursor: 'pointer',
                       }}
-                      onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = '#f0fdf4'; }}
-                      onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#f0fdf4'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                     >
-                      <td
-                        style={{ padding: '12px 16px 12px 20px', width: 36 }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleOne(client._id)}
-                          style={{ width: 15, height: 15, accentColor: '#10b981', cursor: 'pointer' }}
-                        />
-                      </td>
-
                       {/* Business name + email + avatar */}
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

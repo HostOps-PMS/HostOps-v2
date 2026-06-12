@@ -6,6 +6,7 @@ import { useDashboard } from "../context/DashboardContext";
 import { exportDashboardPDF } from "../services/pdfExportService";
 import AccountSettingsModal from "./AccountSettingsModal";
 import SwitchAccountModal from "./SwitchAccountModal";
+import FetchingOverlay from "./FetchingOverlay";
 import { useActivityLog } from "../hooks/useActivityLog";
 import safeStorage from "../../safeStorage";
 
@@ -348,86 +349,85 @@ export default function Navbar() {
     `}</style>
   );
 
-  const LogoutModal = logoutModalOpen ? (
+  const LogoutModal = (
     <>
-      {ConfirmModalStyles}
-      <div
-        style={{
-          position: 'fixed', inset: 0, zIndex: 99999,
-          background: 'rgba(12,28,20,0.55)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '24px',
-          animation: 'hp-overlay-in 0.22s ease forwards',
-        }}
-        onClick={(e) => { if (e.target === e.currentTarget) cancelLogout(); }}
-      >
-        <div style={{
-          background: dark ? '#1a2e20' : '#fff',
-          border: `1px solid ${dark ? '#1e3a2a' : '#e3ede8'}`,
-          borderRadius: '20px',
-          padding: '32px 28px 28px',
-          maxWidth: '340px',
-          width: '100%',
-          boxShadow: '0 32px 80px rgba(12,28,20,0.28)',
-          textAlign: 'center',
-          animation: 'hp-card-in 0.28s cubic-bezier(0.34,1.56,0.64,1) forwards',
-        }}>
-          {/* Icon circle */}
-          <div style={{
-            width: '56px', height: '56px',
-            borderRadius: '50%',
-            background: dark ? '#2a1515' : '#fff0ee',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 20px',
-            border: `1.5px solid ${dark ? '#4a2020' : '#ffd5ce'}`,
-          }}>
-            {isLoggingOut ? (
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-                stroke="#c13515" strokeWidth="2.5" strokeLinecap="round"
-                style={{ animation: 'hp-spin 0.7s linear infinite' }}>
-                <path d="M12 2a10 10 0 0 1 10 10" />
-              </svg>
-            ) : (
-              <i className="ti ti-logout" style={{ fontSize: '22px', color: '#c13515' }} />
-            )}
-          </div>
+      {/* Full-screen signing-out overlay — same style as FetchingOverlay */}
+      <FetchingOverlay
+        isVisible={isLoggingOut}
+        message="Signing out…"
+        subMessage="Clearing your session securely"
+      />
 
-          <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: '16px',
-            color: dark ? '#eaf5f0' : '#0c1c14', margin: '0 0 8px' }}>
-            {isLoggingOut ? 'Signing out…' : 'Sign out?'}
-          </p>
-          <p style={{ fontSize: '13px', color: dark ? '#9ab8a9' : '#6a8b7c',
-            lineHeight: 1.6, margin: '0 0 24px' }}>
-            {isLoggingOut
-              ? 'Please wait while we securely sign you out.'
-              : "You'll be signed out of your HostOps account."}
-          </p>
-
-          {!isLoggingOut && (
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={cancelLogout} style={{
-                flex: 1, padding: '11px 0', borderRadius: '10px',
-                border: `1px solid ${dark ? '#1e3a2a' : '#d4e8dd'}`,
-                background: dark ? '#132a1e' : '#f3f9f5',
-                color: dark ? '#9ab8a9' : '#4a7a62',
-                fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-              }}>Cancel</button>
-              <button onClick={confirmLogout} style={{
-                flex: 1, padding: '11px 0', borderRadius: '10px',
-                border: 'none', background: '#c13515', color: '#fff',
-                fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+      {/* Confirmation card — only shown before user confirms */}
+      {logoutModalOpen && !isLoggingOut && (
+        <>
+          {ConfirmModalStyles}
+          <div
+            style={{
+              position: 'fixed', inset: 0, zIndex: 99999,
+              background: 'rgba(12,28,20,0.55)',
+              backdropFilter: 'blur(6px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '24px',
+              animation: 'hp-overlay-in 0.22s ease forwards',
+            }}
+            onClick={(e) => { if (e.target === e.currentTarget) cancelLogout(); }}
+          >
+            <div style={{
+              background: dark ? '#1a2e20' : '#fff',
+              border: `1px solid ${dark ? '#1e3a2a' : '#e3ede8'}`,
+              borderRadius: '20px',
+              padding: '32px 28px 28px',
+              maxWidth: '340px',
+              width: '100%',
+              boxShadow: '0 32px 80px rgba(12,28,20,0.28)',
+              textAlign: 'center',
+              animation: 'hp-card-in 0.28s cubic-bezier(0.34,1.56,0.64,1) forwards',
+            }}>
+              <div style={{
+                width: '56px', height: '56px',
+                borderRadius: '50%',
+                background: dark ? '#2a1515' : '#fff0ee',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 20px',
+                border: `1.5px solid ${dark ? '#4a2020' : '#ffd5ce'}`,
               }}>
-                <i className="ti ti-logout" style={{ fontSize: '14px' }} />
-                Sign out
-              </button>
+                <i className="ti ti-logout" style={{ fontSize: '22px', color: '#c13515' }} />
+              </div>
+
+              <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: '16px',
+                color: dark ? '#eaf5f0' : '#0c1c14', margin: '0 0 8px' }}>
+                Sign out?
+              </p>
+              <p style={{ fontSize: '13px', color: dark ? '#9ab8a9' : '#6a8b7c',
+                lineHeight: 1.6, margin: '0 0 24px' }}>
+                You'll be signed out of your HostOps account.
+              </p>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={cancelLogout} style={{
+                  flex: 1, padding: '11px 0', borderRadius: '10px',
+                  border: `1px solid ${dark ? '#1e3a2a' : '#d4e8dd'}`,
+                  background: dark ? '#132a1e' : '#f3f9f5',
+                  color: dark ? '#9ab8a9' : '#4a7a62',
+                  fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                }}>Cancel</button>
+                <button onClick={confirmLogout} style={{
+                  flex: 1, padding: '11px 0', borderRadius: '10px',
+                  border: 'none', background: '#c13515', color: '#fff',
+                  fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                }}>
+                  <i className="ti ti-logout" style={{ fontSize: '14px' }} />
+                  Sign out
+                </button>
+              </div>
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        </>
+      )}
     </>
-  ) : null;
+  );
 
   const SwitchConfirmModal = switchConfirmOpen ? (
     <>

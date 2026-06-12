@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { changePin } from '../../Login/services/authservice';
 import { useAuth } from '../../AuthContext';
 import safeStorage from '../../safeStorage';
+import FetchingOverlay from './FetchingOverlay';
 
 // Inline validation for exactly 6 digits
 function validateNewPin(pin) {
@@ -86,81 +87,86 @@ export default function FirstLoginPinModal({ onComplete }) {
   };
 
   return (
-    <div style={styles.backdrop}>
-      <div style={styles.modal}>
-        {/* Icon */}
-        <div style={styles.iconWrap}>
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
-            stroke="#26a676" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="5" y="11" width="14" height="10" rx="2" ry="2" />
-            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-          </svg>
-        </div>
+    <>
+      <FetchingOverlay
+        isVisible={loading}
+        message="Verifying PIN…"
+        subMessage="Please wait a moment"
+      />
+      <FetchingOverlay
+        isVisible={success}
+        message="PIN set successfully!"
+        subMessage="Loading your dashboard…"
+      />
 
-        <h2 style={styles.heading}>Set your PIN</h2>
-        <p style={styles.sub}>
-          Your account was created with a temporary PIN. Please set a new
-          6-digit PIN to secure your account.
-        </p>
+      {!loading && !success && (
+        <div style={styles.backdrop}>
+          <div style={styles.modal}>
+            {/* Icon */}
+            <div style={styles.iconWrap}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+                stroke="#26a676" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="11" width="14" height="10" rx="2" ry="2" />
+                <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+              </svg>
+            </div>
 
-        {success ? (
-          <div style={styles.successBox}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-              stroke="#26a676" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            <span>PIN set! Loading your dashboard…</span>
+            <h2 style={styles.heading}>Set your PIN</h2>
+            <p style={styles.sub}>
+              Your account was created with a temporary PIN. Please set a new
+              6-digit PIN to secure your account.
+            </p>
+
+            <form onSubmit={handleSubmit} autoComplete="off">
+              <div style={styles.field}>
+                <label style={styles.label}>Temporary PIN</label>
+                <input
+                  style={styles.input}
+                  type="password"
+                  inputMode="numeric"
+                  required
+                  value={currentPin}
+                  onChange={handleInput(setCurrentPin)}
+                  placeholder="6 digits"
+                />
+              </div>
+
+              <div style={styles.field}>
+                <label style={styles.label}>New PIN</label>
+                <input
+                  style={styles.input}
+                  type="password"
+                  inputMode="numeric"
+                  required
+                  value={newPin}
+                  onChange={handleInput(setNewPin)}
+                  placeholder="6 digits"
+                />
+              </div>
+
+              <div style={styles.field}>
+                <label style={styles.label}>Confirm new PIN</label>
+                <input
+                  style={styles.input}
+                  type="password"
+                  inputMode="numeric"
+                  required
+                  value={confirmPin}
+                  onChange={handleInput(setConfirmPin)}
+                  placeholder="6 digits"
+                />
+              </div>
+
+              {error && <p style={styles.error}>{error}</p>}
+
+              <button style={styles.btn} type="submit">
+                Set PIN &amp; Continue
+              </button>
+            </form>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} autoComplete="off">
-            <div style={styles.field}>
-              <label style={styles.label}>Temporary PIN</label>
-              <input
-                style={styles.input}
-                type="password"
-                inputMode="numeric"
-                required
-                value={currentPin}
-                onChange={handleInput(setCurrentPin)}
-                placeholder="6 digits"
-              />
-            </div>
-
-            <div style={styles.field}>
-              <label style={styles.label}>New PIN</label>
-              <input
-                style={styles.input}
-                type="password"
-                inputMode="numeric"
-                required
-                value={newPin}
-                onChange={handleInput(setNewPin)}
-                placeholder="6 digits"
-              />
-            </div>
-
-            <div style={styles.field}>
-              <label style={styles.label}>Confirm new PIN</label>
-              <input
-                style={styles.input}
-                type="password"
-                inputMode="numeric"
-                required
-                value={confirmPin}
-                onChange={handleInput(setConfirmPin)}
-                placeholder="6 digits"
-              />
-            </div>
-
-            {error && <p style={styles.error}>{error}</p>}
-
-            <button style={styles.btn} type="submit" disabled={loading}>
-              {loading ? 'Saving…' : 'Set PIN & Continue'}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -254,17 +260,5 @@ const styles = {
     marginTop: '4px',
     letterSpacing: '0.02em',
     transition: 'opacity 0.2s',
-  },
-  successBox: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '10px',
-    padding: '20px',
-    background: '#eaf8f1',
-    borderRadius: '12px',
-    color: '#1e8760',
-    fontWeight: 600,
-    fontSize: '0.9rem',
   },
 };

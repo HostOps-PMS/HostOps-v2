@@ -709,36 +709,38 @@ export default function Sidebar({ onExport, exportLoading = false, alerts = [] }
           )}
         </div>
 
-        <button
-          onClick={onExport}
-          disabled={exportLoading}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '7px 12px',
-            background: exportLoading ? '#e0e0e0' : '#1a9e6e',
-            color: exportLoading ? '#aaa' : '#fff',
-            border: 'none', borderRadius: 8,
-            cursor: exportLoading ? 'not-allowed' : 'pointer',
-            fontSize: 12, fontWeight: 600,
-            fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-          }}
-        >
-          {exportLoading ? (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
-              style={{ animation: 'pdf-spin 0.8s linear infinite' }}>
-              <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
-            </svg>
-          ) : (
-            <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M3 16h14" strokeLinecap="round" />
-            </svg>
-          )}
-          {exportLoading ? 'Exporting...' : 'Export PDF'}
-        </button>
+        {onExport && (
+          <button
+            onClick={onExport}
+            disabled={exportLoading}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '7px 12px',
+              background: exportLoading ? '#e0e0e0' : '#1a9e6e',
+              color: exportLoading ? '#aaa' : '#fff',
+              border: 'none', borderRadius: 8,
+              cursor: exportLoading ? 'not-allowed' : 'pointer',
+              fontSize: 12, fontWeight: 600,
+              fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            {exportLoading ? (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+                style={{ animation: 'pdf-spin 0.8s linear infinite' }}>
+                <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M3 16h14" strokeLinecap="round" />
+              </svg>
+            )}
+            {exportLoading ? 'Exporting...' : 'Export PDF'}
+          </button>
+        )}
       </div>
 
       {/* Mobile drawer */}
