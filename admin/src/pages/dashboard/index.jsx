@@ -18,6 +18,7 @@ import Modal                from './components/Modal';
 
 import { useStats }    from './hooks/useStats';
 import { useAccounts } from './hooks/useAccounts';
+import FetchingOverlay from '../components/FetchingOverlay';
 
 export default function Dashboard() {
   const [modal, setModal] = useState({ open: false, type: null, data: null });
@@ -83,6 +84,7 @@ export default function Dashboard() {
 
   return (
     <div className="db-layout">
+      <FetchingOverlay isVisible={statsLoading} message="Loading dashboard…" />
       <Sidebar
         onExport={handleExport}
         exportLoading={exportLoading || statsLoading}

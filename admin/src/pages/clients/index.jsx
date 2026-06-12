@@ -9,6 +9,7 @@ import AddClientModal       from './components/AddClientModal';
 import { useClients }       from './hooks/useClients';
 import { useStats }         from '../dashboard/hooks/useStats';
 import { exportClientsPdf } from './utils/exportClientsPdf';
+import FetchingOverlay      from '../components/FetchingOverlay';
 
 export default function Clients() {
   /* ── View-client modal ── */
@@ -88,6 +89,7 @@ export default function Clients() {
 
   return (
     <div className="db-layout">
+      <FetchingOverlay isVisible={loading} message="Loading clients…" />
       <Sidebar />
 
       <div className="db-main">
