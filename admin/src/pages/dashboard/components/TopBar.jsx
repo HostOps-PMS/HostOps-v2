@@ -394,7 +394,7 @@ export default function TopBar({ onAction, onExport, exportLoading = false, aler
   const firstName = currentUser.firstName || 'there';
 
 const location = useLocation();
-  const isDashboard = location.pathname === '/dashboard';
+  const isDashboard = location.pathname === '/dashboard' || location.pathname === '/dashboard/';
   const unreadCount = (alerts || []).filter(a => a.unread).length;
 
   // Close dropdown on outside click
