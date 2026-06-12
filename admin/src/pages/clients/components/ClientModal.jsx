@@ -147,7 +147,6 @@ export default function ClientModal({ client, onClose, onUpdated }) {
   if (!client) return null;
 
   const [isEditing,        setIsEditing]        = useState(false);
-  const [showPassword,     setShowPassword]     = useState(false);
   const [smoobuProperty,   setSmoobuProperty]   = useState(null);
   const [saving,           setSaving]           = useState(false);
   const [saveError,        setSaveError]        = useState(null);
@@ -591,7 +590,13 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }} className="cl-modal-edit-form">
                 <div className="cl-modal-field">
                   <label className="cl-modal-field__label" htmlFor="edit-businessName">Business Name</label>
-                  <input id="edit-businessName" name="businessName" type="text" className="cl-edit-input" placeholder="e.g. Acme Properties Inc." value={form.businessName} onChange={handleChange} maxLength={150} />
+                  <input id="edit-businessName" name="businessName" type="text" className="cl-edit-input" placeholder="e.g. Acme Properties Inc." value={form.businessName}
+                  onChange={(e) => { const val = e.target.value; if (/^[a-zA-Z\s.,'&()-]*$/.test(val)) setForm(f => ({ ...f, businessName: val })); }}
+                  maxLength={150}
+                  style={form.businessName && /[^a-zA-Z\s.,'&()-]/.test(form.businessName) ? { borderColor: '#ef4444' } : {}} />
+                {form.businessName && /[^a-zA-Z\s.,'&()-]/.test(form.businessName) && (
+                  <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Letters and basic punctuation only.</span>
+                )}
                 </div>
                 <div className="cl-modal-field">
                   <label className="cl-modal-field__label">Email</label>
@@ -599,35 +604,27 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                 </div>
                 <div className="cl-modal-field">
                   <label className="cl-modal-field__label">New Password</label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      name="password"
-                      type={showPassword ? 'text' : 'password'}
-                      className="cl-edit-input"
-                      placeholder="Leave blank to keep current password"
-                      value={form.password}
-                      onChange={handleChange}
-                      maxLength={128}
-                      style={{ paddingRight: 40 }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(v => !v)}
-                      style={{
-                        position: 'absolute', right: 10, top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none', border: 'none',
-                        cursor: 'pointer', color: 'var(--color-muted)',
-                        display: 'flex', alignItems: 'center', padding: 0,
-                      }}
-                    >
-                      <i className={`ti ${showPassword ? 'ti-eye-off' : 'ti-eye'}`} style={{ fontSize: 16 }} />
-                    </button>
-                  </div>
+                  <input name="password" type="password" className="cl-edit-input"
+                placeholder="Leave blank to keep current password"
+                value={form.password} onChange={handleChange} maxLength={128}
+                style={form.password && form.password.length < 8 ? { borderColor: '#ef4444' } : {}} />
+              {form.password && form.password.length < 8 && (
+                <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Password must be at least 8 characters.</span>
+              )}
                 </div>
                 <div className="cl-modal-field">
                   <label className="cl-modal-field__label">New 6-Digit PIN</label>
-                  <input type="text" inputMode="numeric" pattern="\d{6}" maxLength={6} className="cl-edit-input" placeholder="Leave blank to keep current PIN" value={form.pin} onChange={(e) => { const val = e.target.value.replace(/\D/g, '').slice(0, 6); setForm((f) => ({ ...f, pin: val })); }} />
+                  <input type="text" inputMode="numeric" pattern="\d{6}" maxLength={6} className="cl-edit-input"
+                placeholder="Leave blank to keep current PIN"
+                value={form.pin}
+                onChange={(e) => { const val = e.target.value.replace(/\D/g, '').slice(0, 6); setForm((f) => ({ ...f, pin: val })); }}
+                style={form.pin && form.pin.length > 0 && form.pin.length < 6 ? { borderColor: '#ef4444' } : form.pin && form.pin.length === 6 ? { borderColor: '#26a676' } : {}} />
+              {form.pin && form.pin.length > 0 && form.pin.length < 6 && (
+                <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ PIN must be exactly 6 digits ({form.pin.length}/6).</span>
+              )}
+              {form.pin && form.pin.length === 6 && (
+                <span style={{ color: '#26a676', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>✓ PIN is valid.</span>
+              )}
                 </div>
                 </div>
               </div>
@@ -652,7 +649,13 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                         )}
                       </div>
                       {/* Name input */}
-                      <input type="text" placeholder="Property name *" value={prop.name} onChange={setProp(index, 'name')} maxLength={150} className="cl-edit-input" style={{ fontSize: '.8rem', textAlign: 'center' }} />
+                      <input type="text" placeholder="Property name *" value={prop.name}
+                    onChange={(e) => { const val = e.target.value; if (/^[a-zA-Z\s.,'&()-]*$/.test(val)) setForm(f => ({ ...f, properties: f.properties.map((p, i) => i === index ? { ...p, name: val } : p) })); }}
+                    maxLength={150} className="cl-edit-input"
+                    style={{ fontSize: '.8rem', textAlign: 'center', ...(prop.name && /[^a-zA-Z\s.,'&()-]/.test(prop.name) ? { borderColor: '#ef4444' } : {}) }} />
+                  {prop.name && /[^a-zA-Z\s.,'&()-]/.test(prop.name) && (
+                    <span style={{ color: '#ef4444', fontSize: '.65rem', fontWeight: 600, textAlign: 'center', display: 'block' }}>⚠ Letters only.</span>
+                  )}
                       
                       {/* Smoobu API Key */}
                       <div className="db-field" style={{ margin: 0, marginTop: 4 }}>

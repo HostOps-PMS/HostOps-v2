@@ -185,14 +185,31 @@ export default function AddClientModal({ onClose, onSuccess }) {
           {/* Details Tab */}
           <div style={{ display: activeTab === 'details' ? 'flex' : 'none', flexDirection: 'column', gap: 0 }} className="cl-modal-edit-form">
             <Field label="Business Name" required>
-              <input type="text" placeholder="Example Business Inc." value={form.businessName} onChange={setField('businessName')} maxLength={100} className="cl-edit-input" />
-            </Field>
+            <input type="text" placeholder="Example Business Inc." value={form.businessName}
+              onChange={(e) => { const val = e.target.value; if (/^[a-zA-Z\s.,'&()-]*$/.test(val)) setForm(f => ({ ...f, businessName: val })); }}
+              maxLength={100} className="cl-edit-input"
+              style={form.businessName && /[^a-zA-Z\s.,'&()-]/.test(form.businessName) ? { borderColor: '#ef4444' } : {}} />
+            {form.businessName && /[^a-zA-Z\s.,'&()-]/.test(form.businessName) && (
+              <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Letters and basic punctuation only.</span>
+            )}
+          </Field>
             <Field label="Email" required>
-              <input type="email" placeholder="contact@example.com" value={form.email} onChange={setField('email')} maxLength={254} className="cl-edit-input" />
-            </Field>
+            <input type="email" placeholder="contact@example.com" value={form.email}
+              onChange={setField('email')}
+              maxLength={254} className="cl-edit-input"
+              style={form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) ? { borderColor: '#ef4444' } : {}} />
+            {form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) && (
+              <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Enter a valid email address (e.g. user@example.com).</span>
+            )}
+          </Field>
             <Field label="Password" required>
               <div style={{ position: 'relative' }}>
-                <input type={showPass ? 'text' : 'password'} placeholder="Min. 8 characters" value={form.password} onChange={setField('password')} maxLength={128} className="cl-edit-input" style={{ width: '100%', paddingRight: 40 }} />
+                <input type={showPass ? 'text' : 'password'} placeholder="Min. 8 characters" value={form.password}
+              onChange={setField('password')} maxLength={128} className="cl-edit-input"
+              style={{ width: '100%', paddingRight: 40, ...(form.password && form.password.length < 8 ? { borderColor: '#ef4444' } : {}) }} />
+            {form.password && form.password.length < 8 && (
+              <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Password must be at least 8 characters.</span>
+            )}
                 <button type="button" onClick={() => setShowPass((v) => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', padding: 0, display: 'grid', placeItems: 'center' }} title={showPass ? 'Hide password' : 'Show password'}>
                   {showPass ? (
                     <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 3l14 14M10 5C5.5 5 2 10 2 10s1.3 2 3.5 3.5M10 15c4.5 0 8-5 8-5s-1.3-2-3.5-3.5" strokeLinecap="round" /></svg>
@@ -203,7 +220,17 @@ export default function AddClientModal({ onClose, onSuccess }) {
               </div>
             </Field>
             <Field label="Temporary 6-Digit PIN" required>
-              <input type="text" inputMode="numeric" pattern="\d{6}" maxLength={6} placeholder="Exactly 6 digits" value={form.pin} onChange={(e) => { const val = e.target.value.replace(/\D/g, '').slice(0, 6); setForm((f) => ({ ...f, pin: val })); }} className="cl-edit-input" style={{ width: '100%' }} />
+              <input type="text" inputMode="numeric" pattern="\d{6}" maxLength={6} placeholder="Exactly 6 digits"
+            value={form.pin}
+            onChange={(e) => { const val = e.target.value.replace(/\D/g, '').slice(0, 6); setForm((f) => ({ ...f, pin: val })); }}
+            className="cl-edit-input"
+            style={{ width: '100%', ...(form.pin && form.pin.length > 0 && form.pin.length < 6 ? { borderColor: '#ef4444' } : form.pin.length === 6 ? { borderColor: '#26a676' } : {}) }} />
+          {form.pin && form.pin.length > 0 && form.pin.length < 6 && (
+            <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ PIN must be exactly 6 digits ({form.pin.length}/6).</span>
+          )}
+          {form.pin && form.pin.length === 6 && (
+            <span style={{ color: '#26a676', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>✓ PIN is valid.</span>
+          )}
             </Field>
           </div>
 
@@ -237,7 +264,13 @@ export default function AddClientModal({ onClose, onSuccess }) {
                       </div>
                     )}
                   </div>
-                  <input type="text" placeholder="Property name *" value={prop.name} onChange={setProp(index, 'name')} maxLength={150} className="cl-edit-input" style={{ fontSize: '.8rem', textAlign: 'center' }} />
+                  <input type="text" placeholder="Property name *" value={prop.name}
+                  onChange={(e) => { const val = e.target.value; if (/^[a-zA-Z\s.,'&()-]*$/.test(val)) setProperties(prev => prev.map((p, i) => i === index ? { ...p, name: val } : p)); }}
+                  maxLength={150} className="cl-edit-input"
+                  style={{ fontSize: '.8rem', textAlign: 'center', ...(prop.name && /[^a-zA-Z\s.,'&()-]/.test(prop.name) ? { borderColor: '#ef4444' } : {}) }} />
+                {prop.name && /[^a-zA-Z\s.,'&()-]/.test(prop.name) && (
+                  <span style={{ color: '#ef4444', fontSize: '.65rem', fontWeight: 600, textAlign: 'center', display: 'block' }}>⚠ Letters only.</span>
+                )}
                   <input type="text" placeholder="Smoobu API Key (optional)" value={prop.smoobuApiKey} onChange={setProp(index, 'smoobuApiKey')} maxLength={512} className="cl-edit-input" style={{ fontSize: '.75rem' }} />
                   <div style={{ display: 'flex', gap: 6 }}>
                     {prop.pictureUrl && (
