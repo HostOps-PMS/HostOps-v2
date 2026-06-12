@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import Sidebar from '../Sidebar';
 import TopBar from '../dashboard/components/TopBar';
-import { useStats } from '../dashboard/hooks/useStats';
 import { useActivityLogs } from './hooks/useActivityLogs';
 import ActivityLogTable from './components/ActivityLogTable';
 
@@ -27,9 +26,6 @@ export default function ActivityLogs() {
     to:     filterDateTo ? filterDateTo + 'T23:59:59' : '',
   });
 
-  /* ── Alerts + Activity from dashboard overview (same source as Dashboard/Clients/Staffs) ── */
-  const { overview, loading: notifLoading } = useStats();
-  
   // Client-side text search layered on top of server-side results
   const filtered = logs.filter(log => {
     if (!search) return true;
@@ -83,13 +79,7 @@ export default function ActivityLogs() {
       <Sidebar />
 
       <div className="db-main">
-        {/* TopBar — same component as Dashboard/Clients/Staffs, fed with live alerts + activities.
-            No onExport/showExport passed, so the Export PDF button stays hidden here. */}
-        <TopBar
-          alerts={overview?.alerts ?? []}
-          activities={overview?.recentActivities ?? []}
-          notifLoading={notifLoading}
-        />
+        <TopBar />
 
         <div className="cl-content">
           {/* Page Header */}

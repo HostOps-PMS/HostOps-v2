@@ -7,7 +7,6 @@ import ClientsTable      from './components/ClientsTable';
 import ClientModal          from './components/ClientModal';
 import AddClientModal       from './components/AddClientModal';
 import { useClients }       from './hooks/useClients';
-import { useStats }         from '../dashboard/hooks/useStats';
 import { exportClientsPdf } from './utils/exportClientsPdf';
 
 export default function Clients() {
@@ -21,9 +20,6 @@ export default function Clients() {
 
   /* ── Data ── */
   const { clients, loading, error, refetch } = useClients();
-
-  /* ── Alerts + Activity from dashboard overview (same source as Dashboard) ── */
-  const { overview, loading: notifLoading } = useStats();
 
   /* ── Search / filter ── */
   const [search,     setSearch]     = useState('');
@@ -91,12 +87,7 @@ export default function Clients() {
       <Sidebar />
 
       <div className="db-main">
-        {/* TopBar — same component as Dashboard, fed with live alerts + activities */}
-        <TopBar
-          alerts={overview?.alerts ?? []}
-          activities={overview?.recentActivities ?? []}
-          notifLoading={notifLoading}
-        />
+        <TopBar />
 
         {/* Page content */}
         <div className="cl-content">
