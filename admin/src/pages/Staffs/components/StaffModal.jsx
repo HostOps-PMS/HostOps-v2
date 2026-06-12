@@ -456,7 +456,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
             <label style={labelStyle}>
               {isEdit ? "New 6-Digit PIN (leave blank to keep)" : "Temporary 6-Digit PIN *"}
             </label>
-            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 4, width: '100%' }}>
               {Array.from({ length: 6 }).map((_, i) => (
                 <input
                   key={i}
@@ -489,7 +489,9 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
                     document.getElementById(`pin-box-${nextBox}`)?.focus();
                   }}
                   style={{
-                    width: 48, height: 52,
+                    flex: 1,
+                    minWidth: 0,
+                    height: 52,
                     textAlign: 'center',
                     fontSize: '1.2rem', fontWeight: 700,
                     borderRadius: 10,
