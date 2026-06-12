@@ -1157,55 +1157,49 @@ export default function PropertyMap({ mapLocations, loading }) {
           </button>
 
           {/* Dropdown 1 — Business Account */}
-          <select
+          <SearchableDropdown
             value={selectedClient}
-            onChange={(e) => handleClientChange(e.target.value)}
+            onChange={handleClientChange}
             disabled={isDropdownLoading}
-            style={dropdownStyle(isDropdownLoading)}
-          >
-            <option value="all">
-              {isDropdownLoading ? 'Loading accounts…' : `All accounts (${clients.length})`}
-            </option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+            placeholder={isDropdownLoading ? 'Loading accounts…' : `All accounts (${clients.length})`}
+            options={[
+              { value: 'all', label: `All accounts (${clients.length})` },
+              ...clients.map(c => ({ value: c.id, label: c.name })),
+            ]}
+          />
 
-          {/* Dropdown 2 — Property (only when a client is selected) */}
+          {/* Dropdown 2 — Property */}
           {selectedClient !== 'all' && (
-            <select
-              value={selectedPropIndex ?? ''}
-              onChange={(e) => handlePropChange(e.target.value)}
+            <SearchableDropdown
+              value={selectedPropIndex !== null ? String(selectedPropIndex) : ''}
+              onChange={(v) => handlePropChange(v === '' ? null : Number(v))}
               disabled={isDropdownLoading || propertyOptions.length === 0}
-              style={dropdownStyle(isDropdownLoading || propertyOptions.length === 0)}
-            >
-              <option value="">
-                {propertyOptions.length === 0
-                  ? 'No properties'
-                  : `All properties (${propertyOptions.length})`}
-              </option>
-              {propertyOptions.map((p) => (
-                <option key={p.index} value={p.index}>{p.name}</option>
-              ))}
-            </select>
+              placeholder={propertyOptions.length === 0 ? 'No properties' : `All properties (${propertyOptions.length})`}
+              options={[
+                { value: '', label: `All properties (${propertyOptions.length})` },
+                ...propertyOptions.map(p => ({ value: String(p.index), label: p.name })),
+              ]}
+            />
           )}
 
-          {/* Dropdown 3 — Room / Apartment (only when a specific property is selected
-                          AND Smoobu returned at least one apartment) */}
+          {/* Dropdown 3 — Room */}
           {selectedClient !== 'all' && selectedPropIndex !== null && roomOptions.length > 0 && (
-            <select
+            <SearchableDropdown
               value={selectedAptId}
-              onChange={(e) => handleAptChange(e.target.value)}
+              onChange={(v) => {
+                handleAptChange(v);
+                if (v) {
+                  const apt = smoobuApts.find(a => String(a.apartmentId) === v);
+                  if (apt) { setSelectedLegendApt(apt); setActiveTab('detail'); }
+                }
+              }}
               disabled={aptLoading}
-              style={dropdownStyle(aptLoading)}
-            >
-              <option value="">All rooms ({roomOptions.length})</option>
-              {roomOptions.map((r) => (
-                <option key={r.id} value={r.id} disabled={!r.hasCoord}>
-                  {r.name}{!r.hasCoord ? ' (no coords)' : ''}
-                </option>
-              ))}
-            </select>
+              placeholder={`All rooms (${roomOptions.length})`}
+              options={[
+                { value: '', label: `All rooms (${roomOptions.length})` },
+                ...roomOptions.map(r => ({ value: r.id, label: r.hasCoord ? r.name : `${r.name} (no coords)` })),
+              ]}
+            />
           )}
 
         </div>
@@ -1405,52 +1399,49 @@ export default function PropertyMap({ mapLocations, loading }) {
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {/* Dropdown 1 — Business Account */}
-                <select
+                <SearchableDropdown
                   value={selectedClient}
-                  onChange={(e) => handleClientChange(e.target.value)}
+                  onChange={handleClientChange}
                   disabled={isDropdownLoading}
-                  style={dropdownStyle(isDropdownLoading)}
-                >
-                  <option value="all">
-                    {isDropdownLoading ? 'Loading accounts…' : `All accounts (${clients.length})`}
-                  </option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                  placeholder={isDropdownLoading ? 'Loading accounts…' : `All accounts (${clients.length})`}
+                  options={[
+                    { value: 'all', label: `All accounts (${clients.length})` },
+                    ...clients.map(c => ({ value: c.id, label: c.name })),
+                  ]}
+                />
 
                 {/* Dropdown 2 — Property */}
                 {selectedClient !== 'all' && (
-                  <select
-                    value={selectedPropIndex ?? ''}
-                    onChange={(e) => handlePropChange(e.target.value)}
+                  <SearchableDropdown
+                    value={selectedPropIndex !== null ? String(selectedPropIndex) : ''}
+                    onChange={(v) => handlePropChange(v === '' ? null : Number(v))}
                     disabled={isDropdownLoading || propertyOptions.length === 0}
-                    style={dropdownStyle(isDropdownLoading || propertyOptions.length === 0)}
-                  >
-                    <option value="">
-                      {propertyOptions.length === 0 ? 'No properties' : `All properties (${propertyOptions.length})`}
-                    </option>
-                    {propertyOptions.map((p) => (
-                      <option key={p.index} value={p.index}>{p.name}</option>
-                    ))}
-                  </select>
+                    placeholder={propertyOptions.length === 0 ? 'No properties' : `All properties (${propertyOptions.length})`}
+                    options={[
+                      { value: '', label: `All properties (${propertyOptions.length})` },
+                      ...propertyOptions.map(p => ({ value: String(p.index), label: p.name })),
+                    ]}
+                  />
                 )}
 
                 {/* Dropdown 3 — Room */}
                 {selectedClient !== 'all' && selectedPropIndex !== null && roomOptions.length > 0 && (
-                  <select
+                  <SearchableDropdown
                     value={selectedAptId}
-                    onChange={(e) => handleAptChange(e.target.value)}
+                    onChange={(v) => {
+                      handleAptChange(v);
+                      if (v) {
+                        const apt = smoobuApts.find(a => String(a.apartmentId) === v);
+                        if (apt) { setSelectedLegendApt(apt); setActiveTab('detail'); }
+                      }
+                    }}
                     disabled={aptLoading}
-                    style={dropdownStyle(aptLoading)}
-                  >
-                    <option value="">All rooms ({roomOptions.length})</option>
-                    {roomOptions.map((r) => (
-                      <option key={r.id} value={r.id} disabled={!r.hasCoord}>
-                        {r.name}{!r.hasCoord ? ' (no coords)' : ''}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder={`All rooms (${roomOptions.length})`}
+                    options={[
+                      { value: '', label: `All rooms (${roomOptions.length})` },
+                      ...roomOptions.map(r => ({ value: r.id, label: r.hasCoord ? r.name : `${r.name} (no coords)` })),
+                    ]}
+                  />
                 )}
 
                 <button
@@ -1930,4 +1921,115 @@ function dropdownStyle(disabled) {
     cursor: disabled ? 'not-allowed' : 'pointer',
     maxWidth: 220,
   };
+}
+
+// ── Searchable custom dropdown ────────────────────────────────────
+function SearchableDropdown({ value, onChange, options, placeholder, disabled, label }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+        setSearch('');
+      }
+    }
+    if (open) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  const filtered = options.filter(o =>
+    !search || o.label.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const selected = options.find(o => o.value === value);
+
+  return (
+    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
+      <div
+        onClick={() => { if (!disabled) setOpen(v => !v); }}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '6px 10px 6px 12px',
+          borderRadius: 'var(--radius-pill)',
+          border: '1px solid var(--color-border)',
+          background: value && value !== 'all' && value !== '' ? '#f0fdf4' : 'var(--color-surface)',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          fontSize: '.78rem', fontWeight: 600,
+          color: disabled ? 'var(--color-muted)' : (value && value !== 'all' && value !== '' ? '#059669' : 'var(--color-text)'),
+          userSelect: 'none', whiteSpace: 'nowrap',
+          maxWidth: 200, minWidth: 100,
+          opacity: disabled ? 0.6 : 1,
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+          <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0,
+          zIndex: 9000, background: '#fff',
+          border: '1.5px solid #e2e8f0', borderRadius: 10,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          minWidth: 200, maxWidth: 280,
+          display: 'flex', flexDirection: 'column',
+          overflow: 'hidden',
+        }}>
+          <div style={{ padding: '8px 10px', borderBottom: '1px solid #f0f0f0' }}>
+            <input
+              autoFocus
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search…"
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '6px 10px', borderRadius: 6,
+                border: '1.5px solid #e2e8f0', fontSize: '.78rem',
+                outline: 'none', background: '#fafafa',
+                fontFamily: 'var(--font-body)',
+              }}
+              onClick={e => e.stopPropagation()}
+            />
+          </div>
+          <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+            {filtered.map(o => (
+              <div
+                key={o.value}
+                onClick={() => { onChange(o.value); setOpen(false); setSearch(''); }}
+                style={{
+                  padding: '9px 14px', cursor: 'pointer', fontSize: '.83rem',
+                  background: value === o.value ? '#f0fdf4' : 'transparent',
+                  color: value === o.value ? '#059669' : '#374151',
+                  fontWeight: value === o.value ? 600 : 400,
+                  borderBottom: '1px solid #f7f7f7',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                }}
+                onMouseEnter={e => { if (value !== o.value) e.currentTarget.style.background = '#f8faf9'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = value === o.value ? '#f0fdf4' : 'transparent'; }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.label}</span>
+                {value === o.value && (
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                    <polyline points="2,6 5,9 10,3"/>
+                  </svg>
+                )}
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <div style={{ padding: '12px 14px', fontSize: '.78rem', color: '#a0aec0', textAlign: 'center' }}>
+                No results
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
