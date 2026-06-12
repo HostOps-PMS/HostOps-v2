@@ -45,6 +45,7 @@ export function DashboardProvider({ children }) {
     // With safeStorage this now works correctly even when localStorage
     // is blocked — the in-memory store is read consistently.
     showPropertySelector: !restoredProp.id,
+    isSwitching: false,
   });
 
   const [dark, setDark] = useState(false);
@@ -68,6 +69,8 @@ export function DashboardProvider({ children }) {
       selectedPropertyId:   id   || null,
       selectedPropertyName: name || '',
       showPropertySelector: false,
+      rawData:      null,
+      isSwitching:  true,
     }));
   }, []);
 

@@ -1,11 +1,14 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import './clients.css';
 
 import Sidebar           from '../Sidebar';
+import TopBar            from '../Dashboard/components/TopBar';
 import ClientsTable      from './components/ClientsTable';
 import ClientModal          from './components/ClientModal';
 import AddClientModal       from './components/AddClientModal';
 import { useClients }       from './hooks/useClients';
+import { useStats }         from '../Dashboard/hooks/useStats';
+import { exportClientsPdf } from './utils/exportClientsPdf';
 
 export default function Clients() {
   /* ── View-client modal ── */
@@ -18,6 +21,9 @@ export default function Clients() {
 
   /* ── Data ── */
   const { clients, loading, error, refetch } = useClients();
+
+  /* ── Alerts + Activity from dashboard overview (same source as Dashboard) ── */
+  const { overview, loading: notifLoading } = useStats();
 
   /* ── Search / filter ── */
   const [search,     setSearch]     = useState('');
@@ -53,32 +59,49 @@ export default function Clients() {
     setSelectedClient(updatedClient);
   }
 
+  /* ── Export PDF ─────────────────────────────────────────────────
+     visibleClientsRef always holds the currently tab-filtered rows
+     as reported by ClientsTable via onVisibleClientsChange.
+     This means the export reflects BOTH the search filter (from this
+     component) AND the active tab filter (from ClientsTable).
+  ── */
+  const visibleClientsRef = useRef({ clients: filtered, activeTab: 'All' });
+
+  const handleVisibleClientsChange = useCallback((clients, activeTab) => {
+    visibleClientsRef.current = { clients, activeTab };
+  }, []);
+
+  const [exportLoading, setExportLoading] = useState(false);
+
+  const handleExport = () => {
+    if (exportLoading || loading) return;
+    setExportLoading(true);
+    try {
+      const { clients: visibleClients, activeTab } = visibleClientsRef.current;
+      exportClientsPdf({
+        clients:   visibleClients,
+        activeTab,
+        search,
+      });
+    } catch (err) {
+      console.error('[exportClientsPdf] failed:', err);
+    } finally {
+      // exportClientsPdf is synchronous (opens print dialog); reset immediately
+      setExportLoading(false);
+    }
+  };
+
   return (
     <div className="db-layout">
       <Sidebar />
 
       <div className="db-main">
-        {/* TopBar */}
-        <header className="db-topbar">
-          <div className="db-topbar__search">
-            <span className="db-topbar__search-icon">
-              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="9" cy="9" r="7" />
-                <path d="M15 15l3 3" strokeLinecap="round" />
-              </svg>
-            </span>
-            <input type="text" placeholder="Search…" />
-          </div>
-          <div className="db-topbar__actions">
-            <button className="db-topbar__icon-btn" title="Notifications">
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M10 2a6 6 0 00-6 6v3l-1.5 2H17.5L16 11V8a6 6 0 00-6-6z" />
-                <path d="M8.5 17a1.5 1.5 0 003 0" strokeLinecap="round" />
-              </svg>
-            </button>
-            <div className="db-topbar__avatar" title="Admin User">A</div>
-          </div>
-        </header>
+        {/* TopBar — same component as Dashboard, fed with live alerts + activities */}
+        <TopBar
+          alerts={overview?.alerts ?? []}
+          activities={overview?.recentActivities ?? []}
+          notifLoading={notifLoading}
+        />
 
         {/* Page content */}
         <div className="cl-content">
@@ -88,6 +111,42 @@ export default function Clients() {
               <h1 className="cl-content__title">Businesses</h1>
               <p className="cl-content__sub">All registered users on the platform</p>
             </div>
+
+            {/* Export PDF — reflects current tab + search filter */}
+            <button
+              onClick={handleExport}
+              disabled={exportLoading || loading}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7,
+                padding: '9px 18px',
+                background: (exportLoading || loading) ? '#e0e0e0' : '#1a9e6e',
+                color: (exportLoading || loading) ? '#aaa' : '#fff',
+                border: 'none', borderRadius: 10,
+                cursor: (exportLoading || loading) ? 'not-allowed' : 'pointer',
+                fontSize: '0.875rem', fontWeight: 600,
+                letterSpacing: '0.01em', whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+                boxShadow: (exportLoading || loading) ? 'none' : '0 2px 8px rgba(26,158,110,0.18)',
+              }}
+              onMouseEnter={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#158a5e'; }}
+              onMouseLeave={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#1a9e6e'; }}
+              title="Export visible businesses as PDF"
+            >
+              {exportLoading ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+                  style={{ animation: 'cl-pdf-spin 0.8s linear infinite' }}>
+                  <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                  <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M3 16h14" strokeLinecap="round" />
+                </svg>
+              )}
+              {exportLoading ? 'Exporting…' : 'Export PDF'}
+            </button>
+            <style>{`@keyframes cl-pdf-spin { to { transform: rotate(360deg); } }`}</style>
           </header>
 
           {/* Error banner */}
@@ -115,6 +174,7 @@ export default function Clients() {
             totalCount={filtered.length}
             onPrev={() => setPage(p => Math.max(1, p - 1))}
             onNext={() => setPage(p => Math.min(totalPages, p + 1))}
+            onVisibleClientsChange={handleVisibleClientsChange}
           />
         </div>
       </div>
