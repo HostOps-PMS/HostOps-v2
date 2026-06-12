@@ -1,4 +1,5 @@
 import React from "react";
+import hostopsLogo from "../../../assets/HostOpsLOGO.png";
 
 export default function Footer() {
   const year = new Date().getFullYear();
@@ -43,16 +44,8 @@ export default function Footer() {
 
         {/* Logo + Brand */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 8,
-            background: "linear-gradient(135deg, #26a676, #1e8760)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 2px 8px rgba(38,166,118,0.25)",
-          }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
+          <div style={{ width: 32, height: 32, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
+            <img src={hostopsLogo} alt="HostOps" style={{ width: 32, height: 32, objectFit: "contain" }} />
           </div>
           <div>
             <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e6b4a" }}>HostOps</div>

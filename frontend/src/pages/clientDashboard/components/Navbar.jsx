@@ -9,6 +9,7 @@ import SwitchAccountModal from "./SwitchAccountModal";
 import FetchingOverlay from "./FetchingOverlay";
 import { useActivityLog } from "../hooks/useActivityLog";
 import safeStorage from "../../safeStorage";
+import hostopsLogo from "../../../assets/HostOpsLOGO.png"; 
 
 function getUserData(auth) {
   let fromStore = auth.getUser();
@@ -523,14 +524,15 @@ export default function Navbar() {
       textDecoration: "none",
     },
     logoBox: {
-      width: "28px",
-      height: "28px",
-      background: dark ? "#eaf5f0" : "#0c1c14",
-      borderRadius: "6px",
+      width: "36px",
+      height: "36px",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       flexShrink: 0,
+      background: "#d6ece2",
+      borderRadius: 6,
+      padding: 2,
     },
     logoIcon: {
       fontSize: "14px",
@@ -751,7 +753,7 @@ export default function Navbar() {
                 making it impossible to get back to /dashboard from the logo. */}
             <Link to="/dashboard" style={t.logoWrap}>
               <div style={t.logoBox}>
-                <i className="ti ti-home" style={t.logoIcon} aria-hidden="true" />
+                <img src={hostopsLogo} alt="HostOps" style={{ width: 32, height: 32, objectFit: "contain" }} />
               </div>
               <span style={t.logoText}>HostOps</span>
             </Link>
@@ -959,7 +961,7 @@ export default function Navbar() {
           {/* FIX: Link to /dashboard not / — same as mobile fix above */}
           <Link to="/dashboard" style={t.logoWrap}>
             <div style={t.logoBox}>
-              <i className="ti ti-home" style={t.logoIcon} aria-hidden="true" />
+              <img src={hostopsLogo} alt="HostOps" style={{ width: 28, height: 28, objectFit: "contain" }} />
             </div>
             <span style={t.logoText}>HostOps</span>
           </Link>
