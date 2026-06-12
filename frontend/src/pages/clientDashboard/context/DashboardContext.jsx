@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { getPresetRange } from '../../utils/dateHelpers';
 import safeStorage from '../../safeStorage';
 
@@ -17,6 +17,7 @@ const defaultRange = getPresetRange('monthly');
 
 const PROP_ID_KEY   = 'hp_selected_property_id';
 const PROP_NAME_KEY = 'hp_selected_property_name';
+const DARK_KEY      = 'hp_dark_mode';
 
 function readStoredProperty() {
   // safeStorage.getItem never throws — fallback is handled internally.
@@ -46,9 +47,17 @@ export function DashboardProvider({ children }) {
     // is blocked — the in-memory store is read consistently.
     showPropertySelector: !restoredProp.id,
     isSwitching: false,
+    // true on first mount so the dashboard's FetchingOverlay appears
+    // immediately — closing the gap between the ProtectedRoute overlay
+    // ("Verifying session…") and the first data fetch overlay.
+    isLoading: true,
   });
 
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(() => safeStorage.getItem(DARK_KEY) === 'true');
+
+  useEffect(() => {
+    safeStorage.setItem(DARK_KEY, String(dark));
+  }, [dark]);
 
   const updateDashState = useCallback((partial) => {
     setDashState((prev) => ({ ...prev, ...partial }));

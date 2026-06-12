@@ -18,13 +18,15 @@ export function useDashboardData() {
   const auth = useAuth();
   const { dashState, updateDashState } = useDashboard();
   const [banner, setBanner] = useState({ message: '', type: '' });
-  const [isLoading, setIsLoading] = useState(false);
   const loadingRef = useRef(false);
 
   const loadData = useCallback(async (fromOverride, toOverride, apartmentIdOverride) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
-    setIsLoading(true);
+    // isLoading lives in dashState so every hook instance (DateFilterBar,
+    // dashboard index, etc.) that calls loadData updates the same flag,
+    // letting the single overlay in index.jsx react to all fetches.
+    updateDashState({ isLoading: true });
 
     const from = fromOverride ?? dashState.from;
     const to   = toOverride   ?? dashState.to;
@@ -68,10 +70,9 @@ export function useDashboardData() {
       setBanner({ message: 'Live data', type: 'live' });
     } finally {
       loadingRef.current = false;
-      setIsLoading(false);
-      updateDashState({ isSwitching: false });
+      updateDashState({ isLoading: false, isSwitching: false });
     }
   }, [auth, dashState.from, dashState.to, dashState.selectedPropertyId, updateDashState]);
 
-  return { loadData, banner, isLoading };
+  return { loadData, banner };
 }
