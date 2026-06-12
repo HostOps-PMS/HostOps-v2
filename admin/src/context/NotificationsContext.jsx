@@ -34,7 +34,18 @@ export function NotificationsProvider({ children }) {
   useEffect(() => {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 60000); // refresh every 60s
-    return () => clearInterval(interval);
+
+    // Refetch when the tab regains focus (handles the case where the context
+    // mounted before the token was ready, or the initial fetch failed silently).
+    function onVisible() {
+      if (document.visibilityState === 'visible') fetchNotifications();
+    }
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [fetchNotifications]);
 
   return (

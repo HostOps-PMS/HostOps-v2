@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getClientSmoobuData, getExchangeRate } from '../services/clientsService';
+import { getClientSmoobuData, getExchangeRate, getApartmentPhotosBulk } from '../services/clientsService';
 
 // ── Date helpers (same logic as frontend DateFilterBar) ──────────
 function toYMD(date) {
@@ -525,6 +525,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
   const [currency, setCurrency] = useState('PHP');
   const [phpRate, setPhpRate] = useState(61.75);
   const [rateLabel, setRateLabel] = useState('est.');
+  const [apartmentPhotos, setApartmentPhotos] = useState({});
 
   // Fetch live exchange rate once on mount
   useEffect(() => {
@@ -558,6 +559,17 @@ export default function ClientSmoobuView({ client, property, onClose }) {
   // Load on mount
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fetch apartment photos whenever the properties list changes
+  useEffect(() => {
+    const props = data?.properties;
+    if (!props?.length) return;
+    const ids = props.map(p => String(p.id)).filter(Boolean);
+    if (!ids.length) return;
+    getApartmentPhotosBulk(ids)
+      .then(res => setApartmentPhotos(res.photos ?? {}))
+      .catch(() => {});
+  }, [data?.properties]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Handle preset change
   function handlePresetChange(preset, range) {
     setActivePreset(preset);
@@ -584,7 +596,10 @@ export default function ClientSmoobuView({ client, property, onClose }) {
   const cancellations = stats.cancellations ?? 0;
   const cancelledNights = stats.cancelledNights ?? 0;
 
-  const properties = data?.properties ?? [];
+  const properties = (data?.properties ?? []).map(p => ({
+    ...p,
+    picture: apartmentPhotos[String(p.id)]?.[0]?.url ?? p.picture ?? null,
+  }));
   const byChannel = data?.byChannel ?? {};
 
   const recentBookings = (data?.bookings ?? [])
