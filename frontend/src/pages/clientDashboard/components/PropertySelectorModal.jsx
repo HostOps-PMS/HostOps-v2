@@ -266,6 +266,8 @@ function PropertyCard({ prop, disabled, onClick, slideDir }) {
         textAlign:    'left',
         outline:      'none',
         position:     'relative',
+        WebkitTransform: 'translateZ(0)',
+        transform:    'translateZ(0)',
       }}
     >
       {/* ── Full card visual ── */}
@@ -273,6 +275,7 @@ function PropertyCard({ prop, disabled, onClick, slideDir }) {
         position:     'relative',
         width:        '100%',
         aspectRatio:  '4 / 3',
+        minHeight:    '220px',
         borderRadius: '22px',
         overflow:     'hidden',
         boxShadow:    '0 10px 40px rgba(0,0,0,0.22)',
@@ -315,6 +318,8 @@ function PropertyCard({ prop, disabled, onClick, slideDir }) {
           inset:         0,
           background:    'linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.4) 38%, rgba(0,0,0,0.0) 65%, transparent 100%)',
           pointerEvents: 'none',
+          WebkitTransform: 'translateZ(0)',
+          transform:    'translateZ(0)',
         }} />
 
         {/* ── Hover shimmer ── */}
@@ -478,6 +483,9 @@ const cardAnimations = `
   }
   .prop-card__img {
     transition: transform 0.5s cubic-bezier(0.22,1,0.36,1) !important;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    will-change: transform;
   }
   .prop-card__shimmer {
     transition: opacity 0.28s ease;
