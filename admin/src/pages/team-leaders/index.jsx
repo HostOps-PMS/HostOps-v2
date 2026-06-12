@@ -7,7 +7,6 @@ import TeamLeaderModal from './components/TeamLeaderModal';
 import DeleteModal from './components/DeleteModal';
 import TeamLeaderTable from './components/TeamLeaderTable';
 import { exportTeamLeadersPdf } from './utils/exportTeamLeadersPdf';
-import FetchingOverlay         from '../components/FetchingOverlay';
 
 export default function TeamLeaders() {
   const [search, setSearch]             = useState('');
@@ -78,7 +77,6 @@ export default function TeamLeaders() {
 
   return (
     <div className="db-layout">
-      <FetchingOverlay isVisible={loading} message="Loading team leaders…" />
       <Sidebar />
 
       <div className="db-main">
