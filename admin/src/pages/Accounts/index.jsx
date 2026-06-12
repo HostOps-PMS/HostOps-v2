@@ -17,6 +17,9 @@ export default function AccountsPage() {
   const [search,       setSearch]       = useState('');
   const [page,         setPage]         = useState(1);
   const [unlockTarget, setUnlockTarget] = useState(null);
+  const [exportLoading, setExportLoading] = useState(false);
+
+  const { overview, loading: notifLoading } = useStats();
 
   const now         = new Date();
   const lockedCount = combined.filter(a =>
@@ -36,26 +39,41 @@ export default function AccountsPage() {
     combined, tab, search, page, pageSize: PAGE_SIZE,
   });
 
-  const { overview, loading: notifLoading } = useStats();
-
-  const [exportLoading, setExportLoading] = useState(false);
-
-  async function handleExport() {
-    if (exportLoading || loading) return;
-    setExportLoading(true);
-    try {
-      await exportAccountsPdf({ accounts: totalFiltered, tab, search });
-    } finally {
-      setExportLoading(false);
-    }
-  }
-
   function handleTabChange(id) { setTab(id); setPage(1); }
   function handleSearch(val)   { setSearch(val); setPage(1); }
 
+  const handleExport = () => {
+    if (exportLoading || loading) return;
+    setExportLoading(true);
+    try {
+      exportAccountsPdf({
+        accounts: totalFiltered,
+        activeTab: tab,
+        search,
+      });
+    } catch (err) {
+      console.error('[exportAccountsPdf] failed:', err);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const exportBtnIcon = exportLoading ? (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+      style={{ animation: 'acc-pdf-spin 0.8s linear infinite' }}>
+      <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+      <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+    </svg>
+  ) : (
+    <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 16h14" strokeLinecap="round" />
+    </svg>
+  );
+
   return (
     <div className="db-layout">
-      <Sidebar />
+      <Sidebar onExport={handleExport} exportLoading={exportLoading} />
 
       <div className="db-main">
         <TopBar
@@ -65,11 +83,12 @@ export default function AccountsPage() {
         />
 
         <div className="cl-content">
-          <header className="cl-content__header" style={{ marginBottom: 28 }}>
+          <header style={{ marginBottom: 28 }} className="cl-content__header">
             <div>
               <h1 className="cl-content__title">Accounts</h1>
               <p className="cl-content__sub">All platform users and staffs — PIN lockout status, attempts, and access control.</p>
             </div>
+
             <button
               onClick={handleExport}
               disabled={exportLoading || loading}
@@ -87,23 +106,12 @@ export default function AccountsPage() {
               }}
               onMouseEnter={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#158a5e'; }}
               onMouseLeave={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#1a9e6e'; }}
-              title="Export visible accounts as PDF"
+              title="Export all accounts as PDF"
             >
-              {exportLoading ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
-                  style={{ animation: 'ac-pdf-spin 0.8s linear infinite' }}>
-                  <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-                  <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M3 16h14" strokeLinecap="round" />
-                </svg>
-              )}
+              {exportBtnIcon}
               {exportLoading ? 'Exporting…' : 'Export PDF'}
             </button>
-            <style>{`@keyframes ac-pdf-spin { to { transform: rotate(360deg); } }`}</style>
+            <style>{`@keyframes acc-pdf-spin { to { transform: rotate(360deg); } }`}</style>
           </header>
 
           <AccountsTable
