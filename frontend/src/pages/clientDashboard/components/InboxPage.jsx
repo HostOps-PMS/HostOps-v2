@@ -333,7 +333,7 @@ export default function InboxPage() {
       </div>
 
       {/* Main two-panel layout */}
-      <div style={{ display: "flex", flex: 1, height: "calc(100vh - 58px)", overflow: "hidden", position: "fixed", top: 58, left: 0, right: 0, bottom: 0 }}>
+      <div style={{ display: "flex", flex: 1, overflow: "hidden", position: "fixed", top: 58, left: 0, right: 0, bottom: 0 }}>
 
         {/* ── LEFT PANEL — Thread list ── */}
         <div style={{
@@ -457,7 +457,8 @@ export default function InboxPage() {
           </div>
 
           {/* Thread list */}
-          <div style={{ flex: 1, overflowY: "auto" }}>
+          <div style={{ flex: 1, overflowY: "auto", scrollbarWidth: "none", msOverflowStyle: "none" }}
+            className="scrollbar-none">
             {Object.keys(grouped).length === 0 ? (
               <div style={{ padding: "40px 20px", textAlign: "center", color: textSub, fontSize: "13px" }}>
                 No conversations found.
@@ -610,7 +611,8 @@ export default function InboxPage() {
               </div>
 
               {/* Messages */}
-              <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "14px 12px" : "24px 28px" }}>
+              <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "14px 12px" : "24px 28px", scrollbarWidth: "none", msOverflowStyle: "none" }}
+                className="scrollbar-none">
                 {loadingMsgs && <LoadingDots />}
                 {msgError && !loadingMsgs && (
                   <div style={{ textAlign: "center", color: "#e84545", fontSize: "13px", paddingTop: 40 }}>
@@ -645,6 +647,7 @@ export default function InboxPage() {
               {/* Reply box */}
               <div style={{
                 padding: isMobile ? "10px 12px" : "14px 24px",
+                paddingBottom: isMobile ? "max(12px, env(safe-area-inset-bottom, 12px))" : "14px",
                 borderTop: `1px solid ${border}`,
                 background: panelBg,
                 flexShrink: 0,

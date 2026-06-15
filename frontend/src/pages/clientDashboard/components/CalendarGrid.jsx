@@ -69,6 +69,7 @@ function PropertyRow({ prop, allBookings, dateRange, ymdRange, todayISO }) {
   const propBookings = allBookings.filter((b) => {
     if (!b.apartment || b.apartment.id !== prop.id) return false;
     if (!b["guest-name"] && b["is-blocked-booking"]) return false;
+    if (b.type === 'cancellation' || (b.type && b.type.toLowerCase().includes('cancel'))) return false;
     const arrYMD = toYMD(b.arrival);
     const depYMD = toYMD(b.departure);
     return arrYMD <= rangeEndYMD && depYMD > rangeStartYMD;
@@ -133,7 +134,7 @@ function PropertyRow({ prop, allBookings, dateRange, ymdRange, todayISO }) {
       const pillClass = getChannelPillClass(channel);
 
       return (
-        <td key={dayStr} className={tdClass || undefined}>
+        <td key={dayStr} className={tdClass || undefined} style={{ zIndex: 1 }}>
           <div
             className={`cal-pill ${pillClass}`}
             style={{ width: `calc(${renderSpan * 100}% - 6px)`, left: 3 }}
@@ -250,6 +251,7 @@ function SingleCalendarView({ prop, allBookings, dark }) {
     if (!b.apartment) return false;
     if (String(b.apartment.id) !== String(prop.id)) return false;
     if (!b['guest-name'] && b['is-blocked-booking']) return false;
+    if (b.type === 'cancellation' || (b.type && b.type.toLowerCase().includes('cancel'))) return false;
     return true;
   });
 
@@ -628,13 +630,12 @@ const [showBookings, setShowBookings] = useState(false);
         <div style={{ padding: '13px 20px', borderBottom: `1px solid ${borderCol}`, background: cardBg, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: textSecondary, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Upcoming bookings</div>
           <button
+            className="single-cal-close-btn"
             onClick={() => setShowBookings(false)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: textSecondary, padding: 4, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
+            style={{ display: 'none', width: 28, height: 28, borderRadius: '50%', border: `1px solid ${borderCol}`, background: cardBg, color: textSecondary, cursor: 'pointer', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}
+          >✕</button>
         </div>
-      <div style={{ padding: '12px 16px', background: surfaceBg, flex: 1, overflowY: 'auto', maxHeight: 480, minHeight: 0 }}>
+      <div className="scrollbar-none" style={{ padding: '12px 16px', background: surfaceBg, flex: 1, overflowY: 'auto', maxHeight: 480, minHeight: 0 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {navMonthBookings.length === 0 ? (
             <div style={{ fontSize: 13, color: textSecondary, fontStyle: 'italic' }}>No bookings this month</div>
@@ -739,13 +740,17 @@ const { dark } = useDashboard();
   const dateRange = buildDateRange(calBaseDate, calMonthsCount);
   const ymdRange = dateRange.map(toYMD);
 
+  const nonCancelledBookings = bookings.filter(
+    (b) => !(b.type === 'cancellation' || (b.type && b.type.toLowerCase().includes('cancel')))
+  );
+  
   const filteredBookings =
     channels.length > 0
-      ? bookings.filter((b) => {
+      ? nonCancelledBookings.filter((b) => {
           const ch = (b.channel && b.channel.name) || "Direct";
           return channels.includes(ch);
         })
-      : bookings;
+      : nonCancelledBookings;
 
   const singleProp = view === "single"
     ? (properties.find(p => String(p.id) === String(singlePropId))
@@ -849,126 +854,126 @@ const { dark } = useDashboard();
   }
 
   return (
-  <div style={{ display: "flex", width: "100%", overflow: "visible", borderTop: dark ? "1px solid #1e3a2a" : "1px solid #e3ede8", borderRadius: "0 0 14px 14px", "--cal-td-bg": "#fff", "--cal-td-today": "#f0faf4", "--cal-td-weekend": "#fcfafa", "--cal-month-bg": "#f5f9f7", "--cal-month-color": "#1a3028", "--cal-dayrow-bg": "#f7faf8", "--cal-daynum-color": "#0c1c14", "--cal-border": "1px solid #e3ede8" }}>
+  <div style={{ display: "flex", width: "100%", overflow: "visible", borderTop: dark ? "1px solid #1e3a2a" : "1px solid #e3ede8", borderRadius: "0 0 14px 14px", "--cal-td-bg": dark ? "#0d2619" : "#fff", "--cal-td-today": dark ? "#112e1c" : "#f0faf4", "--cal-td-weekend": dark ? "#0c2416" : "#fcfafa", "--cal-td-hover": dark ? "#163d28" : "#fafcfb", "--cal-month-bg": dark ? "#0a1f15" : "#f5f9f7", "--cal-month-color": dark ? "#eaf5f0" : "#1a3028", "--cal-dayrow-bg": dark ? "#0d2619" : "#f7faf8", "--cal-daynum-color": dark ? "#eaf5f0" : "#0c1c14", "--cal-border": dark ? "1px solid #1e3a2a" : "1px solid #e3ede8", "--cal-today-header-bg": dark ? "#0f2d1a" : "#e8f5ee", "--cal-today-text": dark ? "#56c299" : "#1e8760" }}>
       <style>{`
           /* ── Tooltip ── */
           .cal-tt {
             display: none; position: fixed; z-index: 9999;
-            background: #fff; border: 0.5px solid #e5e7eb; border-radius: 10px;
+            background: ${dark ? '#132a1e' : '#fff'}; border: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; border-radius: 10px;
             min-width: 220px; font-family: 'DM Sans', sans-serif;
-            overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+            overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,${dark ? '0.40' : '0.10'});
           }
-          .cal-tt-top { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 0.5px solid #e5e7eb; }
-          .cal-tt-name { font-size: 13px; font-weight: 600; color: #0c1c14; }
-          .cal-tt-chip { background: #E1F5EE; color: #0F6E56; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 100px; }
-          .cal-tt-dates { display: flex; border-bottom: 0.5px solid #e5e7eb; }
+          .cal-tt-top { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; }
+          .cal-tt-name { font-size: 13px; font-weight: 600; color: ${dark ? '#eaf5f0' : '#0c1c14'}; }
+          .cal-tt-chip { background: ${dark ? '#1a3d28' : '#E1F5EE'}; color: ${dark ? '#56c299' : '#0F6E56'}; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 100px; }
+          .cal-tt-dates { display: flex; border-bottom: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; }
           .cal-tt-dates > div { flex: 1; padding: 9px 14px; }
-          .cal-tt-dates > div + div { border-left: 0.5px solid #e5e7eb; }
-          .cal-tt-dl { font-size: 10px; font-weight: 600; color: #9ab8a9; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 3px; }
-          .cal-tt-dv { font-size: 13px; font-weight: 600; color: #0c1c14; }
-          .cal-tt-row { display: flex; justify-content: space-between; padding: 8px 14px; border-bottom: 0.5px solid #e5e7eb; font-size: 12px; }
+          .cal-tt-dates > div + div { border-left: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; }
+          .cal-tt-dl { font-size: 10px; font-weight: 600; color: ${dark ? '#4d9e7a' : '#9ab8a9'}; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 3px; }
+          .cal-tt-dv { font-size: 13px; font-weight: 600; color: ${dark ? '#eaf5f0' : '#0c1c14'}; }
+          .cal-tt-row { display: flex; justify-content: space-between; padding: 8px 14px; border-bottom: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; font-size: 12px; }
           .cal-tt-last { border-bottom: none; }
-          .cal-tt-rl { color: #9ab8a9; }
-          .cal-tt-rv { font-weight: 500; color: #0c1c14; }
-          .cal-tt-price { color: #0F6E56 !important; }
+          .cal-tt-rl { color: ${dark ? '#4d9e7a' : '#9ab8a9'}; }
+          .cal-tt-rv { font-weight: 500; color: ${dark ? '#eaf5f0' : '#0c1c14'}; }
+          .cal-tt-price { color: ${dark ? '#56c299' : '#0F6E56'} !important; }
 
           /* ── Toolbar ── */
           .cal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px 14px; }
-          .cal-title { font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 800; color: #0c1c14; }
+          .cal-title { font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 800; color: ${dark ? '#eaf5f0' : '#0c1c14'}; }
           .cal-controls { display: flex; gap: 8px; align-items: center; }
-          .cal-btn { background: #fff; border: 1px solid #e3ede8; padding: 6px 12px; border-radius: 100px; font-size: .75rem; font-weight: 600; color: #0c1c14; cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
-          .cal-btn-group { background: #f0f5f2; border-radius: 100px; padding: 3px; display: flex; }
-          .cal-btn-group button { background: transparent; border: none; padding: 5px 12px; border-radius: 100px; font-size: .75rem; font-weight: 700; color: #6a8b7c; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+          .cal-btn { background: ${dark ? '#1a3d28' : '#f0f5f2'}; border: 1px solid ${dark ? '#2a5c3c' : '#e3ede8'}; padding: 6px 12px; border-radius: 100px; font-size: .75rem; font-weight: 600; color: ${dark ? '#a8d4bc' : '#0c1c14'}; cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+          .cal-btn-group { background: ${dark ? '#0a1f15' : '#f0f5f2'}; border-radius: 100px; padding: 3px; display: flex; }
+          .cal-btn-group button { background: transparent; border: none; padding: 5px 12px; border-radius: 100px; font-size: .75rem; font-weight: 700; color: ${dark ? '#7aab8a' : '#6a8b7c'}; cursor: pointer; font-family: 'DM Sans', sans-serif; }
           .cal-btn-group button.active { background: #26a676; color: #fff; }
 
           /* ── Nav bar ── */
-          .cal-nav { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 14px 24px; border-bottom: 1px solid #f0f5f2; background: #fff; flex-wrap: nowrap; white-space: nowrap; }
+          .cal-nav { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 14px 24px; border-bottom: 1px solid ${dark ? '#1e3a2a' : '#f0f5f2'}; background: ${dark ? '#0d2619' : '#f7faf8'}; flex-wrap: nowrap; white-space: nowrap; }
           .cal-nav > * { flex-shrink: 0; }
-          .cal-nav-btn { width: 30px; height: 30px; border: 1px solid #e3ede8; border-radius: 50%; background: #fff; color: #6a8b7c; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; }
-          .cal-nav-btn:hover { background: #eaf8f1; color: #1e8760; border-color: #b7e4cf; }
-          .cal-nav-label { font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 800; color: #0c1c14; padding: 0 6px; flex: 1; }
-          .cal-nav-today { padding: 6px 14px; border: 1px solid #b7e4cf; background: #eaf8f1; color: #1e8760; border-radius: 100px; font-family: 'DM Sans', sans-serif; font-size: .75rem; font-weight: 700; cursor: pointer; margin-left: auto; }
-          .cal-nav-today:hover { background: #d4f0e4; }
+          .cal-nav-btn { width: 30px; height: 30px; border: 1px solid ${dark ? '#2a5c3c' : '#e3ede8'}; border-radius: 50%; background: ${dark ? '#0d2619' : '#f0f5f2'}; color: ${dark ? '#9ab8a9' : '#6a8b7c'}; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; }
+          .cal-nav-btn:hover { background: ${dark ? '#1a3d28' : '#eaf8f1'}; color: ${dark ? '#56c299' : '#1e8760'}; border-color: ${dark ? '#2a5c3c' : '#b7e4cf'}; }
+          .cal-nav-label { font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 800; color: ${dark ? '#eaf5f0' : '#0c1c14'}; padding: 0 6px; flex: 1; }
+          .cal-nav-today { padding: 6px 14px; border: 1px solid ${dark ? '#2a5c3c' : '#b7e4cf'}; background: ${dark ? '#1a3d28' : '#eaf8f1'}; color: ${dark ? '#56c299' : '#1e8760'}; border-radius: 100px; font-family: 'DM Sans', sans-serif; font-size: .75rem; font-weight: 700; cursor: pointer; margin-left: auto; }
+          .cal-nav-today:hover { background: ${dark ? '#163d28' : '#d4f0e4'}; }
 
           /* ── Scroll container ── */
-          .cal-scroll { overflow-x: auto; overflow-y: visible; width: 100%; border-top: 1px solid #e3ede8; scroll-behavior: smooth; position: relative; border-radius: 0 0 14px 14px; }
+          .cal-scroll { overflow-x: auto; overflow-y: visible; width: 100%; border-top: 1px solid ${dark ? '#1e3a2a' : '#e3ede8'}; scroll-behavior: smooth; position: relative; border-radius: 0 0 14px 14px; }
           .cal-scroll::-webkit-scrollbar { height: 8px; }
-          .cal-scroll::-webkit-scrollbar-track { background: #f4f7f5; border-radius: 6px; margin: 0 4px; }
-          .cal-scroll::-webkit-scrollbar-thumb { background: #b7e4cf; border-radius: 6px; border: 2px solid #f4f7f5; }
+          .cal-scroll::-webkit-scrollbar-track { background: ${dark ? '#0a1f15' : '#f4f7f5'}; border-radius: 6px; margin: 0 4px; }
+          .cal-scroll::-webkit-scrollbar-thumb { background: ${dark ? '#2a5c3c' : '#b7e4cf'}; border-radius: 6px; border: 2px solid ${dark ? '#0a1f15' : '#f4f7f5'}; }
           .cal-scroll::-webkit-scrollbar-thumb:hover { background: #56c299; }
           .cal-scroll-inner { display: block; min-height: 0; }
 
           /* ── Table ── */
           .cal-table { width: max-content; min-width: 100%; border-collapse: collapse; }
-          .cal-table th { padding: 10px 6px; border-right: 1px solid #f0f5f2; border-bottom: 1px solid #e3ede8; font-size: .72rem; font-weight: 600; color: #9ab8a9; text-align: center; }
-          .cal-table td { min-width: 56px; max-width: 56px; width: 56px; height: 48px; border-right: 1px solid #eef2f0; border-bottom: 1px solid #eef2f0; position: relative; padding: 0; background: #fff; }
+          .cal-table th { padding: 10px 6px; border-right: 1px solid ${dark ? '#1a3d28' : '#f0f5f2'}; border-bottom: 1px solid ${dark ? '#1e3a2a' : '#e3ede8'}; font-size: .72rem; font-weight: 600; color: #9ab8a9; text-align: center; }
+          .cal-table td { min-width: 56px; max-width: 56px; width: 56px; height: 48px; border-right: 1px solid ${dark ? '#1a3d28' : '#eef2f0'}; border-bottom: 1px solid ${dark ? '#1a3d28' : '#eef2f0'}; position: relative; padding: 0; background: var(--cal-td-bg, #fff); }
           /* ── Tooltip ── */
           .cal-tt {
             display: none; position: fixed; z-index: 9999;
-            background: #fff; border: 0.5px solid #e5e7eb; border-radius: 10px;
+            background: ${dark ? '#132a1e' : '#fff'}; border: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; border-radius: 10px;
             min-width: 220px; font-family: 'DM Sans', sans-serif;
-            overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+            overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,${dark ? '0.40' : '0.10'});
           }
-          .cal-tt-top { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 0.5px solid #e5e7eb; }
-          .cal-tt-name { font-size: 13px; font-weight: 600; color: #0c1c14; }
-          .cal-tt-chip { background: #E1F5EE; color: #0F6E56; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 100px; }
-          .cal-tt-dates { display: flex; border-bottom: 0.5px solid #e5e7eb; }
+          .cal-tt-top { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; }
+          .cal-tt-name { font-size: 13px; font-weight: 600; color: ${dark ? '#eaf5f0' : '#0c1c14'}; }
+          .cal-tt-chip { background: ${dark ? '#1a3d28' : '#E1F5EE'}; color: ${dark ? '#56c299' : '#0F6E56'}; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 100px; }
+          .cal-tt-dates { display: flex; border-bottom: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; }
           .cal-tt-dates > div { flex: 1; padding: 9px 14px; }
-          .cal-tt-dates > div + div { border-left: 0.5px solid #e5e7eb; }
-          .cal-tt-dl { font-size: 10px; font-weight: 600; color: #9ab8a9; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 3px; }
-          .cal-tt-dv { font-size: 13px; font-weight: 600; color: #0c1c14; }
-          .cal-tt-row { display: flex; justify-content: space-between; padding: 8px 14px; border-bottom: 0.5px solid #e5e7eb; font-size: 12px; }
+          .cal-tt-dates > div + div { border-left: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; }
+          .cal-tt-dl { font-size: 10px; font-weight: 600; color: ${dark ? '#4d9e7a' : '#9ab8a9'}; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 3px; }
+          .cal-tt-dv { font-size: 13px; font-weight: 600; color: ${dark ? '#eaf5f0' : '#0c1c14'}; }
+          .cal-tt-row { display: flex; justify-content: space-between; padding: 8px 14px; border-bottom: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; font-size: 12px; }
           .cal-tt-last { border-bottom: none; }
-          .cal-tt-rl { color: #9ab8a9; }
-          .cal-tt-rv { font-weight: 500; color: #0c1c14; }
-          .cal-tt-price { color: #0F6E56 !important; }
+          .cal-tt-rl { color: ${dark ? '#4d9e7a' : '#9ab8a9'}; }
+          .cal-tt-rv { font-weight: 500; color: ${dark ? '#eaf5f0' : '#0c1c14'}; }
+          .cal-tt-price { color: ${dark ? '#56c299' : '#0F6E56'} !important; }
 
           /* ── Toolbar ── */
           .cal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px 14px; }
-          .cal-title { font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 800; color: #0c1c14; }
+          .cal-title { font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 800; color: ${dark ? '#eaf5f0' : '#0c1c14'}; }
           .cal-controls { display: flex; gap: 8px; align-items: center; }
-          .cal-btn { background: #fff; border: 1px solid #e3ede8; padding: 6px 12px; border-radius: 100px; font-size: .75rem; font-weight: 600; color: #0c1c14; cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
-          .cal-btn-group { background: #f0f5f2; border-radius: 100px; padding: 3px; display: flex; }
-          .cal-btn-group button { background: transparent; border: none; padding: 5px 12px; border-radius: 100px; font-size: .75rem; font-weight: 700; color: #6a8b7c; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+          .cal-btn { background: ${dark ? '#1a3d28' : '#f0f5f2'}; border: 1px solid ${dark ? '#2a5c3c' : '#e3ede8'}; padding: 6px 12px; border-radius: 100px; font-size: .75rem; font-weight: 600; color: ${dark ? '#a8d4bc' : '#0c1c14'}; cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+          .cal-btn-group { background: ${dark ? '#0a1f15' : '#f0f5f2'}; border-radius: 100px; padding: 3px; display: flex; }
+          .cal-btn-group button { background: transparent; border: none; padding: 5px 12px; border-radius: 100px; font-size: .75rem; font-weight: 700; color: ${dark ? '#7aab8a' : '#6a8b7c'}; cursor: pointer; font-family: 'DM Sans', sans-serif; }
           .cal-btn-group button.active { background: #26a676; color: #fff; }
 
           /* ── Nav bar ── */
-          .cal-nav { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 14px 24px; border-bottom: 1px solid #f0f5f2; background: #fff; flex-wrap: nowrap; white-space: nowrap; }
+          .cal-nav { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 14px 24px; border-bottom: 1px solid ${dark ? '#1e3a2a' : '#f0f5f2'}; background: ${dark ? '#0d2619' : '#f7faf8'}; flex-wrap: nowrap; white-space: nowrap; }
           .cal-nav > * { flex-shrink: 0; }
-          .cal-nav-btn { width: 30px; height: 30px; border: 1px solid #e3ede8; border-radius: 50%; background: #fff; color: #6a8b7c; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; }
-          .cal-nav-btn:hover { background: #eaf8f1; color: #1e8760; border-color: #b7e4cf; }
-          .cal-nav-label { font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 800; color: #0c1c14; padding: 0 6px; flex: 1; }
-          .cal-nav-today { padding: 6px 14px; border: 1px solid #b7e4cf; background: #eaf8f1; color: #1e8760; border-radius: 100px; font-family: 'DM Sans', sans-serif; font-size: .75rem; font-weight: 700; cursor: pointer; margin-left: auto; }
-          .cal-nav-today:hover { background: #d4f0e4; }
+          .cal-nav-btn { width: 30px; height: 30px; border: 1px solid ${dark ? '#2a5c3c' : '#e3ede8'}; border-radius: 50%; background: ${dark ? '#0d2619' : '#f0f5f2'}; color: ${dark ? '#9ab8a9' : '#6a8b7c'}; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; }
+          .cal-nav-btn:hover { background: ${dark ? '#1a3d28' : '#eaf8f1'}; color: ${dark ? '#56c299' : '#1e8760'}; border-color: ${dark ? '#2a5c3c' : '#b7e4cf'}; }
+          .cal-nav-label { font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 800; color: ${dark ? '#eaf5f0' : '#0c1c14'}; padding: 0 6px; flex: 1; }
+          .cal-nav-today { padding: 6px 14px; border: 1px solid ${dark ? '#2a5c3c' : '#b7e4cf'}; background: ${dark ? '#1a3d28' : '#eaf8f1'}; color: ${dark ? '#56c299' : '#1e8760'}; border-radius: 100px; font-family: 'DM Sans', sans-serif; font-size: .75rem; font-weight: 700; cursor: pointer; margin-left: auto; }
+          .cal-nav-today:hover { background: ${dark ? '#163d28' : '#d4f0e4'}; }
 
           /* ── Scroll container ── */
-          .cal-scroll { overflow-x: auto; overflow-y: visible; width: 100%; border-top: 1px solid #e3ede8; scroll-behavior: smooth; position: relative; border-radius: 0 0 14px 14px; }
+          .cal-scroll { overflow-x: auto; overflow-y: visible; width: 100%; border-top: 1px solid ${dark ? '#1e3a2a' : '#e3ede8'}; scroll-behavior: smooth; position: relative; border-radius: 0 0 14px 14px; }
           .cal-scroll::-webkit-scrollbar { height: 8px; }
-          .cal-scroll::-webkit-scrollbar-track { background: #f4f7f5; border-radius: 6px; margin: 0 4px; }
-          .cal-scroll::-webkit-scrollbar-thumb { background: #b7e4cf; border-radius: 6px; border: 2px solid #f4f7f5; }
+          .cal-scroll::-webkit-scrollbar-track { background: ${dark ? '#0a1f15' : '#f4f7f5'}; border-radius: 6px; margin: 0 4px; }
+          .cal-scroll::-webkit-scrollbar-thumb { background: ${dark ? '#2a5c3c' : '#b7e4cf'}; border-radius: 6px; border: 2px solid ${dark ? '#0a1f15' : '#f4f7f5'}; }
           .cal-scroll::-webkit-scrollbar-thumb:hover { background: #56c299; }
           .cal-scroll-inner { display: block; min-height: 0; }
 
           /* ── Table ── */
           .cal-table { width: max-content; min-width: 100%; border-collapse: collapse; }
-          .cal-table th { padding: 10px 6px; border-right: 1px solid #f0f5f2; border-bottom: 1px solid #e3ede8; font-size: .72rem; font-weight: 600; color: #9ab8a9; text-align: center; }
-          .cal-table td { min-width: 56px; max-width: 56px; width: 56px; height: 48px; border-right: 1px solid #eef2f0; border-bottom: 1px solid #eef2f0; position: relative; padding: 0; background: var(--cal-td-bg, #fff); }
+          .cal-table th { padding: 10px 6px; border-right: 1px solid ${dark ? '#1a3d28' : '#f0f5f2'}; border-bottom: 1px solid ${dark ? '#1e3a2a' : '#e3ede8'}; font-size: .72rem; font-weight: 600; color: #9ab8a9; text-align: center; }
+          .cal-table td { min-width: 56px; max-width: 56px; width: 56px; height: 48px; border-right: 1px solid ${dark ? '#1a3d28' : '#eef2f0'}; border-bottom: 1px solid ${dark ? '#1a3d28' : '#eef2f0'}; position: relative; padding: 0; background: var(--cal-td-bg, #fff); }
           .cal-table td.today-col { background: var(--cal-td-today, #f0faf4); }
           .cal-table td.weekend-col { background: var(--cal-td-weekend, #fcfafa); }
           .cal-table td.month-start { border-left: 2px solid #b7e4cf; }
-          .cal-table tbody tr:hover td { background: #fafcfb; }
-          .cal-table tbody tr:hover td.today-col { background: #e8f5ee; }
+          .cal-table tbody tr:hover td { background: var(--cal-td-hover, #fafcfb); }
+          .cal-table tbody tr:hover td.today-col { background: var(--cal-td-today, #f0faf4); }
 
           /* ── Month label ── */
           .cal-month-label { text-align: left !important; padding: 8px 14px !important; font-family: 'Sora', sans-serif; font-size: .8rem; font-weight: 800; color: var(--cal-month-color, #1a3028); background: var(--cal-month-bg, #f5f9f7); border-bottom: var(--cal-border, 1px solid #e3ede8); border-right: var(--cal-border, 1px solid #dde8e3); white-space: nowrap; position: relative; }
 
           /* ── Day header row ── */
-          .cal-day-row th { min-width: 56px; max-width: 56px; width: 56px; text-align: center; padding: 6px 4px; background: var(--cal-dayrow-bg, #f7faf8); border-bottom: var(--cal-border, 1px solid #e3ede8); border-right: 1px solid #eef2f0; font-size: .6rem; font-weight: 700; color: #7aab95; text-transform: uppercase; letter-spacing: .4px; }
+          .cal-day-row th { min-width: 56px; max-width: 56px; width: 56px; text-align: center; padding: 6px 4px; background: var(--cal-dayrow-bg, #f7faf8); border-bottom: var(--cal-border, 1px solid #e3ede8); border-right: 1px solid ${dark ? '#1a3d28' : '#eef2f0'}; font-size: .6rem; font-weight: 700; color: #7aab95; text-transform: uppercase; letter-spacing: .4px; }
           .cal-day-row th .day-num { display: block; margin-top: 1px; font-size: .85rem; font-weight: 800; color: var(--cal-daynum-color, #0c1c14); }
           .cal-day-row th.weekend { color: #ec4899; }
           .cal-day-row th.weekend .day-num { color: #ec4899; }
-          .cal-day-row th.today { background: #e8f5ee; }
-          .cal-day-row th.today .day-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #1e8760; color: #fff; border-radius: 50%; margin-top: 1px; font-size: .8rem; }
+          .cal-day-row th.today { background: var(--cal-today-header-bg, #e8f5ee); color: var(--cal-today-text, #1e8760); border-top: 2px solid #26a676; }
+          .cal-day-row th.today .day-num { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: #1e8760; color: #fff; border-radius: 50%; margin-top: 2px; font-size: .8rem; font-weight: 800; box-shadow: 0 2px 6px rgba(30,135,96,0.35); }
           .cal-day-row th.month-start { border-left: 2px solid #b7e4cf; }
 
           /* ── Sticky property column ── */
@@ -979,8 +984,8 @@ const { dark } = useDashboard();
           .cal-table tbody tr:hover .cal-prop-col { background: #163d28; }
 
           /* ── Pills ── */
-          .cal-pill { position: absolute; top: 50%; transform: translateY(-50%); height: 26px; display: flex; align-items: center; gap: 4px; padding: 0 8px 0 3px; border-radius: 100px; font-size: 10.5px; font-weight: 500; white-space: nowrap; overflow: hidden; cursor: pointer; z-index: 3; box-shadow: 0 1px 3px rgba(0,0,0,.06); transition: transform .15s, box-shadow .15s; }
-          .cal-pill:hover { transform: translateY(-50%) scale(1.04); box-shadow: 0 4px 14px rgba(0,0,0,.12); z-index: 20; }
+          .cal-pill { position: absolute; top: 50%; transform: translateY(-50%); height: 26px; display: flex; align-items: center; gap: 4px; padding: 0 8px 0 3px; border-radius: 100px; font-size: 10.5px; font-weight: 500; white-space: nowrap; overflow: hidden; cursor: pointer; z-index: 3; box-shadow: 0 1px 3px rgba(0,0,0,.06); transition: box-shadow .15s, filter .15s; }
+          .cal-pill:hover { transform: translateY(-50%); box-shadow: 0 4px 20px rgba(0,0,0,.22); z-index: 50; filter: brightness(1.1); }
           .cal-pill-direct  { background: #d1fae5; border: 0.5px solid #6ee7b7; color: #065f46; }
           .cal-pill-website { background: #f1f5f9; border: 0.5px solid #cbd5e1; color: #334155; }
           .cal-pill-airbnb  { background: #fce7f3; border: 0.5px solid #f9a8d4; color: #9d174d; }
@@ -1037,7 +1042,7 @@ const { dark } = useDashboard();
           <button
             className="cal-btn"
             onClick={() => setShowPropFilter((v) => !v)}
-            style={{ width: "100%", justifyContent: "space-between", padding: "7px 12px", fontSize: ".72rem", borderRadius: 8, background: selectedProps.length > 0 ? "#e6f4ed" : "#fff", borderColor: selectedProps.length > 0 ? "#26a676" : "#d4e8dc", color: selectedProps.length > 0 ? "#1a6b44" : "#4a7a60" }}
+            style={{ width: "100%", justifyContent: "space-between", padding: "7px 12px", fontSize: ".72rem", borderRadius: 8, background: selectedProps.length > 0 ? (dark ? "#1a3d28" : "#e6f4ed") : (dark ? "#0d2619" : "#f0f5f2"), borderColor: selectedProps.length > 0 ? "#26a676" : (dark ? "#1e3a2a" : "#d4e8dc"), color: selectedProps.length > 0 ? (dark ? "#56c299" : "#1a6b44") : (dark ? "#7aab8a" : "#4a7a60") }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1054,20 +1059,20 @@ const { dark } = useDashboard();
             </svg>
           </button>
           {showPropFilter && (
-            <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, width: 230, background: "#fff", borderRadius: 12, border: "1px solid #e3ede8", boxShadow: "0 8px 24px rgba(0,0,0,0.10)", zIndex: 999, overflow: "hidden" }}>
-              <div style={{ padding: "12px 14px 8px", borderBottom: "1px solid #f0f5f2", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: ".7rem", fontWeight: 700, color: "#5a8a70", letterSpacing: ".5px", textTransform: "uppercase" }}>Properties</span>
+            <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, width: 230, background: dark ? "#132a1e" : "#fff", borderRadius: 12, border: dark ? "1px solid #1e3a2a" : "1px solid #e3ede8", boxShadow: "0 8px 24px rgba(0,0,0,0.18)", zIndex: 999, overflow: "hidden" }}>
+              <div style={{ padding: "12px 14px 8px", borderBottom: dark ? "1px solid #1a3d28" : "1px solid #f0f5f2", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: ".7rem", fontWeight: 700, color: dark ? "#6aab8a" : "#5a8a70", letterSpacing: ".5px", textTransform: "uppercase" }}>Properties</span>
                 {selectedProps.length > 0 && (
                   <button onClick={clearProps} style={{ fontSize: ".68rem", fontWeight: 600, color: "#26a676", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Clear all</button>
                 )}
               </div>
-              <div style={{ maxHeight: 260, overflowY: "auto", padding: "6px 8px" }}>
+              <div className="scrollbar-none" style={{ maxHeight: 260, overflowY: "auto", padding: "6px 8px" }}>
                 {properties.length === 0 ? (
                   <div style={{ padding: "14px", fontSize: ".8rem", color: "#9ab8a9", textAlign: "center", fontStyle: "italic" }}>No properties found</div>
                 ) : (
                   properties.map((p) => (
-                    <label key={p.id} onClick={() => toggleProp(p.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 8px", cursor: "pointer", borderRadius: 8, fontSize: ".8rem", color: selectedProps.includes(p.id) ? "#1a6b44" : "#2a4e3c", fontWeight: selectedProps.includes(p.id) ? 700 : 500, background: selectedProps.includes(p.id) ? "#eaf8f1" : "transparent" }}>
-                      <div style={{ width: 16, height: 16, borderRadius: 5, flexShrink: 0, border: selectedProps.includes(p.id) ? "2px solid #26a676" : "2px solid #cde0d6", background: selectedProps.includes(p.id) ? "#26a676" : "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <label key={p.id} onClick={() => toggleProp(p.id)} onMouseEnter={e => { if (!selectedProps.includes(p.id)) e.currentTarget.style.background = dark ? '#1a3d28' : '#edf7f1'; }} onMouseLeave={e => { e.currentTarget.style.background = selectedProps.includes(p.id) ? (dark ? '#1a3d28' : '#eaf8f1') : 'transparent'; }} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 8px", cursor: "pointer", borderRadius: 8, fontSize: ".8rem", color: selectedProps.includes(p.id) ? (dark ? "#56c299" : "#1a6b44") : (dark ? "#9ab8a9" : "#2a4e3c"), fontWeight: selectedProps.includes(p.id) ? 700 : 500, background: selectedProps.includes(p.id) ? (dark ? "#1a3d28" : "#eaf8f1") : "transparent", transition: "background .12s" }}>
+                      <div style={{ width: 16, height: 16, borderRadius: 5, flexShrink: 0, border: selectedProps.includes(p.id) ? "2px solid #26a676" : `2px solid ${dark ? "#2a5c3c" : "#cde0d6"}`, background: selectedProps.includes(p.id) ? "#26a676" : (dark ? "#0d2619" : "#f0f5f2"), display: "flex", alignItems: "center", justifyContent: "center" }}>
                         {selectedProps.includes(p.id) && (
                           <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
                             <path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>

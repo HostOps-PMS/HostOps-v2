@@ -6,8 +6,8 @@
 // Run once before deploying:
 //   npm install jspdf jspdf-autotable
 // ─────────────────────────────────────────────────────────────────────────────
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { jsPDF } from 'jsPDF';
+import autoTable from 'jsPDF-autotable';
 
 function fmtMoney(val) {
   const n = Number(val || 0);

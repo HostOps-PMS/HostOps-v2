@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { useDashboard } from "../context/DashboardContext";
 
 export default function Banner({ type, message }) {
+  const { dark } = useDashboard();
   const [dismissed, setDismissed] = useState(false);
 
   const AUTO_DISMISS_MS = 4000; // 4 seconds, palitan mo kung gusto mo
@@ -19,8 +21,8 @@ export default function Banner({ type, message }) {
 
   const config = {
     live: {
-      bg: "#f0faf5",
-      borderColor: "#a8d5be",
+      bg: dark ? "#0d2619" : "#f0faf5",
+      borderColor: dark ? "#1e3a2a" : "#a8d5be",
       wrapper: {
         position: "fixed",
         top: "70px",
@@ -32,8 +34,8 @@ export default function Banner({ type, message }) {
       sub: "Dashboard is showing real-time data",
     },
     loading: {
-      bg: "#fffbec",
-      borderColor: "#f5d87e",
+      bg: dark ? "#1c1800" : "#fffbec",
+      borderColor: dark ? "#3a2e00" : "#f5d87e",
       wrapper: {
         position: "fixed",
         top: "70px",
@@ -45,8 +47,8 @@ export default function Banner({ type, message }) {
       sub: "Fetching your real-time data",
     },
     error: {
-      bg: "#fff0ee",
-      borderColor: "#ffb5aa",
+      bg: dark ? "#280f0a" : "#fff0ee",
+      borderColor: dark ? "#5c2020" : "#ffb5aa",
       wrapper: {
         position: "fixed",
         top: "70px",
@@ -103,7 +105,7 @@ export default function Banner({ type, message }) {
             style={{
               fontSize: "13px",
               fontWeight: 600,
-              color: "#0c1c14",
+              color: dark ? "#eaf5f0" : "#0c1c14",
               margin: 0,
             }}
           >
