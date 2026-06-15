@@ -316,22 +316,6 @@ return (
             </div>
           )}
         </div>
-        <button
-          onClick={onNew}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 7,
-            padding: '7px 16px', borderRadius: 999,
-            border: 'none', background: '#10b981',
-            color: '#fff', fontSize: '0.82rem', fontWeight: 700,
-            cursor: 'pointer', whiteSpace: 'nowrap',
-            boxShadow: '0 2px 8px rgba(59,95,192,0.18)',
-            transition: 'background 0.15s',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = '#059669'}
-          onMouseLeave={e => e.currentTarget.style.background = '#10b981'}
-        >
-          + New Staff
-        </button>
         </div>
       </div>
 
@@ -434,13 +418,6 @@ return (
                             <rect x="2" y="6" width="16" height="11" rx="1.5"/><path d="M2 6l2-3h12l2 3" strokeLinecap="round" strokeLinejoin="round"/><path d="M8 11h4" strokeLinecap="round"/>
                           </svg>
                           Archive
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); onDelete(s); }} style={{
-                          padding: '5px 14px', borderRadius: 6,
-                          border: '1px solid #fecaca', background: '#fff5f5',
-                          fontSize: '0.78rem', fontWeight: 600, color: '#dc2626', cursor: 'pointer',
-                        }}>
-                          Delete
                         </button>
                       </div>
                     </td>

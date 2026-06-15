@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { deleteStaff } from '../services/staffApi';
+import { toast } from '../../../utils/toast';
 
 export default function DeleteModal({ staff, onClose, onDeleted }) {
   const [deleting, setDeleting] = useState(false);
@@ -10,6 +11,7 @@ export default function DeleteModal({ staff, onClose, onDeleted }) {
     setError('');
     try {
       await deleteStaff(staff._id);
+      toast.success(`${staff.firstName} ${staff.lastName} has been deleted.`, { title: 'Staff Deleted' });
       onDeleted();
     } catch (err) {
       setError(err.message);

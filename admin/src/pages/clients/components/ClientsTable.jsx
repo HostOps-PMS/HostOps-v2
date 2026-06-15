@@ -262,22 +262,6 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
             </svg>
             Refresh
           </button>
-          <button
-            onClick={onAddClient}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 7,
-              padding: '7px 14px', borderRadius: 999,
-              border: 'none', background: '#10b981',
-              color: '#fff', fontSize: '0.82rem', fontWeight: 700,
-              cursor: 'pointer', whiteSpace: 'nowrap',
-              boxShadow: '0 2px 8px rgba(59,95,192,0.18)',
-              transition: 'background 0.15s',
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = '#059669'}
-            onMouseLeave={e => e.currentTarget.style.background = '#10b981'}
-          >
-            + Add Business
-          </button>
           </div>
         </div>
 
@@ -295,7 +279,7 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #f0f2f5' }}>
-                  {['Business', 'Role', 'Status', 'Last Login', 'Joined', ''].map((h) => (
+                  {['Business', 'Role', 'Status', 'Last Login', ''].map((h) => (
                     <th key={h} style={{
                       padding: '10px 16px',
                       textAlign: 'left', fontSize: '0.72rem', fontWeight: 700,
@@ -359,27 +343,34 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
                         {formatDate(client.lastLoginAt)}
                       </td>
 
-                      {/* Joined */}
-                      <td style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
-                        {formatDate(client.createdAt)}
-                      </td>
-
-                      {/* Archive action */}
+                      {/* Actions */}
                       <td style={{ padding: '12px 16px 12px 8px', whiteSpace: 'nowrap' }}>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); onArchive && onArchive(client); }}
-                          style={{
-                            padding: '5px 12px', borderRadius: 6,
-                            border: '1px solid #fbbf24', background: '#fffbeb',
-                            fontSize: '0.78rem', fontWeight: 600, color: '#92400e', cursor: 'pointer',
-                            display: 'inline-flex', alignItems: 'center', gap: 5,
-                          }}
-                        >
-                          <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="2" y="6" width="16" height="11" rx="1.5"/><path d="M2 6l2-3h12l2 3" strokeLinecap="round" strokeLinejoin="round"/><path d="M8 11h4" strokeLinecap="round"/>
-                          </svg>
-                          Archive
-                        </button>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onRowClick(client); }}
+                            style={{
+                              padding: '5px 14px', borderRadius: 6,
+                              border: '1px solid #e5e7eb', background: '#fff',
+                              fontSize: '0.78rem', fontWeight: 600, color: '#374151', cursor: 'pointer',
+                            }}
+                          >
+                            Details
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onArchive && onArchive(client); }}
+                            style={{
+                              padding: '5px 12px', borderRadius: 6,
+                              border: '1px solid #fbbf24', background: '#fffbeb',
+                              fontSize: '0.78rem', fontWeight: 600, color: '#92400e', cursor: 'pointer',
+                              display: 'inline-flex', alignItems: 'center', gap: 5,
+                            }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                              <rect x="2" y="6" width="16" height="11" rx="1.5"/><path d="M2 6l2-3h12l2 3" strokeLinecap="round" strokeLinejoin="round"/><path d="M8 11h4" strokeLinecap="round"/>
+                            </svg>
+                            Archive
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

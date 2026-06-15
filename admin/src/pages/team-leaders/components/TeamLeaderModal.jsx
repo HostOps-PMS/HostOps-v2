@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createClient, updateClient } from '../../clients/services/clientsService';
+import { toast } from '../../../utils/toast';
 
 const inputStyle = {
   width: '100%',
@@ -65,6 +66,7 @@ try {
         body.password = form.password;
         body.role = 'team_leader';
         await createClient(body);
+        toast.success(`${form.firstName} ${form.lastName} has been added.`, { title: 'Team Leader Created' });
       } else {
         if (form.password) {
           // If password update is supported via another endpoint or same endpoint
@@ -74,6 +76,7 @@ try {
           // Let's just avoid sending it to not throw zod errors.
         }
         await updateClient(teamLeader._id, body);
+        toast.success(`${form.firstName} ${form.lastName} has been updated.`, { title: 'Team Leader Updated' });
       }
 
       onSaved();
@@ -85,6 +88,11 @@ try {
   }
 
   return (
+    <>
+    <style>{`
+      @keyframes tl-modal-overlay { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes tl-modal-card { from { opacity: 0; transform: translateY(20px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    `}</style>
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
@@ -93,6 +101,7 @@ try {
         WebkitBackdropFilter: 'blur(4px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: 16,
+        animation: 'tl-modal-overlay 0.2s ease',
       }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
@@ -107,6 +116,7 @@ try {
           border: 'none',
           display: 'flex',
           flexDirection: 'column',
+          animation: 'tl-modal-card 0.28s cubic-bezier(0.16,1,0.3,1)',
         }}
       >
         <div style={{
@@ -314,5 +324,6 @@ try {
         </div>
       </div>
     </div>
+    </>
   );
 }
