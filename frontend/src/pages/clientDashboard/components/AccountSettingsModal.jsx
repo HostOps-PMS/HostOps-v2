@@ -49,14 +49,8 @@ function getUserData(auth) {
 // ClientAccount. Requires a valid Bearer token.
 // ─────────────────────────────────────────────────────────────────
 async function sendOtpForPasswordChange(auth) {
-  const token = auth.getToken();
-  const res = await fetch(`${API_BASE}/auth/send-change-password-otp`, {
+  const res = await auth.fetchWithAuth(`${API_BASE}/auth/send-change-password-otp`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": import.meta.env.VITE_API_KEY,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Unable to send OTP.");
@@ -87,14 +81,8 @@ async function verifyOtp(email, token) {
 // Works for both regular users and staff (backend detects via token).
 // ─────────────────────────────────────────────────────────────────
 async function changePassword({ currentPassword, newPassword }, auth) {
-  const token = auth.getToken();
-  const res = await fetch(`${API_BASE}/auth/change-password`, {
+  const res = await auth.fetchWithAuth(`${API_BASE}/auth/change-password`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": import.meta.env.VITE_API_KEY,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
     body: JSON.stringify({ currentPassword, newPassword }),
   });
   const data = await res.json().catch(() => ({}));
@@ -106,14 +94,8 @@ async function changePassword({ currentPassword, newPassword }, auth) {
 // changePin — POST /auth/change-pin
 // ─────────────────────────────────────────────────────────────────
 async function changePin({ currentPin, newPin }, auth) {
-  const token = auth.getToken();
-  const res = await fetch(`${API_BASE}/auth/change-pin`, {
+  const res = await auth.fetchWithAuth(`${API_BASE}/auth/change-pin`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": import.meta.env.VITE_API_KEY,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
     body: JSON.stringify({ currentPin, newPin }),
   });
   const data = await res.json().catch(() => ({}));

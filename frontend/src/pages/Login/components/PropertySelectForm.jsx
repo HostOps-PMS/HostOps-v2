@@ -43,14 +43,7 @@ export default function PropertySelectForm({
     const fetchProperties = async () => {
       setLoading(true);
       try {
-        const token = auth.getToken();
-        const res = await fetch(`${API_BASE}/auth/my-properties`, {
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key':    import.meta.env.VITE_API_KEY || '',
-            Authorization:  `Bearer ${token}`,
-          },
-        });
+        const res = await auth.fetchWithAuth(`${API_BASE}/auth/my-properties`);
 
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));

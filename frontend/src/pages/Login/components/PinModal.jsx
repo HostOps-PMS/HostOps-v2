@@ -244,14 +244,8 @@ export default function PinModal({
     setLoading(true);
 
     try {
-      const token = auth.getToken();
-      const res = await fetch(`${API_BASE}/auth/verify-pin`, {
+      const res = await auth.fetchWithAuth(`${API_BASE}/auth/verify-pin`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key':    import.meta.env.VITE_API_KEY || '',
-          Authorization:  `Bearer ${token}`,
-        },
         body: JSON.stringify({
           email:      email.trim().toLowerCase(),
           pin,
@@ -340,14 +334,8 @@ export default function PinModal({
       //   - team_leader → isStaff=false, role=team_leader
       // Fire-and-forget — we don't block navigation on log failure.
       try {
-        const logToken = data.accessToken || auth.getToken();
-        fetch(`${API_BASE}/api/activity-log`, {
-          method:  'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key':    import.meta.env.VITE_API_KEY || '',
-            Authorization:  `Bearer ${logToken}`,
-          },
+        auth.fetchWithAuth(`${API_BASE}/api/activity-log`, {
+          method: 'POST',
           body: JSON.stringify({
             action: 'login',
             meta:   {
