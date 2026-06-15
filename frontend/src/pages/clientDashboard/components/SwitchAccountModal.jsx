@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../AuthContext";
 import { authFetch } from "../../apiService";
 import safeStorage from "../../safeStorage";
+import { useDashboard } from "../context/DashboardContext";
 
 const canAccessProperty = (property) => property?.hasAccess !== false;
 const PROP_ID_KEY = "hp_selected_property_id";
@@ -23,6 +24,7 @@ const PROP_NAME_KEY = "hp_selected_property_name";
 // ─────────────────────────────────────────────────────────────────
 export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
   const auth = useAuth();
+  const { dark } = useDashboard();
 
   // FIX 1: Read user fresh on every render — avoids stale null on first mount
   // when the auth context hasn't fully hydrated yet.
@@ -199,8 +201,8 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
           gap: 12px;
           padding: 12px 14px;
           border-radius: 12px;
-          border: 1.5px solid #eaf3ee;
-          background: #fff;
+          border: 1.5px solid ${dark ? '#1e3a2a' : '#eaf3ee'};
+          background: ${dark ? '#0d2619' : '#fff'};
           cursor: pointer;
           transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
           margin-bottom: 8px;
@@ -210,23 +212,23 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
           font-family: inherit;
         }
         .sw-prop-item:hover:not(.sw-prop-selected):not(:disabled) {
-          border-color: #9ab8a9;
-          background: #f7faf8;
+          border-color: ${dark ? '#2a5c3c' : '#9ab8a9'};
+          background: ${dark ? '#1a3d28' : '#f7faf8'};
         }
         .sw-prop-selected {
           border-color: #1e8760 !important;
-          background: #eaf8f1 !important;
+          background: ${dark ? '#0f2d1a' : '#eaf8f1'} !important;
           box-shadow: 0 0 0 3px rgba(30,135,96,0.10) !important;
         }
         .sw-confirm-btn:hover:not(:disabled) {
-          background: #1a3325 !important;
+          background: ${dark ? '#26a676' : '#1a3325'} !important;
         }
         .sw-cancel-btn:hover {
-          background: #f0f8f4 !important;
+          background: ${dark ? '#1a3d28' : '#f0f8f4'} !important;
         }
         .sw-close-btn:hover {
-          background: #f0f8f4 !important;
-          color: #0c1c14 !important;
+          background: ${dark ? '#1a3d28' : '#f0f8f4'} !important;
+          color: ${dark ? '#eaf5f0' : '#0c1c14'} !important;
         }
         .sw-modal-scroll::-webkit-scrollbar { display: none; }
         .sw-modal-scroll { -ms-overflow-style: none; scrollbar-width: none; }
@@ -255,7 +257,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
           aria-modal="true"
           aria-label="Switch Property"
           style={{
-            background: "#fff",
+            background: dark ? "#132a1e" : "#fff",
             borderRadius: 20,
             width: "100%",
             maxWidth: 420,
@@ -269,7 +271,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
           <div
             style={{
               padding: "22px 24px 18px",
-              borderBottom: "1px solid #eaf3ee",
+              borderBottom: `1px solid ${dark ? "#1e3a2a" : "#eaf3ee"}`,
               display: "flex",
               alignItems: "flex-start",
               justifyContent: "space-between",
@@ -303,7 +305,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                     fontFamily: "'Sora', sans-serif",
                     fontSize: "1rem",
                     fontWeight: 800,
-                    color: "#0c1c14",
+                    color: dark ? "#eaf5f0" : "#0c1c14",
                     margin: 0,
                     lineHeight: 1.2,
                   }}
@@ -325,7 +327,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                 width: 32,
                 height: 32,
                 borderRadius: 8,
-                border: "1px solid #e0ede6",
+                border: `1px solid ${dark ? "#2a5c3c" : "#e0ede6"}`,
                 background: "transparent",
                 display: "flex",
                 alignItems: "center",
@@ -433,7 +435,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                       width: 36,
                       height: 36,
                       borderRadius: 10,
-                      background: selected ? "#1e8760" : active ? "#eaf3ee" : disabled ? "#f0f4f2" : "#eaf3ee",
+                      background: selected ? "#1e8760" : active ? (dark ? "#0f2d1a" : "#eaf3ee") : disabled ? (dark ? "#0a1f15" : "#f0f4f2") : (dark ? "#0d2619" : "#eaf3ee"),
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -476,7 +478,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                         style={{
                           fontSize: 13,
                           fontWeight: 700,
-                          color: (active || disabled) ? "#9ab8a9" : "#0c1c14",
+                          color: (active || disabled) ? "#9ab8a9" : (dark ? "#eaf5f0" : "#0c1c14"),
                           margin: 0,
                           whiteSpace: "nowrap",
                           overflow: "hidden",
@@ -490,8 +492,8 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                           style={{
                             fontSize: 10,
                             fontWeight: 700,
-                            color: "#1e8760",
-                            background: "#d1f0e3",
+                            color: dark ? "#56c299" : "#1e8760",
+                            background: dark ? "#1a3d28" : "#d1f0e3",
                             borderRadius: 20,
                             padding: "1px 7px",
                             letterSpacing: "0.04em",
@@ -557,7 +559,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
             <div
               style={{
                 padding: "14px 24px 22px",
-                borderTop: "1px solid #eaf3ee",
+                borderTop: `1px solid ${dark ? "#1e3a2a" : "#eaf3ee"}`,
                 display: "flex",
                 gap: 10,
                 justifyContent: "flex-end",
@@ -569,11 +571,11 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                 style={{
                   padding: "9px 18px",
                   borderRadius: 10,
-                  border: "1.5px solid #d4e8dd",
+                  border: `1.5px solid ${dark ? "#2a5c3c" : "#d4e8dd"}`,
                   background: "transparent",
                   fontSize: 13,
                   fontWeight: 600,
-                  color: "#4a6b5a",
+                  color: dark ? "#9ab8a9" : "#4a6b5a",
                   cursor: "pointer",
                   transition: "background 0.15s",
                   fontFamily: "inherit",
@@ -589,7 +591,7 @@ export default function SwitchAccountModal({ isOpen, onClose, onSwitch }) {
                   padding: "9px 22px",
                   borderRadius: 10,
                   border: "none",
-                  background: canConfirm ? "#0c1c14" : "#b8d4c4",
+                  background: canConfirm ? (dark ? "#1e8760" : "#0c1c14") : (dark ? "#1a3d28" : "#b8d4c4"),
                   fontSize: 13,
                   fontWeight: 700,
                   color: "#eaf5f0",

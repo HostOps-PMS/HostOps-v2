@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getClients, unarchiveClient } from '../../clients/services/clientsService';
 import { fetchStaffs, unarchiveStaff } from '../../Staffs/services/staffApi';
 import { fetchDisabledAppeals, resolveAppeal } from '../services/recoveryRequestsApi';
@@ -53,14 +53,22 @@ function TypeBadge({ subTab }) {
 
 /* ── sub-tabs config ── */
 const SUB_TABS = [
+  { id: 'all',        label: 'All' },
   { id: 'businesses', label: 'Businesses' },
   { id: 'staffs',     label: 'Staffs' },
   { id: 'leaders',    label: 'Team Leaders' },
 ];
 
+const SUB_TAB_LABELS = {
+  all:        'accounts',
+  businesses: 'businesses',
+  staffs:     'staffs',
+  leaders:    'team leaders',
+};
+
 /* ══════════════════════════════════════════════════════════ */
-export default function ArchivesSection({ view, onViewChange }) {
-  const [subTab,    setSubTab]    = useState('businesses');
+export default function ArchivesSection({ view, onViewChange, onRowsChange }) {
+  const [subTab,    setSubTab]    = useState('all');
   const [businesses, setBusinesses] = useState([]);
   const [leaders,    setLeaders]    = useState([]);
   const [staffs,     setStaffs]     = useState([]);
@@ -94,7 +102,8 @@ export default function ArchivesSection({ view, onViewChange }) {
   useEffect(() => { load(); }, [load]);
 
   function getName(r) {
-    if (subTab === 'staffs') return `${r.firstName || ''} ${r.lastName || ''}`.trim() || r.email;
+    const type = r._type || subTab;
+    if (type === 'staffs') return `${r.firstName || ''} ${r.lastName || ''}`.trim() || r.email;
     return r.businessName || r.email;
   }
 
@@ -128,8 +137,24 @@ export default function ArchivesSection({ view, onViewChange }) {
   }
 
   const appealsByEmail = Object.fromEntries(appeals.map(a => [a.email, a]));
-  const counts = { businesses: businesses.length, staffs: staffs.length, leaders: leaders.length };
-  const rows = subTab === 'businesses' ? businesses : subTab === 'staffs' ? staffs : leaders;
+  const total  = businesses.length + staffs.length + leaders.length;
+  const counts = { all: total, businesses: businesses.length, staffs: staffs.length, leaders: leaders.length };
+
+  const allRows = [
+    ...businesses.map(r => ({ ...r, _type: 'businesses' })),
+    ...staffs.map(r => ({ ...r, _type: 'staffs' })),
+    ...leaders.map(r => ({ ...r, _type: 'leaders' })),
+  ];
+  const rows = subTab === 'all' ? allRows
+    : subTab === 'businesses' ? businesses
+    : subTab === 'staffs'     ? staffs
+    : leaders;
+
+  const onRowsChangeRef = useRef(onRowsChange);
+  onRowsChangeRef.current = onRowsChange;
+  useEffect(() => {
+    onRowsChangeRef.current?.(rows, subTab);
+  }, [rows, subTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -190,7 +215,7 @@ export default function ArchivesSection({ view, onViewChange }) {
         {/* Filter bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px 12px', borderBottom: '1px solid #f0f2f5' }}>
           <span style={{ fontSize: '0.76rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
-            {loading ? '…' : rows.length} archived {SUB_TABS.find(t => t.id === subTab)?.label.toLowerCase()}
+            {loading ? '…' : rows.length} archived {SUB_TAB_LABELS[subTab] || subTab}
           </span>
           <button
             onClick={load} disabled={loading}
@@ -240,7 +265,7 @@ export default function ArchivesSection({ view, onViewChange }) {
           </div>
         ) : rows.length === 0 ? (
           <div style={{ padding: 48, textAlign: 'center', color: '#a0aec0', fontSize: '0.875rem' }}>
-            No archived {SUB_TABS.find(t => t.id === subTab)?.label.toLowerCase()}.
+            No archived {SUB_TAB_LABELS[subTab] || subTab}.
           </div>
         ) : (
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
@@ -288,7 +313,7 @@ export default function ArchivesSection({ view, onViewChange }) {
 
                         {/* Type */}
                         <td style={{ padding: '11px 16px' }}>
-                          <TypeBadge subTab={subTab} />
+                          <TypeBadge subTab={r._type || subTab} />
                         </td>
 
                         {/* Status */}
@@ -316,7 +341,7 @@ export default function ArchivesSection({ view, onViewChange }) {
                         {/* Actions */}
                         <td style={{ padding: '11px 16px', whiteSpace: 'nowrap', textAlign: 'right' }}>
                           <button
-                            onClick={() => setUnarchiveTarget({ ...r, _subTab: subTab })}
+                            onClick={() => setUnarchiveTarget({ ...r, _subTab: r._type || subTab })}
                             style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 7, border: '1px solid #bbf7d0', background: '#f0fdf4', fontSize: '0.76rem', fontWeight: 600, color: '#16a34a', cursor: 'pointer', transition: 'background 0.12s' }}
                             onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
                             onMouseLeave={e => e.currentTarget.style.background = '#f0fdf4'}

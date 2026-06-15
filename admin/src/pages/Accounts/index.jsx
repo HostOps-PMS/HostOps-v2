@@ -7,6 +7,7 @@ import ArchivesSection      from './components/ArchivesSection';
 import AccountDetailModal   from './components/AccountDetailModal';
 import { useAccounts, useFilteredAccounts } from './hooks/useAccounts';
 import { exportAccountsPdf } from './utils/exportAccountsPdf';
+import { exportArchivedPdf }  from './utils/exportArchivedPdf';
 import { toast }            from './utils/toast';
 import { archiveClient }    from '../clients/services/clientsService';
 import { archiveStaff }     from '../Staffs/services/staffApi';
@@ -46,12 +47,18 @@ export default function AccountsPage() {
   });
 
   const [exportLoading, setExportLoading] = useState(false);
+  const [archiveRows,   setArchiveRows]   = useState([]);
+  const [archiveSubTab, setArchiveSubTab] = useState('all');
 
   async function handleExport() {
     if (exportLoading || loading) return;
     setExportLoading(true);
     try {
-      await exportAccountsPdf({ accounts: totalFiltered, tab, search });
+      if (view === 'archives') {
+        await exportArchivedPdf({ rows: archiveRows, subTab: archiveSubTab });
+      } else {
+        await exportAccountsPdf({ accounts: totalFiltered, tab, search });
+      }
     } finally {
       setExportLoading(false);
     }
@@ -146,7 +153,11 @@ export default function AccountsPage() {
             style={{ animation: 'ac-view-enter 0.2s cubic-bezier(0.4,0,0.2,1)' }}
           >
             {view === 'archives' ? (
-              <ArchivesSection view={view} onViewChange={handleViewChange} />
+              <ArchivesSection
+                view={view}
+                onViewChange={handleViewChange}
+                onRowsChange={(rows, sub) => { setArchiveRows(rows); setArchiveSubTab(sub); }}
+              />
             ) : (
               <AccountsTable
                 tabs={tabs} activeTab={tab} onTabChange={handleTabChange}

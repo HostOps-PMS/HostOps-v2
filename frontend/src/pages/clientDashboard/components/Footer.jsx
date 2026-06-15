@@ -1,15 +1,20 @@
 import React from "react";
 import hostopsLogo from "../../../assets/HostOpsLOGO.png";
+import { useDashboard } from "../context/DashboardContext";
 
 export default function Footer() {
   const year = new Date().getFullYear();
+  const { dark } = useDashboard();
 
   return (
     <footer style={{
       width: "100%",
       boxSizing: "border-box",
-      background: "linear-gradient(135deg, #f0faf6 0%, #e8f5f0 100%)",
-      borderTop: "1px solid #c8e6d8",
+      background: dark
+        ? "linear-gradient(135deg, #0a1f15 0%, #0c2318 100%)"
+        : "linear-gradient(135deg, #f0faf6 0%, #e8f5f0 100%)",
+      borderTop: dark ? "1px solid #1e3a2a" : "1px solid #c8e6d8",
+      transition: "background 0.2s, border-color 0.2s",
     }}>
       <style>{`
         .footer-inner {
@@ -21,9 +26,9 @@ export default function Footer() {
           padding: 20px clamp(16px, 5vw, 80px);
         }
         .footer-links a:hover {
-          background: #f0faf6 !important;
-          border-color: #c8e6d8 !important;
-          color: #1e6b4a !important;
+          background: ${dark ? "#132a1e" : "#f0faf6"} !important;
+          border-color: ${dark ? "#2a5c3c" : "#c8e6d8"} !important;
+          color: ${dark ? "#56c299" : "#1e6b4a"} !important;
         }
         @media (max-width: 768px) {
           .footer-inner {
@@ -48,7 +53,7 @@ export default function Footer() {
             <img src={hostopsLogo} alt="HostOps" style={{ width: 32, height: 32, objectFit: "contain" }} />
           </div>
           <div>
-            <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e6b4a" }}>HostOps</div>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: dark ? "#56c299" : "#1e6b4a" }}>HostOps</div>
             <div style={{ fontSize: "11px", color: "#8ab8a0", marginTop: 1 }}>{year} — All rights reserved</div>
           </div>
         </div>
@@ -56,7 +61,8 @@ export default function Footer() {
         {/* Status Badge */}
         <div style={{
           display: "flex", alignItems: "center", gap: "6px",
-          background: "#fff", border: "1px solid #c8e6d8",
+          background: dark ? "#132a1e" : "#fff",
+          border: dark ? "1px solid #1e3a2a" : "1px solid #c8e6d8",
           borderRadius: 20, padding: "6px 14px", flexShrink: 0,
         }}>
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#26a676" }} />
@@ -67,7 +73,7 @@ export default function Footer() {
         <div className="footer-links" style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
           {["Privacy Policy", "Terms of Use"].map((label) => (
             <a key={label} href="#" style={{
-              fontSize: "12px", color: "#7aaa90", textDecoration: "none",
+              fontSize: "12px", color: dark ? "#6aab8a" : "#7aaa90", textDecoration: "none",
               fontWeight: 500, padding: "6px 12px", borderRadius: 8,
               border: "1px solid transparent", transition: "all .15s",
             }}>{label}</a>

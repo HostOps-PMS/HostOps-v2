@@ -3,6 +3,7 @@ import { useAuth } from '../../AuthContext';
 import { fetchMessages, sendReply } from '../services/dashboardService';
 import { timeAgo, fmtDate } from '../../utils/dateHelpers';
 import { getChannelColor, getChannelInitial } from '../utils/channelHelpers';
+import { useDashboard } from '../context/DashboardContext';
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
 function stripHtml(html) {
@@ -54,25 +55,27 @@ function isStaffSession(auth) {
 }
 
 /* ─── Design tokens (inline, no global CSS) ──────────────────────── */
-const T = {
-  bg: '#fff',
-  bgSurface: '#f7faf8',
-  bgDeep: '#0c1c14',
-  border: '1px solid #eaf0ec',
-  borderMid: '1px solid #d8e5de',
-  green: '#26a676',
-  greenDark: '#1a7a57',
-  greenLight: '#e8f7f0',
-  text: '#0c1c14',
-  muted: '#7a9e8c',
-  faint: '#b8d0c4',
-  red: '#e84545',
-  fontDisplay: "'Sora', sans-serif",
-  fontBody: "'DM Sans', sans-serif",
-  radius: 20,
-  radiusSm: 12,
-  radiusPill: 100,
-};
+function mkT(dark) {
+  return {
+    bg: dark ? '#132a1e' : '#fff',
+    bgSurface: dark ? '#0d2619' : '#f7faf8',
+    bgDeep: '#0c1c14',
+    border: dark ? '1px solid #1e3a2a' : '1px solid #eaf0ec',
+    borderMid: dark ? '1px solid #2a5c3c' : '1px solid #d8e5de',
+    green: '#26a676',
+    greenDark: '#1a7a57',
+    greenLight: dark ? '#0f2d1a' : '#e8f7f0',
+    text: dark ? '#eaf5f0' : '#0c1c14',
+    muted: dark ? '#9ab8a9' : '#7a9e8c',
+    faint: dark ? '#56997a' : '#b8d0c4',
+    red: '#e84545',
+    fontDisplay: "'Sora', sans-serif",
+    fontBody: "'DM Sans', sans-serif",
+    radius: 20,
+    radiusSm: 12,
+    radiusPill: 100,
+  };
+}
 
 /* ─── Channel badge ──────────────────────────────────────────────── */
 const CHANNEL_META = {
@@ -120,6 +123,8 @@ function Avatar({ name, size = 36 }) {
 /* ─── Close button ───────────────────────────────────────────────── */
 function CloseBtn({ onClick }) {
   const [hov, setHov] = useState(false);
+  const { dark } = useDashboard();
+  const T = mkT(dark);
   return (
     <button
       onClick={onClick}
@@ -127,7 +132,7 @@ function CloseBtn({ onClick }) {
       onMouseLeave={() => setHov(false)}
       style={{
         width: 32, height: 32, borderRadius: '50%',
-        border: T.border, background: hov ? '#fff4f4' : T.bgSurface,
+        border: T.border, background: hov ? (dark ? '#3a1a14' : '#fff4f4') : T.bgSurface,
         color: hov ? T.red : T.muted, cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         transition: 'all .15s', flexShrink: 0,
@@ -165,6 +170,8 @@ function SpinnerIcon() {
 /* ─── List mode: inbox thread item ───────────────────────────────── */
 function ThreadItem({ thread, onClick }) {
   const [hov, setHov] = useState(false);
+  const { dark } = useDashboard();
+  const T = mkT(dark);
   const ch = thread.channel || 'Direct';
   let preview = stripHtml((thread.latestMessage?.body) || '');
   if (preview.length > 72) preview = preview.slice(0, 72) + '…';
@@ -206,6 +213,8 @@ function ThreadItem({ thread, onClick }) {
 
 /* ─── Thread view: single message bubble ─────────────────────────── */
 function MessageBubble({ msg }) {
+  const { dark } = useDashboard();
+  const T = mkT(dark);
   const isIncoming = msg.type === 1 || msg.direction === 'incoming' || msg.from === 'guest';
   const body = stripHtml(msg.message || msg.messageHtml || msg.body || '');
   const date = msg['created-at'] || msg.createdAt || msg.date || '';
@@ -264,6 +273,8 @@ export default function MessageModal({
   onSelectThread,
 }) {
   const auth = useAuth();
+  const { dark } = useDashboard();
+  const T = mkT(dark);
   // Reply bar reacts to the CURRENT logged-in user: staff can reply, while
   // team leaders and clients get the read-only notice. Frontend-only — the
   // detection reads the session token / stored user, no backend changes.

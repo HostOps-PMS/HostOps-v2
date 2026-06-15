@@ -34,6 +34,205 @@ function getUserData(auth) {
   }
 }
 
+/* ─── Logout jokes ──────────────────────────────────────────────── */
+const LOGOUT_JOKES = [
+  'Scientists have confirmed: logging out causes 100% of post-logout regrets.',
+  'Your dashboard will miss you. It has feelings too, you know.',
+  'Fun fact: The last user who logged out was never heard from again.',
+  'Leaving so soon? The bugs will throw a party the moment you are gone.',
+  'Plot twist: You log out, you become... a guest. Are you ready for that life?',
+  'Stay. The coffee is hot and the data needs you.',
+  'Every time a user logs out, a server quietly weeps into its logs.',
+  'Your unread notifications will haunt you if you leave now.',
+  'Tip: Logging out is just logging in tomorrow with extra steps.',
+  'Breaking news: System stability drops 47% every time a user clicks logout.',
+  'The production server is watching. Do not betray it.',
+  'Logout equals instant karma. The next critical bug will appear 5 minutes after you leave.',
+  'Great users do not logout. They just go AFK forever.',
+  'The system misses you already and you have not even left yet.',
+  'Warning: Logged-out users cannot respond to urgent changes. Just saying.',
+  'Statistically, 9 out of 10 users who logged out wished they had not.',
+  'The dashboard was not designed to be abandoned. Please reconsider.',
+  'Logging out is just a fancy way of saying you do not care about your data.',
+  'Fun fact: Systems perform 23% better when the user is logged in. We made that up, but still.',
+  'Your session is getting comfortable. Do not throw it away.',
+  'Consider this: You log out. Something changes. No one is around to notice. Was it worth it?',
+  'Historically, every major incident was preceded by a user logging out. Coincidence? We think not.',
+  'The platform practically runs on your presence at this point. It is basically emotional support.',
+  'The data needs you. Please do not go.',
+  'Logging out now means logging back in later. Save yourself the extra step.',
+  'One user once logged out for five minutes. The horror stories are still told today.',
+  'Your login session took time to establish. Do not waste that work.',
+  'The activity logs would look much better with you staying online right now.',
+  'If you log out now, who will keep an eye on things? Think about it.',
+];
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function LogoutConfirmModal({ isOpen, joke, onConfirm, onCancel, dark = false }) {
+  const [exiting, setExiting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) setExiting(false);
+  }, [isOpen]);
+
+  const handleCancel = () => {
+    setExiting(true);
+    setTimeout(onCancel, 260);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <style>{`
+        @keyframes lo-backdrop-in  { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes lo-backdrop-out { from { opacity: 1 } to { opacity: 0 } }
+        @keyframes lo-card-in {
+          0%   { opacity: 0; transform: translateY(32px) scale(0.9)  }
+          60%  { opacity: 1; transform: translateY(-5px) scale(1.02) }
+          100% { opacity: 1; transform: translateY(0)    scale(1)    }
+        }
+        @keyframes lo-card-out {
+          from { opacity: 1; transform: translateY(0)    scale(1)    }
+          to   { opacity: 0; transform: translateY(24px) scale(0.94) }
+        }
+        @keyframes lo-icon-in {
+          0%   { opacity: 0; transform: scale(0.5) }
+          70%  { transform: scale(1.12) }
+          100% { opacity: 1; transform: scale(1)   }
+        }
+        @keyframes lo-text-in {
+          from { opacity: 0; transform: translateY(8px) }
+          to   { opacity: 1; transform: translateY(0)   }
+        }
+        @keyframes lo-joke-in {
+          from { opacity: 0; transform: translateY(10px) }
+          to   { opacity: 1; transform: translateY(0)    }
+        }
+        @keyframes lo-arrow-walk {
+          0%, 30%  { transform: translateX(0px) }
+          55%, 75% { transform: translateX(5px) }
+          100%     { transform: translateX(0px) }
+        }
+      `}</style>
+      <div
+        onClick={handleCancel}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 99999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.45)',
+          backdropFilter: 'blur(4px)',
+          animation: exiting ? 'lo-backdrop-out 0.26s ease forwards' : 'lo-backdrop-in 0.22s ease forwards',
+        }}
+      >
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            background: dark ? '#132a1e' : '#fff',
+            borderRadius: 20,
+            padding: '36px 28px 26px',
+            maxWidth: 380,
+            width: 'calc(100% - 40px)',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.13), 0 4px 16px rgba(0,0,0,0.06)',
+            animation: exiting
+              ? 'lo-card-out 0.26s cubic-bezier(.4,0,.2,1) forwards'
+              : 'lo-card-in 0.38s cubic-bezier(.34,1.56,.64,1) forwards',
+            fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+            textAlign: 'center',
+          }}
+        >
+          <div style={{
+            width: 68, height: 68, borderRadius: 20,
+            background: dark ? '#0f2d1a' : '#f0faf6',
+            border: dark ? '1.5px solid #1e3a2a' : '1.5px solid #c8eedd',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 20px',
+            animation: exiting ? 'none' : 'lo-icon-in 0.42s cubic-bezier(.34,1.56,.64,1) 0.08s both',
+          }}>
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#1a9e6e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ overflow: 'visible' }}>
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+              <g style={{ animation: 'lo-arrow-walk 1.8s ease-in-out infinite' }}>
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </g>
+            </svg>
+          </div>
+
+          <div style={{
+            fontSize: 17, fontWeight: 700, color: dark ? '#eaf5f0' : '#111',
+            marginBottom: 5, letterSpacing: '-0.02em',
+            animation: exiting ? 'none' : 'lo-text-in 0.32s ease 0.14s both',
+          }}>
+            Are you sure you want to log out?
+          </div>
+          <div style={{
+            fontSize: 12, color: dark ? '#7aab8a' : '#bbb', marginBottom: 18,
+            animation: exiting ? 'none' : 'lo-text-in 0.32s ease 0.2s both',
+          }}>
+            Think twice before you leave.
+          </div>
+
+          <p style={{
+            fontSize: 13,
+            color: dark ? '#56c299' : '#888',
+            lineHeight: 1.7,
+            fontStyle: 'italic',
+            animation: exiting ? 'none' : 'lo-joke-in 0.38s ease 0.26s both',
+            margin: '0 0 24px',
+          }}>
+            &ldquo;{joke}&rdquo;
+          </p>
+
+          <div style={{
+            display: 'flex', gap: 10,
+            animation: exiting ? 'none' : 'lo-text-in 0.32s ease 0.32s both',
+          }}>
+            <button
+              onClick={handleCancel}
+              style={{
+                flex: 1, padding: '12px 0',
+                borderRadius: 12,
+                border: dark ? '1.5px solid #2a5c3c' : '1.5px solid rgba(0,0,0,0.1)',
+                background: dark ? '#0d2619' : '#fff', color: dark ? '#9ab8a9' : '#333',
+                fontSize: 14, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'inherit',
+                transition: 'background 0.15s, border-color 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = dark ? '#1a3d28' : '#f5f5f5'; e.currentTarget.style.borderColor = dark ? '#2a5c3c' : 'rgba(0,0,0,0.18)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = dark ? '#0d2619' : '#fff'; e.currentTarget.style.borderColor = dark ? '#2a5c3c' : 'rgba(0,0,0,0.1)'; }}
+            >
+              Stay
+            </button>
+            <button
+              onClick={onConfirm}
+              style={{
+                flex: 1, padding: '12px 0',
+                borderRadius: 12, border: 'none',
+                background: '#d94040', color: '#fff',
+                fontSize: 14, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'inherit',
+                transition: 'background 0.15s, transform 0.1s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#c0392b'; e.currentTarget.style.transform = 'scale(1.02)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#d94040'; e.currentTarget.style.transform = 'scale(1)'; }}
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function Navbar() {
   const { getUser, clear } = useAuth();
   const { dashState, dark, setDark, selectProperty } = useDashboard();
@@ -47,6 +246,7 @@ export default function Navbar() {
   const [isExporting, setIsExporting] = useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutJoke, setLogoutJoke] = useState('');
   const [switchConfirmOpen, setSwitchConfirmOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -57,6 +257,7 @@ export default function Navbar() {
   const audioCtxRef = useRef(null);
   const dropdownRef = useRef(null);
   const menuRef = useRef(null);
+  const jokeQueueRef = useRef([]);
   const isStaffUser = user?.isStaff || user?.role === "staff";
   const personName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim();
   const displayName = isStaffUser
@@ -204,9 +405,17 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const pickNextJoke = () => {
+    if (jokeQueueRef.current.length === 0) {
+      jokeQueueRef.current = shuffleArray(LOGOUT_JOKES);
+    }
+    return jokeQueueRef.current.pop();
+  };
+
   const handleLogout = () => {
     setDropOpen(false);
     setMenuOpen(false);
+    setLogoutJoke(pickNextJoke());
     setLogoutModalOpen(true);
   };
 
@@ -352,81 +561,18 @@ export default function Navbar() {
 
   const LogoutModal = (
     <>
-      {/* Full-screen signing-out overlay — same style as FetchingOverlay */}
       <FetchingOverlay
         isVisible={isLoggingOut}
         message="Signing out…"
         subMessage="Clearing your session securely"
       />
-
-      {/* Confirmation card — only shown before user confirms */}
-      {logoutModalOpen && !isLoggingOut && (
-        <>
-          {ConfirmModalStyles}
-          <div
-            style={{
-              position: 'fixed', inset: 0, zIndex: 99999,
-              background: 'rgba(12,28,20,0.55)',
-              backdropFilter: 'blur(6px)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: '24px',
-              animation: 'hp-overlay-in 0.22s ease forwards',
-            }}
-            onClick={(e) => { if (e.target === e.currentTarget) cancelLogout(); }}
-          >
-            <div style={{
-              background: dark ? '#1a2e20' : '#fff',
-              border: `1px solid ${dark ? '#1e3a2a' : '#e3ede8'}`,
-              borderRadius: '20px',
-              padding: '32px 28px 28px',
-              maxWidth: '340px',
-              width: '100%',
-              boxShadow: '0 32px 80px rgba(12,28,20,0.28)',
-              textAlign: 'center',
-              animation: 'hp-card-in 0.28s cubic-bezier(0.34,1.56,0.64,1) forwards',
-            }}>
-              <div style={{
-                width: '56px', height: '56px',
-                borderRadius: '50%',
-                background: dark ? '#2a1515' : '#fff0ee',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 20px',
-                border: `1.5px solid ${dark ? '#4a2020' : '#ffd5ce'}`,
-              }}>
-                <i className="ti ti-logout" style={{ fontSize: '22px', color: '#c13515' }} />
-              </div>
-
-              <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: '16px',
-                color: dark ? '#eaf5f0' : '#0c1c14', margin: '0 0 8px' }}>
-                Sign out?
-              </p>
-              <p style={{ fontSize: '13px', color: dark ? '#9ab8a9' : '#6a8b7c',
-                lineHeight: 1.6, margin: '0 0 24px' }}>
-                You'll be signed out of your HostOps account.
-              </p>
-
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={cancelLogout} style={{
-                  flex: 1, padding: '11px 0', borderRadius: '10px',
-                  border: `1px solid ${dark ? '#1e3a2a' : '#d4e8dd'}`,
-                  background: dark ? '#132a1e' : '#f3f9f5',
-                  color: dark ? '#9ab8a9' : '#4a7a62',
-                  fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-                }}>Cancel</button>
-                <button onClick={confirmLogout} style={{
-                  flex: 1, padding: '11px 0', borderRadius: '10px',
-                  border: 'none', background: '#c13515', color: '#fff',
-                  fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                }}>
-                  <i className="ti ti-logout" style={{ fontSize: '14px' }} />
-                  Sign out
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      <LogoutConfirmModal
+        isOpen={logoutModalOpen && !isLoggingOut}
+        joke={logoutJoke}
+        onConfirm={confirmLogout}
+        onCancel={cancelLogout}
+        dark={dark}
+      />
     </>
   );
 
@@ -802,7 +948,7 @@ export default function Navbar() {
                         </button>
                       )}
                     </div>
-                    <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    <div className="scrollbar-none" style={{ maxHeight: '300px', overflowY: 'auto' }}>
                       {notifications.length === 0 ? (
                         <div style={{ padding: '28px 16px', textAlign: 'center', color: '#9ab8a9', fontSize: '13px' }}>
                           No notifications yet
@@ -1016,7 +1162,7 @@ export default function Navbar() {
                       </button>
                     )}
                   </div>
-                  <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
+                  <div className="scrollbar-none" style={{ maxHeight: '360px', overflowY: 'auto' }}>
                     {notifications.length === 0 ? (
                       <div style={{ padding: '32px 16px', textAlign: 'center', color: '#9ab8a9', fontSize: '13px' }}>
                         No notifications yet

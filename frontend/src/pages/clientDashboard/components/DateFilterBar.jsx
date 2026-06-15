@@ -61,7 +61,7 @@ const PRESETS = [
 // loadData is called with explicit from/to params so the stale
 // useCallback closure is bypassed — safe to call from any instance.
 export default function DateFilterBar() {
-  const { dashState, updateDashState } = useDashboard();
+  const { dashState, updateDashState, dark } = useDashboard();
   const { loadData } = useDashboardData();
 
   const [activePreset, setActivePreset] = useState('monthly');
@@ -203,7 +203,7 @@ export default function DateFilterBar() {
         {/* Row 1: Daily / Weekly / Monthly / Yearly */}
         <div className="dfb-presets-row" style={{
           display: 'flex',
-          background: '#f0f5f2',
+          background: dark ? '#0a1f15' : '#f0f5f2',
           borderRadius: 12,
           padding: 4,
           gap: 2,
@@ -220,9 +220,9 @@ export default function DateFilterBar() {
                     fontSize: '.78rem',
                     fontWeight: 700,
                     fontFamily: "'DM Sans', sans-serif",
-                    color: on ? '#0c1c14' : '#6a8b7c',
-                    background: on ? '#fff' : 'transparent',
-                    border: on ? '1.5px solid #d6ebe0' : '1.5px solid transparent',
+                    color: on ? (dark ? '#eaf5f0' : '#0c1c14') : (dark ? '#6aab8a' : '#6a8b7c'),
+                    background: on ? (dark ? '#1a3d28' : '#fff') : 'transparent',
+                    border: on ? `1.5px solid ${dark ? '#2a5c3c' : '#d6ebe0'}` : '1.5px solid transparent',
                     cursor: 'pointer',
                     transition: 'all .15s',
                     boxShadow: on ? '0 1px 4px rgba(0,0,0,.07)' : 'none',
@@ -248,9 +248,9 @@ export default function DateFilterBar() {
               fontSize: '.78rem',
               fontWeight: 700,
               fontFamily: "'DM Sans', sans-serif",
-              color: activePreset === 'custom' ? '#0c1c14' : '#6a8b7c',
-              background: activePreset === 'custom' ? '#fff' : '#f0f5f2',
-              border: activePreset === 'custom' ? '1.5px solid #d6ebe0' : '1.5px solid transparent',
+              color: activePreset === 'custom' ? (dark ? '#eaf5f0' : '#0c1c14') : (dark ? '#6aab8a' : '#6a8b7c'),
+              background: activePreset === 'custom' ? (dark ? '#1a3d28' : '#fff') : (dark ? '#0a1f15' : '#f0f5f2'),
+              border: activePreset === 'custom' ? `1.5px solid ${dark ? '#2a5c3c' : '#d6ebe0'}` : '1.5px solid transparent',
               cursor: 'pointer',
               transition: 'all .15s',
               boxShadow: activePreset === 'custom' ? '0 1px 4px rgba(0,0,0,.07)' : 'none',
@@ -301,10 +301,10 @@ export default function DateFilterBar() {
               position: 'absolute',
               top: 'calc(100% + 8px)',
               right: 0,
-              background: '#fff',
-              border: '1.5px solid #e3ede8',
+              background: dark ? '#132a1e' : '#fff',
+              border: dark ? '1.5px solid #1e3a2a' : '1.5px solid #e3ede8',
               borderRadius: 14,
-              boxShadow: '0 8px 32px rgba(0,0,0,.12)',
+              boxShadow: '0 8px 32px rgba(0,0,0,.18)',
               padding: '16px',
               zIndex: 1000,
               minWidth: 280,
@@ -316,7 +316,7 @@ export default function DateFilterBar() {
                 gap: 8,
               }}>
                 <div style={{
-                  fontSize: '.7rem', fontWeight: 700, color: '#9ab8a9',
+                  fontSize: '.7rem', fontWeight: 700, color: dark ? '#6aab8a' : '#9ab8a9',
                   letterSpacing: '.5px', textTransform: 'uppercase',
                   flex: 1,
                 }}>
@@ -363,21 +363,21 @@ export default function DateFilterBar() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-                <label style={{ fontSize: '.75rem', color: '#6a8b7c', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>From</label>
+                <label style={{ fontSize: '.75rem', color: dark ? '#9ab8a9' : '#6a8b7c', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>From</label>
                 <input
                   type="date" value={customFrom}
                   onChange={e => setCustomFrom(e.target.value)}
-                  style={{ padding: '9px 12px', border: '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box', minHeight: 44, display: 'block', backgroundColor: '#fff', colorScheme: 'light', WebkitAppearance: 'none', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236a8b7c' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', paddingRight: 40, WebkitCalendarPickerIndicator: 'none' }}
+                  style={{ padding: '9px 12px', border: dark ? '1.5px solid #2a5c3c' : '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: dark ? '#eaf5f0' : '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box', minHeight: 44, display: 'block', backgroundColor: dark ? '#0f2d1f' : '#fff', colorScheme: dark ? 'dark' : 'light', WebkitAppearance: 'none', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236a8b7c' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', paddingRight: 40, WebkitCalendarPickerIndicator: 'none' }}
                 />
-                <label style={{ fontSize: '.75rem', color: '#6a8b7c', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>To</label>
+                <label style={{ fontSize: '.75rem', color: dark ? '#9ab8a9' : '#6a8b7c', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>To</label>
                 <input
                   type="date" value={customTo}
                   onChange={e => setCustomTo(e.target.value)}
-     style={{ padding: '9px 12px', border: '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box', minHeight: 44, display: 'block', backgroundColor: '#fff', colorScheme: 'light', WebkitAppearance: 'none', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236a8b7c' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', paddingRight: 40, WebkitCalendarPickerIndicator: 'none' }}
+                  style={{ padding: '9px 12px', border: dark ? '1.5px solid #2a5c3c' : '1.5px solid #e3ede8', borderRadius: 9, fontFamily: 'inherit', fontSize: '.82rem', color: dark ? '#eaf5f0' : '#0c1c14', outline: 'none', width: '100%', boxSizing: 'border-box', minHeight: 44, display: 'block', backgroundColor: dark ? '#0f2d1f' : '#fff', colorScheme: dark ? 'dark' : 'light', WebkitAppearance: 'none', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236a8b7c' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', paddingRight: 40, WebkitCalendarPickerIndicator: 'none' }}
                 />
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => setShowCustomPop(false)} className="dfb-cancel-btn" style={{ flex: 1, padding: '9px', background: '#f0f5f2', color: '#2a4e3c', border: 'none', borderRadius: 9, fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+                <button onClick={() => setShowCustomPop(false)} className="dfb-cancel-btn" style={{ flex: 1, padding: '9px', background: dark ? '#0a1f15' : '#f0f5f2', color: dark ? '#9ab8a9' : '#2a4e3c', border: 'none', borderRadius: 9, fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
                 <button onClick={applyCustom} className="dfb-apply-btn" style={{ flex: '1 1 0', padding: '10px', color: '#fff', border: 'none', borderRadius: 9, fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 700, cursor: 'pointer', WebkitAppearance: 'none', appearance: 'none', minHeight: 40 }}>Apply</button>
               </div>
             </div>
