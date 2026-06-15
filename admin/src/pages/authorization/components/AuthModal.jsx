@@ -3,12 +3,13 @@ import OtpInput from './OtpInput';
 import { useOtp }           from '../hooks/useOtp';
 import { useAuthorization } from '../hooks/useAuthorization';
 
-const SLIDES = [
-  'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80',
-  'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&q=80',
-  'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=800&q=80',
-  'https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&q=80',
-];
+import pro1 from '../../../assets/pro1.jpg';
+import pro2 from '../../../assets/pro2.jpg';
+import pro3 from '../../../assets/pro3.jpg';
+import pro4 from '../../../assets/pro4.jpg';
+import pro5 from '../../../assets/pro5.jpg';
+
+const SLIDES = [pro1, pro2, pro3, pro4, pro5];
 
 export default function AuthModal({ onAuthorized }) {
   const otp = useOtp();
@@ -48,7 +49,7 @@ const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
         <div className="am-slide-content">
           <div className="am-slide-logo">
             <img
-              src="/src/assets/HostOpsLOGO.png"
+              src="/HostOpsLOGO.png"
               alt="HostOps"
               className="am-slide-logo-img"
               onError={(e) => { e.target.style.display = 'none'; }}
@@ -89,25 +90,34 @@ const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
               <div className={`am-msg am-msg--${auth.message.type}`}>{auth.message.text}</div>
             )}
 
-            <button
-              className="am-btn am-btn--modern"
-              style={{ marginBottom: 12, background: '#1e8760' }}
-              onClick={() => setMethod('totp')}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01"/>
+            <button className="am-method-card" onClick={() => setMethod('totp')}>
+              <div className="am-method-icon am-method-icon--app">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01"/>
+                </svg>
+              </div>
+              <div className="am-method-text">
+                <span className="am-method-title">Authenticator app</span>
+                <span className="am-method-desc">Use a 6-digit code from your app</span>
+              </div>
+              <svg className="am-method-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
               </svg>
-              Use Authenticator App
             </button>
 
-            <button
-              className="am-btn am-btn--modern"
-              onClick={() => { setMethod('email'); auth.resend(); }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+            <button className="am-method-card" onClick={() => { setMethod('email'); auth.resend(); }}>
+              <div className="am-method-icon am-method-icon--email">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                </svg>
+              </div>
+              <div className="am-method-text">
+                <span className="am-method-title">Email OTP</span>
+                <span className="am-method-desc">Send a code to your email</span>
+              </div>
+              <svg className="am-method-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
               </svg>
-              Use Email OTP
             </button>
 
             <div className="am-footer">© 2026 HostOps. All rights reserved.</div>

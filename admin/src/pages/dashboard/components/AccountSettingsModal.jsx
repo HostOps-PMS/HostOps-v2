@@ -226,7 +226,11 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
       setShowSuccessModal(false);
       verifiedTokenRef.current = null;
     }
-  }, [isOpen]);
+  setTotpStep('idle');
+      setTotpCode('');
+      setTotpMsg(null);
+      setDeviceName('');
+    }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -902,13 +906,18 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                           </p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => setDevices(prev => prev.filter((_, idx) => idx !== i))}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ab8a9', fontSize: 14, padding: 4 }}
-                        title="Remove device"
-                      >
-                        <i className="ti ti-trash" />
-                      </button>
+                      {devices.length > 1 && (
+                        <button
+                          onClick={async () => {
+                            await deleteTotpDevice(d._id);
+                            setDevices(prev => prev.filter((_, idx) => idx !== i));
+                          }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ab8a9', fontSize: 14, padding: 4 }}
+                          title="Remove device"
+                        >
+                          <i className="ti ti-trash" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
