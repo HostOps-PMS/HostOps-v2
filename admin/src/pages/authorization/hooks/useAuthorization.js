@@ -128,5 +128,12 @@ export function useAuthorization(onAuthorized) {
     }
   }
 
-  return { loading, resendLoading, resendCooldown, message, submit, resend };
+  const userEmail = (() => {
+    try {
+      const u = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
+      return u.email || u.businessEmail || '';
+    } catch { return ''; }
+  })();
+
+  return { loading, resendLoading, resendCooldown, message, submit, resend, userEmail };
 }
