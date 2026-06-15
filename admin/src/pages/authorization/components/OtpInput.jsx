@@ -1,24 +1,6 @@
-/**
- * authorization/components/OtpInput.jsx
- * ─────────────────────────────────────────────────────
- * Renders 6 individual digit boxes with:
- *   • auto-advance on digit entry
- *   • backspace moves focus to previous box
- *   • paste fills all boxes at once
- *   • visual separator between box 3 and 4
- *
- * Props:
- *   digits      string[]        array of 6 single-char strings
- *   inputRefs   React.MutableRefObject
- *   onChange    (index, value) => void
- *   onKeyDown   (index, KeyboardEvent) => void
- *   onPaste     (ClipboardEvent) => void
- *   hasError    boolean
- */
-
 export default function OtpInput({ digits, inputRefs, onChange, onKeyDown, onPaste, hasError }) {
   return (
-    <div className="am-otp-row">
+    <div className="am-otp-row" style={{ justifyContent: 'center' }}>
       {digits.map((digit, i) => (
         <div key={i} style={{ display: 'contents' }}>
           {/* visual dash separator between digit 3 and 4 */}

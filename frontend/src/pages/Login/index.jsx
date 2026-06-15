@@ -101,9 +101,10 @@ const [showLogin, setShowLogin] = useState(window.innerWidth > 768);
       className="lp-wrap"
       style={{
         backgroundImage: window.innerWidth > 768 ? `url(${bgImage})` : 'none',
-        backgroundSize: '130%',
+        backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
+        minHeight: '100dvh',
       }}
     >
       <style>{`
