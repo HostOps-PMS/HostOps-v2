@@ -6,6 +6,7 @@ import PropertySelectForm from './components/PropertySelectForm';
 import PinModal from './components/PinModal';
 import Message from './components/Message';
 import bgImage from '../../assets/bg.png';
+import hostOpsLogo from '../../assets/HostOpsLOGO.png';
 import safeStorage from '../safeStorage';
 import './Login.css';
 
@@ -137,7 +138,7 @@ const [showLogin, setShowLogin] = useState(window.innerWidth > 768);
           <div className="lp-slide-overlay" />
           <div className="lp-slide-content">
             <div className="lp-slide-logo">
-              <div className="lp-slide-logo-mark">H</div>
+             <img src={hostOpsLogo} alt="HostOps" style={{ width: '42px', height: '42px', objectFit: 'cover', borderRadius: '10px', flexShrink: 0 }} />
               <span className="lp-slide-brand">HostOps</span>
             </div>
             <div>

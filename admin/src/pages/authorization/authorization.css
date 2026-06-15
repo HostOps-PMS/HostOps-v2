@@ -504,9 +504,9 @@ appearance: none;
 }
 
 .am-slide-logo-img {
-  width: 60px;
-  height: 60px;
-  border-radius: 14px;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
   object-fit: cover;
   flex-shrink: 0;
 }
@@ -514,19 +514,19 @@ appearance: none;
 .am-slide-brand {
   color: rgba(255,255,255,0.92);
   font-weight: 700;
-  font-size: 19px;
+  font-size: 18px;
   font-family: var(--font-display);
 }
 
 .am-slide-tagline {
-  font-size: 30px;
+  font-size: 36px;
   font-weight: 700;
   color: #fff;
   line-height: 1.2;
   letter-spacing: -0.5px;
   margin-bottom: 10px;
   font-family: var(--font-display);
-}
+}S
 
 .am-slide-tagline em {
   font-style: italic;
