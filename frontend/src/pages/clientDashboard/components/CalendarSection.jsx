@@ -126,6 +126,10 @@ export default function CalendarSection() {
           .cal-controls-responsive { gap: 5px !important; }
           .cal-controls-responsive .cal-btn { font-size: .68rem !important; padding: 5px 8px !important; }
         }
+
+        @media (max-width: 768px) {
+          .cal-prop-dropdown { left: 0 !important; right: auto !important; min-width: min(280px, 88vw) !important; max-height: 50vh !important; overflow-y: auto !important; }
+        }
       `}</style>
       {/* Toolbar */}
       <div className="cal-header cal-header-responsive" style={{ borderBottom: dark ? '1px solid #1e3a2a' : '1px solid #f0f5f2' }}>
@@ -205,7 +209,7 @@ export default function CalendarSection() {
                 </svg>
               </button>
               {showPropDrop && (
-                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, minWidth: 190, background: dark ? '#132a1e' : '#fff', border: dark ? '1px solid #1e3a2a' : '1px solid #e3ede8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.22)', zIndex: 999, overflow: 'hidden', padding: '4px 0' }}>
+                <div className="cal-prop-dropdown" style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, minWidth: 190, background: dark ? '#132a1e' : '#fff', border: dark ? '1px solid #1e3a2a' : '1px solid #e3ede8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.22)', zIndex: 999, overflow: 'hidden', padding: '4px 0' }}>
                   {properties.map(p => {
                     const isActive = dashState.singlePropId === p.id;
                     return (

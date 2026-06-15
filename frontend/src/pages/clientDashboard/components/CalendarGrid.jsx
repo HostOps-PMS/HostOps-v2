@@ -627,7 +627,11 @@ const [showBookings, setShowBookings] = useState(false);
       <div className={`single-cal-sidebar${showBookings ? ' mobile-open' : ''}`} style={{ width: 335, minWidth: 295, flexShrink: 0, background: surfaceBg, borderLeft: `1px solid ${borderCol}`, display: 'flex', flexDirection: 'column', alignSelf: 'stretch' }}>
         <div style={{ padding: '13px 20px', borderBottom: `1px solid ${borderCol}`, background: cardBg, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: textSecondary, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Upcoming bookings</div>
-          
+          <button
+            className="single-cal-close-btn"
+            onClick={() => setShowBookings(false)}
+            style={{ display: 'none', width: 28, height: 28, borderRadius: '50%', border: `1px solid ${borderCol}`, background: cardBg, color: textSecondary, cursor: 'pointer', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}
+          >✕</button>
         </div>
       <div className="scrollbar-none" style={{ padding: '12px 16px', background: surfaceBg, flex: 1, overflowY: 'auto', maxHeight: 480, minHeight: 0 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -886,17 +890,17 @@ const { dark } = useDashboard();
           .cal-nav-today:hover { background: ${dark ? '#163d28' : '#d4f0e4'}; }
 
           /* ── Scroll container ── */
-          .cal-scroll { overflow-x: auto; overflow-y: visible; width: 100%; border-top: 1px solid #e3ede8; scroll-behavior: smooth; position: relative; border-radius: 0 0 14px 14px; }
+          .cal-scroll { overflow-x: auto; overflow-y: visible; width: 100%; border-top: 1px solid ${dark ? '#1e3a2a' : '#e3ede8'}; scroll-behavior: smooth; position: relative; border-radius: 0 0 14px 14px; }
           .cal-scroll::-webkit-scrollbar { height: 8px; }
-          .cal-scroll::-webkit-scrollbar-track { background: #f4f7f5; border-radius: 6px; margin: 0 4px; }
-          .cal-scroll::-webkit-scrollbar-thumb { background: #b7e4cf; border-radius: 6px; border: 2px solid #f4f7f5; }
+          .cal-scroll::-webkit-scrollbar-track { background: ${dark ? '#0a1f15' : '#f4f7f5'}; border-radius: 6px; margin: 0 4px; }
+          .cal-scroll::-webkit-scrollbar-thumb { background: ${dark ? '#2a5c3c' : '#b7e4cf'}; border-radius: 6px; border: 2px solid ${dark ? '#0a1f15' : '#f4f7f5'}; }
           .cal-scroll::-webkit-scrollbar-thumb:hover { background: #56c299; }
           .cal-scroll-inner { display: block; min-height: 0; }
 
           /* ── Table ── */
           .cal-table { width: max-content; min-width: 100%; border-collapse: collapse; }
-          .cal-table th { padding: 10px 6px; border-right: 1px solid #f0f5f2; border-bottom: 1px solid #e3ede8; font-size: .72rem; font-weight: 600; color: #9ab8a9; text-align: center; }
-          .cal-table td { min-width: 56px; max-width: 56px; width: 56px; height: 48px; border-right: 1px solid #eef2f0; border-bottom: 1px solid #eef2f0; position: relative; padding: 0; background: var(--cal-td-bg, #fff); }
+          .cal-table th { padding: 10px 6px; border-right: 1px solid ${dark ? '#1a3d28' : '#f0f5f2'}; border-bottom: 1px solid ${dark ? '#1e3a2a' : '#e3ede8'}; font-size: .72rem; font-weight: 600; color: #9ab8a9; text-align: center; }
+          .cal-table td { min-width: 56px; max-width: 56px; width: 56px; height: 48px; border-right: 1px solid ${dark ? '#1a3d28' : '#eef2f0'}; border-bottom: 1px solid ${dark ? '#1a3d28' : '#eef2f0'}; position: relative; padding: 0; background: var(--cal-td-bg, #fff); }
           /* ── Tooltip ── */
           .cal-tt {
             display: none; position: fixed; z-index: 9999;
@@ -937,17 +941,17 @@ const { dark } = useDashboard();
           .cal-nav-today:hover { background: ${dark ? '#163d28' : '#d4f0e4'}; }
 
           /* ── Scroll container ── */
-          .cal-scroll { overflow-x: auto; overflow-y: visible; width: 100%; border-top: 1px solid #e3ede8; scroll-behavior: smooth; position: relative; border-radius: 0 0 14px 14px; }
+          .cal-scroll { overflow-x: auto; overflow-y: visible; width: 100%; border-top: 1px solid ${dark ? '#1e3a2a' : '#e3ede8'}; scroll-behavior: smooth; position: relative; border-radius: 0 0 14px 14px; }
           .cal-scroll::-webkit-scrollbar { height: 8px; }
-          .cal-scroll::-webkit-scrollbar-track { background: #f4f7f5; border-radius: 6px; margin: 0 4px; }
-          .cal-scroll::-webkit-scrollbar-thumb { background: #b7e4cf; border-radius: 6px; border: 2px solid #f4f7f5; }
+          .cal-scroll::-webkit-scrollbar-track { background: ${dark ? '#0a1f15' : '#f4f7f5'}; border-radius: 6px; margin: 0 4px; }
+          .cal-scroll::-webkit-scrollbar-thumb { background: ${dark ? '#2a5c3c' : '#b7e4cf'}; border-radius: 6px; border: 2px solid ${dark ? '#0a1f15' : '#f4f7f5'}; }
           .cal-scroll::-webkit-scrollbar-thumb:hover { background: #56c299; }
           .cal-scroll-inner { display: block; min-height: 0; }
 
           /* ── Table ── */
           .cal-table { width: max-content; min-width: 100%; border-collapse: collapse; }
-          .cal-table th { padding: 10px 6px; border-right: 1px solid #f0f5f2; border-bottom: 1px solid #e3ede8; font-size: .72rem; font-weight: 600; color: #9ab8a9; text-align: center; }
-          .cal-table td { min-width: 56px; max-width: 56px; width: 56px; height: 48px; border-right: 1px solid #eef2f0; border-bottom: 1px solid #eef2f0; position: relative; padding: 0; background: var(--cal-td-bg, #fff); }
+          .cal-table th { padding: 10px 6px; border-right: 1px solid ${dark ? '#1a3d28' : '#f0f5f2'}; border-bottom: 1px solid ${dark ? '#1e3a2a' : '#e3ede8'}; font-size: .72rem; font-weight: 600; color: #9ab8a9; text-align: center; }
+          .cal-table td { min-width: 56px; max-width: 56px; width: 56px; height: 48px; border-right: 1px solid ${dark ? '#1a3d28' : '#eef2f0'}; border-bottom: 1px solid ${dark ? '#1a3d28' : '#eef2f0'}; position: relative; padding: 0; background: var(--cal-td-bg, #fff); }
           .cal-table td.today-col { background: var(--cal-td-today, #f0faf4); }
           .cal-table td.weekend-col { background: var(--cal-td-weekend, #fcfafa); }
           .cal-table td.month-start { border-left: 2px solid #b7e4cf; }
@@ -958,7 +962,7 @@ const { dark } = useDashboard();
           .cal-month-label { text-align: left !important; padding: 8px 14px !important; font-family: 'Sora', sans-serif; font-size: .8rem; font-weight: 800; color: var(--cal-month-color, #1a3028); background: var(--cal-month-bg, #f5f9f7); border-bottom: var(--cal-border, 1px solid #e3ede8); border-right: var(--cal-border, 1px solid #dde8e3); white-space: nowrap; position: relative; }
 
           /* ── Day header row ── */
-          .cal-day-row th { min-width: 56px; max-width: 56px; width: 56px; text-align: center; padding: 6px 4px; background: var(--cal-dayrow-bg, #f7faf8); border-bottom: var(--cal-border, 1px solid #e3ede8); border-right: 1px solid #eef2f0; font-size: .6rem; font-weight: 700; color: #7aab95; text-transform: uppercase; letter-spacing: .4px; }
+          .cal-day-row th { min-width: 56px; max-width: 56px; width: 56px; text-align: center; padding: 6px 4px; background: var(--cal-dayrow-bg, #f7faf8); border-bottom: var(--cal-border, 1px solid #e3ede8); border-right: 1px solid ${dark ? '#1a3d28' : '#eef2f0'}; font-size: .6rem; font-weight: 700; color: #7aab95; text-transform: uppercase; letter-spacing: .4px; }
           .cal-day-row th .day-num { display: block; margin-top: 1px; font-size: .85rem; font-weight: 800; color: var(--cal-daynum-color, #0c1c14); }
           .cal-day-row th.weekend { color: #ec4899; }
           .cal-day-row th.weekend .day-num { color: #ec4899; }
