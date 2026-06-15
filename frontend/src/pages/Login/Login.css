@@ -93,20 +93,19 @@ html, body, #root {
 .lp-slide-logo-mark {
   width: 34px;
   height: 34px;
-  background: #26a676;
+  background: transparent;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-weight: 800;
-  font-size: 15px;
+  overflow: hidden;
+  padding: 0;
 }
 
 .lp-slide-brand {
   color: rgba(255,255,255,0.92);
   font-weight: 700;
-  font-size: 15px;
+  font-size: 18px;
 }
 
 .lp-slide-tagline {
@@ -177,15 +176,13 @@ html, body, #root {
 .lp-logo-mark {
   width: 42px;
   height: 42px;
-  background: #26a676;
+  background: transparent;
   border-radius: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-weight: 800;
-  font-size: 20px;
-  box-shadow: 0 6px 16px rgba(38, 166, 118, 0.3);
+  overflow: hidden;
+  padding: 0;
 }
 
 .lp-brand {
@@ -499,6 +496,13 @@ html, body, #root {
     max-height: 50vh;
     overflow-y: auto;
   }
+
+.lp-card:has(.lp-form-slide-up) .lp-slide-content > div:last-child {
+    position: absolute;
+    left: 28px;
+    right: 28px;
+    bottom: calc(70dvh + 16px);
+  }
 }
 
 @media (max-width: 480px) {
@@ -517,7 +521,7 @@ html, body, #root {
     font-size: 22px;
   }
 
-  .lp-slide-brand {
+.lp-slide-brand {
     font-size: 20px;
   }
 }
