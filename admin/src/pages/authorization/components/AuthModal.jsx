@@ -8,6 +8,7 @@ import pro2 from '../../../assets/pro2.jpg';
 import pro3 from '../../../assets/pro3.jpg';
 import pro4 from '../../../assets/pro4.jpg';
 import pro5 from '../../../assets/pro5.jpg';
+import hostOpsLogo from '../../../assets/HostOpsLOGO.png';
 
 const SLIDES = [pro1, pro2, pro3, pro4, pro5];
 
@@ -48,12 +49,7 @@ const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
         <div className="am-slide-overlay" />
         <div className="am-slide-content">
           <div className="am-slide-logo">
-            <img
-              src="/HostOpsLOGO.png"
-              alt="HostOps"
-              className="am-slide-logo-img"
-              onError={(e) => { e.target.style.display = 'none'; }}
-            />
+            <img src={hostOpsLogo} alt="HostOps" className="am-slide-logo-img" />
             <span className="am-slide-brand">HostOps</span>
           </div>
           <div>
@@ -120,6 +116,7 @@ const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
               </svg>
             </button>
 
+            <button type="button" className="am-back-btn" onClick={() => window.history.back()}>← Back to login</button>
             <div className="am-footer">© 2026 HostOps. All rights reserved.</div>
           </>
         )}
