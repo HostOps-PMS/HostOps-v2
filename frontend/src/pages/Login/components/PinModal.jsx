@@ -298,6 +298,7 @@ export default function PinModal({
       // the client account regardless of who actually entered the PIN.
       if (data.accessToken) {
         auth.setToken(data.accessToken);
+        if (data.sk) auth.setSessionKey(data.sk);
       }
       if (data.user) {
         const verifiedUser = {

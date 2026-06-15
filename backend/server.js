@@ -17,6 +17,7 @@ import accountsRoutes            from './routes/accounts.js';
 import dashboardOverviewRoute    from './routes/dashboardOverviewRoute.js';
 import { publicRecoveryRouter, adminRecoveryRouter } from './routes/recoveryRequests.js';
 import { requireApiKey } from './middleware/apiKeyAuth.js';
+import { encryptApiResponse } from './middleware/encryptResponse.js';
 import keyDiagnosticRoute from './routes/keyDiagnosticRoute.js';
 import smoobuApartmentsRoute   from './routes/smoobuApartments.js';
 import activityLogRoute        from './routes/activityLog.js';
@@ -127,7 +128,7 @@ app.use(
     },
     credentials: true,
     methods:     ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'x-api-key'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'x-api-key', 'X-Session-Hint'],
   })
 );
 
@@ -141,6 +142,11 @@ app.use(cookieParser());
 
 // ── MongoDB Injection Sanitization ────────────────────────────────────────────
 app.use(mongoSanitize());
+
+// ── Response Encryption ───────────────────────────────────────────────────────
+// Patches res.json at call-time: if requireAuth has set req._jti and a session
+// key exists for that JTI, the response body is AES-256-GCM encrypted.
+app.use(encryptApiResponse);
 
 // ── Rate Limiting ─────────────────────────────────────────────────────────────
 const globalLimiter = rateLimit({
