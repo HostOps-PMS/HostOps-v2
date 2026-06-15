@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 
 import { NotificationsProvider } from './context/NotificationsContext';
+import ToastContainer from './components/ToastContainer';
 import LoginPage     from './pages/Login';
 import Dashboard     from './pages/dashboard';
 import Clients       from './pages/clients';
@@ -137,6 +138,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <NotificationsProvider>
+      <ToastContainer />
       {!authorized && (
         <AuthorizationModal onAuthorized={handleAuthorized} />
       )}

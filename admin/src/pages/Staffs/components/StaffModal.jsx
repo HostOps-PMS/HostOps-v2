@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchClientProperties, createStaff, updateStaff } from '../services/staffApi';
+import { toast } from '../../../utils/toast';
 
 const inputStyle = {
   width: '100%',
@@ -104,8 +105,10 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
 
       if (isEdit) {
         await updateStaff(staff._id, body);
+        toast.success(`${form.firstName} ${form.lastName} has been updated.`, { title: 'Staff Updated' });
       } else {
         await createStaff(body);
+        toast.success(`${form.firstName} ${form.lastName} has been added.`, { title: 'Staff Created' });
       }
 
       onSaved();
@@ -117,6 +120,11 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
   }
 
   return (
+    <>
+    <style>{`
+      @keyframes st-modal-overlay { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes st-modal-card { from { opacity: 0; transform: translateY(20px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    `}</style>
     <div
       style={{
         position: "fixed",
@@ -129,6 +137,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
         alignItems: "center",
         justifyContent: "center",
         padding: 16,
+        animation: 'st-modal-overlay 0.2s ease',
       }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
@@ -144,6 +153,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
           border: "none",
           display: "flex",
           flexDirection: "column",
+          animation: 'st-modal-card 0.28s cubic-bezier(0.16,1,0.3,1)',
         }}
       >
         {/* Header */}
@@ -708,5 +718,6 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
         </div>
       </div>
     </div>
+    </>
   );
 }

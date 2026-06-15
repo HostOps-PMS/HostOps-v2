@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AccountSettingsModal from './dashboard/components/AccountSettingsModal';
 import { logoutUser } from './authorization/services/authService';
 import HostOpsLogo from '../assets/HostOpsLOGO.png';
@@ -339,11 +339,196 @@ function SidebarButton({ icon, label, onClick, collapsed, danger }) {
   );
 }
 
+/* ─── Logout jokes ──────────────────────────────────────────────── */
+const LOGOUT_JOKES = [
+  'Scientists have confirmed: logging out causes 100% of post-logout regrets.',
+  'Your dashboard will miss you. It has feelings too, you know.',
+  'Fun fact: The last admin who logged out was never heard from again.',
+  'Leaving so soon? The bugs will throw a party the moment you are gone.',
+  'Plot twist: You log out, you become a regular user. Are you ready for that life?',
+  'Stay. The coffee is hot and the data needs you.',
+  'Every time an admin logs out, a server quietly weeps into its logs.',
+  'Your unread notifications will haunt you if you leave now.',
+  'Admin tip: Logging out is just logging in tomorrow with extra steps.',
+  'Breaking news: System stability drops 47% every time an admin clicks logout.',
+  'The production server is watching. Do not betray it.',
+  'Logout equals instant karma. The next critical bug will appear 5 minutes after you leave.',
+  'Great admins do not logout. They just go AFK forever.',
+  'The system misses you already and you have not even left yet.',
+  'Warning: Logged-out admins cannot respond to 3 AM emergency tickets. Just saying.',
+  'Statistically, 9 out of 10 admins who logged out wished they had not.',
+  'The dashboard was not designed to be abandoned. Please reconsider.',
+  'Logging out is just a fancy way of saying you do not care about uptime.',
+  'Fun fact: Systems perform 23% better when the admin is logged in. We made that up, but still.',
+  'Your session token is getting comfortable. Do not throw it away.',
+  'The help desk is already composing a ticket for when you are gone.',
+  'Consider this: You log out. A bug appears. No one is around to fix it. Was it worth it?',
+  'Historically, every major outage was preceded by an admin logging out. Coincidence? We think not.',
+  'The server practically runs on your presence at this point. It is basically emotional support.',
+  'The users need you. The system needs you. Please do not go.',
+  'Logging out now means logging back in later. Save yourself the extra step.',
+  'One admin once logged out for five minutes. The horror stories are still told today.',
+  'Your login session took time to establish. Do not waste that work.',
+  'The audit logs would look much better with you staying online right now.',
+  'If you log out now, who will approve the pending requests? Think about it.',
+];
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function LogoutConfirmModal({ isOpen, joke, onConfirm, onCancel }) {
+  const [exiting, setExiting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) setExiting(false);
+  }, [isOpen]);
+
+  const handleCancel = () => {
+    setExiting(true);
+    setTimeout(onCancel, 260);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      onClick={handleCancel}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.45)',
+        backdropFilter: 'blur(4px)',
+        animation: exiting ? 'lo-backdrop-out 0.26s ease forwards' : 'lo-backdrop-in 0.22s ease forwards',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: '#fff',
+          borderRadius: 20,
+          padding: '36px 28px 26px',
+          maxWidth: 380,
+          width: 'calc(100% - 40px)',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.13), 0 4px 16px rgba(0,0,0,0.06)',
+          animation: exiting
+            ? 'lo-card-out 0.26s cubic-bezier(.4,0,.2,1) forwards'
+            : 'lo-card-in 0.38s cubic-bezier(.34,1.56,.64,1) forwards',
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          textAlign: 'center',
+        }}
+      >
+        {/* animated brand icon */}
+        <div style={{
+          width: 68, height: 68, borderRadius: 20,
+          background: '#f0faf6',
+          border: '1.5px solid #c8eedd',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 20px',
+          animation: exiting ? 'none' : 'lo-icon-in 0.42s cubic-bezier(.34,1.56,.64,1) 0.08s both',
+        }}>
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#1a9e6e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ overflow: 'visible' }}>
+            {/* door frame — static */}
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+            {/* arrow — slides right on loop */}
+            <g style={{ animation: 'lo-arrow-walk 1.8s ease-in-out infinite' }}>
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </g>
+          </svg>
+        </div>
+
+        <div style={{
+          fontSize: 17, fontWeight: 700, color: '#111',
+          marginBottom: 5, letterSpacing: '-0.02em',
+          animation: exiting ? 'none' : 'lo-text-in 0.32s ease 0.14s both',
+        }}>
+          Are you sure you want to log out?
+        </div>
+        <div style={{
+          fontSize: 12, color: '#bbb', marginBottom: 18,
+          animation: exiting ? 'none' : 'lo-text-in 0.32s ease 0.2s both',
+        }}>
+          Think twice before you leave.
+        </div>
+
+        <div style={{
+          background: '#f7fdf9',
+          border: '1px solid #daf0e7',
+          borderRadius: 12,
+          padding: '13px 16px',
+          fontSize: 13,
+          color: '#555',
+          lineHeight: 1.7,
+          marginBottom: 22,
+          fontStyle: 'italic',
+          textAlign: 'left',
+          animation: exiting ? 'none' : 'lo-joke-in 0.38s ease 0.26s both',
+        }}>
+          &ldquo;{joke}&rdquo;
+        </div>
+
+        <div style={{
+          display: 'flex', gap: 10,
+          animation: exiting ? 'none' : 'lo-text-in 0.32s ease 0.32s both',
+        }}>
+          <button
+            onClick={handleCancel}
+            style={{
+              flex: 1, padding: '12px 0',
+              borderRadius: 12,
+              border: '1.5px solid rgba(0,0,0,0.1)',
+              background: '#fff', color: '#333',
+              fontSize: 14, fontWeight: 600,
+              cursor: 'pointer', fontFamily: 'inherit',
+              transition: 'background 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f5f5f5'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.18)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.1)'; }}
+          >
+            Stay
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              flex: 1, padding: '12px 0',
+              borderRadius: 12, border: 'none',
+              background: '#d94040', color: '#fff',
+              fontSize: 14, fontWeight: 600,
+              cursor: 'pointer', fontFamily: 'inherit',
+              transition: 'background 0.15s, transform 0.1s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#c0392b'; e.currentTarget.style.transform = 'scale(1.02)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#d94040'; e.currentTarget.style.transform = 'scale(1)'; }}
+          >
+            Logout
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Main Sidebar ──────────────────────────────────────────────── */
 export default function Sidebar({ onExport, exportLoading = false, alerts }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [logoutJoke, setLogoutJoke] = useState('');
+  const jokeQueueRef = useRef([]);
+
+  const pickNextJoke = () => {
+    if (jokeQueueRef.current.length === 0) {
+      jokeQueueRef.current = shuffleArray(LOGOUT_JOKES);
+    }
+    return jokeQueueRef.current.pop();
+  };
   const [currentUser, setCurrentUser] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('hp_user') || '{}'); } catch { return {}; }
   });
@@ -527,12 +712,9 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
             label="Logout"
             collapsed={isCollapsed}
             danger
-            onClick={async () => {
-              await logoutUser();
-              sessionStorage.removeItem('hp_access_token');
-              sessionStorage.removeItem('hp_user');
-              sessionStorage.removeItem('hp_authorized');
-              window.location.href = 'https://go.hostops.online/';
+            onClick={() => {
+              setLogoutJoke(pickNextJoke());
+              setLogoutOpen(true);
             }}
           />
 
@@ -887,6 +1069,20 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
         onSaved={(updated) => setCurrentUser(updated)}
       />
 
+      <LogoutConfirmModal
+        isOpen={logoutOpen}
+        joke={logoutJoke}
+        onConfirm={async () => {
+          setLogoutOpen(false);
+          await logoutUser();
+          sessionStorage.removeItem('hp_access_token');
+          sessionStorage.removeItem('hp_user');
+          sessionStorage.removeItem('hp_authorized');
+          window.location.href = 'https://go.hostops.online/';
+        }}
+        onCancel={() => setLogoutOpen(false)}
+      />
+
       <style>{`
         @media (max-width: 768px) {
           .db-sidebar-desktop { display: none !important; }
@@ -894,6 +1090,35 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
         }
         @media (min-width: 769px) {
           .db-sidebar-mobile-bar { display: none !important; }
+        }
+        @keyframes lo-backdrop-in  { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes lo-backdrop-out { from { opacity: 1 } to { opacity: 0 } }
+        @keyframes lo-card-in {
+          0%   { opacity: 0; transform: translateY(32px) scale(0.9)  }
+          60%  { opacity: 1; transform: translateY(-5px) scale(1.02) }
+          100% { opacity: 1; transform: translateY(0)    scale(1)    }
+        }
+        @keyframes lo-card-out {
+          from { opacity: 1; transform: translateY(0)    scale(1)    }
+          to   { opacity: 0; transform: translateY(24px) scale(0.94) }
+        }
+        @keyframes lo-icon-in {
+          0%   { opacity: 0; transform: scale(0.5) }
+          70%  { transform: scale(1.12) }
+          100% { opacity: 1; transform: scale(1)   }
+        }
+        @keyframes lo-text-in {
+          from { opacity: 0; transform: translateY(8px) }
+          to   { opacity: 1; transform: translateY(0)   }
+        }
+        @keyframes lo-joke-in {
+          from { opacity: 0; transform: translateY(10px) }
+          to   { opacity: 1; transform: translateY(0)    }
+        }
+        @keyframes lo-arrow-walk {
+          0%, 30%  { transform: translateX(0px) }
+          55%, 75% { transform: translateX(5px) }
+          100%     { transform: translateX(0px) }
         }
       `}</style>
     </>

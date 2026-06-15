@@ -60,10 +60,12 @@ export function useAccounts() {
   useEffect(() => { reload(); }, [reload]);
 
   const combined = [
-    ...users.map(u => ({
-      ...u, accountType: 'user',
-      name: u.businessName || [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email,
-    })),
+    ...users
+      .filter(u => u.role !== 'admin')
+      .map(u => ({
+        ...u, accountType: 'user',
+        name: u.businessName || [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email,
+      })),
     ...staffs.map(s => ({
       ...s, accountType: 'staff',
       name: [s.firstName, s.lastName].filter(Boolean).join(' ') || s.email,

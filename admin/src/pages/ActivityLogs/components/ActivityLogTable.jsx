@@ -135,81 +135,176 @@ function buildFilename({ filterAction, filterDateFrom, filterDateTo }) {
   return `${parts.join('-')}.csv`;
 }
 
-// ── Expanded row detail ───────────────────────────────────────────────────────
-function ExpandedDetail({ entry }) {
-  const time = new Date(entry.createdAt || entry.timestamp).toLocaleString('en-PH', {
-    month: 'short', day: 'numeric', year: 'numeric',
+// ── Detail modal helpers ──────────────────────────────────────────────────────
+const ROLE_BADGE = {
+  admin:       { bg: '#ede9fe', color: '#7c3aed', border: '#c4b5fd', label: 'Admin' },
+  client:      { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe', label: 'Business' },
+  team_leader: { bg: '#f0fdf4', color: '#15803d', border: '#86efac', label: 'Team Leader' },
+  staff:       { bg: '#f9fafb', color: '#374151', border: '#e5e7eb', label: 'Staff' },
+};
+
+function DmSectionLabel({ children }) {
+  return (
+    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#9ca3af', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2, marginTop: 4 }}>
+      {children}
+    </div>
+  );
+}
+
+function DmRow({ label, children, last = false }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+      padding: '10px 0',
+      borderBottom: last ? 'none' : '1px solid #f3f4f6',
+    }}>
+      <span style={{ fontSize: '0.8rem', color: '#6b7280', fontWeight: 500, flexShrink: 0 }}>{label}</span>
+      <div style={{ fontSize: '0.82rem', color: '#111827', fontWeight: 600, textAlign: 'right', wordBreak: 'break-word' }}>{children}</div>
+    </div>
+  );
+}
+
+// ── Detail modal ──────────────────────────────────────────────────────────────
+function ActivityLogDetailModal({ entry, onClose }) {
+  React.useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose(); }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  if (!entry) return null;
+
+  const meta  = getActionMeta(entry.action);
+  const label = ACTION_LABELS[entry.action] || entry.action;
+  const pb    = entry.performedBy || {};
+  const name  = [pb.firstName, pb.lastName].filter(Boolean).join(' ') || pb.email || '—';
+  const role  = pb.staffRole || pb.role || 'client';
+  const email = pb.email || null;
+  const biz   = entry.businessName || pb.businessName || null;
+  const time  = new Date(entry.createdAt || entry.timestamp).toLocaleString('en-PH', {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
     hour: 'numeric', minute: '2-digit', hour12: true,
   });
 
-  const pb = entry.performedBy || {};
-  const performedByName = [pb.firstName, pb.lastName].filter(Boolean).join(' ') || pb.email || '—';
-  const performedByRole = pb.staffRole || pb.role || 'client';
-
-  const rows = [
-    { label: 'Timestamp',        value: time },
-    entry.businessName && { label: 'Business Account', value: entry.businessName },
-    (pb.firstName || pb.email) && {
-      label: 'Performed By',
-      value: `${performedByName} (${performedByRole})`,
-    },
-    // For switched_property: show From and To as separate rows
-    entry.action === 'switched_property' && (entry.meta?.fromPropertyName || entry.meta?.fromPropertyId) && {
-      label: 'Switched From',
-      value: entry.meta.fromPropertyName || entry.meta.fromPropertyId,
-      color: '#6b7280',
-      badge: true,
-    },
-    entry.action === 'switched_property' && (entry.meta?.toPropertyName || entry.meta?.toPropertyId) && {
-      label: 'Switched To',
-      value: entry.meta.toPropertyName || entry.meta.toPropertyId,
-      color: '#1d4ed8',
-      highlight: true,
-    },
-    // For non-switch entries, show generic property
-    entry.action !== 'switched_property' && entry.meta?.propertyName && {
-      label: 'Property', value: entry.meta.propertyName,
-    },
-    entry.ipAddress && { label: 'IP Address', value: entry.ipAddress },
-  ].filter(Boolean);
+  const initials  = pb.firstName?.[0]?.toUpperCase() || pb.email?.[0]?.toUpperCase() || '?';
+  const fromProp  = entry.action === 'switched_property' ? (entry.meta?.fromPropertyName || entry.meta?.fromPropertyId || null) : null;
+  const toProp    = entry.action === 'switched_property' ? (entry.meta?.toPropertyName   || entry.meta?.toPropertyId   || null) : null;
+  const property  = entry.action !== 'switched_property' ? (entry.meta?.propertyName || null) : null;
+  const hasContext = fromProp || toProp || property;
+  const roleStyle  = ROLE_BADGE[role] || ROLE_BADGE.client;
 
   return (
-    <td
-      colSpan={5}
-      style={{
-        padding: '0 16px 14px 56px',
-        background: '#f7fbf9',
-        borderBottom: '1px solid #eaf3ee',
-      }}
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.38)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
+      <style>{`@keyframes aldm-in { from { opacity:0; transform:translateY(10px) scale(0.975); } to { opacity:1; transform:none; } }`}</style>
+
       <div style={{
-        display: 'flex', flexWrap: 'wrap', gap: '10px 32px',
-        paddingTop: 10,
+        background: '#fff', borderRadius: 16,
+        width: 420, maxWidth: '92vw',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.16), 0 4px 16px rgba(0,0,0,0.07)',
+        animation: 'aldm-in 0.2s cubic-bezier(0.4,0,0.2,1)',
+        overflow: 'hidden',
       }}>
-        {rows.map((r, i) => (
-          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{
-              fontSize: 10, fontWeight: 700,
-              color: r.highlight ? '#3b82f6' : '#9ab8a9',
-              textTransform: 'uppercase', letterSpacing: '0.06em',
-            }}>
-              {r.label}
-            </span>
-            <span style={{
-              fontSize: 12, fontWeight: r.highlight ? 700 : 600,
-              color: r.color || '#0c1c14',
-              background: r.highlight ? '#eff6ff' : r.badge ? '#f3f4f6' : 'transparent',
-              borderRadius: r.highlight || r.badge ? 5 : 0,
-              padding: r.highlight || r.badge ? '1px 7px' : 0,
-              border: r.highlight ? '1px solid #bfdbfe' : r.badge ? '1px solid #e5e7eb' : 'none',
-              display: 'inline-block',
-            }}>
-              {r.value}
-            </span>
+
+        {/* ── Header ── */}
+        <div style={{ background: '#f8fafb', padding: '18px 20px 16px', borderBottom: '1px solid #f0f2f5' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                background: 'linear-gradient(135deg, #34d399, #059669)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 17, fontWeight: 800, color: '#fff',
+                boxShadow: '0 2px 8px rgba(5,150,105,0.28)',
+              }}>
+                {initials}
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#111827', lineHeight: 1.25 }}>
+                  {label}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: 3 }}>
+                  {name}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={onClose}
+              style={{ border: 'none', background: '#eef0f3', cursor: 'pointer', color: '#6b7280', display: 'flex', padding: 7, borderRadius: 8, transition: 'background 0.12s, color 0.12s', flexShrink: 0 }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#e2e5e9'; e.currentTarget.style.color = '#374151'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#eef0f3'; e.currentTarget.style.color = '#6b7280'; }}
+            >
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M4 4l12 12M16 4L4 16" strokeLinecap="round"/>
+              </svg>
+            </button>
           </div>
-        ))}
+        </div>
+
+        {/* ── Body ── */}
+        <div style={{ padding: '14px 20px 6px' }}>
+
+          {/* Event */}
+          <DmSectionLabel>Event</DmSectionLabel>
+          <DmRow label="Timestamp">{time}</DmRow>
+          <DmRow label="Business Account" last>
+            <span style={{ color: biz ? '#111827' : '#d1d5db' }}>{biz || '—'}</span>
+          </DmRow>
+
+          <div style={{ height: 1, background: '#f0f2f5', margin: '10px 0 8px' }} />
+
+          {/* Performed By */}
+          <DmSectionLabel>Performed By</DmSectionLabel>
+          <DmRow label="Role">
+            <span style={{ background: roleStyle.bg, color: roleStyle.color, border: `1px solid ${roleStyle.border}`, borderRadius: 6, padding: '2px 9px', fontSize: 11, fontWeight: 700 }}>
+              {roleStyle.label}
+            </span>
+          </DmRow>
+          <DmRow label="Email" last>
+            <span style={{ color: email ? '#374151' : '#d1d5db' }}>{email || '—'}</span>
+          </DmRow>
+
+          {/* Context */}
+          {hasContext && (
+            <>
+              <div style={{ height: 1, background: '#f0f2f5', margin: '10px 0 8px' }} />
+              <DmSectionLabel>Context</DmSectionLabel>
+              {fromProp && (
+                <DmRow label="Switched From">
+                  <span style={{ background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: 6, padding: '2px 9px', fontSize: 11, fontWeight: 700 }}>
+                    {fromProp}
+                  </span>
+                </DmRow>
+              )}
+              {toProp && (
+                <DmRow label="Switched To" last={!property}>
+                  <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 6, padding: '2px 9px', fontSize: 11, fontWeight: 700 }}>
+                    {toProp}
+                  </span>
+                </DmRow>
+              )}
+              {property && <DmRow label="Property" last>{property}</DmRow>}
+            </>
+          )}
+        </div>
+
+        {/* ── Footer ── */}
+        <div style={{ padding: '12px 20px 18px', display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={onClose}
+            style={{ padding: '7px 18px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', fontSize: '0.8rem', fontWeight: 600, color: '#4b5563', cursor: 'pointer', transition: 'background 0.12s' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+            onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+          >
+            Close
+          </button>
+        </div>
+
       </div>
-    </td>
+    </div>
   );
 }
 
@@ -318,6 +413,31 @@ function AlDropdown({ value, onChange, options, disabled }) {
   );
 }
 
+// ── Date preset helpers ───────────────────────────────────────────────────────
+function getPresetRange(preset) {
+  const today = new Date();
+  const pad   = n => String(n).padStart(2, '0');
+  const fmt   = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const todayStr = fmt(today);
+
+  if (preset === 'today') return { from: todayStr, to: todayStr };
+
+  if (preset === 'week') {
+    const day    = today.getDay();
+    const diff   = day === 0 ? -6 : 1 - day;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diff);
+    return { from: fmt(monday), to: todayStr };
+  }
+
+  if (preset === 'month') {
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { from: fmt(firstDay), to: todayStr };
+  }
+
+  return { from: '', to: '' };
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function ActivityLogTable({
   logs = [],
@@ -340,9 +460,32 @@ export default function ActivityLogTable({
   onPrev,
   onNext,
 }) {
-  const [expandedRow,   setExpandedRow]   = useState(null);
+  const [selectedEntry, setSelectedEntry] = useState(null);
   const [exporting,     setExporting]     = useState(false);
   const [exportError,   setExportError]   = useState('');
+  const [activePreset,  setActivePreset]  = useState(null);
+
+  function handlePresetClick(preset) {
+    const { from, to } = getPresetRange(preset);
+    setActivePreset(preset);
+    onFilterDateFromChange(from);
+    onFilterDateToChange(to);
+  }
+
+  function handleDateFromChange(val) {
+    setActivePreset(null);
+    onFilterDateFromChange(val);
+  }
+
+  function handleDateToChange(val) {
+    setActivePreset(null);
+    onFilterDateToChange(val);
+  }
+
+  function handleClearAll() {
+    setActivePreset(null);
+    onClearFilters();
+  }
 
   const hasFilters = search || filterClient || filterAction || filterDateFrom || filterDateTo;
 
@@ -397,6 +540,7 @@ export default function ActivityLogTable({
           .al-filters-row2 { display: flex !important; width: 100%; padding: 0 12px 8px; box-sizing: border-box; gap: 8px; flex-wrap: nowrap; }
           .al-filters-row2 select { flex: 1; min-width: 0; max-width: 50%; }
           .al-filters-row3 { display: flex !important; width: 100%; padding: 0 12px 8px; box-sizing: border-box; gap: 6px; align-items: center; flex-wrap: wrap; }
+          .al-filters-row3 .al-preset-chips { width: 100%; overflow-x: auto; padding-bottom: 2px; }
           .al-filters-row3 .al-date-input { flex: 1 1 0; min-width: 0; width: 0; }
           .al-filters-row4 { display: flex !important; width: 100%; padding: 0 12px 12px; box-sizing: border-box; }
           .al-search-wrap { max-width: 100% !important; flex: 1; }
@@ -431,7 +575,6 @@ export default function ActivityLogTable({
         .al-row { border-bottom: 1px solid #f0f7f3; transition: background 0.1s; }
         .al-row:last-child { border-bottom: none; }
         .al-row:hover > td { background: #f7fbf9; }
-        .al-row.expanded > td { background: #f7fbf9; }
         .al-td { padding: 11px 16px; font-size: 13px; color: #0c1c14; vertical-align: middle; }
         .al-action-cell { display: flex; align-items: center; gap: 9px; }
         .al-icon-circle { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -451,6 +594,12 @@ export default function ActivityLogTable({
         @keyframes al-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .al-spinner { animation: al-spin 0.8s linear infinite; }
         .al-date-sep { font-size: 12px; color: #9ab8a9; font-weight: 500; }
+        @keyframes al-shimmer { 0% { background-position: -600px 0; } 100% { background-position: 600px 0; } }
+        .al-skeleton { background: linear-gradient(90deg, #e8f0eb 25%, #d4e8dd 50%, #e8f0eb 75%); background-size: 1200px 100%; animation: al-shimmer 1.5s ease-in-out infinite; border-radius: 6px; }
+        .al-preset-chips { display: flex; gap: 6px; flex-wrap: nowrap; align-items: center; }
+        .al-preset-chip { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1.5px solid #d4e8dd; background: #f7faf8; color: #4a6b5a; font-family: inherit; transition: all 0.15s; white-space: nowrap; }
+        .al-preset-chip:hover { background: #eaf8f1; border-color: #1e8760; color: #1e8760; }
+        .al-preset-chip.active { background: #1e8760; border-color: #1e8760; color: #fff; }
       `}</style>
 
       <div className="al-table-wrap">
@@ -496,14 +645,29 @@ export default function ActivityLogTable({
             />
           </div>
 
-          {/* Row 3 — Date range + Clear */}
+          {/* Row 3 — Quick presets + Date range + Clear */}
           <div className="al-filters-row3">
+            <div className="al-preset-chips">
+              {[
+                { key: 'today', label: 'Today' },
+                { key: 'week',  label: 'This Week' },
+                { key: 'month', label: 'This Month' },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  className={`al-preset-chip${activePreset === key ? ' active' : ''}`}
+                  onClick={() => handlePresetClick(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <input
               className="al-date-input"
               type="date"
               title="From date"
               value={filterDateFrom}
-              onChange={e => onFilterDateFromChange(e.target.value)}
+              onChange={e => handleDateFromChange(e.target.value)}
             />
             <span className="al-date-sep">–</span>
             <input
@@ -511,10 +675,10 @@ export default function ActivityLogTable({
               type="date"
               title="To date"
               value={filterDateTo}
-              onChange={e => onFilterDateToChange(e.target.value)}
+              onChange={e => handleDateToChange(e.target.value)}
             />
             {hasFilters && (
-              <button className="al-clear-btn" onClick={onClearFilters}>
+              <button className="al-clear-btn" onClick={handleClearAll}>
                 <i className="ti ti-x" style={{ fontSize: 12 }} />
                 Clear
               </button>
@@ -551,9 +715,44 @@ export default function ActivityLogTable({
 
         {/* ── Table body ── */}
         {loading ? (
-          <div className="al-loading">
-            <i className="ti ti-loader-2 al-spinner" style={{ fontSize: 18 }} />
-            Loading activity logs…
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table className="al-table" style={{ minWidth: 580 }}>
+              <thead className="al-thead">
+                <tr>
+                  <th>Action</th>
+                  <th>Business</th>
+                  <th>Performed By</th>
+                  <th>Date &amp; Time</th>
+                  <th style={{ textAlign: 'center' }}>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <tr key={i} className="al-row">
+                    <td className="al-td">
+                      <div className="al-action-cell">
+                        <div className="al-skeleton" style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0 }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div className="al-skeleton" style={{ width: 100 + (i % 3) * 20, height: 13 }} />
+                          <div className="al-skeleton" style={{ width: 50, height: 10, borderRadius: 10 }} />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="al-td"><div className="al-skeleton" style={{ width: 110 + (i % 2) * 30, height: 13 }} /></td>
+                    <td className="al-td">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div className="al-skeleton" style={{ width: 90, height: 13 }} />
+                        <div className="al-skeleton" style={{ width: 45, height: 10 }} />
+                      </div>
+                    </td>
+                    <td className="al-td"><div className="al-skeleton" style={{ width: 110, height: 12 }} /></td>
+                    <td className="al-td" style={{ textAlign: 'center' }}>
+                      <div className="al-skeleton" style={{ width: 60, height: 26, borderRadius: 7, margin: '0 auto' }} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : logs.length === 0 ? (
           <div className="al-empty">
@@ -585,92 +784,75 @@ export default function ActivityLogTable({
             </thead>
             <tbody>
               {logs.map((entry, i) => {
-                const meta       = getActionMeta(entry.action);
-                const label      = ACTION_LABELS[entry.action] || entry.action;
-                const isExpanded = expandedRow === i;
-                const pb         = entry.performedBy || {};
-                const name       = [pb.firstName, pb.lastName].filter(Boolean).join(' ') || pb.email || '—';
-                const role       = pb.staffRole || pb.role || 'client';
-                const bizName    = entry.businessName || pb.businessName || '—';
-                const time       = new Date(entry.createdAt || entry.timestamp).toLocaleString('en-PH', {
+                const meta    = getActionMeta(entry.action);
+                const label   = ACTION_LABELS[entry.action] || entry.action;
+                const pb      = entry.performedBy || {};
+                const name    = [pb.firstName, pb.lastName].filter(Boolean).join(' ') || pb.email || '—';
+                const role    = pb.staffRole || pb.role || 'client';
+                const bizName = entry.businessName || pb.businessName || '—';
+                const time    = new Date(entry.createdAt || entry.timestamp).toLocaleString('en-PH', {
                   month: 'short', day: 'numeric', year: 'numeric',
                   hour: 'numeric', minute: '2-digit', hour12: true,
                 });
 
                 return (
-                  <React.Fragment key={entry._id || i}>
-                    <tr className={`al-row${isExpanded ? ' expanded' : ''}`}>
+                  <tr key={entry._id || i} className="al-row">
 
-                      {/* Action */}
-                      <td className="al-td">
-                        <div className="al-action-cell">
-                          <div
-                            className="al-icon-circle"
-                            style={{ background: meta.bg, border: `1.5px solid ${meta.color}22` }}
-                          >
-                            <i className={`ti ${meta.icon}`} style={{ fontSize: 14, color: meta.color }} />
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: 13, color: '#0c1c14' }}>{label}</div>
-                            <span
-                              className="al-badge"
-                              style={{
-                                background: meta.bg,
-                                color: meta.color,
-                                borderColor: `${meta.color}33`,
-                                marginTop: 3,
-                              }}
-                            >
-                              {meta.badge}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Business */}
-                      <td className="al-td" style={{ color: bizName === '—' ? '#9ab8a9' : '#0c1c14' }}>
-                        {bizName}
-                      </td>
-
-                      {/* Performed By */}
-                      <td className="al-td">
-                        <div style={{ fontWeight: 500 }}>{name}</div>
-                        <div style={{ fontSize: 11, color: '#9ab8a9', marginTop: 1, textTransform: 'capitalize' }}>
-                          {role}
-                        </div>
-                      </td>
-
-                      {/* Date */}
-                      <td className="al-td" style={{ whiteSpace: 'nowrap', color: '#4a6b5a', fontSize: 12 }}>
-                        {time}
-                      </td>
-
-                      {/* Details toggle */}
-                      <td className="al-td" style={{ textAlign: 'center' }}>
-                        <button
-                          className={`al-detail-btn${isExpanded ? ' open' : ''}`}
-                          onClick={() => setExpandedRow(isExpanded ? null : i)}
+                    {/* Action */}
+                    <td className="al-td">
+                      <div className="al-action-cell">
+                        <div
+                          className="al-icon-circle"
+                          style={{ background: meta.bg, border: `1.5px solid ${meta.color}22` }}
                         >
-                          <i
-                            className="ti ti-chevron-down"
+                          <i className={`ti ${meta.icon}`} style={{ fontSize: 14, color: meta.color }} />
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: '#0c1c14' }}>{label}</div>
+                          <span
+                            className="al-badge"
                             style={{
-                              fontSize: 11,
-                              transition: 'transform 0.2s',
-                              transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                              background: meta.bg,
+                              color: meta.color,
+                              borderColor: `${meta.color}33`,
+                              marginTop: 3,
                             }}
-                          />
-                          {isExpanded ? 'Hide' : 'Details'}
-                        </button>
-                      </td>
-                    </tr>
+                          >
+                            {meta.badge}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
 
-                    {/* Expanded detail row */}
-                    {isExpanded && (
-                      <tr className="al-row expanded">
-                        <ExpandedDetail entry={entry} />
-                      </tr>
-                    )}
-                  </React.Fragment>
+                    {/* Business */}
+                    <td className="al-td" style={{ color: bizName === '—' ? '#9ab8a9' : '#0c1c14' }}>
+                      {bizName}
+                    </td>
+
+                    {/* Performed By */}
+                    <td className="al-td">
+                      <div style={{ fontWeight: 500 }}>{name}</div>
+                      <div style={{ fontSize: 11, color: '#9ab8a9', marginTop: 1, textTransform: 'capitalize' }}>
+                        {role}
+                      </div>
+                    </td>
+
+                    {/* Date */}
+                    <td className="al-td" style={{ whiteSpace: 'nowrap', color: '#4a6b5a', fontSize: 12 }}>
+                      {time}
+                    </td>
+
+                    {/* Details button → opens modal */}
+                    <td className="al-td" style={{ textAlign: 'center' }}>
+                      <button
+                        className="al-detail-btn"
+                        onClick={() => setSelectedEntry(entry)}
+                      >
+                        <i className="ti ti-info-circle" style={{ fontSize: 11 }} />
+                        Details
+                      </button>
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>
@@ -707,6 +889,12 @@ export default function ActivityLogTable({
           </div>
         )}
       </div>
+
+      {/* ── Detail modal ── */}
+      <ActivityLogDetailModal
+        entry={selectedEntry}
+        onClose={() => setSelectedEntry(null)}
+      />
     </>
   );
 }
