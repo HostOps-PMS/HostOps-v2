@@ -442,6 +442,8 @@ appearance: none;
   inset: 0;
   z-index: 0;
   overflow: hidden;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 .am-slide {
@@ -452,6 +454,9 @@ appearance: none;
   background-repeat: no-repeat;
   opacity: 0;
   transition: opacity 1.2s ease;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: opacity;
 }
 
 .am-slide--active {
@@ -530,7 +535,7 @@ appearance: none;
   border-radius: 20px 20px 0 0;
   padding: 28px 24px 36px;
   box-shadow: 0 -8px 24px rgba(0,0,0,0.12);
-  max-height: 70dvh;
+  max-height: 65dvh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   animation: am-slide-up 0.4s ease forwards;
