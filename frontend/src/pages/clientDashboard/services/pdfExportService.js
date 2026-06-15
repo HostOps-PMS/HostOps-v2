@@ -1,4 +1,4 @@
-// ── Static imports — jsPDF and autoTable are bundled with the app ────────────
+// ── Static imports — jspdf and autoTable are bundled with the app ────────────
 // Previously loaded from CDN at runtime, which failed on mobile when CDNs
 // were blocked or unreachable. Now bundled via npm so no network request is
 // needed at export time — works offline and on any network.
@@ -6,8 +6,8 @@
 // Run once before deploying:
 //   npm install jspdf jspdf-autotable
 // ─────────────────────────────────────────────────────────────────────────────
-import { jsPDF } from 'jsPDF';
-import autoTable from 'jsPDF-autotable';
+import { jspdf } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 function fmtMoney(val) {
   const n = Number(val || 0);
@@ -94,7 +94,7 @@ function drawFooter(doc, pageNum, pageCount, period, pageWidth) {
  * The property image and name are shown in the business profile card
  * (drawBusinessProfile) in the content area, so the page header stays clean: just HOSTOPS pill, title, period, generated.
  *
- * @param {object} doc           - jsPDF instance
+ * @param {object} doc           - jspdf instance
  * @param {string} businessName  - e.g. "Juan dela Cruz Properties"
  * @param {string} propertyName  - e.g. "Barkada Room" (selected property, or empty for all)
  * @param {object} period        - { from, to }
@@ -798,7 +798,7 @@ function getBalance(b) {
  *                             Shape: { businessName, firstName, lastName, properties: [{ _id, propertyName, propertyPicture }] }
  */
 export async function exportDashboardPDF(dashState, user) {
-  // jsPDF and autoTable are imported statically at the top of this module —
+  // jspdf and autoTable are imported statically at the top of this module —
   // no runtime CDN loading needed. autoTable self-registers on import.
   const data      = dashState.rawData || {};
   const stats     = data.stats        || {};
@@ -839,7 +839,7 @@ export async function exportDashboardPDF(dashState, user) {
     }
   }
 
-  const doc       = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const doc       = new jspdf({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin    = 14;
 
@@ -991,7 +991,7 @@ if (bookings.length > 0) {
   //       compatible approach for Android.
   //
   //  3. Desktop browsers
-  //     • jsPDF's doc.save() (blob + <a download>) works everywhere.
+  //     • jspdf's doc.save() (blob + <a download>) works everywhere.
   //
   // Detection strategy:
   //   isIOS   — covers iPhone, iPad (including modern iPads that drop "iPad"
@@ -1066,7 +1066,7 @@ if (bookings.length > 0) {
     }
 
   } else {
-    // ── Desktop: standard jsPDF save ─────────────────────────────────────
+    // ── Desktop: standard jspdf save ─────────────────────────────────────
     doc.save(filename);
   }
 }
