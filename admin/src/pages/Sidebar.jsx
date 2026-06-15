@@ -457,21 +457,17 @@ function LogoutConfirmModal({ isOpen, joke, onConfirm, onCancel }) {
           Think twice before you leave.
         </div>
 
-        <div style={{
-          background: '#f7fdf9',
-          border: '1px solid #daf0e7',
-          borderRadius: 12,
-          padding: '13px 16px',
+        <p style={{
           fontSize: 13,
-          color: '#555',
+          color: '#888',
           lineHeight: 1.7,
-          marginBottom: 22,
+          marginBottom: 24,
           fontStyle: 'italic',
-          textAlign: 'left',
           animation: exiting ? 'none' : 'lo-joke-in 0.38s ease 0.26s both',
+          margin: '0 0 24px',
         }}>
           &ldquo;{joke}&rdquo;
-        </div>
+        </p>
 
         <div style={{
           display: 'flex', gap: 10,
