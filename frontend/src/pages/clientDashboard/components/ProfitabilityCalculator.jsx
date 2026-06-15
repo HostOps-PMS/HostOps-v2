@@ -281,7 +281,32 @@ const [showResetConfirm, setShowResetConfirm] = useState(false);
   const meetsBreakEven = calc.occupancy >= calc.breakEvenOcc;
 
   return (
-    <div style={t.card}>
+    <div style={t.card} className="hp-profit-card">
+      <style>{`
+        .hp-profit-card::-webkit-scrollbar { display: none; }
+        .hp-profit-card input[type=range] { accent-color: #1e8760; }
+        ${dark ? `
+        .hp-profit-card input[type=range] {
+          -webkit-appearance: none; appearance: none;
+          height: 4px; border-radius: 4px;
+          background: #1e3a2a;
+          outline: none;
+        }
+        .hp-profit-card input[type=range]::-webkit-slider-thumb {
+          -webkit-appearance: none; appearance: none;
+          width: 16px; height: 16px; border-radius: 50%;
+          background: #26a676; cursor: pointer;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+        }
+        .hp-profit-card input[type=range]::-moz-range-thumb {
+          width: 16px; height: 16px; border-radius: 50%;
+          background: #26a676; cursor: pointer; border: none;
+        }
+        .hp-profit-card input[type=range]::-moz-range-track {
+          background: #1e3a2a; height: 4px; border-radius: 4px;
+        }
+        ` : ''}
+      `}</style>
       {/* Header */}
       <div style={t.header}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -722,6 +747,8 @@ function getTheme(dark) {
       overscrollBehavior: "contain",
       width: "100%",
       boxSizing: "border-box",
+      scrollbarWidth: "none",
+      msOverflowStyle: "none",
     },
     header: {
       display: "flex", justifyContent: "space-between", alignItems: "flex-start",

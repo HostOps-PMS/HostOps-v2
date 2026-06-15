@@ -142,7 +142,7 @@ console.log("profitOpen:", profitOpen);
   const ownerName = dashState.selectedPropertyName || data.ownerName || 'Dashboard';
 
   return (
-    <div style={{ background: "#f4f6f5", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <div style={{ background: dark ? "#0c1c14" : "#f4f6f5", minHeight: "100vh", display: "flex", flexDirection: "column", transition: "background 0.2s" }}>
 
       {/* ── Data load / date-filter refetch overlay ── */}
       <FetchingOverlay
@@ -176,15 +176,15 @@ console.log("profitOpen:", profitOpen);
             justifyContent: "center",
             gap: "8px",
             padding: "8px 20px",
-            background: "linear-gradient(135deg, #eaf8f1 0%, #f0fdf8 100%)",
-            borderBottom: "1px solid #d1f0e3",
+            background: dark ? "linear-gradient(135deg, #0c2318 0%, #0f2d1f 100%)" : "linear-gradient(135deg, #eaf8f1 0%, #f0fdf8 100%)",
+            borderBottom: dark ? "1px solid #1e3a2a" : "1px solid #d1f0e3",
             width: "100%",
           }}>
-            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#1e8760", display: "inline-block", animation: "pulse 2s infinite", flexShrink: 0 }} />
-            <span style={{ fontSize: "12px", fontWeight: 600, color: "#1e8760", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: dark ? "#56c299" : "#1e8760", display: "inline-block", animation: "pulse 2s infinite", flexShrink: 0 }} />
+            <span style={{ fontSize: "12px", fontWeight: 600, color: dark ? "#56c299" : "#1e8760", letterSpacing: "0.04em", textTransform: "uppercase" }}>
               Live Data Dashboard
             </span>
-            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#1e8760", display: "inline-block", animation: "pulse 2s infinite 1s", flexShrink: 0 }} />
+            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: dark ? "#56c299" : "#1e8760", display: "inline-block", animation: "pulse 2s infinite 1s", flexShrink: 0 }} />
           </div>
         )}
       </div>
@@ -286,7 +286,7 @@ console.log("profitOpen:", profitOpen);
                     fontFamily: "'Sora',sans-serif",
                     fontSize: '1.75rem',
                     fontWeight: 800,
-                    color: '#0c1c14',
+                    color: dark ? '#eaf5f0' : '#0c1c14',
                     margin: '0 0 4px',
                   }}>
                     {ownerName}

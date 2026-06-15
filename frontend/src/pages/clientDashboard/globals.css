@@ -275,6 +275,10 @@ html, body {
 .txt-blue  { color: #1555C0; }
 .txt-red   { color: #c13515; }
 
+/* ── Scrollbar hide ──────────────────────────────────────────────────── */
+.scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
 
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }

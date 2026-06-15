@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../AuthContext";
 import { useActivityLog } from "../hooks/useActivityLog";
+import { useDashboard } from "../context/DashboardContext";
 const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "https://hostpilot-smoobu.onrender.com";
 
 function getEmailFromToken(token) {
@@ -106,7 +107,7 @@ async function changePin({ currentPin, newPin }, auth) {
 // ─────────────────────────────────────────────────────────────────
 // OTPInput — 6-box OTP input, same pattern as the reset page
 // ─────────────────────────────────────────────────────────────────
-function OTPInput({ length = 6, onComplete, isError, isLoading, version }) {
+function OTPInput({ length = 6, onComplete, isError, isLoading, version, dark = false }) {
   const [values, setValues] = useState(Array(length).fill(""));
   const inputRefs = useRef([]);
 
@@ -172,9 +173,9 @@ function OTPInput({ length = 6, onComplete, isError, isLoading, version }) {
             fontWeight: 700,
             fontFamily: "'Sora', sans-serif",
             borderRadius: 10,
-            border: `2px solid ${isError ? "#c13515" : v ? "#1e8760" : "#d4e8dd"}`,
-            background: isError ? "#fff5f3" : "#fff",
-            color: isError ? "#c13515" : "#0c1c14",
+            border: `2px solid ${isError ? "#c13515" : v ? "#1e8760" : dark ? "#2a5c3c" : "#d4e8dd"}`,
+            background: isError ? (dark ? "#3a1a14" : "#fff5f3") : (dark ? "#0d2619" : "#fff"),
+            color: isError ? "#c13515" : (dark ? "#eaf5f0" : "#0c1c14"),
             outline: "none",
             transition: "border-color 0.15s, background 0.15s",
             boxSizing: "border-box",
@@ -189,7 +190,7 @@ function OTPInput({ length = 6, onComplete, isError, isLoading, version }) {
 // ─────────────────────────────────────────────────────────────────
 // OTPModal — overlay modal for OTP verification step
 // ─────────────────────────────────────────────────────────────────
-function OTPModal({ email, auth, onVerified, onCancel }) {
+function OTPModal({ email, auth, onVerified, onCancel, dark = false }) {
   const [otpVersion, setOtpVersion] = useState(0);
   const [otpStatus, setOtpStatus] = useState("idle"); // idle | loading | error
   const [otpError, setOtpError] = useState("");
@@ -262,7 +263,7 @@ function OTPModal({ email, auth, onVerified, onCancel }) {
     >
       <div
         style={{
-          background: "#fff",
+          background: dark ? "#132a1e" : "#fff",
           borderRadius: 20,
           width: "100%",
           maxWidth: 380,
@@ -281,7 +282,7 @@ function OTPModal({ email, auth, onVerified, onCancel }) {
               width: 52,
               height: 52,
               borderRadius: "50%",
-              background: "#eaf8f1",
+              background: dark ? "#0f2d1a" : "#eaf8f1",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
@@ -295,7 +296,7 @@ function OTPModal({ email, auth, onVerified, onCancel }) {
               fontFamily: "'Sora', sans-serif",
               fontSize: "1.05rem",
               fontWeight: 800,
-              color: "#0c1c14",
+              color: dark ? "#eaf5f0" : "#0c1c14",
               margin: "0 0 6px",
             }}
           >
@@ -303,7 +304,7 @@ function OTPModal({ email, auth, onVerified, onCancel }) {
           </h3>
           <p style={{ fontSize: 13, color: "#6a8b7c", margin: 0, lineHeight: 1.5 }}>
             A 6-digit code was sent to{" "}
-            <strong style={{ color: "#0c1c14" }}>{email}</strong>.
+            <strong style={{ color: dark ? "#eaf5f0" : "#0c1c14" }}>{email}</strong>.
             <br />Enter it below to continue.
           </p>
         </div>
@@ -316,6 +317,7 @@ function OTPModal({ email, auth, onVerified, onCancel }) {
           isError={otpStatus === "error"}
           isLoading={otpStatus === "loading"}
           version={otpVersion}
+          dark={dark}
         />
 
         {/* Error message */}
@@ -353,12 +355,12 @@ function OTPModal({ email, auth, onVerified, onCancel }) {
             onClick={onCancel}
             style={{
               background: "transparent",
-              border: "1.5px solid #d4e8dd",
+              border: `1.5px solid ${dark ? "#2a5c3c" : "#d4e8dd"}`,
               borderRadius: 10,
               padding: "9px 18px",
               fontSize: 13,
               fontWeight: 600,
-              color: "#4a6b5a",
+              color: dark ? "#9ab8a9" : "#4a6b5a",
               cursor: "pointer",
             }}
           >
@@ -368,13 +370,13 @@ function OTPModal({ email, auth, onVerified, onCancel }) {
             onClick={handleResend}
             disabled={resendCooldown > 0}
             style={{
-              background: resendCooldown > 0 ? "#e3ede8" : "#eaf8f1",
+              background: resendCooldown > 0 ? (dark ? "#1a3d28" : "#e3ede8") : (dark ? "#1a3d28" : "#eaf8f1"),
               border: "none",
               borderRadius: 10,
               padding: "9px 18px",
               fontSize: 13,
               fontWeight: 700,
-              color: resendCooldown > 0 ? "#6a8b7c" : "#1e8760",
+              color: resendCooldown > 0 ? "#6a8b7c" : (dark ? "#56c299" : "#1e8760"),
               cursor: resendCooldown > 0 ? "not-allowed" : "pointer",
               transition: "all 0.2s",
             }}
@@ -390,7 +392,7 @@ function OTPModal({ email, auth, onVerified, onCancel }) {
 // ─────────────────────────────────────────────────────────────────
 // SuccessModal — shown after password is changed successfully
 // ─────────────────────────────────────────────────────────────────
-function SuccessModal({ context, onDone }) {
+function SuccessModal({ context, onDone, dark = false }) {
   const isPin = context === "pin";
   return (
     <div
@@ -409,7 +411,7 @@ function SuccessModal({ context, onDone }) {
     >
       <div
         style={{
-          background: "#fff",
+          background: dark ? "#132a1e" : "#fff",
           borderRadius: 20,
           width: "100%",
           maxWidth: 360,
@@ -449,7 +451,7 @@ function SuccessModal({ context, onDone }) {
             fontFamily: "'Sora', sans-serif",
             fontSize: "1.15rem",
             fontWeight: 800,
-            color: "#0c1c14",
+            color: dark ? "#eaf5f0" : "#0c1c14",
             margin: "0 0 8px",
           }}
         >
@@ -458,7 +460,7 @@ function SuccessModal({ context, onDone }) {
         <p
           style={{
             fontSize: 13,
-            color: "#6a8b7c",
+            color: dark ? "#9ab8a9" : "#6a8b7c",
             margin: "0 0 24px",
             lineHeight: 1.6,
           }}
@@ -475,7 +477,7 @@ function SuccessModal({ context, onDone }) {
             padding: "11px 0",
             borderRadius: 12,
             border: "none",
-            background: "#0c1c14",
+            background: dark ? "#1e8760" : "#0c1c14",
             color: "#eaf5f0",
             fontSize: 14,
             fontWeight: 700,
@@ -505,6 +507,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
   const auth = useAuth();
   const { fetchWithAuth } = useAuth();
   const { logActivity } = useActivityLog();
+  const { dark } = useDashboard();
   const user = getUserData(auth);  
   const accountEmail = user?.email || auth.getUser()?.email || getEmailFromToken(auth.getToken());
   const isStaffUser = user?.isStaff || user?.role === "staff";
@@ -818,7 +821,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       padding: "12px",
     },
     modal: {
-      background: "#fff",
+      background: dark ? "#132a1e" : "#fff",
       borderRadius: "20px",
       width: "100%",
       maxWidth: "480px",
@@ -832,7 +835,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
     },
     header: {
       padding: "24px 28px 20px",
-      borderBottom: "1px solid #eaf3ee",
+      borderBottom: `1px solid ${dark ? "#1e3a2a" : "#eaf3ee"}`,
       display: "flex",
       alignItems: "flex-start",
       justifyContent: "space-between",
@@ -864,7 +867,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       fontFamily: "'Sora', sans-serif",
       fontSize: "1.1rem",
       fontWeight: 800,
-      color: "#0c1c14",
+      color: dark ? "#eaf5f0" : "#0c1c14",
       margin: 0,
       lineHeight: 1.2,
     },
@@ -877,7 +880,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       width: 32,
       height: 32,
       borderRadius: 8,
-      border: "1px solid #e0ede6",
+      border: `1px solid ${dark ? "#2a5c3c" : "#e0ede6"}`,
       background: "transparent",
       display: "flex",
       alignItems: "center",
@@ -907,9 +910,9 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       alignItems: "center",
       gap: 10,
       padding: "10px 14px",
-      background: "#f7faf8",
+      background: dark ? "#0d2619" : "#f7faf8",
       borderRadius: 10,
-      border: "1px solid #eaf3ee",
+      border: `1px solid ${dark ? "#1e3a2a" : "#eaf3ee"}`,
       marginBottom: 8,
     },
     readOnlyIcon: {
@@ -933,7 +936,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
     },
     readOnlyVal: {
       fontSize: "13px",
-      color: "#0c1c14",
+      color: dark ? "#eaf5f0" : "#0c1c14",
       fontWeight: 500,
       whiteSpace: "nowrap",
       overflow: "hidden",
@@ -955,17 +958,17 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       display: "block",
       fontSize: "12px",
       fontWeight: 600,
-      color: "#4a6b5a",
+      color: dark ? "#9ab8a9" : "#4a6b5a",
       marginBottom: 6,
     },
     input: {
       width: "100%",
       padding: "10px 14px",
       borderRadius: 10,
-      border: "1.5px solid #d4e8dd",
+      border: `1.5px solid ${dark ? "#2a5c3c" : "#d4e8dd"}`,
       fontSize: "13px",
-      color: "#0c1c14",
-      background: "#fff",
+      color: dark ? "#eaf5f0" : "#0c1c14",
+      background: dark ? "#0a1f15" : "#fff",
       outline: "none",
       transition: "border-color 0.15s, box-shadow 0.15s",
       boxSizing: "border-box",
@@ -985,10 +988,10 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       width: "100%",
       padding: "10px 40px 10px 14px",
       borderRadius: 10,
-      border: "1.5px solid #d4e8dd",
+      border: `1.5px solid ${dark ? "#2a5c3c" : "#d4e8dd"}`,
       fontSize: "13px",
-      color: "#0c1c14",
-      background: "#fff",
+      color: dark ? "#eaf5f0" : "#0c1c14",
+      background: dark ? "#0a1f15" : "#fff",
       outline: "none",
       transition: "border-color 0.15s, box-shadow 0.15s",
       boxSizing: "border-box",
@@ -1009,7 +1012,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
     },
     divider: {
       height: 1,
-      background: "#eaf3ee",
+      background: dark ? "#1e3a2a" : "#eaf3ee",
       margin: "4px 0 20px",
     },
     footer: {
@@ -1018,7 +1021,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       alignItems: "center",
       justifyContent: "space-between",
       gap: 10,
-      borderTop: "1px solid #eaf3ee",
+      borderTop: `1px solid ${dark ? "#1e3a2a" : "#eaf3ee"}`,
     },
     statusMsg: {
       display: "flex",
@@ -1035,11 +1038,11 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
     cancelBtn: {
       padding: "9px 18px",
       borderRadius: 10,
-      border: "1.5px solid #d4e8dd",
+      border: `1.5px solid ${dark ? "#2a5c3c" : "#d4e8dd"}`,
       background: "transparent",
       fontSize: "13px",
       fontWeight: 600,
-      color: "#4a6b5a",
+      color: dark ? "#9ab8a9" : "#4a6b5a",
       cursor: "pointer",
       transition: "background 0.15s",
     },
@@ -1047,7 +1050,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       padding: "9px 22px",
       borderRadius: 10,
       border: "none",
-      background: isSaving ? "#9ab8a9" : "#0c1c14",
+      background: isSaving ? (dark ? "#1a3d28" : "#9ab8a9") : (dark ? "#1e8760" : "#0c1c14"),
       fontSize: "13px",
       fontWeight: 700,
       color: "#eaf5f0",
@@ -1123,10 +1126,10 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
           border-color: #1e8760!important;
           box-shadow: 0 0 0 3px rgba(30,135,96,0.10)!important;
         }
-        .acc-close-btn:hover { background: #f0f8f4!important; color: #0c1c14!important; }
-        .acc-cancel-btn:hover { background: #f0f8f4!important; }
-        .acc-save-btn:hover:not(:disabled) { background: #1a3325!important; }
-        .acc-eye-btn:hover { color: #0c1c14!important; }
+        .acc-close-btn:hover { background: ${dark ? '#1a3d28' : '#f0f8f4'}!important; color: ${dark ? '#eaf5f0' : '#0c1c14'}!important; }
+        .acc-cancel-btn:hover { background: ${dark ? '#1a3d28' : '#f0f8f4'}!important; }
+        .acc-save-btn:hover:not(:disabled) { background: ${dark ? '#26a676' : '#1a3325'}!important; }
+        .acc-eye-btn:hover { color: ${dark ? '#eaf5f0' : '#0c1c14'}!important; }
         .acc-modal-scroll::-webkit-scrollbar { display: none; }
         .acc-modal-scroll { -ms-overflow-style: none; scrollbar-width: none; }
         @media (max-width: 480px) {
@@ -1145,12 +1148,13 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
           auth={auth}
           onVerified={handleOtpVerified}
           onCancel={() => setShowOtpModal(false)}
+          dark={dark}
         />
       )}
 
       {/* Success modal layer */}
       {showSuccessModal && (
-        <SuccessModal context={successContext} onDone={handleSuccessDone} />
+        <SuccessModal context={successContext} onDone={handleSuccessDone} dark={dark} />
       )}
 
       <div style={styles.overlay} ref={overlayRef} onClick={handleOverlayClick}>
@@ -1176,7 +1180,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
           </div>
 
           {/* ── Tabs ── */}
-          <div style={{ display: "flex", borderBottom: "1px solid #eaf3ee", padding: "0 20px" }}>
+          <div style={{ display: "flex", borderBottom: `1px solid ${dark ? "#1e3a2a" : "#eaf3ee"}`, padding: "0 20px" }}>
             {["profile", ...(isStaffUser ? [] : ["password"]), "pin", "activity"].map((tab) => (
               <button
                 key={tab}
@@ -1192,7 +1196,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                   padding: "10px 10px",
                   fontSize: 12,
                   fontWeight: 700,
-                  color: activeTab === tab ? "#0c1c14" : "#9ab8a9",
+                  color: activeTab === tab ? (dark ? "#eaf5f0" : "#0c1c14") : "#9ab8a9",
                   background: "none",
                   border: "none",
                   borderBottom: activeTab === tab ? "2px solid #1e8760" : "2px solid transparent",
@@ -1491,7 +1495,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
               });
               return (
               <div style={{ ...styles.section, marginBottom: 8 }}>
-                <div style={{ position: 'sticky', top: -24, background: '#fff', zIndex: 10, paddingTop: 4, paddingBottom: 8, marginBottom: 2 }}>
+                <div style={{ position: 'sticky', top: -24, background: dark ? '#132a1e' : '#fff', zIndex: 10, paddingTop: 4, paddingBottom: 8, marginBottom: 2 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                   <p style={{ ...styles.sectionLabel, marginBottom: 0 }}>Login & Security Activity</p>
                   <button
@@ -1524,7 +1528,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                       URL.revokeObjectURL(url);
                     }}
                     disabled={filtered.length === 0}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, border: '1px solid #d4e8dd', background: activityLog.length === 0 ? '#f7faf8' : '#eaf8f1', color: activityLog.length === 0 ? '#9ab8a9' : '#1e8760', fontSize: 12, fontWeight: 600, cursor: activityLog.length === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, border: `1px solid ${dark ? '#2a5c3c' : '#d4e8dd'}`, background: activityLog.length === 0 ? (dark ? '#0d2619' : '#f7faf8') : (dark ? '#1a3d28' : '#eaf8f1'), color: activityLog.length === 0 ? '#9ab8a9' : (dark ? '#56c299' : '#1e8760'), fontSize: 12, fontWeight: 600, cursor: activityLog.length === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
                   >
                     <i className="ti ti-download" style={{ fontSize: 13 }} />
                     Export CSV
@@ -1532,7 +1536,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                 </div>
                 <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
                   {[{id:'today',label:'Today'},{id:'week',label:'Last 7 days'},{id:'all',label:'All time'}].map((f) => (
-                    <button key={f.id} onClick={() => setActivityFilter(f.id)} style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid', borderColor: activityFilter === f.id ? '#1e8760' : '#d4e8dd', background: activityFilter === f.id ? '#eaf8f1' : 'transparent', color: activityFilter === f.id ? '#1e8760' : '#9ab8a9', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>{f.label}</button>
+                    <button key={f.id} onClick={() => setActivityFilter(f.id)} style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid', borderColor: activityFilter === f.id ? '#1e8760' : (dark ? '#2a5c3c' : '#d4e8dd'), background: activityFilter === f.id ? (dark ? '#1a3d28' : '#eaf8f1') : 'transparent', color: activityFilter === f.id ? (dark ? '#56c299' : '#1e8760') : '#9ab8a9', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>{f.label}</button>
                   ))}
                 </div>
                 </div>
@@ -1543,13 +1547,13 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                   </div>
                 ) : filtered.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "32px 0" }}>
-                    <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#f0f8f4", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
+                    <div style={{ width: 48, height: 48, borderRadius: "50%", background: dark ? "#0d2619" : "#f0f8f4", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
                       <i className="ti ti-history" style={{ fontSize: 22, color: "#9ab8a9" }} />
                     </div>
                     <p style={{ fontSize: 13, color: "#9ab8a9", margin: 0 }}>No activity recorded yet.</p>
                   </div>
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "340px", overflowY: "auto", paddingRight: 2 }}>
+                  <div className="acc-modal-scroll" style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "340px", overflowY: "auto", paddingRight: 2 }}>
                     {filtered.map((entry, i) => {
                       const isLogin      = entry.action === "login";
                       const isLogout     = entry.action === "logout";
@@ -1585,12 +1589,12 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                         hour: "numeric", minute: "2-digit", hour12: true,
                       });
                       return (
-                        <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", background: "#f7faf8", borderRadius: 12, border: "1px solid #eaf3ee" }}>
+                        <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", background: dark ? "#0d2619" : "#f7faf8", borderRadius: 12, border: `1px solid ${dark ? "#1e3a2a" : "#eaf3ee"}` }}>
                           <div style={{ width: 36, height: 36, borderRadius: "50%", background: iconBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                             <i className={`ti ${icon}`} style={{ fontSize: 16, color: iconColor }} />
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#0c1c14", marginBottom: 2 }}>{label}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: dark ? "#eaf5f0" : "#0c1c14", marginBottom: 2 }}>{label}</div>
                             <div style={{ fontSize: 11, color: "#9ab8a9" }}>{time}</div>
                               {entry.performedBy && (entry.performedBy.email || entry.performedBy.firstName) && (
                               <div style={{ fontSize: 11, color: "#b0c8ba", marginTop: 2 }}>

@@ -1069,7 +1069,7 @@ router.post('/send-change-password-otp', requireAuth, async (req, res, next) => 
     user.resetToken       = hashed;
     user.resetTokenExpiry = expiry;
     await user.save();
-    try { await sendResetEmail(user.email, user.firstName || user.businessName, rawToken); }
+    try { await sendVerificationEmail(user.email, user.firstName || user.businessName, rawToken); }
     catch (e) { console.error('User change-password OTP send failed:', e); }
 
     res.json({ message: 'A verification code has been sent to your email.' });
