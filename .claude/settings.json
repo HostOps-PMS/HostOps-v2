@@ -4,7 +4,14 @@
       "Bash(node -e ' *)",
       "Bash(node -e \"import\\('./backend/routes/auth.js'\\).then\\(\\(\\) => console.log\\('auth.js OK'\\)\\).catch\\(e => console.error\\('auth.js ERROR:', e.message\\)\\)\")",
       "Bash(xargs grep -l \"unarchive\\\\|archive\")",
-      "Bash(grep -v \"//.*http\")"
+      "Bash(grep -v \"//.*http\")",
+      "Bash(node -e \"const c=require\\('crypto'\\); console.log\\('RESPONSE_MASTER_KEY='+c.randomBytes\\(32\\).toString\\('hex'\\)\\); console.log\\('RESPONSE_HMAC_KEY='+c.randomBytes\\(32\\).toString\\('hex'\\)\\);\")",
+      "Bash(ls \"c:\\\\Users\\\\hhsarmiento\\\\.claude\\\\projects\\\\c--Users-hhsarmiento-Desktop-HostOps-v2\\\\memory\\\\\" 2>/dev/null | head -20)",
+      "Read(//c/Users/hhsarmiento/.claude/projects/c--Users-hhsarmiento-Desktop-HostOps-v2/memory\" 2>/dev/**)",
+      "Read(//c/Users/hhsarmiento/.claude/projects/c--Users-hhsarmiento-Desktop-HostOps-v2/memory/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\hhsarmiento\\.claude\\projects\\c--Users-hhsarmiento-Desktop-HostOps-v2\\memory"
     ]
   }
 }

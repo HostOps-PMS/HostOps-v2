@@ -84,6 +84,7 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
       // the parent client's properties from /api/properties.
       if (data.isClientAccount) {
         auth.setToken(data.accessToken);
+        if (data.sk) auth.setSessionKey(data.sk);
         auth.setUser({ ...data.clientAccount, role: 'clientAccount', isClientAccount: true });
 
         if (data.mustChangePassword) {
@@ -115,6 +116,7 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
       }
 
       auth.setToken(data.accessToken);
+      if (data.sk) auth.setSessionKey(data.sk);
 
       // Staff login returns data.staff (not data.user).
       // Normalise so auth context and downstream handlers always have data.user.

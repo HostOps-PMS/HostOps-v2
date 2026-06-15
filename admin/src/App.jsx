@@ -4,7 +4,6 @@ import './App.css';
 
 import { NotificationsProvider } from './context/NotificationsContext';
 import ToastContainer from './components/ToastContainer';
-import LoginPage     from './pages/Login';
 import Dashboard     from './pages/dashboard';
 import Clients       from './pages/clients';
 import Staffs        from './pages/Staffs/index';
@@ -47,7 +46,7 @@ const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5174
 
 function PrivateRoute({ children }) {
   const token = sessionStorage.getItem('hp_access_token');
-  if (!token) return <Navigate to="/login" replace />;
+  if (!token) { window.location.href = `${FRONTEND_URL}/login`; return null; }
   
   try {
     const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
@@ -67,15 +66,15 @@ function PrivateRoute({ children }) {
 
 function TeamLeaderRoute({ children }) {
   const token = sessionStorage.getItem('hp_access_token');
-  if (!token) return <Navigate to="/login" replace />;
-  
+  if (!token) { window.location.href = `${FRONTEND_URL}/login`; return null; }
+
   try {
     const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
     if (user.role !== 'team_leader') {
       return <Navigate to="/dashboard" replace />;
     }
   } catch (e) {
-    return <Navigate to="/login" replace />;
+    window.location.href = `${FRONTEND_URL}/login`; return null;
   }
 
   return children;
@@ -88,14 +87,13 @@ function TeamLeaderRoute({ children }) {
 // until the user passes it — so no content is shown before verification.
 function AdminEntryRedirect() {
   const token = sessionStorage.getItem('hp_access_token');
-  if (!token) return <Navigate to="/login" replace />;
+  if (!token) { window.location.href = `${FRONTEND_URL}/login`; return null; }
   try {
     const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
     if (user.role === 'team_leader') return <Navigate to="/team-leader/staffs" replace />;
-    // admin → main dashboard
     return <Navigate to="/dashboard" replace />;
   } catch {
-    return <Navigate to="/login" replace />;
+    window.location.href = `${FRONTEND_URL}/login`; return null;
   }
 }
 
@@ -144,8 +142,6 @@ export default function App() {
       )}
 
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-
         {/* ── Entry point from the login app cross-origin redirect ── */}
         <Route path="/admin" element={<AdminEntryRedirect />} />
 
@@ -229,7 +225,7 @@ export default function App() {
           }
         />
 
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<AdminEntryRedirect />} />
       </Routes>
       </NotificationsProvider>
     </BrowserRouter>

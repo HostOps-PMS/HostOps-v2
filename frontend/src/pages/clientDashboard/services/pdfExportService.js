@@ -6,7 +6,7 @@
 // Run once before deploying:
 //   npm install jspdf jspdf-autotable
 // ─────────────────────────────────────────────────────────────────────────────
-import { jspdf } from 'jspdf';
+import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 function fmtMoney(val) {
@@ -839,7 +839,7 @@ export async function exportDashboardPDF(dashState, user) {
     }
   }
 
-  const doc       = new jspdf({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const doc       = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin    = 14;
 
