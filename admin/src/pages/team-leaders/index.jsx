@@ -139,37 +139,26 @@ export default function TeamLeaders() {
               {/* New Team Leader button */}
               <button
                 onClick={() => setModal({ type: 'create' })}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 7,
-                  padding: '9px 18px',
-                  background: '#10b981', color: '#fff',
-                  border: 'none', borderRadius: 10,
-                  cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600,
-                  letterSpacing: '0.01em', whiteSpace: 'nowrap',
-                  transition: 'background 0.15s',
-                  boxShadow: '0 2px 8px rgba(16,185,129,0.18)',
-                }}
+                className="tl-add-btn"
                 onMouseEnter={e => { e.currentTarget.style.background = '#059669'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = '#10b981'; }}
+                title="New Team Leader"
               >
-                + New Team Leader
+                <span className="tl-add-icon">+</span>
+                <span className="tl-add-label">New Team Leader</span>
               </button>
 
               {/* Export PDF button */}
               <button
                 onClick={handleExport}
                 disabled={exportLoading || loading}
+                className="tl-export-btn"
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 7,
-                  padding: '9px 18px',
-                  background: (exportLoading || loading) ? '#f3f4f6' : '#fff',
-                  color: (exportLoading || loading) ? '#aaa' : '#374151',
-                  border: (exportLoading || loading) ? '1px solid #e5e7eb' : '1px solid #d1d5db',
-                  borderRadius: 10,
-                  cursor: (exportLoading || loading) ? 'not-allowed' : 'pointer',
-                  fontSize: '0.875rem', fontWeight: 600,
-                  letterSpacing: '0.01em', whiteSpace: 'nowrap',
-                  transition: 'background 0.15s',
+                  background: (exportLoading || loading) ? '#f3f4f6' : undefined,
+                  color: (exportLoading || loading) ? '#aaa' : undefined,
+                  border: (exportLoading || loading) ? '1px solid #e5e7eb' : undefined,
+                  cursor: (exportLoading || loading) ? 'not-allowed' : undefined,
+                  opacity: (exportLoading || loading) ? 0.7 : 1,
                 }}
                 onMouseEnter={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#f9fafb'; }}
                 onMouseLeave={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#fff'; }}
@@ -181,7 +170,41 @@ export default function TeamLeaders() {
             </div>
             <style>{`
               @keyframes tl-pdf-spin { to { transform: rotate(360deg); } }
+
+              .tl-add-btn {
+                display: inline-flex; align-items: center; gap: 7px;
+                padding: 9px 16px;
+                background: #10b981; color: #fff;
+                border: none; border-radius: 10px;
+                cursor: pointer; font-size: 0.875rem; font-weight: 600;
+                transition: background 0.15s; white-space: nowrap;
+                box-shadow: 0 2px 8px rgba(16,185,129,0.18);
+              }
+              .tl-add-icon { font-size: 1.1rem; font-weight: 400; }
+              .tl-add-label { display: inline; }
+
+              .tl-export-btn {
+                display: inline-flex; align-items: center; gap: 7px;
+                padding: 9px 16px;
+                background: #fff; color: #374151;
+                border: 1px solid #d1d5db; border-radius: 10px;
+                cursor: pointer; font-size: 0.875rem; font-weight: 600;
+                transition: background 0.15s; white-space: nowrap;
+              }
+              .tl-export-label { display: inline; }
+
               @media (max-width: 768px) {
+                .tl-add-btn {
+                  width: 38px; height: 38px; padding: 0;
+                  justify-content: center; border-radius: 12px;
+                  box-shadow: none;
+                }
+                .tl-add-label { display: none; }
+
+                .tl-export-btn {
+                  width: 38px; height: 38px; padding: 0;
+                  justify-content: center; border-radius: 12px;
+                }
                 .tl-export-label { display: none; }
               }
             `}</style>
