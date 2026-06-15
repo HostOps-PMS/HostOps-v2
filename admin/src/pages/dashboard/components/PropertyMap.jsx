@@ -282,13 +282,16 @@ function useApartmentImages(clientId, apartmentId) {
 //
 // NOTE: L is now a bundled import, not window.L. The map is created
 // directly — no async CDN loading, no leafletReady / leafletError state.
-function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId, mapStyle = 'standard') {
+function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId, mapStyle = 'standard', extraDep = undefined) {
   const mapRef     = useRef(null);
   const markersRef = useRef([]);
   const clusterRef = useRef(null);
   const tileRef    = useRef(null);
 
-  // Init / re-init map when DOM node becomes available
+  // Init / re-init map when DOM node becomes available.
+  // extraDep lets callers (e.g. a modal) trigger re-init when they become visible,
+  // because ref.current is still null during the render phase when the container
+  // first mounts — it's only set after commit, which is when this effect runs.
   useEffect(() => {
     if (!containerRef.current) return;
     ensurePmStyles();
@@ -334,7 +337,7 @@ function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId, mapS
       if (markerMapRef) markerMapRef.current = {};
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [containerRef.current]);
+  }, [containerRef.current, extraDep]);
 
   // Update markers whenever plottable list changes
   useEffect(() => {
@@ -480,14 +483,16 @@ function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId, mapS
             </div>
           </div>`;
       })();
-      // Compact popup — no close button, no auto-pan; shown on HOVER only.
+      // Compact popup — shown on HOVER only. autoPan keeps the popup inside the
+      // map container (overflow:hidden clips it otherwise near the edges).
       marker.bindPopup(popupHtml, {
-        closeButton: false,
-        autoPan:     false,
-        offset:      [0, -4],
-        className:   'pm-popup',
-        minWidth:    150,
-        maxWidth:    230,
+        closeButton:    false,
+        autoPan:        true,
+        autoPanPadding: [20, 20],
+        offset:         [0, -4],
+        className:      'pm-popup',
+        minWidth:       150,
+        maxWidth:       230,
       });
 
       // ── Hover-to-show details (with small anti-flicker delay) ─────
@@ -1061,7 +1066,7 @@ export default function PropertyMap({ mapLocations, loading }) {
   // ── Leaflet map ────────────────────────────────────────────────
   const mapContainerRef = useRef(null);
   useLeafletMap(mapContainerRef, mapPoints, markerMapRef, focusedAptId, mapStyle);
-  useLeafletMap(modalMapContainerRef, mapPoints, modalMarkerMapRef, focusedAptId, mapStyle);
+  useLeafletMap(modalMapContainerRef, mapPoints, modalMarkerMapRef, focusedAptId, mapStyle, isModalOpen);
 
   // ── Dropdown options ───────────────────────────────────────────
   const propertyOptions = useMemo(() => {
@@ -1203,7 +1208,7 @@ export default function PropertyMap({ mapLocations, loading }) {
           >
             {/* Map style switcher */}
             <div style={{
-              position: 'absolute', top: 80, left: 10, zIndex: 1000,
+              position: 'absolute', top: 10, right: 10, zIndex: 1000,
               display: 'flex', borderRadius: 8, overflow: 'hidden',
               border: '1px solid rgba(0,0,0,0.18)',
               boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
@@ -1456,6 +1461,30 @@ export default function PropertyMap({ mapLocations, loading }) {
                 className="pm-modal-map"
                 style={{ flex: 1, minWidth: 0, zIndex: 0, overflow: 'hidden', position: 'relative', WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
               >
+                {/* Map style switcher — top-right of map area */}
+                <div style={{
+                  position: 'absolute', top: 10, right: 10, zIndex: 1000,
+                  display: 'flex', borderRadius: 8, overflow: 'hidden',
+                  border: '1px solid rgba(0,0,0,0.18)',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
+                }}>
+                  {Object.entries(MAP_STYLES).map(([key, val], i, arr) => (
+                    <button
+                      key={key}
+                      onClick={() => setMapStyle(key)}
+                      style={{
+                        padding: '5px 12px', fontSize: '12px', fontWeight: 600,
+                        fontFamily: 'var(--font-body)', border: 'none',
+                        borderRight: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.1)' : 'none',
+                        cursor: 'pointer',
+                        background: mapStyle === key ? '#1a9e6e' : 'rgba(255,255,255,0.93)',
+                        color: mapStyle === key ? '#fff' : '#374151',
+                        transition: 'background 0.15s, color 0.15s',
+                      }}
+                    >{val.label}</button>
+                  ))}
+                </div>
+
                 {!isMapLoading && locations.length > 0 && plottable.length === 0 && (
                   <div style={{
                     position: 'absolute', inset: 0, zIndex: 1000,
@@ -1469,30 +1498,6 @@ export default function PropertyMap({ mapLocations, loading }) {
                     </div>
                   </div>
                 )}
-              </div>
-
-              {/* Map style switcher — modal */}
-              <div style={{
-                position: 'absolute', top: 10, left: 10, zIndex: 1000,
-                display: 'flex', borderRadius: 8, overflow: 'hidden',
-                border: '1px solid rgba(0,0,0,0.18)',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
-              }}>
-                {Object.entries(MAP_STYLES).map(([key, val], i, arr) => (
-                  <button
-                    key={key}
-                    onClick={() => setMapStyle(key)}
-                    style={{
-                      padding: '5px 12px', fontSize: '12px', fontWeight: 600,
-                      fontFamily: 'var(--font-body)', border: 'none',
-                      borderRight: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.1)' : 'none',
-                      cursor: 'pointer',
-                      background: mapStyle === key ? '#1a9e6e' : 'rgba(255,255,255,0.93)',
-                      color: mapStyle === key ? '#fff' : '#374151',
-                      transition: 'background 0.15s, color 0.15s',
-                    }}
-                  >{val.label}</button>
-                ))}
               </div>
 
               {/* Legend + Detail — tabbed */}
