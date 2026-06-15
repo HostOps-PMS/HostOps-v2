@@ -13,6 +13,9 @@ const SLIDES = [
 export default function AuthModal({ onAuthorized }) {
   const otp = useOtp();
   const auth = useAuthorization(onAuthorized);
+  const maskedEmail = auth.userEmail
+    ? auth.userEmail.replace(/(.{2})(.*)(@.*)/, (_, a, b, c) => a + '*'.repeat(b.length) + c)
+    : '';
   const [currentSlide, setCurrentSlide] = useState(0);
 
   useEffect(() => {
@@ -77,7 +80,8 @@ export default function AuthModal({ onAuthorized }) {
 
         <h1 className="am-title" id="am-title">Two-step verification</h1>
         <p className="am-sub">
-          Enter the <strong>6-digit code</strong> sent to your registered email.
+          Enter the <strong>6-digit code</strong> sent to{' '}
+          {maskedEmail ? <strong>{maskedEmail}</strong> : 'your registered email'}.
         </p>
 
         {auth.message && (
