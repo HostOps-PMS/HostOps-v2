@@ -67,6 +67,7 @@ function sanitizeUser(user) {
     mustChangePin:      obj.mustChangePin,
     propertyTagPrefix:  obj.propertyTagPrefix,
     serverId:           obj.serverId,
+    totpEnabled:        obj.totpEnabled || false,
     // propertyPicture is replaced with proxy URL —
     // the real Cloudinary URL never leaves the server.
     properties: (obj.properties || []).map(p => ({
@@ -1232,6 +1233,114 @@ router.get('/pin-status', requireAuth, async (req, res, next) => {
     const user = await User.findOne({ email: req.user.email }).select('+pin');
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({ email: user.email, role: user.role, hasPin: !!user.pin, pinLength: user.pin ? user.pin.length : 0 });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/totp/setup  — generate secret + QR code
+// ─────────────────────────────────────────────────────────────────
+router.post('/totp/setup', requireAuth, async (req, res, next) => {
+  try {
+    const speakeasy = await import('speakeasy');
+    const QRCode    = await import('qrcode');
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const secret = speakeasy.default.generateSecret({
+      name:   `HostOps (${user.email})`,
+      length: 20,
+    });
+
+    // Store secret temporarily — only saved permanently after verify
+    user.totpSecret  = secret.base32;
+    user.totpEnabled = false;
+    await user.save();
+
+    const qrCodeUrl = await QRCode.default.toDataURL(secret.otpauth_url);
+
+    res.json({ secret: secret.base32, qrCode: qrCodeUrl });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/totp/verify-setup  — confirm TOTP is working, enable it
+// ─────────────────────────────────────────────────────────────────
+router.post('/totp/verify-setup', requireAuth, async (req, res, next) => {
+  try {
+    const speakeasy = await import('speakeasy');
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token required' });
+
+    const user = await User.findById(req.user._id).select('+totpSecret');
+    if (!user || !user.totpSecret) return res.status(400).json({ error: 'No TOTP setup in progress' });
+
+    const verified = speakeasy.default.totp.verify({
+      secret:   user.totpSecret,
+      encoding: 'base32',
+      token:    token.replace(/\s/g, ''),
+      window:   1,
+    });
+
+    if (!verified) return res.status(401).json({ error: 'Invalid code. Please try again.' });
+
+    user.totpEnabled = true;
+    await user.save();
+
+    res.json({ ok: true, message: 'Authenticator app enabled successfully.' });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/totp/disable  — turn off TOTP
+// ─────────────────────────────────────────────────────────────────
+router.post('/totp/disable', requireAuth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    user.totpSecret  = null;
+    user.totpEnabled = false;
+    await user.save();
+
+    res.json({ ok: true, message: 'Authenticator app disabled.' });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/totp/verify  — verify TOTP code during login
+// ─────────────────────────────────────────────────────────────────
+router.post('/totp/verify', async (req, res, next) => {
+  try {
+    const speakeasy = await import('speakeasy');
+    const { email, token } = req.body;
+    if (!email || !token) return res.status(400).json({ error: 'Email and token required' });
+
+    const user = await User.findOne({ email: email.toLowerCase() }).select('+totpSecret');
+    if (!user || !user.totpEnabled || !user.totpSecret) {
+      return res.status(400).json({ error: 'TOTP not enabled for this account' });
+    }
+
+    const verified = speakeasy.default.totp.verify({
+      secret:   user.totpSecret,
+      encoding: 'base32',
+      token:    token.replace(/\s/g, ''),
+      window:   1,
+    });
+
+    if (!verified) return res.status(401).json({ error: 'Invalid code. Please try again.' });
+
+    const { encAccessToken, rawRefresh } = await issueTokenPair(
+      signAccessToken, signRefreshToken, user, req
+    );
+
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    setRefreshCookie(res, rawRefresh);
+
+    const isAdmin = user.tag === 'Main Admin' || user.role === 'admin' || user.email === process.env.ADMIN_ROLE;
+    res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin });
   } catch (err) { next(err); }
 });
 

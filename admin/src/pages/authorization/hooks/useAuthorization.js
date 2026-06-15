@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { verifyOtp, resendOtp, sendLoginOtp } from '../services/authService';
+import { verifyOtp, resendOtp, sendLoginOtp, verifyTotp } from '../services/authService';
 
 const RESEND_COOLDOWN_SEC = 60;
 
@@ -128,12 +128,35 @@ export function useAuthorization(onAuthorized) {
     }
   }
 
-  const userEmail = (() => {
+const userEmail = (() => {
     try {
       const u = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
       return u.email || u.businessEmail || '';
     } catch { return ''; }
   })();
 
-  return { loading, resendLoading, resendCooldown, message, submit, resend, userEmail };
+  const totpEnabled = (() => {
+    try {
+      const u = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
+      return u.totpEnabled ?? false;
+    } catch { return false; }
+  })();
+
+  async function submitTotp(token) {
+    setLoading(true);
+    setMessage(null);
+    try {
+      await verifyTotp(token);
+      showMessage('Code verified! Redirecting…', 'success');
+      setTimeout(() => onAuthorized(), 600);
+      return true;
+    } catch (err) {
+      showMessage(err.message ?? 'Invalid code. Please try again.');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return { loading, resendLoading, resendCooldown, message, submit, resend, userEmail, totpEnabled, submitTotp };
 }

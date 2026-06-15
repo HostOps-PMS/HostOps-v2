@@ -3,6 +3,56 @@ import { sendLoginOtp, verifyOtp } from "../../authorization/services/authServic
 import { authHeaders } from "../../../lib/authUtils";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "https://hostpilot-smoobu.onrender.com";
+const API_KEY  = import.meta.env.VITE_API_KEY ?? '';
+
+async function setupTotp() {
+  const token = sessionStorage.getItem("hp_access_token");
+  const res = await fetch(`${API_BASE}/auth/totp/setup`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": API_KEY,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    credentials: "include",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Failed to start setup.");
+  return data; // { secret, qrCode }
+}
+
+async function verifyTotpSetup(token6) {
+  const token = sessionStorage.getItem("hp_access_token");
+  const res = await fetch(`${API_BASE}/auth/totp/verify-setup`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": API_KEY,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    credentials: "include",
+    body: JSON.stringify({ token: token6 }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Invalid code.");
+  return data;
+}
+
+async function disableTotp() {
+  const token = sessionStorage.getItem("hp_access_token");
+  const res = await fetch(`${API_BASE}/auth/totp/disable`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": API_KEY,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    credentials: "include",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Failed to disable.");
+  return data;
+}
 
 // ─────────────────────────────────────────────────────────────────
 // changeAdminPassword
@@ -130,8 +180,17 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
   const [showPw, setShowPw] = useState({ current: false, next: false, confirm: false });
 
   const [showOtpModal, setShowOtpModal] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const verifiedTokenRef = useRef(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const verifiedTokenRef = useRef(null);
+
+  // ── Security / TOTP state ──
+  const [totpEnabled, setTotpEnabled] = useState(user?.totpEnabled ?? false);
+  const [totpStep, setTotpStep] = useState('idle'); // 'idle' | 'qr' | 'verify' | 'done' | 'disabling'
+  const [totpQr, setTotpQr] = useState('');
+  const [totpSecret, setTotpSecret] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [totpLoading, setTotpLoading] = useState(false);
+  const [totpMsg, setTotpMsg] = useState(null); // { text, type }
 
   const overlayRef = useRef(null);
 
@@ -532,7 +591,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
 
           {/* ── Tabs ── */}
           <div style={{ display: "flex", borderBottom: "1px solid #eaf3ee", padding: "0 28px" }}>
-            {["profile", "password"].map((tab) => (
+            {["profile", "password", "security"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => {
@@ -554,7 +613,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                   transition: "color 0.15s",
                 }}
               >
-                {tab === "profile" ? "Profile" : "Change Password"}
+                {tab === "profile" ? "Profile" : tab === "password" ? "Change Password" : "Security"}
               </button>
             ))}
           </div>
@@ -608,8 +667,188 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
               </>
             )}
 
-            {/* ── PASSWORD TAB ── */}
-            {activeTab === "password" && (() => {
+            {/* ── SECURITY TAB ── */}
+            {activeTab === "security" && (
+              <div style={styles.section}>
+                <p style={styles.sectionLabel}>Authenticator App</p>
+
+                {/* Status row */}
+                <div style={{ ...styles.readOnlyRow, marginBottom: 16, justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <i className="ti ti-device-mobile" style={{ ...styles.readOnlyIcon, fontSize: 18 }} />
+                    <div>
+                      <p style={styles.readOnlyKey}>Two-Factor Authentication</p>
+                      <p style={{ ...styles.readOnlyVal, color: totpEnabled ? '#1e8760' : '#9ab8a9' }}>
+                        {totpEnabled ? 'Enabled' : 'Disabled'}
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{
+                    width: 36, height: 20, borderRadius: 10, cursor: 'pointer',
+                    background: totpEnabled ? '#1e8760' : '#d4e8dd',
+                    position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                  }} onClick={async () => {
+                    if (totpEnabled) {
+                      setTotpStep('disabling');
+                      setTotpMsg(null);
+                    } else {
+                      setTotpLoading(true);
+                      setTotpMsg(null);
+                      try {
+                        const { secret, qrCode } = await setupTotp();
+                        setTotpQr(qrCode);
+                        setTotpSecret(secret);
+                        setTotpStep('qr');
+                      } catch (err) {
+                        setTotpMsg({ text: err.message, type: 'error' });
+                      } finally {
+                        setTotpLoading(false);
+                      }
+                    }
+                  }}>
+                    <div style={{
+                      position: 'absolute', top: 3, width: 14, height: 14, borderRadius: '50%',
+                      background: '#fff', transition: 'left 0.2s',
+                      left: totpEnabled ? 19 : 3,
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
+                    }} />
+                  </div>
+                </div>
+
+                {totpMsg && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, marginBottom: 12,
+                    color: totpMsg.type === 'error' ? '#c13515' : '#1e8760' }}>
+                    <i className={totpMsg.type === 'error' ? 'ti ti-alert-circle' : 'ti ti-circle-check'} style={{ fontSize: 14 }} />
+                    {totpMsg.text}
+                  </div>
+                )}
+
+                {/* QR step */}
+                {totpStep === 'qr' && (
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: 12, color: '#4a6b5a', marginBottom: 12, lineHeight: 1.6 }}>
+                      Scan this QR code with your authenticator app<br />
+                      <strong>(Google Authenticator, Authy, etc.)</strong>
+                    </p>
+                    <img src={totpQr} alt="QR Code" style={{ width: 180, height: 180, borderRadius: 12, border: '1px solid #eaf3ee', marginBottom: 12 }} />
+                    <p style={{ fontSize: 11, color: '#9ab8a9', marginBottom: 16 }}>
+                      Or enter this code manually:<br />
+                      <strong style={{ fontSize: 13, color: '#0c1c14', letterSpacing: '0.1em', fontFamily: 'monospace' }}>{totpSecret}</strong>
+                    </p>
+                    <button onClick={() => setTotpStep('verify')} style={{ ...styles.saveBtn(false), width: '100%', justifyContent: 'center' }} className="acc-save-btn">
+                      I've scanned it — Next →
+                    </button>
+                    <button onClick={() => { setTotpStep('idle'); setTotpCode(''); setTotpMsg(null); }}
+                      style={{ ...styles.cancelBtn, width: '100%', marginTop: 8, textAlign: 'center' }} className="acc-cancel-btn">
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
+                {/* Verify step */}
+                {totpStep === 'verify' && (
+                  <div>
+                    <p style={{ fontSize: 12, color: '#4a6b5a', marginBottom: 12, lineHeight: 1.6 }}>
+                      Enter the <strong>6-digit code</strong> from your authenticator app to confirm setup.
+                    </p>
+                    <input
+                      type="text" inputMode="numeric" maxLength={6}
+                      placeholder="000000"
+                      value={totpCode}
+                      onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      style={{ ...styles.input, textAlign: 'center', fontSize: 22, letterSpacing: '0.3em', fontWeight: 700, marginBottom: 12 }}
+                      className="acc-input"
+                    />
+                    <button
+                      disabled={totpCode.length < 6 || totpLoading}
+                      onClick={async () => {
+                        setTotpLoading(true);
+                        setTotpMsg(null);
+                        try {
+                          await verifyTotpSetup(totpCode);
+                          const u = { ...user, totpEnabled: true };
+                          sessionStorage.setItem('hp_user', JSON.stringify(u));
+                          setTotpEnabled(true);
+                          setTotpStep('done');
+                          setTotpMsg({ text: 'Authenticator enabled successfully!', type: 'success' });
+                        } catch (err) {
+                          setTotpMsg({ text: err.message, type: 'error' });
+                          setTotpCode('');
+                        } finally {
+                          setTotpLoading(false);
+                        }
+                      }}
+                      style={{ ...styles.saveBtn(totpLoading || totpCode.length < 6), width: '100%', justifyContent: 'center' }}
+                      className="acc-save-btn"
+                    >
+                      {totpLoading
+                        ? <><i className="ti ti-loader-2" style={{ fontSize: 14, animation: 'spin 0.8s linear infinite' }} />Verifying…</>
+                        : <><i className="ti ti-check" style={{ fontSize: 14 }} />Confirm & Enable</>}
+                    </button>
+                    <button onClick={() => { setTotpStep('qr'); setTotpCode(''); setTotpMsg(null); }}
+                      style={{ ...styles.cancelBtn, width: '100%', marginTop: 8, textAlign: 'center' }} className="acc-cancel-btn">
+                      ← Back
+                    </button>
+                  </div>
+                )}
+
+                {/* Disable confirm step */}
+                {totpStep === 'disabling' && (
+                  <div style={{ background: '#fff5f5', border: '1px solid #fcd4cc', borderRadius: 10, padding: '14px 16px' }}>
+                    <p style={{ fontSize: 13, color: '#c13515', fontWeight: 600, marginBottom: 6 }}>
+                      Disable Authenticator App?
+                    </p>
+                    <p style={{ fontSize: 12, color: '#6a8b7c', marginBottom: 14, lineHeight: 1.6 }}>
+                      Your account will be less secure. You can always re-enable it later.
+                    </p>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => setTotpStep('idle')}
+                        style={{ ...styles.cancelBtn, flex: 1 }} className="acc-cancel-btn">
+                        Keep it
+                      </button>
+                      <button
+                        disabled={totpLoading}
+                        onClick={async () => {
+                          setTotpLoading(true);
+                          setTotpMsg(null);
+                          try {
+                            await disableTotp();
+                            const u = { ...user, totpEnabled: false };
+                            sessionStorage.setItem('hp_user', JSON.stringify(u));
+                            setTotpEnabled(false);
+                            setTotpStep('idle');
+                            setTotpMsg({ text: 'Authenticator disabled.', type: 'success' });
+                          } catch (err) {
+                            setTotpMsg({ text: err.message, type: 'error' });
+                            setTotpStep('idle');
+                          } finally {
+                            setTotpLoading(false);
+                          }
+                        }}
+                        style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: 'none',
+                          background: totpLoading ? '#9ab8a9' : '#c13515', color: '#fff',
+                          fontSize: 13, fontWeight: 700, cursor: totpLoading ? 'not-allowed' : 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                      >
+                        {totpLoading
+                          ? <><i className="ti ti-loader-2" style={{ fontSize: 14, animation: 'spin 0.8s linear infinite' }} />Disabling…</>
+                          : 'Yes, disable'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Idle info */}
+                {totpStep === 'idle' && !totpEnabled && (
+                  <p style={{ fontSize: 12, color: '#9ab8a9', lineHeight: 1.6, marginTop: 4 }}>
+                    Add an extra layer of security to your account. Toggle the switch above to get started.
+                  </p>
+                )}
+              </div>
+            )}
+
+          {/* ── PASSWORD TAB ── */}
+          {activeTab === "password" && (() => {
               const pw = pwForm.newPassword;
               const hasUpper = /[A-Z]/.test(pw);
               const hasNumber = /[0-9]/.test(pw);

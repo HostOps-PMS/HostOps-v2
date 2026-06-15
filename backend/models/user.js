@@ -102,6 +102,10 @@ const userSchema = new mongoose.Schema({
   pinLockedUntil:       { type: Date,   default: null },
   pinPermanentlyLocked: { type: Boolean, default: false },
 
+  // ── TOTP Authenticator ────────────────────────────────────────────
+  totpSecret:  { type: String, default: null, select: false },
+  totpEnabled: { type: Boolean, default: false },
+
   isArchive: { type: Boolean, default: false },
 
   lastLoginAt: { type: Date },

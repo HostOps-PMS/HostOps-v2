@@ -17,6 +17,7 @@ export default function AuthModal({ onAuthorized }) {
     ? auth.userEmail.replace(/(.{2})(.*)(@.*)/, (_, a, b, c) => a + '*'.repeat(b.length) + c)
     : '';
   const [currentSlide, setCurrentSlide] = useState(0);
+const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -78,62 +79,135 @@ export default function AuthModal({ onAuthorized }) {
           </div>
         </div>
 
-        <h1 className="am-title" id="am-title">Two-step verification</h1>
-        <p className="am-sub">
-          Enter the <strong>6-digit code</strong> sent to{' '}
-          {maskedEmail ? <strong>{maskedEmail}</strong> : 'your registered email'}.
-        </p>
+        {/* ── CHOOSE METHOD SCREEN ── */}
+        {method === 'choose' && (
+          <>
+            <h1 className="am-title" id="am-title">Two-step verification</h1>
+            <p className="am-sub">Choose how you want to verify your identity.</p>
 
-        {auth.message && (
-          <div className={`am-msg am-msg--${auth.message.type}`}>
-            {auth.message.text}
-          </div>
+            {auth.message && (
+              <div className={`am-msg am-msg--${auth.message.type}`}>{auth.message.text}</div>
+            )}
+
+            <button
+              className="am-btn am-btn--modern"
+              style={{ marginBottom: 12, background: '#1e8760' }}
+              onClick={() => setMethod('totp')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01"/>
+              </svg>
+              Use Authenticator App
+            </button>
+
+            <button
+              className="am-btn am-btn--modern"
+              onClick={() => { setMethod('email'); auth.resend(); }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+              </svg>
+              Use Email OTP
+            </button>
+
+            <div className="am-footer">© 2026 HostOps. All rights reserved.</div>
+          </>
         )}
 
-        <form onSubmit={handleSubmit} autoComplete="off">
-          <OtpInput
-            digits={otp.digits}
-            inputRefs={otp.inputRefs}
-            onChange={otp.onChange}
-            onKeyDown={otp.onKeyDown}
-            onPaste={otp.onPaste}
-            hasError={auth.message?.type === 'error'}
-          />
-          <button
-            className="am-btn am-btn--modern"
-            type="submit"
-            disabled={!otp.isComplete || auth.loading}
-          >
-            {auth.loading
-              ? <><span className="am-btn-spinner" />Verifying…</>
-              : 'Continue →'}
-          </button>
-        </form>
+        {/* ── TOTP SCREEN ── */}
+        {method === 'totp' && (
+          <>
+            <h1 className="am-title" id="am-title">Authenticator code</h1>
+            <p className="am-sub">Enter the <strong>6-digit code</strong> from your authenticator app.</p>
 
-        <div className="am-resend-row" style={{ justifyContent: 'center' }}>
-          {auth.resendCooldown > 0
-            ? <span className="am-resend-timer am-resend-timer--block">Code expires in {auth.resendCooldown}s</span>
-            : <>
-                <span>Didn't receive it?</span>
-                <button
-                  className="am-resend-btn"
-                  type="button"
-                  disabled={auth.resendLoading}
-                  onClick={auth.resend}
-                >
-                  {auth.resendLoading ? 'Sending…' : 'Resend code'}
-                </button>
-              </>}
-        </div>
+            {auth.message && (
+              <div className={`am-msg am-msg--${auth.message.type}`}>{auth.message.text}</div>
+            )}
 
-        <button
-          type="button"
-          className="am-back-btn"
-          onClick={() => window.history.back()}
-        >
-          ← Back to login
-        </button>
-        <div className="am-footer">© 2026 HostOps. All rights reserved.</div>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!otp.isComplete || auth.loading) return;
+              const success = await auth.submitTotp(otp.otp);
+              if (!success) otp.reset();
+            }} autoComplete="off">
+              <OtpInput
+                digits={otp.digits}
+                inputRefs={otp.inputRefs}
+                onChange={otp.onChange}
+                onKeyDown={otp.onKeyDown}
+                onPaste={otp.onPaste}
+                hasError={auth.message?.type === 'error'}
+              />
+              <button
+                className="am-btn am-btn--modern"
+                type="submit"
+                disabled={!otp.isComplete || auth.loading}
+              >
+                {auth.loading ? <><span className="am-btn-spinner" />Verifying…</> : 'Continue →'}
+              </button>
+            </form>
+
+            <button type="button" className="am-back-btn" onClick={() => { setMethod('choose'); otp.reset(); }}>
+              ← Use a different method
+            </button>
+            <div className="am-footer">© 2026 HostOps. All rights reserved.</div>
+          </>
+        )}
+
+        {/* ── EMAIL OTP SCREEN ── */}
+        {method === 'email' && (
+          <>
+            <h1 className="am-title" id="am-title">Two-step verification</h1>
+            <p className="am-sub">
+              Enter the <strong>6-digit code</strong> sent to{' '}
+              {maskedEmail ? <strong>{maskedEmail}</strong> : 'your registered email'}.
+            </p>
+
+            {auth.message && (
+              <div className={`am-msg am-msg--${auth.message.type}`}>{auth.message.text}</div>
+            )}
+
+            <form onSubmit={handleSubmit} autoComplete="off">
+              <OtpInput
+                digits={otp.digits}
+                inputRefs={otp.inputRefs}
+                onChange={otp.onChange}
+                onKeyDown={otp.onKeyDown}
+                onPaste={otp.onPaste}
+                hasError={auth.message?.type === 'error'}
+              />
+              <button
+                className="am-btn am-btn--modern"
+                type="submit"
+                disabled={!otp.isComplete || auth.loading}
+              >
+                {auth.loading ? <><span className="am-btn-spinner" />Verifying…</> : 'Continue →'}
+              </button>
+            </form>
+
+            <div className="am-resend-row" style={{ justifyContent: 'center' }}>
+              {auth.resendCooldown > 0
+                ? <span className="am-resend-timer am-resend-timer--block">Code expires in {auth.resendCooldown}s</span>
+                : <>
+                    <span>Didn't receive it?</span>
+                    <button
+                      className="am-resend-btn"
+                      type="button"
+                      disabled={auth.resendLoading}
+                      onClick={auth.resend}
+                    >
+                      {auth.resendLoading ? 'Sending…' : 'Resend code'}
+                    </button>
+                  </>}
+            </div>
+
+            {auth.totpEnabled
+              ? <button type="button" className="am-back-btn" onClick={() => { setMethod('choose'); otp.reset(); }}>← Use a different method</button>
+              : <button type="button" className="am-back-btn" onClick={() => window.history.back()}>← Back to login</button>
+            }
+            <div className="am-footer">© 2026 HostOps. All rights reserved.</div>
+          </>
+        )}
       </div>
 
     </div>

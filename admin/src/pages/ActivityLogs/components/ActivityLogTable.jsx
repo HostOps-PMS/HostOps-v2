@@ -560,9 +560,9 @@ export default function ActivityLogTable({
         .al-search-input:focus { border-color: #1e8760; box-shadow: 0 0 0 3px rgba(30,135,96,0.09); background: #fff; }
         .al-select { padding: 8px 12px; border: 1.5px solid #d4e8dd; border-radius: 9px; font-size: 13px; color: #0c1c14; background: #f7faf8; outline: none; cursor: pointer; font-family: inherit; transition: border-color 0.15s; }
         .al-select:focus { border-color: #1e8760; }
-        .al-date-input { padding: 8px 10px; border: 1.5px solid #d4e8dd; border-radius: 9px; font-size: 13px; color: #0c1c14; background: #f7faf8; outline: none; font-family: inherit; transition: border-color 0.15s; -webkit-appearance: textfield; appearance: textfield; min-height: 38px; }
+        .al-date-input { padding: 8px 10px; border: 1.5px solid #d4e8dd; border-radius: 9px; font-size: 13px; color: #0c1c14; background: #f7faf8; outline: none; font-family: inherit; transition: border-color 0.15s; -webkit-appearance: none; appearance: none; min-height: 38px; }
         .al-date-input::-webkit-date-and-time-value { text-align: left; }
-        .al-date-input::-webkit-calendar-picker-indicator { opacity: 1; cursor: pointer; filter: invert(40%) sepia(20%) saturate(500%) hue-rotate(100deg); }
+        .al-date-input::-webkit-calendar-picker-indicator { opacity: 1; cursor: pointer; filter: invert(40%) sepia(20%) saturate(500%) hue-rotate(100deg); width: 18px; height: 18px; padding: 0; margin: 0; }
         .al-date-input:focus { border-color: #1e8760; }
         .al-clear-btn { padding: 7px 14px; border: 1.5px solid #fca5a5; border-radius: 9px; background: #fff5f5; color: #c13515; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 5px; transition: background 0.15s; white-space: nowrap; }
         .al-clear-btn:hover { background: #fee2e2; }
