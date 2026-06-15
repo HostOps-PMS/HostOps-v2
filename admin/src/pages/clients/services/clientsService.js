@@ -1,23 +1,6 @@
-/**
- * clientsService.js
- * All API calls scoped to the clients page.
- *
- * Base URL:  VITE_API_BASE_URL (see .env)
- * Auth:      Bearer token stored in sessionStorage as 'hp_access_token'
- * API Key:   VITE_API_KEY (see .env) — sent as x-api-key header
- */
+import { authHeaders, uploadHeaders } from '../../../lib/authUtils';
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'https://hostpilot-smoobu.onrender.com';
-
-function authHeaders() {
-  const token  = sessionStorage.getItem('hp_access_token');
-  const apiKey = import.meta.env.VITE_API_KEY ?? '';
-  return {
-    'Content-Type': 'application/json',
-    ...(apiKey ? { 'x-api-key': apiKey } : {}),
-    ...(token  ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
@@ -201,17 +184,10 @@ export async function uploadPropertyPicture(clientId, propertyId, file, cropData
   if (file) formData.append('picture', file);
   if (cropData) formData.append('cropData', JSON.stringify(cropData));
 
-  const token = sessionStorage.getItem('hp_access_token');
-  const apiKey = import.meta.env.VITE_API_KEY ?? '';
-
-  const headers = {};
-  if (apiKey) headers['x-api-key'] = apiKey;
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
   // Use raw fetch since we need to send FormData and NOT set Content-Type to application/json
   const res = await fetch(`${BASE}/api/clients/${clientId}/properties/${propertyId}/picture`, {
     method: 'POST',
-    headers,
+    headers: uploadHeaders(),
     body: formData,
   });
 

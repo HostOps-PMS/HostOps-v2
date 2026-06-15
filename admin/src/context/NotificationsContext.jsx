@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { getDashboardOverview } from '../pages/dashboard/services/dashboardService';
+import { getToken } from '../lib/authUtils';
 
 const NotificationsContext = createContext({
   alerts: [],
@@ -14,8 +15,7 @@ export function NotificationsProvider({ children }) {
   const [loading,    setLoading]    = useState(true);
 
   const fetchNotifications = useCallback(async () => {
-    const token = sessionStorage.getItem('hp_access_token');
-    if (!token) {
+    if (!getToken()) {
       setLoading(false);
       return;
     }

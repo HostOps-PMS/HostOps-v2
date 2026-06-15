@@ -1,14 +1,6 @@
-const BASE    = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'https://hostpilot-smoobu.onrender.com';
-const API_KEY = import.meta.env.VITE_API_KEY ?? '';
+import { authHeaders } from '../../../lib/authUtils';
 
-function authHeaders() {
-  const token = sessionStorage.getItem('hp_access_token');
-  return {
-    'Content-Type': 'application/json',
-    ...(API_KEY ? { 'x-api-key': API_KEY } : {}),
-    ...(token   ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
+const BASE = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'https://hostpilot-smoobu.onrender.com';
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {

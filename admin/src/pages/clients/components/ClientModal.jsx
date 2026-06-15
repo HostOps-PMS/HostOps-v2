@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { authHeaders } from '../../../lib/authUtils';
 import { updateClient, getClientSmoobuData, createClientProperty, updateClientProperty, deleteClientProperty, getClientPropertyApiKey, uploadPropertyPicture } from '../services/clientsService';
 import ClientSmoobuView from './ClientSmoobuView';
 import ImageCropModal from './ImageCropModal';
@@ -177,15 +178,9 @@ export default function ClientModal({ client, onClose, onUpdated }) {
     setLoadingProps(true);
     setPropsError(null);
     try {
-      const BASE   = import.meta.env.VITE_API_BASE_URL ?? '';
-      const token  = sessionStorage.getItem('hp_access_token');
-      const apiKey = import.meta.env.VITE_API_KEY ?? '';
+      const BASE = import.meta.env.VITE_API_BASE_URL ?? '';
       const res = await fetch(`${BASE}/api/clients/${client._id}/properties`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...(apiKey ? { 'x-api-key': apiKey } : {}),
-          ...(token  ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: authHeaders(),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));

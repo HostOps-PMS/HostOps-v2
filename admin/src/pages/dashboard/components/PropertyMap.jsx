@@ -63,20 +63,13 @@ function applyCoordJitter(points) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
+import { authHeaders, uploadHeaders } from '../../../lib/authUtils';
+
 const API_BASE = (
   import.meta.env.VITE_API_BASE_URL ??
   import.meta.env.VITE_API_URL ??
   'https://hostpilot-smoobu.onrender.com'
 ).replace(/\/$/, '');
-
-function authHeaders() {
-  const token = sessionStorage.getItem('hp_access_token') ?? '';
-  return {
-    'Content-Type': 'application/json',
-    Authorization:  `Bearer ${token}`,
-    'x-api-key':    import.meta.env.VITE_API_KEY ?? '',
-  };
-}
 
 function apiUrl(path) { return `${API_BASE}${path}`; }
 
@@ -88,15 +81,11 @@ function apiUrl(path) { return `${API_BASE}${path}`; }
 async function uploadApartmentPhotos(clientId, apartmentId, files) {
   const fd = new FormData();
   Array.from(files).forEach((f) => fd.append('photos', f));
-  const token = sessionStorage.getItem('hp_access_token') ?? '';
   const res = await fetch(
     apiUrl(`/api/accounts/${clientId}/smoobu-apartments/${apartmentId}/photos`),
     {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'x-api-key':   import.meta.env.VITE_API_KEY ?? '',
-      },
+      headers: uploadHeaders(),
       credentials: 'include',
       body: fd,
     }
@@ -1023,14 +1012,9 @@ export default function PropertyMap({ mapLocations, loading }) {
     let cancelled = false;
     (async () => {
       try {
-        const token = sessionStorage.getItem('hp_access_token') ?? '';
         const res = await fetch(apiUrl('/api/accounts/apartment-photos/bulk'), {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization:  `Bearer ${token}`,
-            'x-api-key':    import.meta.env.VITE_API_KEY ?? '',
-          },
+          headers: authHeaders(),
           credentials: 'include',
           body: JSON.stringify({ apartmentIds: missing }),
         });

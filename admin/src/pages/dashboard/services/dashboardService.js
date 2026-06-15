@@ -11,17 +11,9 @@
  * slightly after the component mounts) doesn't permanently break the fetch.
  */
 
-const BASE = import.meta.env.VITE_API_BASE_URL ?? '';
+import { authHeaders } from '../../../lib/authUtils';
 
-function getToken() {
-  // Try sessionStorage first (runtime token after login),
-  // then localStorage as a fallback (some auth flows persist there).
-  return (
-    sessionStorage.getItem('hp_access_token') ??
-    localStorage.getItem('hp_access_token') ??
-    ''
-  );
-}
+const BASE = import.meta.env.VITE_API_BASE_URL ?? '';
 
 /**
  * Core request helper.
@@ -31,12 +23,7 @@ function getToken() {
  */
 async function request(path, options = {}, _retried = false) {
   const res = await fetch(`${BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization:  `Bearer ${getToken()}`,
-      'x-api-key':    import.meta.env.VITE_API_KEY ?? '',
-      ...options.headers,
-    },
+    headers: authHeaders(options.headers),
     credentials: 'include',
     ...options,
   });

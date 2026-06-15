@@ -13,6 +13,8 @@
  *   POST /auth/send-login-otp    { email }
  */
 
+import { authHeaders } from '../../../lib/authUtils';
+
 const API_KEY  = import.meta.env.VITE_API_KEY ?? '';
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
@@ -129,15 +131,10 @@ export async function sendLoginOtp() {
 }
 
 export async function logoutUser() {
-  const token = sessionStorage.getItem('hp_access_token');
   try {
     await fetch(authUrl('/auth/logout'), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': API_KEY,
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
+      headers: authHeaders(),
       credentials: 'include',
     });
   } catch (e) {
