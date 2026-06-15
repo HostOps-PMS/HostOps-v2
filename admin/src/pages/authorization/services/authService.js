@@ -128,6 +128,31 @@ export async function sendLoginOtp() {
   return body;
 }
 
+export async function getTotpStatus() {
+  try {
+    const raw  = sessionStorage.getItem('hp_user');
+    const user = raw ? JSON.parse(raw) : {};
+    return { totpEnabled: user?.totpEnabled ?? false };
+  } catch {
+    return { totpEnabled: false };
+  }
+}
+
+export async function verifyTotp(token) {
+  const email = getAdminEmail();
+
+  const res = await fetch(authUrl('/auth/totp/verify'), {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+    credentials: 'include',
+    body: JSON.stringify({ email, token }),
+  });
+
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error ?? 'Invalid code. Please try again.');
+  return body;
+}
+
 export async function logoutUser() {
   const token = sessionStorage.getItem('hp_access_token');
   try {
