@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fmt, fetchRecoveryRequest, unlockAccount } from '../hooks/useAccounts';
+import { toast } from '../utils/toast';
 
 const ROLE_MAP = {
   admin:       { bg: '#ede9fe', color: '#7c3aed', border: '#c4b5fd', label: 'Admin' },
@@ -29,6 +30,7 @@ export default function UnlockModal({ account, onClose, onUnlocked }) {
     setError('');
     try {
       await unlockAccount({ email: account.email, accountType: account.accountType });
+      toast.success(`PIN unlocked for ${account.name || account.email}.`, { title: 'PIN Unlocked' });
       onUnlocked();
       onClose();
     } catch (e) {

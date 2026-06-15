@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { createClient } from '../services/clientsService';
-import { uploadPropertyPicture } from '../services/clientsService';
+import { createClient, uploadPropertyPicture } from '../services/clientsService';
+import { toast } from '../../../utils/toast';
 import ImageCropModal from './ImageCropModal';
 
 const INITIAL_FORM = {
@@ -122,6 +122,7 @@ export default function AddClientModal({ onClose, onSuccess }) {
         }
       }
 
+      toast.success(`${form.businessName.trim()} has been registered.`, { title: 'Business Added' });
       onSuccess();
     } catch (err) {
       setError(err.message ?? 'Failed to create business.');
@@ -130,12 +131,17 @@ export default function AddClientModal({ onClose, onSuccess }) {
   }
 
   return (
+    <>
+    <style>{`
+      @keyframes ac-modal-overlay { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes ac-modal-card { from { opacity: 0; transform: translateY(20px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    `}</style>
     <div
       className="db-modal-overlay"
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12,28,20,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12,28,20,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', animation: 'ac-modal-overlay 0.2s ease' }}
     >
-      <div className="db-modal" style={{ width: '95vw', maxWidth: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 20, padding: 0, overflow: 'hidden' }}>
+      <div className="db-modal" style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 20, padding: 0, overflow: 'hidden', animation: 'ac-modal-card 0.28s cubic-bezier(0.16,1,0.3,1)' }}>
         {/* Header */}
         <div style={{
           padding: '28px 32px 0 32px',
@@ -361,5 +367,6 @@ export default function AddClientModal({ onClose, onSuccess }) {
         />
       )}
     </div>
+    </>
   );
 }

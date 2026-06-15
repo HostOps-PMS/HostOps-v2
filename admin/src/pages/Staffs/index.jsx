@@ -7,6 +7,7 @@ import DeleteModal from './components/DeleteModal';
 import StaffTable from './components/StaffTable';
 import { exportStaffsPdf } from './utils/exportStaffsPdf';
 import { archiveStaff } from './services/staffApi';
+import { toast } from '../../utils/toast';
 import ArchiveConfirmModal from '../components/ArchiveConfirmModal';
 
 export default function Staffs() {
@@ -66,9 +67,12 @@ export default function Staffs() {
     setArchiving(true);
     try {
       await archiveStaff(archiveTarget._id);
+      const name = `${archiveTarget.firstName || ''} ${archiveTarget.lastName || ''}`.trim() || archiveTarget.email;
+      toast.success(`${name} has been archived.`, { title: 'Staff Archived' });
       reload();
       setArchiveTarget(null);
     } catch (err) {
+      toast.error('Failed to archive staff. Please try again.', { title: 'Archive Failed' });
       console.error('[archiveStaff]', err);
     } finally {
       setArchiving(false);
@@ -117,39 +121,61 @@ export default function Staffs() {
               <h1 className="cl-content__title">Staffs</h1>
               <p className="cl-content__sub">Manage staff accounts and their property access</p>
             </div>
-            <button
-              onClick={handleExport}
-              disabled={exportLoading || loading}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 7,
-                padding: '9px 18px',
-                background: (exportLoading || loading) ? '#e0e0e0' : '#1a9e6e',
-                color: (exportLoading || loading) ? '#aaa' : '#fff',
-                border: 'none', borderRadius: 10,
-                cursor: (exportLoading || loading) ? 'not-allowed' : 'pointer',
-                fontSize: '0.875rem', fontWeight: 600,
-                letterSpacing: '0.01em', whiteSpace: 'nowrap',
-                transition: 'background 0.15s',
-                boxShadow: (exportLoading || loading) ? 'none' : '0 2px 8px rgba(26,158,110,0.18)',
-              }}
-              onMouseEnter={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#158a5e'; }}
-              onMouseLeave={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#1a9e6e'; }}
-              title="Export visible staffs as PDF"
-            >
-              {exportLoading ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
-                  style={{ animation: 'st-pdf-spin 0.8s linear infinite' }}>
-                  <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-                  <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M3 16h14" strokeLinecap="round" />
-                </svg>
-              )}
-              <span className="st-export-label">{exportLoading ? 'Exporting…' : 'Export PDF'}</span>
-            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* New Staff button */}
+              <button
+                onClick={() => setModal({ type: 'create' })}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 7,
+                  padding: '9px 18px',
+                  background: '#10b981', color: '#fff',
+                  border: 'none', borderRadius: 10,
+                  cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600,
+                  letterSpacing: '0.01em', whiteSpace: 'nowrap',
+                  transition: 'background 0.15s',
+                  boxShadow: '0 2px 8px rgba(16,185,129,0.18)',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#059669'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#10b981'; }}
+              >
+                + New Staff
+              </button>
+
+              <button
+                onClick={handleExport}
+                disabled={exportLoading || loading}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 7,
+                  padding: '9px 18px',
+                  background: (exportLoading || loading) ? '#f3f4f6' : '#fff',
+                  color: (exportLoading || loading) ? '#aaa' : '#374151',
+                  border: (exportLoading || loading) ? '1px solid #e5e7eb' : '1px solid #d1d5db',
+                  borderRadius: 10,
+                  cursor: (exportLoading || loading) ? 'not-allowed' : 'pointer',
+                  fontSize: '0.875rem', fontWeight: 600,
+                  letterSpacing: '0.01em', whiteSpace: 'nowrap',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#f9fafb'; }}
+                onMouseLeave={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#fff'; }}
+                title="Export visible staffs as PDF"
+              >
+                {exportLoading ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+                    style={{ animation: 'st-pdf-spin 0.8s linear infinite' }}>
+                    <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                    <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M3 16h14" strokeLinecap="round" />
+                  </svg>
+                )}
+                <span className="st-export-label">{exportLoading ? 'Exporting…' : 'Export PDF'}</span>
+              </button>
+            </div>
             <style>{`
             @keyframes st-pdf-spin { to { transform: rotate(360deg); } }
             @media (max-width: 768px) {

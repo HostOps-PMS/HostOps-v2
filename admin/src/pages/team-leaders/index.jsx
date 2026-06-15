@@ -7,6 +7,7 @@ import DeleteModal from './components/DeleteModal';
 import TeamLeaderTable from './components/TeamLeaderTable';
 import { exportTeamLeadersPdf } from './utils/exportTeamLeadersPdf';
 import { archiveClient } from '../clients/services/clientsService';
+import { toast } from '../../utils/toast';
 import ArchiveConfirmModal from '../components/ArchiveConfirmModal';
 
 export default function TeamLeaders() {
@@ -81,9 +82,12 @@ export default function TeamLeaders() {
     setArchiving(true);
     try {
       await archiveClient(archiveTarget._id);
+      const name = archiveTarget.businessName || `${archiveTarget.firstName || ''} ${archiveTarget.lastName || ''}`.trim() || archiveTarget.email;
+      toast.success(`${name} has been archived.`, { title: 'Team Leader Archived' });
       refetch();
       setArchiveTarget(null);
     } catch (err) {
+      toast.error('Failed to archive team leader. Please try again.', { title: 'Archive Failed' });
       console.error('[archiveTeamLeader]', err);
     } finally {
       setArchiving(false);
@@ -131,29 +135,50 @@ export default function TeamLeaders() {
               <p className="cl-content__sub">Manage team leader accounts and assignments</p>
             </div>
 
-            {/* Export PDF button */}
-            <button
-              onClick={handleExport}
-              disabled={exportLoading || loading}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 7,
-                padding: '9px 18px',
-                background: (exportLoading || loading) ? '#e0e0e0' : '#1a9e6e',
-                color: (exportLoading || loading) ? '#aaa' : '#fff',
-                border: 'none', borderRadius: 10,
-                cursor: (exportLoading || loading) ? 'not-allowed' : 'pointer',
-                fontSize: '0.875rem', fontWeight: 600,
-                letterSpacing: '0.01em', whiteSpace: 'nowrap',
-                transition: 'background 0.15s',
-                boxShadow: (exportLoading || loading) ? 'none' : '0 2px 8px rgba(26,158,110,0.18)',
-              }}
-              onMouseEnter={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#158a5e'; }}
-              onMouseLeave={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#1a9e6e'; }}
-              title="Export all team leaders as PDF"
-            >
-              {exportBtnIcon}
-              <span className="tl-export-label">{exportLoading ? 'Exporting…' : 'Export PDF'}</span>
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* New Team Leader button */}
+              <button
+                onClick={() => setModal({ type: 'create' })}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 7,
+                  padding: '9px 18px',
+                  background: '#10b981', color: '#fff',
+                  border: 'none', borderRadius: 10,
+                  cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600,
+                  letterSpacing: '0.01em', whiteSpace: 'nowrap',
+                  transition: 'background 0.15s',
+                  boxShadow: '0 2px 8px rgba(16,185,129,0.18)',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#059669'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#10b981'; }}
+              >
+                + New Team Leader
+              </button>
+
+              {/* Export PDF button */}
+              <button
+                onClick={handleExport}
+                disabled={exportLoading || loading}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 7,
+                  padding: '9px 18px',
+                  background: (exportLoading || loading) ? '#f3f4f6' : '#fff',
+                  color: (exportLoading || loading) ? '#aaa' : '#374151',
+                  border: (exportLoading || loading) ? '1px solid #e5e7eb' : '1px solid #d1d5db',
+                  borderRadius: 10,
+                  cursor: (exportLoading || loading) ? 'not-allowed' : 'pointer',
+                  fontSize: '0.875rem', fontWeight: 600,
+                  letterSpacing: '0.01em', whiteSpace: 'nowrap',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#f9fafb'; }}
+                onMouseLeave={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#fff'; }}
+                title="Export all team leaders as PDF"
+              >
+                {exportBtnIcon}
+                <span className="tl-export-label">{exportLoading ? 'Exporting…' : 'Export PDF'}</span>
+              </button>
+            </div>
             <style>{`
               @keyframes tl-pdf-spin { to { transform: rotate(360deg); } }
               @media (max-width: 768px) {

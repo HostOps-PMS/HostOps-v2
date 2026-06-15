@@ -80,7 +80,6 @@ export default function StaffTable({
                   <td style={{ padding: '13px 16px', whiteSpace: 'nowrap' }}>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button onClick={() => onEdit(s)} style={{ padding: '5px 12px', borderRadius: 6, border: '1.5px solid #e2e8f0', background: '#fff', fontSize: '0.78rem', fontWeight: 600, color: '#2d3748', cursor: 'pointer' }}>Edit</button>
-                      <button onClick={() => onDelete(s)} style={{ padding: '5px 12px', borderRadius: 6, border: '1.5px solid #fcd5d5', background: '#fff5f5', fontSize: '0.78rem', fontWeight: 600, color: '#c53030', cursor: 'pointer' }}>Delete</button>
                     </div>
                   </td>
                 </tr>

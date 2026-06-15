@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { deleteClient } from '../../clients/services/clientsService';
+import { toast } from '../../../utils/toast';
 
 export default function DeleteModal({ teamLeader, onClose, onDeleted }) {
   const [deleting, setDeleting] = useState(false);
@@ -10,6 +11,7 @@ export default function DeleteModal({ teamLeader, onClose, onDeleted }) {
     setError('');
     try {
       await deleteClient(teamLeader._id);
+      toast.success(`${teamLeader.firstName} ${teamLeader.lastName} has been deleted.`, { title: 'Team Leader Deleted' });
       onDeleted();
     } catch (err) {
       setError(err.message || 'Failed to delete team leader.');
