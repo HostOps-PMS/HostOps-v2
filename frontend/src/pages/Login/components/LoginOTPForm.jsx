@@ -12,6 +12,7 @@ export default function LoginOTPForm({ email, rememberMe, showMsg, hideMsg, onBa
   const { submit, loading } = useAuthSubmit(verifyLoginOtp, {
     onSuccess: (data) => {
       auth.setToken(data.accessToken);
+      if (data.sk) auth.setSessionKey(data.sk);
       auth.setUser(data.user);
 
       if (data.user.mustChangePassword) {

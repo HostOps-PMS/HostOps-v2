@@ -22,6 +22,7 @@ export async function requireAuth(req, res, next) {
     if (!decoded.jti) {
       return res.status(401).json({ error: 'Invalid token: missing jti' });
     }
+    req._jti = decoded.jti; // expose for response-encryption middleware
 
     // ── 5. Check jti revocation ──────────────────────────────────
     const isRevoked = await RevokedToken.exists({ jti: decoded.jti });

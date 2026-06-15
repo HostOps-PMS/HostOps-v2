@@ -1,5 +1,6 @@
 // src/routes/auth.js
 import express from 'express';
+import { createSessionKey, deleteSessionKey } from '../utils/responseEncryption.js';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import User from '../models/user.js';
@@ -288,7 +289,7 @@ router.post('/login', async (req, res, next) => {
         return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
       }
 
-      const { encAccessToken, rawRefresh } = await issueTokenPair(
+      const { encAccessToken, rawRefresh, accessJti } = await issueTokenPair(
         signStaffAccessToken, signStaffRefreshToken, staff, req
       );
 
@@ -296,6 +297,7 @@ router.post('/login', async (req, res, next) => {
       await staff.save();
 
       setRefreshCookie(res, rawRefresh);
+      const staffSk = createSessionKey(accessJti, accessTokenExpiryMs());
 
       return res.json({
         accessToken:        encAccessToken,
@@ -303,6 +305,7 @@ router.post('/login', async (req, res, next) => {
         mustChangePassword: staff.mustChangePassword,
         mustChangePin:      staff.mustChangePin,
         isStaff:            true,
+        ...(staffSk ? { sk: staffSk } : {}),
       });
     }
 
@@ -355,7 +358,7 @@ router.post('/login', async (req, res, next) => {
       );
     }
 
-    const { encAccessToken, rawRefresh: refreshTokenToUse } = await issueTokenPair(
+    const { encAccessToken, rawRefresh: refreshTokenToUse, accessJti: userLoginJti } = await issueTokenPair(
       signAccessToken, signRefreshToken, user, req,
       { deviceId: deviceId || undefined }
     );
@@ -373,7 +376,8 @@ router.post('/login', async (req, res, next) => {
     await user.save();
 
     setRefreshCookie(res, refreshTokenToUse);
-    res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin });
+    const userSk = createSessionKey(userLoginJti, accessTokenExpiryMs());
+    res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin, ...(userSk ? { sk: userSk } : {}) });
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ error: 'Validation failed' });
     next(err);
@@ -401,7 +405,7 @@ router.post('/staff-login', async (req, res, next) => {
       return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
     }
 
-    const { encAccessToken, rawRefresh } = await issueTokenPair(
+    const { encAccessToken, rawRefresh, accessJti: staffLoginJti } = await issueTokenPair(
       signStaffAccessToken, signStaffRefreshToken, staff, req
     );
 
@@ -409,12 +413,14 @@ router.post('/staff-login', async (req, res, next) => {
     await staff.save();
 
     setRefreshCookie(res, rawRefresh);
+    const staffLoginSk = createSessionKey(staffLoginJti, accessTokenExpiryMs());
 
     res.json({
       accessToken:        encAccessToken,
       staff:              sanitizeStaff(staff),
       mustChangePassword: staff.mustChangePassword,
       mustChangePin:      staff.mustChangePin,
+      ...(staffLoginSk ? { sk: staffLoginSk } : {}),
     });
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ error: 'Validation failed' });
@@ -464,7 +470,7 @@ router.post('/verify-login-otp', async (req, res, next) => {
         );
       }
 
-      const { encAccessToken, rawRefresh } = await issueTokenPair(
+      const { encAccessToken, rawRefresh, accessJti: otpJti } = await issueTokenPair(
         signAccessToken, signRefreshToken, user, req,
         { deviceId: deviceId || undefined }
       );
@@ -482,9 +488,10 @@ router.post('/verify-login-otp', async (req, res, next) => {
       await user.save();
 
       setRefreshCookie(res, rawRefresh);
+      const otpSk = createSessionKey(otpJti, accessTokenExpiryMs());
 
       const isAdmin = user.tag === 'Main Admin' || user.role === 'admin' || user.email === process.env.ADMIN_ROLE;
-      return res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin });
+      return res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin, ...(otpSk ? { sk: otpSk } : {}) });
     }
 
     return res.status(401).json({ error: 'Invalid or expired OTP' });
@@ -579,10 +586,12 @@ router.post('/refresh', async (req, res, next) => {
       });
 
       setRefreshCookie(res, newRefreshToken);
+      const staffRefreshSk = createSessionKey(newAccessJti, accessTokenExpiryMs());
 
       return res.json({
         accessToken: encryptToken(rawNewAccess),
         user: sanitizeStaff(staff),
+        ...(staffRefreshSk ? { sk: staffRefreshSk } : {}),
       });
     }
 
@@ -609,7 +618,8 @@ router.post('/refresh', async (req, res, next) => {
     });
 
     setRefreshCookie(res, newRefreshToken);
-    res.json({ accessToken: encryptToken(rawNewAccess) });
+    const userRefreshSk = createSessionKey(newAccessJti, accessTokenExpiryMs());
+    res.json({ accessToken: encryptToken(rawNewAccess), ...(userRefreshSk ? { sk: userRefreshSk } : {}) });
   } catch (err) { next(err); }
 });
 
@@ -627,12 +637,15 @@ router.post('/logout', async (req, res, next) => {
       );
     }
 
-    // Revoke access token jti
+    // Revoke access token jti + clean up session key
     const header     = req.headers.authorization || '';
     const accessBlob = header.startsWith('Bearer ') ? header.slice(7) : null;
     if (accessBlob) {
       const jti = extractJti(accessBlob);
-      if (jti) await revokeAccessJti(jti, req.user?._id || 'unknown', 'logout');
+      if (jti) {
+        await revokeAccessJti(jti, req.user?._id || 'unknown', 'logout');
+        deleteSessionKey(jti);
+      }
     }
 
     res.clearCookie('rt', { path: '/auth' });
@@ -1183,16 +1196,18 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
       resetPinLockout(staff);
       await staff.save();
 
-      const { encAccessToken, rawRefresh } = await issueTokenPair(
+      const { encAccessToken, rawRefresh, accessJti: pinStaffJti } = await issueTokenPair(
         signStaffAccessToken, signStaffRefreshToken, staff, req
       );
 
       setRefreshCookie(res, rawRefresh);
+      const pinStaffSk = createSessionKey(pinStaffJti, accessTokenExpiryMs());
 
       return res.json({
         ok:          true,
         accessToken: encAccessToken,
         user:        sanitizeStaff(staff),
+        ...(pinStaffSk ? { sk: pinStaffSk } : {}),
       });
     }
 
@@ -1215,13 +1230,14 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
     resetPinLockout(ownUser);
     await ownUser.save();
 
-    const { encAccessToken, rawRefresh } = await issueTokenPair(
+    const { encAccessToken, rawRefresh, accessJti: pinUserJti } = await issueTokenPair(
       signAccessToken, signRefreshToken, ownUser, req
     );
 
     setRefreshCookie(res, rawRefresh);
+    const pinUserSk = createSessionKey(pinUserJti, accessTokenExpiryMs());
 
-    return res.json({ ok: true, accessToken: encAccessToken, user: sanitizeUser(ownUser) });
+    return res.json({ ok: true, accessToken: encAccessToken, user: sanitizeUser(ownUser), ...(pinUserSk ? { sk: pinUserSk } : {}) });
   } catch (err) { next(err); }
 });
 
@@ -1333,7 +1349,7 @@ router.post('/totp/verify', async (req, res, next) => {
 
     if (!verified) return res.status(401).json({ error: 'Invalid code. Please try again.' });
 
-    const { encAccessToken, rawRefresh } = await issueTokenPair(
+    const { encAccessToken, rawRefresh, accessJti: totpJti } = await issueTokenPair(
       signAccessToken, signRefreshToken, user, req
     );
 
@@ -1341,9 +1357,10 @@ router.post('/totp/verify', async (req, res, next) => {
     await user.save();
 
     setRefreshCookie(res, rawRefresh);
+    const totpSk = createSessionKey(totpJti, accessTokenExpiryMs());
 
     const isAdmin = user.tag === 'Main Admin' || user.role === 'admin' || user.email === process.env.ADMIN_ROLE;
-    res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin });
+    res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin, ...(totpSk ? { sk: totpSk } : {}) });
   } catch (err) { next(err); }
 });
 

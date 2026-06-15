@@ -8,29 +8,56 @@ import React, {
   useState,
 } from 'react';
 import safeStorage from './safeStorage';
+import { decryptApiResponse, generateSessionHint } from './utils/responseDecryption';
 
 const HP_API_BASE = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
 
 const AuthContext = createContext(null);
 
+// Wraps a fetch Response so that .json() transparently decrypts AES-256-GCM
+// envelopes ({ e: 1, d, i, t }) using the current session key.
+// Returns a plain wrapper object with the same surface as a fetch Response.
+function withDecryption(res, sessionKeyRef) {
+  const originalJson = res.json.bind(res);
+  return {
+    ok:         res.ok,
+    status:     res.status,
+    statusText: res.statusText,
+    headers:    res.headers,
+    url:        res.url,
+    json: async () => {
+      const raw = await originalJson();
+      if (raw && raw.e === 1 && sessionKeyRef.current) {
+        return decryptApiResponse(raw, sessionKeyRef.current);
+      }
+      return raw;
+    },
+    text:        () => res.text(),
+    blob:        () => res.blob(),
+    arrayBuffer: () => res.arrayBuffer(),
+    clone:       () => res.clone(),
+  };
+}
+
 export function AuthProvider({ children }) {
   // ── Access token lives ONLY in memory ────────────────────────────
-  // Using a ref (not state) so reads/writes are synchronous and don't
-  // trigger re-renders. Components that need to react to auth changes
-  // should use isReady / getUser(), not the token directly.
   const accessTokenRef = useRef(null);
 
-  // isReady: true once the AuthProvider has finished its one-time
-  // hydration pass (attempting silent refresh via rt cookie).
-  // ProtectedRoute waits for this before calling verifySession.
+  // ── Session key lives ONLY in memory (never persisted) ───────────
+  // Received from the server on every login/refresh as `sk` (base64 AES key).
+  // Used to decrypt encrypted API responses and to sign X-Session-Hint headers.
+  const sessionKeyRef = useRef(null);
+
+  // isReady: true once hydration (silent refresh on mount) has completed.
   const [isReady, setIsReady] = useState(false);
 
   // ── Token accessors ───────────────────────────────────────────────
   const getToken = useCallback(() => accessTokenRef.current, []);
+  const setToken = useCallback((t) => { accessTokenRef.current = t || null; }, []);
 
-  const setToken = useCallback((t) => {
-    accessTokenRef.current = t || null;
-  }, []);
+  // ── Session key accessors ─────────────────────────────────────────
+  const getSessionKey = useCallback(() => sessionKeyRef.current, []);
+  const setSessionKey = useCallback((sk) => { sessionKeyRef.current = sk || null; }, []);
 
   // ── User accessors (display data only — not a secret) ────────────
   const getUser = useCallback(() => {
@@ -49,10 +76,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // ── Silent token refresh (callable by any hook/component) ────────
-  // Attempts to get a new access token using the HttpOnly rt cookie.
-  // Returns the new token string on success, or null on failure.
-  // Used by fetchWithAuth to auto-retry after a 401.
+  // ── Silent token refresh ──────────────────────────────────────────
   const refreshToken = useCallback(async () => {
     try {
       const res = await fetch(`${HP_API_BASE}/auth/refresh`, {
@@ -62,15 +86,18 @@ export function AuthProvider({ children }) {
       });
       if (!res.ok) {
         accessTokenRef.current = null;
+        sessionKeyRef.current  = null;
         return null;
       }
       const data = await res.json();
       const newToken = data.accessToken || null;
       accessTokenRef.current = newToken;
+      if (data.sk)   sessionKeyRef.current = data.sk;
       if (data.user) setUser(data.user);
       return newToken;
     } catch {
       accessTokenRef.current = null;
+      sessionKeyRef.current  = null;
       return null;
     }
   }, [setUser]);
@@ -78,41 +105,47 @@ export function AuthProvider({ children }) {
   // ── fetchWithAuth ─────────────────────────────────────────────────
   // Drop-in replacement for fetch() that:
   //   1. Attaches the current access token + API key automatically
-  //   2. On 401, silently refreshes the token once and retries
-  //   3. On second 401 (refresh also failed), returns the failed response
-  //      so the caller can handle it (e.g. redirect to login)
+  //   2. Adds an HMAC-signed X-Session-Hint header for each request
+  //   3. On 401, silently refreshes the token once and retries
+  //   4. Transparently decrypts AES-256-GCM response envelopes
   const fetchWithAuth = useCallback(async (url, options = {}) => {
+    const hint = await generateSessionHint(sessionKeyRef.current).catch(() => null);
+
     const makeHeaders = (token) => ({
       'Content-Type': 'application/json',
       'x-api-key':    import.meta.env.VITE_API_KEY,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(hint   ? { 'X-Session-Hint': hint } : {}),
       ...(options.headers || {}),
     });
 
-    // First attempt
     let res = await fetch(url, {
       ...options,
       headers: makeHeaders(accessTokenRef.current),
     });
 
-    // If 401, try to refresh once then retry
     if (res.status === 401) {
       const newToken = await refreshToken();
-      if (!newToken) return res; // refresh failed — return 401 to caller
+      if (!newToken) return res;
+      // Regenerate hint with (possibly new) session key after refresh
+      const newHint = await generateSessionHint(sessionKeyRef.current).catch(() => null);
       res = await fetch(url, {
         ...options,
-        headers: makeHeaders(newToken),
+        headers: {
+          ...makeHeaders(newToken),
+          ...(newHint ? { 'X-Session-Hint': newHint } : {}),
+        },
       });
     }
 
-    return res;
+    return withDecryption(res, sessionKeyRef);
   }, [refreshToken]);
 
-  // ── Clear: wipe memory token + stored user ────────────────────────
+  // ── Clear: wipe memory token + session key + stored user ─────────
   const clear = useCallback(() => {
     accessTokenRef.current = null;
+    sessionKeyRef.current  = null;
     safeStorage.removeItem('hp_user');
-    // Belt-and-suspenders: remove any legacy keys left from older versions
     try { localStorage.removeItem('hp_access_token'); } catch { /* ignore */ }
     try { localStorage.removeItem('hp_user'); } catch { /* ignore */ }
     try { localStorage.removeItem('user'); } catch { /* ignore */ }
@@ -125,15 +158,6 @@ export function AuthProvider({ children }) {
   }, []);
 
   // ── Silent refresh on mount ───────────────────────────────────────
-  // On hard reload the in-memory token is gone. Attempt a silent
-  // refresh using the HttpOnly 'rt' cookie. If the cookie is valid,
-  // the server returns a new access token and we store it in memory.
-  // If the cookie is missing/expired, we stay logged out.
-  //
-  // IMPORTANT: setIsReady(true) is called in the finally block so
-  // ProtectedRoute always unblocks — whether the refresh succeeded or
-  // failed. accessTokenRef.current will be null on failure, causing
-  // ProtectedRoute to redirect to login as expected.
   useEffect(() => {
     let cancelled = false;
 
@@ -148,12 +172,17 @@ export function AuthProvider({ children }) {
         if (!cancelled && res.ok) {
           const data = await res.json();
           accessTokenRef.current = data.accessToken || null;
+          if (data.sk)   sessionKeyRef.current = data.sk;
           if (data.user) setUser(data.user);
         } else if (!cancelled) {
           accessTokenRef.current = null;
+          sessionKeyRef.current  = null;
         }
       } catch {
-        if (!cancelled) accessTokenRef.current = null;
+        if (!cancelled) {
+          accessTokenRef.current = null;
+          sessionKeyRef.current  = null;
+        }
       } finally {
         if (!cancelled) setIsReady(true);
       }
@@ -181,10 +210,7 @@ export function AuthProvider({ children }) {
     let revokeTimer = null;
 
     function handlePageHide(e) {
-      // persisted=true means the page went into bfcache (back/forward nav)
-      // — definitely not a close, skip entirely.
       if (e.persisted) return;
-
       const token = accessTokenRef.current;
       if (!token) return;
 
@@ -199,8 +225,6 @@ export function AuthProvider({ children }) {
     }
 
     function handleFocus() {
-      // Window regained focus — the page was refreshed, not closed.
-      // Cancel the pending beacon so the session stays alive.
       if (revokeTimer !== null) {
         clearTimeout(revokeTimer);
         revokeTimer = null;
@@ -221,6 +245,8 @@ export function AuthProvider({ children }) {
       value={{
         getToken,
         setToken,
+        getSessionKey,
+        setSessionKey,
         getUser,
         setUser,
         clear,

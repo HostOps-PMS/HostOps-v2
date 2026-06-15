@@ -1,38 +1,51 @@
 // frontend/src/pages/apiService.js
+import { decryptApiResponse, generateSessionHint } from './utils/responseDecryption';
+
 const HP_API_BASE = import.meta.env.VITE_API_BASE || 'https://hostpilot-smoobu.onrender.com';
+
+// Wraps a fetch Response so .json() transparently decrypts encrypted envelopes.
+function withDecryption(res, auth) {
+  const sk = auth?.getSessionKey?.();
+  if (!sk) return res;
+  const originalJson = res.json.bind(res);
+  res.json = async () => {
+    const raw = await originalJson();
+    if (raw && raw.e === 1) return decryptApiResponse(raw, sk);
+    return raw;
+  };
+  return res;
+}
 
 /**
  * Authenticated fetch wrapper. Reads token from memory (AuthContext),
  * retries once after silent refresh on 401.
- *
- * @param {string} path    - API path, e.g. "/api/dashboard"
- * @param {object} options - Standard fetch options
- * @param {object} auth    - Auth helpers from AuthContext
- * @returns {Response|null} null when the session cannot be recovered
  */
 export async function authFetch(path, options = {}, auth) {
   const token = auth.getToken();
   if (!token) return null;
 
+  const hint = await generateSessionHint(auth.getSessionKey?.()).catch(() => null);
+
   const opts = {
     ...options,
-    credentials: 'include',   // always send cookies (refresh token)
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       'x-api-key':    import.meta.env.VITE_API_KEY,
       ...(options.headers || {}),
       Authorization:  `Bearer ${token}`,
+      ...(hint ? { 'X-Session-Hint': hint } : {}),
     },
   };
 
   let res = await fetch(`${HP_API_BASE}${path}`, opts);
 
-  // ── Silent refresh on 401 ────────────────────────────────────────
   if (res.status === 401) {
     const refreshed = await tryRefresh(auth);
     if (refreshed) {
-      // Retry with the new token
+      const newHint = await generateSessionHint(auth.getSessionKey?.()).catch(() => null);
       opts.headers.Authorization = `Bearer ${auth.getToken()}`;
+      if (newHint) opts.headers['X-Session-Hint'] = newHint;
       res = await fetch(`${HP_API_BASE}${path}`, opts);
     } else {
       auth.clear();
@@ -40,13 +53,12 @@ export async function authFetch(path, options = {}, auth) {
     }
   }
 
-  return res;
+  return withDecryption(res, auth);
 }
 
 /**
  * Attempts a silent token refresh using the HttpOnly refresh cookie.
- * Stores the new encrypted access token in memory via auth.setToken().
- * Also updates the stored user if the refresh response includes it.
+ * Stores the new access token and session key via auth helpers.
  */
 export async function tryRefresh(auth) {
   try {
@@ -59,7 +71,7 @@ export async function tryRefresh(auth) {
 
     const data = await res.json();
     auth.setToken(data.accessToken);
-
+    if (data.sk)   auth.setSessionKey?.(data.sk);
     if (data.user) auth.setUser(data.user);
     return true;
   } catch {
@@ -91,7 +103,6 @@ export async function verifySession(auth) {
       return user;
     }
 
-    // Access token expired — try a silent refresh then re-validate
     const refreshed = await tryRefresh(auth);
     if (!refreshed) { auth.clear(); return null; }
 
