@@ -70,6 +70,7 @@ app.use(
           CLOUDINARY_HOSTNAME,
           ...IMAGE_PROXY_ORIGINS,
           'https://*.tile.openstreetmap.org',
+          'https://server.arcgisonline.com',
         ],
         connectSrc: ["'self'", CLOUDINARY_HOSTNAME,
           'https://*.tile.openstreetmap.org',
