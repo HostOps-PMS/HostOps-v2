@@ -1,13 +1,20 @@
 /* ─── LOGIN PAGE ─────────────────────────────────────────── */
+html, body, #root {
+  background: #f0ebe8;
+  min-height: 100%;
+  min-height: 100dvh;
+}
+
 .lp-wrap {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   width: 100vw;
-  background: transparent;
-  padding: 40px 20px;
+  background: #f0ebe8;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 /* ─── SPLIT CARD CONTAINER ───────────────────────────────── */
@@ -149,10 +156,10 @@
 /* ─── RIGHT PANEL (FORM) ─────────────────────────────────── */
 .lp-form-panel {
   flex: 1;
-  padding: 44px 40px;
+  padding: 44px 40px 32px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
   align-items: stretch;
   min-height: 0;
   overflow: hidden;
