@@ -126,20 +126,13 @@ export default function Clients() {
               {/* Add Business button */}
               <button
                 onClick={() => setShowAddClient(true)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 7,
-                  padding: '9px 18px',
-                  background: '#10b981', color: '#fff',
-                  border: 'none', borderRadius: 10,
-                  cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600,
-                  letterSpacing: '0.01em', whiteSpace: 'nowrap',
-                  transition: 'background 0.15s',
-                  boxShadow: '0 2px 8px rgba(16,185,129,0.18)',
-                }}
+                className="cl-add-btn"
                 onMouseEnter={e => { e.currentTarget.style.background = '#059669'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = '#10b981'; }}
+                title="Add Business"
               >
-                + Add Business
+                <span className="cl-add-icon">+</span>
+                <span className="cl-add-label">Add Business</span>
               </button>
 
               {/* Export PDF — reflects current tab + search filter */}
@@ -147,29 +140,25 @@ export default function Clients() {
                 onClick={handleExport}
                 disabled={exportLoading || loading}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 7,
-                  padding: '9px 18px',
-                  background: (exportLoading || loading) ? '#f3f4f6' : '#fff',
-                  color: (exportLoading || loading) ? '#aaa' : '#374151',
-                  border: (exportLoading || loading) ? '1px solid #e5e7eb' : '1px solid #d1d5db',
-                  borderRadius: 10,
-                  cursor: (exportLoading || loading) ? 'not-allowed' : 'pointer',
-                  fontSize: '0.875rem', fontWeight: 600,
-                  letterSpacing: '0.01em', whiteSpace: 'nowrap',
-                  transition: 'background 0.15s',
+                  background: (exportLoading || loading) ? '#f3f4f6' : undefined,
+                  color: (exportLoading || loading) ? '#aaa' : undefined,
+                  border: (exportLoading || loading) ? '1px solid #e5e7eb' : undefined,
+                  cursor: (exportLoading || loading) ? 'not-allowed' : undefined,
+                  opacity: (exportLoading || loading) ? 0.7 : 1,
                 }}
                 onMouseEnter={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#f9fafb'; }}
                 onMouseLeave={e => { if (!exportLoading && !loading) e.currentTarget.style.background = '#fff'; }}
                 title="Export visible businesses as PDF"
+                className="cl-export-btn"
               >
                 {exportLoading ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
                     style={{ animation: 'cl-pdf-spin 0.8s linear infinite' }}>
                     <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
                     <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
                   </svg>
                 ) : (
-                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
                     <path d="M3 16h14" strokeLinecap="round" />
                   </svg>
@@ -179,7 +168,40 @@ export default function Clients() {
             </div>
             <style>{`
             @keyframes cl-pdf-spin { to { transform: rotate(360deg); } }
+
+            .cl-add-btn {
+              display: inline-flex; align-items: center; gap: 7px;
+              padding: 9px 16px;
+              background: #10b981; color: #fff;
+              border: none; border-radius: 10px;
+              cursor: pointer; font-size: 0.875rem; font-weight: 600;
+              transition: background 0.15s; white-space: nowrap;
+              box-shadow: 0 2px 8px rgba(16,185,129,0.18);
+            }
+            .cl-add-icon { font-size: 1.1rem; font-weight: 400; }
+            .cl-add-label { display: inline; }
+
+            .cl-export-btn {
+              display: inline-flex; align-items: center; gap: 7px;
+              padding: 9px 16px;
+              background: #fff; color: #374151;
+              border: 1px solid #d1d5db; border-radius: 10px;
+              cursor: pointer; font-size: 0.875rem; font-weight: 600;
+              transition: background 0.15s; white-space: nowrap;
+            }
+            .cl-export-label { display: inline; }
+
             @media (max-width: 768px) {
+              .cl-add-btn {
+                width: 38px; height: 38px; padding: 0;
+                justify-content: center; border-radius: 12px;
+              }
+              .cl-add-label { display: none; }
+
+              .cl-export-btn {
+                width: 38px; height: 38px; padding: 0;
+                justify-content: center; border-radius: 12px;
+              }
               .cl-export-label { display: none; }
             }
           `}</style>
