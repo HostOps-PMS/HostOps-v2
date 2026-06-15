@@ -1285,6 +1285,8 @@ router.post('/totp/verify-setup', requireAuth, async (req, res, next) => {
     if (!verified) return res.status(401).json({ error: 'Invalid code. Please try again.' });
 
     user.totpEnabled = true;
+    user.totpDevices = user.totpDevices || [];
+    user.totpDevices.push({ name: req.body.deviceName || 'Authenticator App', addedAt: new Date() });
     await user.save();
 
     res.json({ ok: true, message: 'Authenticator app enabled successfully.' });
@@ -1301,6 +1303,7 @@ router.post('/totp/disable', requireAuth, async (req, res, next) => {
 
     user.totpSecret  = null;
     user.totpEnabled = false;
+    user.totpDevices = [];
     await user.save();
 
     res.json({ ok: true, message: 'Authenticator app disabled.' });
@@ -1341,6 +1344,24 @@ router.post('/totp/verify', async (req, res, next) => {
 
     const isAdmin = user.tag === 'Main Admin' || user.role === 'admin' || user.email === process.env.ADMIN_ROLE;
     res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin });
+  } catch (err) { next(err); }
+});
+
+router.get('/totp/devices', requireAuth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select('totpDevices');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ devices: user.totpDevices || [] });
+  } catch (err) { next(err); }
+});
+
+router.delete('/totp/devices/:deviceId', requireAuth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    user.totpDevices = (user.totpDevices || []).filter(d => String(d._id) !== req.params.deviceId);
+    await user.save();
+    res.json({ ok: true });
   } catch (err) { next(err); }
 });
 

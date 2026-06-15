@@ -21,7 +21,7 @@ async function setupTotp() {
   return data; // { secret, qrCode }
 }
 
-async function verifyTotpSetup(token6) {
+async function verifyTotpSetup(token6, deviceName) {
   const token = sessionStorage.getItem("hp_access_token");
   const res = await fetch(`${API_BASE}/auth/totp/verify-setup`, {
     method: "POST",
@@ -31,7 +31,7 @@ async function verifyTotpSetup(token6) {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     credentials: "include",
-    body: JSON.stringify({ token: token6 }),
+    body: JSON.stringify({ token: token6, deviceName: deviceName }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Invalid code.");
@@ -57,6 +57,25 @@ async function disableTotp() {
 // ─────────────────────────────────────────────────────────────────
 // changeAdminPassword
 // ─────────────────────────────────────────────────────────────────
+async function fetchTotpDevices() {
+  const token = sessionStorage.getItem("hp_access_token");
+  const res = await fetch(`${API_BASE}/auth/totp/devices`, {
+    headers: { "x-api-key": API_KEY, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    credentials: "include",
+  });
+  const data = await res.json().catch(() => ({}));
+  return data.devices || [];
+}
+
+async function deleteTotpDevice(deviceId) {
+  const token = sessionStorage.getItem("hp_access_token");
+  await fetch(`${API_BASE}/auth/totp/devices/${deviceId}`, {
+    method: "DELETE",
+    headers: { "x-api-key": API_KEY, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    credentials: "include",
+  });
+}
+
 async function changeAdminPassword({ currentPassword, newPassword }) {
   const res = await fetch(`${API_BASE}/auth/change-password`, {
     method: "POST",
@@ -189,6 +208,8 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
   const [totpQr, setTotpQr] = useState('');
   const [totpSecret, setTotpSecret] = useState('');
   const [totpCode, setTotpCode] = useState('');
+  const [deviceName, setDeviceName] = useState('');
+  const [devices, setDevices] = useState([]);
   const [totpLoading, setTotpLoading] = useState(false);
   const [totpMsg, setTotpMsg] = useState(null); // { text, type }
 
@@ -217,8 +238,14 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
   }, [isOpen, onClose, showOtpModal, showSuccessModal]);
 
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
+    if (isOpen && totpEnabled) {
+      fetchTotpDevices().then(setDevices);
+    }
+  }, [isOpen, totpEnabled]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
     }
@@ -731,6 +758,14 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                       <strong>(Google Authenticator, Authy, etc.)</strong>
                     </p>
                     <img src={totpQr} alt="QR Code" style={{ width: 180, height: 180, borderRadius: 12, border: '1px solid #eaf3ee', marginBottom: 12 }} />
+                    <input
+                      type="text"
+                      placeholder="Device name (e.g. iPhone 13, Work Phone)"
+                      value={deviceName}
+                      onChange={e => setDeviceName(e.target.value)}
+                      style={{ ...styles.input, marginBottom: 12, textAlign: 'center' }}
+                      className="acc-input"
+                    />
                     <p style={{ fontSize: 11, color: '#9ab8a9', marginBottom: 16 }}>
                       Or enter this code manually:<br />
                       <strong style={{ fontSize: 13, color: '#0c1c14', letterSpacing: '0.1em', fontFamily: 'monospace' }}>{totpSecret}</strong>
@@ -765,12 +800,16 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                         setTotpLoading(true);
                         setTotpMsg(null);
                         try {
-                          await verifyTotpSetup(totpCode);
+                          await verifyTotpSetup(totpCode, deviceName);
                           const u = { ...user, totpEnabled: true };
                           sessionStorage.setItem('hp_user', JSON.stringify(u));
                           setTotpEnabled(true);
-                          setTotpStep('done');
+                          setTotpStep('idle');
                           setTotpMsg({ text: 'Authenticator enabled successfully!', type: 'success' });
+                          setDevices(prev => [...prev, { name: deviceName || 'Authenticator App', addedAt: new Date().toISOString() }]);
+                          setDeviceName('');
+                          fetchTotpDevices().then(setDevices);
+                          localStorage.removeItem('hp_totp_devices');
                         } catch (err) {
                           setTotpMsg({ text: err.message, type: 'error' });
                           setTotpCode('');
@@ -817,6 +856,8 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                             sessionStorage.setItem('hp_user', JSON.stringify(u));
                             setTotpEnabled(false);
                             setTotpStep('idle');
+                            setDevices([]);
+                            localStorage.removeItem('hp_totp_devices');
                             setTotpMsg({ text: 'Authenticator disabled.', type: 'success' });
                           } catch (err) {
                             setTotpMsg({ text: err.message, type: 'error' });
@@ -839,11 +880,39 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                 )}
 
                 {/* Idle info */}
-                {totpStep === 'idle' && !totpEnabled && (
-                  <p style={{ fontSize: 12, color: '#9ab8a9', lineHeight: 1.6, marginTop: 4 }}>
-                    Add an extra layer of security to your account. Toggle the switch above to get started.
+              {totpStep === 'idle' && !totpEnabled && (
+                <p style={{ fontSize: 12, color: '#9ab8a9', lineHeight: 1.6, marginTop: 4 }}>
+                  Add an extra layer of security to your account. Toggle the switch above to get started.
+                </p>
+              )}
+
+              {totpEnabled && devices.length > 0 && totpStep === 'idle' && (
+                <div style={{ marginTop: 16 }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: '#9ab8a9', textTransform: 'uppercase', marginBottom: 10 }}>
+                    Enrolled Devices
                   </p>
-                )}
+                  {devices.map((d, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#f7faf8', borderRadius: 10, border: '1px solid #eaf3ee', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <i className="ti ti-device-mobile-check" style={{ fontSize: 16, color: '#1e8760' }} />
+                        <div>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: '#0c1c14', margin: 0 }}>{d.name}</p>
+                          <p style={{ fontSize: 11, color: '#9ab8a9', margin: 0 }}>
+                            Added {new Date(d.addedAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setDevices(prev => prev.filter((_, idx) => idx !== i))}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ab8a9', fontSize: 14, padding: 4 }}
+                        title="Remove device"
+                      >
+                        <i className="ti ti-trash" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               </div>
             )}
 
