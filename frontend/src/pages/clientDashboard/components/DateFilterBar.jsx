@@ -127,7 +127,7 @@ export default function DateFilterBar() {
           .dfb-presets-row {
             display: flex !important;
             width: 100% !important;
-            background: #f0f5f2 !important;
+            background: ${dark ? '#0a1f15' : '#f0f5f2'} !important;
             border-radius: 12px !important;
             padding: 4px !important;
             gap: 2px !important;
@@ -148,7 +148,7 @@ export default function DateFilterBar() {
           .dfb-custom-row button {
             width: 100% !important;
             justify-content: center !important;
-            background: #f0f5f2 !important;
+            background: ${dark ? '#0a1f15' : '#f0f5f2'} !important;
             border-radius: 12px !important;
             padding: 8px 14px !important;
             font-size: .78rem !important;
