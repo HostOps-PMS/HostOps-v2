@@ -1,14 +1,6 @@
-// src/pages/ActivityLogs/services/activityLogApi.js
+import { authHeaders as getHeaders } from '../../../lib/authUtils';
 
 const BASE = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
-
-function getHeaders() {
-  const token = sessionStorage.getItem('hp_access_token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
 
 /**
  * Fetch all activity logs (admin only).

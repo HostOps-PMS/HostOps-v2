@@ -1,12 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { authHeaders } from '../../../lib/authUtils';
 
-const API     = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
-const API_KEY = import.meta.env.VITE_API_KEY || '';
-const token   = () => sessionStorage.getItem('hp_access_token');
-
-function authHeaders(extra = {}) {
-  return { Authorization: `Bearer ${token()}`, 'x-api-key': API_KEY, ...extra };
-}
+const API = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
 
 export async function fetchRecoveryRequest(email) {
   const res = await fetch(`${API}/api/accounts/recovery-request?email=${encodeURIComponent(email)}`, { headers: authHeaders() });

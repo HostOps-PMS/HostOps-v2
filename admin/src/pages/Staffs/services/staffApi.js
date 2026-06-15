@@ -1,18 +1,11 @@
-const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'https://hostpilot-smoobu.onrender.com';
+import { authHeaders } from '../../../lib/authUtils';
 
-export function getToken() {
-  return sessionStorage.getItem('hp_access_token') || '';
-}
+const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'https://hostpilot-smoobu.onrender.com';
 
 export function apiFetch(path, opts = {}) {
   return fetch(`${API_BASE}${path}`, {
     ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${getToken()}`,
-      'x-api-key': import.meta.env.VITE_API_KEY ?? '',
-      ...(opts.headers || {}),
-    },
+    headers: authHeaders(opts.headers),
   });
 }
 

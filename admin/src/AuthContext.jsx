@@ -1,9 +1,6 @@
-const API_KEY = import.meta.env.VITE_API_KEY ?? '';
-const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? '';
+import { getToken, authHeaders as buildAuthHeaders } from './lib/authUtils';
 
-function getToken() {
-  return sessionStorage.getItem('hp_access_token') ?? '';
-}
+const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? '';
 
 function getUser() {
   try {
@@ -22,10 +19,8 @@ function setUser(user) {
 }
 
 async function fetchWithAuth(url, options = {}) {
-  const token = getToken();
   const headers = {
-    'x-api-key': API_KEY,
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...buildAuthHeaders(),
     ...(options.headers || {}),
   };
   return fetch(url, { ...options, headers });

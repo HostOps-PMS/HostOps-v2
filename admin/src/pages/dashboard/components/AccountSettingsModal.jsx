@@ -1,20 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
 import { sendLoginOtp, verifyOtp } from "../../authorization/services/authService";
+import { authHeaders } from "../../../lib/authUtils";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "https://hostpilot-smoobu.onrender.com";
 
 // ─────────────────────────────────────────────────────────────────
-// changeAdminPassword 
+// changeAdminPassword
 // ─────────────────────────────────────────────────────────────────
 async function changeAdminPassword({ currentPassword, newPassword }) {
-  const token = sessionStorage.getItem("hp_access_token");
   const res = await fetch(`${API_BASE}/auth/change-password`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": import.meta.env.VITE_API_KEY,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    headers: authHeaders(),
     body: JSON.stringify({ currentPassword, newPassword }),
   });
   const data = await res.json().catch(() => ({}));
