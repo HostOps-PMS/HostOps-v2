@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { sendLoginOtp, verifyOtp } from "../../authorization/services/authService";
 import { authHeaders } from "../../../lib/authUtils";
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "https://hostpilot-smoobu.onrender.com";
+const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "https://api.hostops.online";
 const API_KEY  = import.meta.env.VITE_API_KEY ?? '';
 
 async function setupTotp() {

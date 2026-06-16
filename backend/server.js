@@ -53,7 +53,7 @@ const IMAGE_PROXY_ORIGINS = process.env.ALLOWED_ORIGINS
       'https://go.hostops.online',
       'https://hostops-frontend.onrender.com',
       'https://hostops-v2-admin.onrender.com',
-      'https://hostpilot-smoobu.onrender.com',
+      'https://api.hostops.online',
     ];
 
 app.use(
@@ -74,9 +74,13 @@ app.use(
           'https://*.tile.openstreetmap.org',
           'https://server.arcgisonline.com',
         ],
-        connectSrc: ["'self'", CLOUDINARY_HOSTNAME,
+        connectSrc: [
+          "'self'",
+          CLOUDINARY_HOSTNAME,
           'https://*.tile.openstreetmap.org',
           'https://tile.openstreetmap.org',
+          'https://api.hostops.online',
+          'https://api.hostops.online',
         ],
         fontSrc:    ["'self'"],
         objectSrc:  ["'none'"],
@@ -115,7 +119,7 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
       'https://go.hostops.online',
       'https://hostops-frontend.onrender.com',
       'https://hostops-v2-admin.onrender.com',
-      'https://hostpilot-smoobu.onrender.com',
+      'https://api.hostops.online',
     ];
 
 app.use(
@@ -146,33 +150,86 @@ app.use(cookieParser());
 app.use(mongoSanitize());
 
 // ── Response Encryption ───────────────────────────────────────────────────────
-// Patches res.json at call-time: if requireAuth has set req._jti and a session
-// key exists for that JTI, the response body is AES-256-GCM encrypted.
 app.use(encryptApiResponse);
 
 // ── Rate Limiting ─────────────────────────────────────────────────────────────
+const logHit = (req, res, options) => {
+  let rawIdentifier = req.body?.email || req.body?.username || '';
+  if (typeof rawIdentifier !== 'string') rawIdentifier = String(rawIdentifier);
+  
+  // 1. Prevent Log Injection/Forging: remove newlines so attackers can't fake log entries
+  let cleanIdentifier = rawIdentifier.replace(/[\r\n]/g, '');
+  
+  // 2. Prevent Log Spam: limit the length of the string printed to the console
+  if (cleanIdentifier.length > 100) {
+    cleanIdentifier = cleanIdentifier.substring(0, 100) + '...[TRUNCATED]';
+  }
+
+  console.warn(`[rate-limit] ${options.name} blocked`, {
+    ip: req.ip,
+    route: req.originalUrl,
+    identifier: cleanIdentifier || null,
+  });
+  res.status(429).json(options.message);
+};
+
 const globalLimiter = rateLimit({
-  windowMs:         15 * 60 * 1000,
-  max:              100,
+  windowMs:         1 * 60 * 1000,
+  max:              30,
   standardHeaders:  true,
   legacyHeaders:    false,
   message: { error: 'Too many requests, please try again later.' },
-});
-
-const authLimiter = rateLimit({
-  windowMs:        15 * 60 * 1000,
-  max:             100,
-  standardHeaders: true,
-  legacyHeaders:   false,
-  message: { error: 'Too many authentication attempts, please try again later.' },
   skipSuccessfulRequests: true,
 });
 
+const authLimiterByIp = rateLimit({
+  windowMs:        15 * 60 * 1000, 
+  max:             10,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  skipSuccessfulRequests: true,
+  handler: (req, res) => logHit(req, res, {
+    name: 'auth-by-ip',
+    message: { error: 'Too many authentication attempts, please try again later.' },
+  }),
+});
+
+const authLimiterByAccount = rateLimit({
+  windowMs:        15 * 60 * 1000, 
+  max:             5,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  keyGenerator: (req) => req.body?.email?.toLowerCase() || req.ip,
+  skipSuccessfulRequests: true,
+  handler: (req, res) => logHit(req, res, {
+    name: 'auth-by-account',
+    message: { error: 'Too many attempts for this account, please try again later.' },
+  }),
+});
+
+const otpLimiter = rateLimit({
+  windowMs:        90 * 1000, // 90 seconds
+  max:             3,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  keyGenerator: (req) => req.body?.email?.toLowerCase() || req.ip,
+  skipSuccessfulRequests: true,
+  handler: (req, res) => logHit(req, res, {
+    name: 'otp-verification',
+    message: { error: 'Too many OTP attempts, please wait 90 seconds.' },
+  }),
+});
+
 app.use(globalLimiter);
-app.use('/auth/login',            authLimiter);
-app.use('/auth/register',         authLimiter);
-app.use('/auth/forgot-password',  authLimiter);
-app.use('/auth/reset-password',   authLimiter);
+app.use('/auth/login',            authLimiterByIp, authLimiterByAccount);
+app.use('/auth/staff-login',      authLimiterByIp, authLimiterByAccount);
+app.use('/auth/register',         authLimiterByIp);
+app.use('/auth/forgot-password',  authLimiterByIp, authLimiterByAccount);
+app.use('/auth/reset-password',   authLimiterByIp, authLimiterByAccount);
+app.use('/auth/send-login-otp',   authLimiterByIp, authLimiterByAccount);
+app.use('/auth/resend-login-otp', authLimiterByIp, authLimiterByAccount);
+app.use('/auth/verify-login-otp', otpLimiter);
+app.use('/auth/verify',           otpLimiter);
 
 // ── Global API Key Protection ─────────────────────────────────────────────────
 app.use((req, res, next) => {

@@ -159,7 +159,7 @@ export function AuthProvider({ children }) {
 
   // ── Silent refresh on mount ───────────────────────────────────────
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
 
     async function hydrate() {
       try {
@@ -167,29 +167,32 @@ export function AuthProvider({ children }) {
           method:      'POST',
           credentials: 'include',
           headers:     { 'x-api-key': import.meta.env.VITE_API_KEY },
+          signal:      controller.signal,
         });
 
-        if (!cancelled && res.ok) {
+        if (res.ok) {
           const data = await res.json();
           accessTokenRef.current = data.accessToken || null;
           if (data.sk)   sessionKeyRef.current = data.sk;
           if (data.user) setUser(data.user);
-        } else if (!cancelled) {
+          console.info('[Auth] hydrate OK — session restored');
+        } else {
           accessTokenRef.current = null;
           sessionKeyRef.current  = null;
+          console.warn('[Auth] hydrate FAILED — status', res.status, '— session expired or revoked; please log in again');
         }
-      } catch {
-        if (!cancelled) {
-          accessTokenRef.current = null;
-          sessionKeyRef.current  = null;
-        }
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        accessTokenRef.current = null;
+        sessionKeyRef.current  = null;
+        console.error('[Auth] hydrate ERROR —', err.message);
       } finally {
-        if (!cancelled) setIsReady(true);
+        if (!controller.signal.aborted) setIsReady(true);
       }
     }
 
     hydrate();
-    return () => { cancelled = true; };
+    return () => { controller.abort(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Tab-close beacon ──────────────────────────────────────────────

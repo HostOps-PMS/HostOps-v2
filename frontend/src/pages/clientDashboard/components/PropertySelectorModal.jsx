@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../AuthContext';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://hostpilot-smoobu.onrender.com';
+const API_BASE = import.meta.env.VITE_API_BASE || 'https://api.hostops.online';
 
 // ─────────────────────────────────────────────────────────────────
 // PropertySelectForm

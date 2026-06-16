@@ -1,7 +1,7 @@
 // frontend/src/pages/apiService.js
 import { decryptApiResponse, generateSessionHint } from './utils/responseDecryption';
 
-const HP_API_BASE = import.meta.env.VITE_API_BASE || 'https://hostpilot-smoobu.onrender.com';
+const HP_API_BASE = import.meta.env.VITE_API_URL || 'https://api.hostops.online';
 
 // Wraps a fetch Response so .json() transparently decrypts encrypted envelopes.
 function withDecryption(res, auth) {
@@ -56,11 +56,13 @@ export async function authFetch(path, options = {}, auth) {
   return withDecryption(res, auth);
 }
 
-/**
- * Attempts a silent token refresh using the HttpOnly refresh cookie.
- * Stores the new access token and session key via auth helpers.
- */
-export async function tryRefresh(auth) {
+// Deduplicate concurrent refresh attempts. If multiple authFetch calls fire
+// simultaneously on a 401, only one POST /auth/refresh is made. All callers
+// share the same promise so the server never sees the same RT cookie twice,
+// which would otherwise trigger reuse-attack detection and revoke all sessions.
+let _refreshPromise = null;
+
+async function _doRefresh(auth) {
   try {
     const res = await fetch(`${HP_API_BASE}/auth/refresh`, {
       method:      'POST',
@@ -77,6 +79,17 @@ export async function tryRefresh(auth) {
   } catch {
     return false;
   }
+}
+
+/**
+ * Attempts a silent token refresh using the HttpOnly refresh cookie.
+ * Concurrent calls share one in-flight request to avoid RT reuse detection.
+ */
+export function tryRefresh(auth) {
+  if (!_refreshPromise) {
+    _refreshPromise = _doRefresh(auth).finally(() => { _refreshPromise = null; });
+  }
+  return _refreshPromise;
 }
 
 /**

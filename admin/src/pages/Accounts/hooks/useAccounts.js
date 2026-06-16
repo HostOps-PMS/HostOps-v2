@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchWithAuth } from '../../../lib/authUtils';
 
-const API = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
+const API = import.meta.env.VITE_API_URL || 'https://api.hostops.online';
 
 export async function fetchRecoveryRequest(email) {
   const res = await fetchWithAuth(`${API}/api/accounts/recovery-request?email=${encodeURIComponent(email)}`);

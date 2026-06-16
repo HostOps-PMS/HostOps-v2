@@ -117,7 +117,7 @@ const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
             </button>
 
             <button type="button" className="am-back-btn" onClick={() => window.history.back()}>← Back to login</button>
-            <div className="am-footer">© 2026 HostOps. All rights reserved.</div>
+            <div className="am-footer">© {new Date().getFullYear()} HostOps. All rights reserved.</div>
           </>
         )}
 
@@ -157,7 +157,7 @@ const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
             <button type="button" className="am-back-btn" onClick={() => { setMethod('choose'); otp.reset(); }}>
               ← Use a different method
             </button>
-            <div className="am-footer">© 2026 HostOps. All rights reserved.</div>
+            <div className="am-footer">© {new Date().getFullYear()} HostOps. All rights reserved.</div>
           </>
         )}
 
@@ -212,7 +212,7 @@ const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
               ? <button type="button" className="am-back-btn" onClick={() => { setMethod('choose'); otp.reset(); }}>← Use a different method</button>
               : <button type="button" className="am-back-btn" onClick={() => window.history.back()}>← Back to login</button>
             }
-            <div className="am-footer">© 2026 HostOps. All rights reserved.</div>
+            <div className="am-footer">© {new Date().getFullYear()} HostOps. All rights reserved.</div>
           </>
         )}
       </div>

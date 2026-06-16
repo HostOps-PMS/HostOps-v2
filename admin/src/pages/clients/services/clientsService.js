@@ -1,6 +1,6 @@
 import { fetchWithAuth, uploadHeaders } from '../../../lib/authUtils';
 
-const BASE = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'https://hostpilot-smoobu.onrender.com';
+const BASE = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'https://api.hostops.online';
 
 async function request(path, options = {}) {
   const res = await fetchWithAuth(`${BASE}${path}`, options);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { StrictMode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/Login';
 import DashboardPage from './pages/clientDashboard';
@@ -30,6 +30,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <StrictMode>
         <Routes>
           <Route path="/" element={<LoginPage />} />
           <Route path="/verify-email" element={<VerifyPage />} />
@@ -57,6 +58,7 @@ function App() {
           {/* Wildcard: only matches truly unknown paths — not /inbox or /dashboard */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </StrictMode>
       </AuthProvider>
     </BrowserRouter>
   );
