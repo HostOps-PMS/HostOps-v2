@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useDashboard } from '../context/DashboardContext';
 import { useDashboardData } from '../hooks/useDashboardData';
+import { useActivityLog } from '../hooks/useActivityLog';
 
 /* ─── Date helpers (self-contained, no external dependency) ──── */
 function toYMD(date) {
@@ -63,6 +64,7 @@ const PRESETS = [
 export default function DateFilterBar() {
   const { dashState, updateDashState, dark } = useDashboard();
   const { loadData } = useDashboardData();
+  const { logActivity } = useActivityLog();
 
   const [activePreset, setActivePreset] = useState('monthly');
   const [showCustomPop, setShowCustomPop] = useState(false);
@@ -93,8 +95,8 @@ export default function DateFilterBar() {
     if (!range) return;
     setActivePreset(preset);
     updateDashState({ preset, from: range.from, to: range.to });
-    // Pass dates explicitly — avoids reading a stale useCallback closure
     loadData(range.from, range.to);
+    logActivity('changed_dashboard_period', { period: preset });
   }
 
   function applyCustom() {
@@ -102,8 +104,8 @@ export default function DateFilterBar() {
     if (customFrom > customTo)    { alert('"From" must be before "To".'); return; }
     setShowCustomPop(false);
     updateDashState({ preset: 'custom', from: customFrom, to: customTo });
-    // Pass dates explicitly — avoids reading a stale useCallback closure
     loadData(customFrom, customTo);
+    logActivity('changed_dashboard_period', { period: 'custom', from: customFrom, to: customTo });
   }
 
   /* active preset label for display */

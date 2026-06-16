@@ -23,6 +23,7 @@ import {
 } from '../utils/tokens.js';
 import { sendVerificationEmail, sendResetEmail } from '../services/email.js';
 import { requireAuth } from '../middleware/auth.js';
+import ActivityLog from '../models/activityLog.js';
 
 const router = express.Router();
 
@@ -1322,8 +1323,19 @@ router.post('/totp/verify-setup', requireAuth, async (req, res, next) => {
 
     user.totpEnabled = true;
     user.totpDevices = user.totpDevices || [];
-    user.totpDevices.push({ name: req.body.deviceName || 'Authenticator App', addedAt: new Date() });
+    const deviceName = req.body.deviceName || 'Authenticator App';
+    user.totpDevices.push({ name: deviceName, addedAt: new Date() });
     await user.save();
+
+    ActivityLog.create({
+      userId:      user._id,
+      performedBy: { userId: user._id, email: user.email, firstName: user.firstName || '', lastName: user.lastName || '', role: user.role || 'client' },
+      businessName: user.businessName || '',
+      action:      'totp_enabled',
+      meta:        { deviceName },
+      ipAddress:   req.ip || '',
+      userAgent:   req.get('user-agent') || '',
+    }).catch(() => {});
 
     res.json({ ok: true, message: 'Authenticator app enabled successfully.' });
   } catch (err) { next(err); }
@@ -1341,6 +1353,16 @@ router.post('/totp/disable', requireAuth, async (req, res, next) => {
     user.totpEnabled = false;
     user.totpDevices = [];
     await user.save();
+
+    ActivityLog.create({
+      userId:      user._id,
+      performedBy: { userId: user._id, email: user.email, firstName: user.firstName || '', lastName: user.lastName || '', role: user.role || 'client' },
+      businessName: user.businessName || '',
+      action:      'totp_disabled',
+      meta:        {},
+      ipAddress:   req.ip || '',
+      userAgent:   req.get('user-agent') || '',
+    }).catch(() => {});
 
     res.json({ ok: true, message: 'Authenticator app disabled.' });
   } catch (err) { next(err); }
@@ -1396,8 +1418,20 @@ router.delete('/totp/devices/:deviceId', requireAuth, async (req, res, next) => 
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
+    const removed = (user.totpDevices || []).find(d => String(d._id) === req.params.deviceId);
     user.totpDevices = (user.totpDevices || []).filter(d => String(d._id) !== req.params.deviceId);
     await user.save();
+
+    ActivityLog.create({
+      userId:      user._id,
+      performedBy: { userId: user._id, email: user.email, firstName: user.firstName || '', lastName: user.lastName || '', role: user.role || 'client' },
+      businessName: user.businessName || '',
+      action:      'totp_device_removed',
+      meta:        { deviceName: removed?.name || 'Unknown device' },
+      ipAddress:   req.ip || '',
+      userAgent:   req.get('user-agent') || '',
+    }).catch(() => {});
+
     res.json({ ok: true });
   } catch (err) { next(err); }
 });

@@ -7,6 +7,7 @@ import { useDashboardData } from "../hooks/useDashboardData";
 import { useAuth } from "../../AuthContext";
 import { fetchMessages, sendReply } from "../services/dashboardService";
 import { timeAgo, fmtDate } from "../../utils/dateHelpers";
+import { useActivityLog } from "../hooks/useActivityLog";
 
 function stripHtml(html) {
   const div = document.createElement("div");
@@ -142,8 +143,17 @@ export default function InboxPage() {
     currentUser?.isStaff === true ||
     sessionStorage.getItem('hp_is_staff') === 'true'
   );
+  const { logActivity } = useActivityLog();
+
+  useEffect(() => { logActivity('opened_messages_page'); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [search, setSearch] = useState("");
+  useEffect(() => {
+    if (!search.trim()) return;
+    const t = setTimeout(() => logActivity('searched_inbox', { query: search.trim() }), 800);
+    return () => clearTimeout(t);
+  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [filter, setFilter] = useState("all");
   const [propertyFilter, setPropertyFilter] = useState("all");
   const [selected, setSelected] = useState(null);
@@ -269,12 +279,14 @@ export default function InboxPage() {
       const res = await sendReply({ reservationId: selected.reservationId, subject: "Re: Your message", messageBody: msg }, auth);
       if (!res?.ok) throw new Error("Send failed");
       setReplyText("");
+      logActivity('sent_message', { guest: selected.guestName, property: selected.property, channel: selected.channel || 'Direct' });
       setTimeout(() => {
         fetchMessages(selected.reservationId, auth)
           .then(async (r) => { if (r?.ok) { const d = await r.json(); setMessages(Array.isArray(d) ? d : (d.messages || [])); } });
       }, 1200);
     } catch (e) {
       alert("Failed to send: " + e.message);
+      logActivity('sent_message_failed', { guest: selected.guestName, property: selected.property, reason: e.message });
     } finally {
       setSending(false);
     }
@@ -401,7 +413,7 @@ export default function InboxPage() {
                   </svg>
                   <select
                     value={propertyFilter}
-                    onChange={(e) => setPropertyFilter(e.target.value)}
+                    onChange={(e) => { setPropertyFilter(e.target.value); logActivity('filtered_inbox_by_property', { property: e.target.value }); }}
                     style={{
                       width: "100%",
                       padding: "7px 28px 7px 28px",
@@ -442,7 +454,7 @@ export default function InboxPage() {
                 { key: "unread", label: `Unread${totalUnread > 0 ? ` (${totalUnread})` : ""}` },
                 { key: "replied", label: "Replied" },
               ].map((f) => (
-                <button key={f.key} onClick={() => setFilter(f.key)} style={{
+                <button key={f.key} onClick={() => { setFilter(f.key); logActivity('filtered_inbox', { filter: f.key }); }} style={{
                   padding: "4px 12px", borderRadius: 20, cursor: "pointer",
                   border: "none", flexShrink: 0,
                   background: filter === f.key ? "#26a676" : inputBg,
@@ -493,7 +505,7 @@ export default function InboxPage() {
                     return (
                       <div
                         key={idx}
-                        onClick={() => { setSelected(thread); setShowThread(true); }}
+                        onClick={() => { setSelected(thread); setShowThread(true); logActivity('opened_message_thread', { guest: thread.guestName, property: thread.property, channel: thread.channel || 'Direct' }); }}
                         style={{
                           display: "flex", alignItems: "center", gap: "11px",
                           padding: "12px 16px",
