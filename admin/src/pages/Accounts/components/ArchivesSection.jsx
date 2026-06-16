@@ -364,18 +364,18 @@ const appealsByEmail = Object.fromEntries((Array.isArray(appeals) ? appeals : []
                       {isExpanded && appeal && (
                         <tr key={`${r._id}-appeal`} style={{ borderBottom: !isLast ? `1px solid ${dark ? '#1e3a2a' : '#f7f8fa'}` : 'none' }}>
                           <td colSpan={5} style={{ padding: '0 16px 12px 20px' }}>
-                            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderLeft: '3px solid #f59e0b', borderRadius: 10, padding: '12px 16px' }}>
+                            <div style={{ background: dark ? '#1a1200' : '#fffbeb', border: `1px solid ${dark ? '#3d2e00' : '#fde68a'}`, borderLeft: `3px solid #f59e0b`, borderRadius: 10, padding: '12px 16px' }}>
                               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <p style={{ margin: '0 0 4px', fontSize: '0.7rem', fontWeight: 700, color: '#b45309', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Appeal Message</p>
-                                  <p style={{ margin: '0 0 6px', fontSize: '0.85rem', color: '#78350f', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{appeal.reason}</p>
-                                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#a78234' }}>Submitted {formatDate(appeal.createdAt)}</p>
+                                  <p style={{ margin: '0 0 4px', fontSize: '0.7rem', fontWeight: 700, color: dark ? '#fbbf24' : '#b45309', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Appeal Message</p>
+                                  <p style={{ margin: '0 0 6px', fontSize: '0.85rem', color: dark ? '#fde68a' : '#78350f', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{appeal.reason}</p>
+                                  <p style={{ margin: 0, fontSize: '0.72rem', color: dark ? '#a78234' : '#a78234' }}>Submitted {formatDate(appeal.createdAt)}</p>
                                 </div>
                                 <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
                                   <button
                                     onClick={() => handleAppealAction(appeal, 'approve')}
                                     disabled={appealAction === appeal._id}
-                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid #10b981', background: '#f0fdf4', fontSize: '0.78rem', fontWeight: 700, color: '#059669', cursor: appealAction === appeal._id ? 'not-allowed' : 'pointer', opacity: appealAction === appeal._id ? 0.6 : 1 }}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: `1px solid ${dark ? '#166534' : '#10b981'}`, background: dark ? '#0d2619' : '#f0fdf4', fontSize: '0.78rem', fontWeight: 700, color: dark ? '#4ade80' : '#059669', cursor: appealAction === appeal._id ? 'not-allowed' : 'pointer', opacity: appealAction === appeal._id ? 0.6 : 1 }}
                                   >
                                     <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M4 10l4 4 8-8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                     Approve & Enable
