@@ -48,6 +48,12 @@ export function AuthProvider({ children }) {
   // Used to decrypt encrypted API responses and to sign X-Session-Hint headers.
   const sessionKeyRef = useRef(null);
 
+  // ── Refresh mutex ─────────────────────────────────────────────────
+  // Deduplicates concurrent calls to refreshToken(). Without this, two
+  // simultaneous 401 retries would each POST /auth/refresh with the same
+  // cookie, triggering reuse-attack detection and revoking all sessions.
+  const refreshPromiseRef = useRef(null);
+
   // isReady: true once hydration (silent refresh on mount) has completed.
   const [isReady, setIsReady] = useState(false);
 
@@ -77,29 +83,42 @@ export function AuthProvider({ children }) {
   }, []);
 
   // ── Silent token refresh ──────────────────────────────────────────
+  // The refreshPromiseRef mutex ensures that if multiple callers (e.g.
+  // concurrent fetchWithAuth retries or an authFetch from apiService)
+  // trigger this at the same time, only ONE POST /auth/refresh is sent.
+  // All concurrent callers share the same in-flight promise and receive
+  // the same result — the server never sees the same RT cookie twice.
   const refreshToken = useCallback(async () => {
-    try {
-      const res = await fetch(`${HP_API_BASE}/auth/refresh`, {
-        method:      'POST',
-        credentials: 'include',
-        headers:     { 'x-api-key': import.meta.env.VITE_API_KEY },
-      });
-      if (!res.ok) {
+    if (refreshPromiseRef.current) return refreshPromiseRef.current;
+
+    refreshPromiseRef.current = (async () => {
+      try {
+        const res = await fetch(`${HP_API_BASE}/auth/refresh`, {
+          method:      'POST',
+          credentials: 'include',
+          headers:     { 'x-api-key': import.meta.env.VITE_API_KEY },
+        });
+        if (!res.ok) {
+          accessTokenRef.current = null;
+          sessionKeyRef.current  = null;
+          return null;
+        }
+        const data = await res.json();
+        const newToken = data.accessToken || null;
+        accessTokenRef.current = newToken;
+        if (data.sk)   sessionKeyRef.current = data.sk;
+        if (data.user) setUser(data.user);
+        return newToken;
+      } catch {
         accessTokenRef.current = null;
         sessionKeyRef.current  = null;
         return null;
+      } finally {
+        refreshPromiseRef.current = null;
       }
-      const data = await res.json();
-      const newToken = data.accessToken || null;
-      accessTokenRef.current = newToken;
-      if (data.sk)   sessionKeyRef.current = data.sk;
-      if (data.user) setUser(data.user);
-      return newToken;
-    } catch {
-      accessTokenRef.current = null;
-      sessionKeyRef.current  = null;
-      return null;
-    }
+    })();
+
+    return refreshPromiseRef.current;
   }, [setUser]);
 
   // ── fetchWithAuth ─────────────────────────────────────────────────
