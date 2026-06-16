@@ -35,9 +35,10 @@
 }
 
 .ep404-number {
-  font-size: clamp(84px, 16vw, 220px); /* smaller than before */
+  font-size: clamp(72px, 13vw, 180px); 
   font-family: 'Climate Crisis', sans-serif;
   line-height: 1;
+  letter-spacing: 5px;
   margin-bottom: 16px;
   color: transparent;
   background: linear-gradient(160deg, #0C1C14 0%, #0C1C14 50%, #26A676 100%);
