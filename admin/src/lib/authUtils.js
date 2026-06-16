@@ -33,21 +33,50 @@ export const uploadHeaders = (extra = {}) => ({
 });
 
 // ── Silent token refresh ───────────────────────────────────────────
+// Singleton promise — all concurrent 401 callers share one refresh
+// request so only one refresh cookie is ever sent at a time. Without
+// this, parallel API calls that all return 401 each send their own
+// refresh request with the same cookie. The server rotates (revokes)
+// the cookie on the first request, then the second request presents
+// the already-revoked token → triggers reuse-attack detection →
+// all sessions nuked → everyone logged out.
+let _refreshPromise = null;
+
 async function tryRefresh() {
-  try {
-    const res = await fetch(`${API_BASE}/auth/refresh`, {
-      method:      'POST',
-      credentials: 'include',
-      headers:     { 'x-api-key': API_KEY },
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
-    if (data.accessToken) setToken(data.accessToken);
-    if (data.sk)          setSessionKey(data.sk);
-    return !!data.accessToken;
-  } catch {
-    return false;
-  }
+  if (_refreshPromise) return _refreshPromise;
+
+  _refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
+        method:      'POST',
+        credentials: 'include',
+        headers:     { 'x-api-key': API_KEY },
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (data.accessToken) setToken(data.accessToken);
+      if (data.sk)          setSessionKey(data.sk);
+      return !!data.accessToken;
+    } catch {
+      return false;
+    } finally {
+      _refreshPromise = null;
+    }
+  })();
+
+  return _refreshPromise;
+}
+
+// Clears all auth state and redirects to login when the session
+// cannot be recovered (refresh failed). Called after a failed refresh.
+function handleSessionExpired() {
+  setToken(null);
+  setSessionKey(null);
+  sessionStorage.removeItem('hp_user');
+  sessionStorage.removeItem('hp_authorized');
+  // Redirect to the admin login entry point or main frontend login
+  const loginUrl = import.meta.env.VITE_LOGIN_URL || import.meta.env.VITE_FRONTEND_URL || '/';
+  window.location.href = loginUrl;
 }
 
 // ── Wrap res.json() to transparently decrypt encrypted envelopes ───
@@ -91,6 +120,8 @@ export async function fetchWithAuth(url, options = {}) {
         },
         credentials: 'include',
       });
+    } else {
+      handleSessionExpired();
     }
   }
 
