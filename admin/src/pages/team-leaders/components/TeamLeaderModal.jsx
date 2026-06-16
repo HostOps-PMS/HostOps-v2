@@ -1,33 +1,37 @@
 import { useState, useEffect } from 'react';
 import { createClient, updateClient } from '../../clients/services/clientsService';
 import { toast } from '../../../utils/toast';
+import { useTheme } from '../../../context/ThemeContext';
 
-const inputStyle = {
-  width: '100%',
-  padding: '11px 14px',
-  borderRadius: 10,
-  border: '1.5px solid #e8edf2',
-  fontSize: '0.875rem',
-  outline: 'none',
-  boxSizing: 'border-box',
-  background: '#fff',
-  color: '#0d1117',
-  transition: 'border-color 0.15s, box-shadow 0.15s',
-  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-};
-
-const labelStyle = {
-  display: 'block',
-  fontSize: '0.72rem',
-  fontWeight: 700,
-  color: '#64748b',
-  marginBottom: 5,
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase',
-};
+// moved inside component
 
 export default function TeamLeaderModal({ mode, teamLeader, clients, onClose, onSaved }) {
   const isEdit = mode === 'edit';
+  const { dark } = useTheme();
+
+  const inputStyle = {
+    width: '100%',
+    padding: '11px 14px',
+    borderRadius: 10,
+    border: `1.5px solid ${dark ? '#1e3a2a' : '#e8edf2'}`,
+    fontSize: '0.875rem',
+    outline: 'none',
+    boxSizing: 'border-box',
+    background: dark ? '#0d2619' : '#fff',
+    color: dark ? '#eaf5f0' : '#0d1117',
+    transition: 'border-color 0.15s, box-shadow 0.15s',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+  };
+
+  const labelStyle = {
+    display: 'block',
+    fontSize: '0.72rem',
+    fontWeight: 700,
+    color: dark ? '#7ab89a' : '#64748b',
+    marginBottom: 5,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+  };
 
   const [form, setForm] = useState({
     firstName: teamLeader?.firstName || '',
@@ -92,11 +96,15 @@ try {
     <style>{`
       @keyframes tl-modal-overlay { from { opacity: 0; } to { opacity: 1; } }
       @keyframes tl-modal-card { from { opacity: 0; transform: translateY(20px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+      ${dark ? `.tl-modal input, .tl-modal select { background: #0d2619 !important; color: #eaf5f0 !important; border-color: #1e3a2a !important; }` : ''}
+      ${dark ? `.tl-modal input::placeholder { color: #4d8a6a !important; }` : ''}
+      ${dark ? `.tl-modal input:disabled, .tl-modal select:disabled { background: #0d2619 !important; color: #4d8a6a !important; }` : ''}
+      ${dark ? `.tl-modal option { background: #132a1e; color: #eaf5f0; }` : ''}
     `}</style>
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
-        background: 'rgba(12,28,20,0.45)',
+        background: dark ? 'rgba(0,0,0,0.65)' : 'rgba(12,28,20,0.45)',
         backdropFilter: 'blur(4px)',
         WebkitBackdropFilter: 'blur(4px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -106,8 +114,9 @@ try {
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
+        className="tl-modal"
         style={{
-          background: '#fff',
+          background: dark ? '#132a1e' : '#fff',
           borderRadius: 20,
           width: '100%',
           maxWidth: 520,
@@ -126,21 +135,21 @@ try {
         }}>
           <div>
             <h2 style={{
-              fontSize: '1.6rem', fontWeight: 800, color: '#0d1117',
+              fontSize: '1.6rem', fontWeight: 800, color: dark ? '#eaf5f0' : '#0d1117',
               lineHeight: 1.15, margin: 0, letterSpacing: '-0.02em',
             }}>
               {isEdit ? <>Edit <span style={{ color: '#26a676' }}>Team Leader</span></> : <>Create <span style={{ color: '#26a676' }}>Team Leader</span></>}
             </h2>
-            <p style={{ margin: '6px 0 0', fontSize: '.8125rem', color: '#9ca3af', fontWeight: 400 }}>
+            <p style={{ margin: '6px 0 0', fontSize: '.8125rem', color: dark ? '#4d8a6a' : '#9ca3af', fontWeight: 400 }}>
               {isEdit ? 'Update the team leader details below.' : 'Fill in the details to create a team leader.'}
             </p>
           </div>
           <button
             onClick={onClose}
             style={{
-              background: '#f3f4f6', border: 'none', borderRadius: 10,
+              background: dark ? '#0d2619' : '#f3f4f6', border: `1px solid ${dark ? '#1e3a2a' : 'transparent'}`, borderRadius: 10,
               width: 32, height: 32, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', cursor: 'pointer', color: '#6b7280',
+              justifyContent: 'center', cursor: 'pointer', color: dark ? '#4d8a6a' : '#6b7280',
               fontSize: '1rem', flexShrink: 0, marginTop: 2,
             }}
           >✕</button>
@@ -158,7 +167,7 @@ try {
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '12px 16px', borderRadius: 12,
-                background: '#f8faf9', border: '1px solid #e5efe9',
+                background: dark ? '#0d2619' : '#f8faf9', border: `1px solid ${dark ? '#1e3a2a' : '#e5efe9'}`,
                 marginBottom: 16,
               }}>
                 <div style={{
@@ -168,8 +177,8 @@ try {
                   color: '#fff', fontWeight: 700, fontSize: '0.95rem', flexShrink: 0,
                 }}>{ini}</div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0d1117' }}>{c.firstName} {c.lastName}</div>
-                  <div style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: 1 }}>{c.email}</div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: dark ? '#eaf5f0' : '#0d1117' }}>{c.firstName} {c.lastName}</div>
+                  <div style={{ fontSize: '0.78rem', color: dark ? '#4d8a6a' : '#9ca3af', marginTop: 1 }}>{c.email}</div>
                 </div>
               </div>
             );
@@ -178,19 +187,28 @@ try {
           {/* Assigned Server */}
           <div style={{ marginBottom: 14 }}>
             <label style={labelStyle}>Assigned Server (Client) *</label>
-            <select
-              value={form.serverId}
-              onChange={(e) => setForm({ ...form, serverId: e.target.value })}
-              required
-              style={{ ...inputStyle, cursor: 'pointer' }}
-            >
-              <option value="" disabled>Select a server</option>
-              {clients.map(client => (
-                <option key={client._id} value={client._id}>
-                  {client.firstName} {client.lastName} ({client.email})
-                </option>
-              ))}
-            </select>
+            <div style={{ position: 'relative' }}>
+              <select
+                value={form.serverId}
+                onChange={(e) => setForm({ ...form, serverId: e.target.value })}
+                required
+                style={{ ...inputStyle, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none', paddingRight: 36 }}
+              >
+                <option value="" disabled>Select a server</option>
+                {clients.map(client => (
+                  <option key={client._id} value={client._id}>
+                    {client.firstName} {client.lastName} ({client.email})
+                  </option>
+                ))}
+              </select>
+              <svg
+                width="14" height="14" viewBox="0 0 20 20" fill="none"
+                stroke={dark ? '#4d8a6a' : '#9ca3af'} strokeWidth="2.5"
+                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+              >
+                <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
@@ -264,7 +282,7 @@ try {
                     position: 'absolute', right: 10, top: '50%',
                     transform: 'translateY(-50%)',
                     background: 'none', border: 'none',
-                    cursor: 'pointer', color: '#9ca3af',
+                    cursor: 'pointer', color: dark ? '#4d8a6a' : '#9ca3af',
                     display: 'flex', alignItems: 'center', padding: 0,
                   }}
                 >
@@ -291,7 +309,8 @@ try {
           padding: '16px 32px 24px',
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
           gap: 10,
-          borderTop: '1px solid #f0f2f5',
+          borderTop: `1px solid ${dark ? '#1e3a2a' : '#f0f2f5'}`,
+          background: dark ? '#132a1e' : '#fff',
           flexShrink: 0,
         }}>
           <button
@@ -300,8 +319,8 @@ try {
             disabled={saving}
             style={{
               padding: '9px 22px', borderRadius: 10,
-              border: '1.5px solid #e5e7eb', background: '#fff',
-              fontSize: '0.875rem', fontWeight: 600, color: '#374151',
+              border: `1.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`, background: dark ? 'transparent' : '#fff',
+              fontSize: '0.875rem', fontWeight: 600, color: dark ? '#7ab89a' : '#374151',
               cursor: saving ? 'not-allowed' : 'pointer',
             }}
           >

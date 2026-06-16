@@ -1,3 +1,5 @@
+import { useTheme } from '../../../context/ThemeContext';
+
 export default function ConfirmModal({
   title          = 'Confirm',
   message        = 'Are you sure?',
@@ -7,6 +9,7 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
 }) {
+  const { dark } = useTheme();
   const isDanger = confirmVariant === 'danger';
  
   return (
@@ -15,7 +18,7 @@ export default function ConfirmModal({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(12,28,20,.5)',
+        background: dark ? 'rgba(0,0,0,0.65)' : 'rgba(12,28,20,.5)',
         backdropFilter: 'blur(2px)',
         display: 'flex',
         alignItems: 'center',
@@ -26,8 +29,8 @@ export default function ConfirmModal({
     >
       <div
         style={{
-          background: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
+          background: dark ? '#132a1e' : 'var(--color-surface)',
+          border: `1px solid ${dark ? '#1e3a2a' : 'var(--color-border)'}`,
           borderRadius: 14,
           width: 340,
           maxWidth: 'calc(100vw - 32px)',
