@@ -750,9 +750,11 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       await sendOtpForPasswordChange(auth);
       setOtpContext("password");
       setShowOtpModal(true);
+      logActivity('password_change_otp_sent');
     } catch (err) {
       setPwErrorMsg(err.message);
       setPwStatus("error");
+      logActivity('password_change_failed', { reason: err.message, stage: 'otp_request' });
     } finally {
       setPwSaving(false);
     }
@@ -789,9 +791,11 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       await sendOtpForPasswordChange(auth);
       setOtpContext("pin");
       setShowOtpModal(true);
+      logActivity('pin_change_otp_sent');
     } catch (err) {
       setPinErrorMsg(err.message);
       setPinStatus("error");
+      logActivity('pin_change_failed', { reason: err.message, stage: 'otp_request' });
     } finally {
       setPinSaving(false);
     }
@@ -826,6 +830,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       } catch (err) {
         setPwErrorMsg(err.message);
         setPwStatus("error");
+        logActivity('password_change_failed', { reason: err.message, stage: 'change' });
       }
     } else if (otpContext === "pin") {
       const { currentPin, newPin } = pinForm;
@@ -851,6 +856,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       } catch (err) {
         setPinErrorMsg(err.message);
         setPinStatus("error");
+        logActivity('pin_change_failed', { reason: err.message, stage: 'change' });
       }
     }
   }
@@ -1251,6 +1257,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                   setPinStatus(null);
                   setPinErrorMsg("");
                   if (tab === "activity") fetchActivityLog();
+                  logActivity(`viewed_settings_tab`, { tab });
                 }}
                 style={{
                   padding: "10px 10px",
@@ -1567,9 +1574,11 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                       if (totpEnabled) {
                         setTotpStep('disabling');
                         setTotpMsg(null);
+                        logActivity('2fa_disable_initiated');
                       } else {
                         setTotpLoading(true);
                         setTotpMsg(null);
+                        logActivity('2fa_setup_started');
                         try {
                           const { secret, qrCode } = await setupTotp(auth);
                           setTotpQr(qrCode);
@@ -1577,6 +1586,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                           setTotpStep('qr');
                         } catch (err) {
                           setTotpMsg({ text: err.message, type: 'error' });
+                          logActivity('2fa_setup_failed', { reason: err.message, stage: 'setup' });
                         } finally {
                           setTotpLoading(false);
                         }
@@ -1634,14 +1644,14 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                       </strong>
                     </p>
                     <button
-                      onClick={() => setTotpStep('verify')}
+                      onClick={() => { setTotpStep('verify'); logActivity('2fa_qr_scanned', { deviceName: deviceName || 'Authenticator App' }); }}
                       style={{ ...styles.saveBtn(false), width: '100%', justifyContent: 'center' }}
                       className="acc-save-btn"
                     >
                       I've scanned it — Next →
                     </button>
                     <button
-                      onClick={() => { setTotpStep('idle'); setTotpCode(''); setTotpMsg(null); }}
+                      onClick={() => { setTotpStep('idle'); setTotpCode(''); setTotpMsg(null); logActivity('2fa_setup_cancelled', { stage: 'qr' }); }}
                       style={{ ...styles.cancelBtn, width: '100%', marginTop: 8, textAlign: 'center' }}
                       className="acc-cancel-btn"
                     >
@@ -1684,6 +1694,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                         } catch (err) {
                           setTotpMsg({ text: err.message, type: 'error' });
                           setTotpCode('');
+                          logActivity('2fa_setup_failed', { reason: err.message, stage: 'verify' });
                         } finally {
                           setTotpLoading(false);
                         }
@@ -1696,7 +1707,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                         : <><i className="ti ti-check" style={{ fontSize: 14 }} /> Confirm & Enable</>}
                     </button>
                     <button
-                      onClick={() => { setTotpStep('qr'); setTotpCode(''); setTotpMsg(null); }}
+                      onClick={() => { setTotpStep('qr'); setTotpCode(''); setTotpMsg(null); logActivity('2fa_setup_cancelled', { stage: 'verify' }); }}
                       style={{ ...styles.cancelBtn, width: '100%', marginTop: 8, textAlign: 'center' }}
                       className="acc-cancel-btn"
                     >
@@ -1716,7 +1727,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                     </p>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button
-                        onClick={() => setTotpStep('idle')}
+                        onClick={() => { setTotpStep('idle'); logActivity('2fa_disable_cancelled'); }}
                         style={{ ...styles.cancelBtn, flex: 1 }}
                         className="acc-cancel-btn"
                       >
@@ -1738,6 +1749,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                           } catch (err) {
                             setTotpMsg({ text: err.message, type: 'error' });
                             setTotpStep('idle');
+                            logActivity('2fa_disable_failed', { reason: err.message });
                           } finally {
                             setTotpLoading(false);
                           }
@@ -1876,34 +1888,123 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                 ) : (
                   <div className="acc-modal-scroll" style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "340px", overflowY: "auto", paddingRight: 2 }}>
                     {filtered.map((entry, i) => {
-                      const isLogin      = entry.action === "login";
-                      const isLogout     = entry.action === "logout";
-                      const isPwChange   = entry.action === "password_changed";
-                      const isPinChange  = entry.action === "pin_changed";
-                      const isSwitchProp = entry.action === "switched_property";
-                      const icon = isLogin      ? "ti-login"
-                                 : isLogout     ? "ti-logout"
-                                 : isPwChange   ? "ti-lock"
-                                 : isPinChange  ? "ti-password"
-                                 : isSwitchProp ? "ti-arrows-exchange"
+                      const isLogin            = entry.action === "login";
+                      const isLogout           = entry.action === "logout";
+                      const isPwChange         = entry.action === "password_changed";
+                      const isPinChange        = entry.action === "pin_changed";
+                      const isSwitchProp       = entry.action === "switched_property";
+                      const isTotpEnabled      = entry.action === "totp_enabled";
+                      const isTotpDisabled     = entry.action === "totp_disabled";
+                      const isTotpDeviceRm     = entry.action === "totp_device_removed";
+                      const isViewedTab        = entry.action === "viewed_settings_tab";
+                      const isOpenedSettings   = entry.action === "opened_account_settings";
+                      const is2faSetupStarted  = entry.action === "2fa_setup_started";
+                      const is2faQrScanned     = entry.action === "2fa_qr_scanned";
+                      const is2faSetupFailed   = entry.action === "2fa_setup_failed";
+                      const is2faSetupCancelled= entry.action === "2fa_setup_cancelled";
+                      const is2faDisableInit   = entry.action === "2fa_disable_initiated";
+                      const is2faDisableCancelled = entry.action === "2fa_disable_cancelled";
+                      const is2faDisableFailed = entry.action === "2fa_disable_failed";
+                      const isPwOtpSent        = entry.action === "password_change_otp_sent";
+                      const isPwChangeFailed   = entry.action === "password_change_failed";
+                      const isPinOtpSent       = entry.action === "pin_change_otp_sent";
+                      const isPinChangeFailed  = entry.action === "pin_change_failed";
+                      const isFail = is2faSetupFailed || is2faDisableFailed || isPwChangeFailed || isPinChangeFailed;
+                      const isCancel = is2faSetupCancelled || is2faDisableCancelled;
+                      const settingsTabLabels = { profile: "Profile", password: "Change Password", pin: "Change PIN", security: "Security", activity: "Activity" };
+                      const stageLabels = { qr: "QR scan", verify: "code entry", otp_request: "OTP request", change: "save" };
+                      const icon = isLogin             ? "ti-login"
+                                 : isLogout            ? "ti-logout"
+                                 : isPwChange          ? "ti-lock"
+                                 : isPinChange         ? "ti-password"
+                                 : isSwitchProp        ? "ti-arrows-exchange"
+                                 : isTotpEnabled       ? "ti-shield-check"
+                                 : isTotpDisabled      ? "ti-shield-off"
+                                 : isTotpDeviceRm      ? "ti-device-mobile-off"
+                                 : isViewedTab         ? "ti-layout-tabs"
+                                 : isOpenedSettings    ? "ti-settings"
+                                 : is2faSetupStarted   ? "ti-shield-plus"
+                                 : is2faQrScanned      ? "ti-qrcode"
+                                 : is2faDisableInit    ? "ti-shield-exclamation"
+                                 : is2faDisableCancelled ? "ti-shield-check"
+                                 : isFail              ? "ti-alert-triangle"
+                                 : isCancel            ? "ti-x"
+                                 : isPwOtpSent         ? "ti-mail"
+                                 : isPinOtpSent        ? "ti-mail"
                                  : "ti-info-circle";
-                      const iconColor = isLogin      ? "#1e8760"
-                                      : isLogout     ? "#c13515"
-                                      : isPwChange   ? "#f59e0b"
-                                      : isPinChange  ? "#8b5cf6"
-                                      : isSwitchProp ? "#3b82f6"
+                      const iconColor = isLogin             ? "#1e8760"
+                                      : isLogout            ? "#c13515"
+                                      : isPwChange          ? "#f59e0b"
+                                      : isPinChange         ? "#8b5cf6"
+                                      : isSwitchProp        ? "#3b82f6"
+                                      : isTotpEnabled       ? "#059669"
+                                      : isTotpDisabled      ? "#dc2626"
+                                      : isTotpDeviceRm      ? "#ea580c"
+                                      : isViewedTab         ? "#0ea5e9"
+                                      : isOpenedSettings    ? "#6b7280"
+                                      : is2faSetupStarted   ? "#059669"
+                                      : is2faQrScanned      ? "#0ea5e9"
+                                      : is2faDisableInit    ? "#dc2626"
+                                      : is2faDisableCancelled ? "#059669"
+                                      : isFail              ? "#dc2626"
+                                      : isCancel            ? "#9ab8a9"
+                                      : isPwOtpSent         ? "#f59e0b"
+                                      : isPinOtpSent        ? "#8b5cf6"
                                       : "#9ab8a9";
-                      const iconBg    = isLogin      ? "#eaf8f1"
-                                      : isLogout     ? "#fff0ee"
-                                      : isPwChange   ? "#fffbeb"
-                                      : isPinChange  ? "#f5f3ff"
-                                      : isSwitchProp ? "#eff6ff"
+                      const iconBg    = isLogin             ? "#eaf8f1"
+                                      : isLogout            ? "#fff0ee"
+                                      : isPwChange          ? "#fffbeb"
+                                      : isPinChange         ? "#f5f3ff"
+                                      : isSwitchProp        ? "#eff6ff"
+                                      : isTotpEnabled       ? "#d1fae5"
+                                      : isTotpDisabled      ? "#fee2e2"
+                                      : isTotpDeviceRm      ? "#ffedd5"
+                                      : isViewedTab         ? "#e0f2fe"
+                                      : isOpenedSettings    ? "#f3f4f6"
+                                      : is2faSetupStarted   ? "#d1fae5"
+                                      : is2faQrScanned      ? "#e0f2fe"
+                                      : is2faDisableInit    ? "#fee2e2"
+                                      : is2faDisableCancelled ? "#d1fae5"
+                                      : isFail              ? "#fee2e2"
+                                      : isCancel            ? "#f3f4f6"
+                                      : isPwOtpSent         ? "#fffbeb"
+                                      : isPinOtpSent        ? "#f5f3ff"
                                       : "#f7faf8";
-                      const label = isLogin      ? "Logged in"
-                                  : isLogout     ? "Logged out"
-                                  : isPwChange   ? "Password changed"
-                                  : isPinChange  ? "PIN changed"
-                                  : isSwitchProp ? "Switched property"
+                      const periodLabels = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly', custom: 'Custom range' };
+                      const label = isLogin               ? "Logged in"
+                                  : isLogout              ? "Logged out"
+                                  : isPwChange            ? "Password changed successfully"
+                                  : isPinChange           ? "PIN changed successfully"
+                                  : isSwitchProp          ? `Switched property${entry.meta?.toPropertyName ? ` → ${entry.meta.toPropertyName}` : ''}`
+                                  : isTotpEnabled         ? "2FA enabled"
+                                  : isTotpDisabled        ? "2FA disabled"
+                                  : isTotpDeviceRm        ? "Authenticator device removed"
+                                  : isOpenedSettings      ? "Opened account settings"
+                                  : isViewedTab           ? `Viewed ${settingsTabLabels[entry.meta?.tab] || entry.meta?.tab || "tab"} settings`
+                                  : is2faSetupStarted     ? "Started 2FA setup"
+                                  : is2faQrScanned        ? "Scanned 2FA QR code"
+                                  : is2faSetupFailed      ? `2FA setup failed${entry.meta?.stage ? ` (at ${stageLabels[entry.meta.stage] || entry.meta.stage})` : ''}`
+                                  : is2faSetupCancelled   ? `2FA setup cancelled${entry.meta?.stage ? ` (at ${stageLabels[entry.meta.stage] || entry.meta.stage})` : ''}`
+                                  : is2faDisableInit      ? "Initiated 2FA disable"
+                                  : is2faDisableCancelled ? "Kept 2FA enabled (cancelled disable)"
+                                  : is2faDisableFailed    ? "2FA disable failed"
+                                  : isPwOtpSent           ? "Password change OTP sent to email"
+                                  : isPwChangeFailed      ? `Password change failed${entry.meta?.stage ? ` (at ${stageLabels[entry.meta.stage] || entry.meta.stage})` : ''}`
+                                  : isPinOtpSent          ? "PIN change OTP sent to email"
+                                  : isPinChangeFailed     ? `PIN change failed${entry.meta?.stage ? ` (at ${stageLabels[entry.meta.stage] || entry.meta.stage})` : ''}`
+                                  : entry.action === "opened_messages_page"           ? "Opened Messages page"
+                                  : entry.action === "opened_message_thread"          ? `Opened message thread${entry.meta?.guest ? ` — ${entry.meta.guest}` : ''}`
+                                  : entry.action === "sent_message"                   ? `Sent message to ${entry.meta?.guest || 'guest'}${entry.meta?.property ? ` (${entry.meta.property})` : ''}`
+                                  : entry.action === "sent_message_failed"            ? `Message send failed${entry.meta?.guest ? ` for ${entry.meta.guest}` : ''}`
+                                  : entry.action === "filtered_inbox"                 ? `Filtered inbox: ${entry.meta?.filter || 'all'}`
+                                  : entry.action === "filtered_inbox_by_property"     ? `Filtered inbox by property: ${entry.meta?.property === 'all' ? 'All' : (entry.meta?.property || '—')}`
+                                  : entry.action === "searched_inbox"                 ? `Searched messages: "${entry.meta?.query || ''}"`
+                                  : entry.action === "changed_dashboard_period"       ? `Changed dashboard period: ${periodLabels[entry.meta?.period] || entry.meta?.period || ''}${entry.meta?.period === 'custom' && entry.meta?.from ? ` (${entry.meta.from} → ${entry.meta.to})` : ''}`
+                                  : entry.action === "changed_date_filter"            ? `Changed calendar filter: ${entry.meta?.preset || ''}`
+                                  : entry.action === "filtered_by_channel"            ? `Filtered by channel: ${(entry.meta?.channels || []).join(', ') || 'all'}`
+                                  : entry.action === "switched_calendar_view"         ? `Switched calendar view: ${entry.meta?.view || ''}`
+                                  : entry.action === "opened_profitability_calculator"? "Opened Profitability Calculator"
+                                  : entry.action === "exported_pdf"                   ? "Exported PDF report"
                                   : entry.action;
                       const time = new Date(entry.createdAt || entry.timestamp).toLocaleString("en-PH", {
                         month: "short", day: "numeric", year: "numeric",
@@ -1948,6 +2049,16 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                                 While on: {entry.meta.propertyName}
                               </div>
                             )}
+                            {(isTotpEnabled || isTotpDeviceRm || is2faQrScanned) && entry.meta?.deviceName && (
+                              <div style={{ fontSize: 11, color: "#b0c8ba", marginTop: 2 }}>
+                                Device: {entry.meta.deviceName}
+                              </div>
+                            )}
+                            {isFail && entry.meta?.reason && (
+                              <div style={{ fontSize: 11, color: "#dc2626", marginTop: 2 }}>
+                                Reason: {entry.meta.reason}
+                              </div>
+                            )}
                             {entry.ipAddress && (
                               <div style={{ fontSize: 11, color: "#b0c8ba", marginTop: 2 }}>
                                 IP: {entry.ipAddress}
@@ -1955,11 +2066,24 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                             )}
                           </div>
                           <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 20, background: iconBg, color: iconColor, flexShrink: 0, alignSelf: "flex-start" }}>
-                            {isLogin      ? "Login"
-                             : isLogout    ? "Logout"
-                             : isPwChange  ? "Security"
-                             : isPinChange ? "Security"
-                             : isSwitchProp ? "Switch"
+                            {isLogin              ? "Login"
+                             : isLogout           ? "Logout"
+                             : isPwChange         ? "Security"
+                             : isPinChange        ? "Security"
+                             : isSwitchProp       ? "Switch"
+                             : isTotpEnabled      ? "Security"
+                             : isTotpDisabled     ? "Security"
+                             : isTotpDeviceRm     ? "Security"
+                             : is2faSetupStarted  ? "Security"
+                             : is2faQrScanned     ? "Security"
+                             : is2faDisableInit   ? "Security"
+                             : is2faDisableCancelled ? "Security"
+                             : isFail             ? "Failed"
+                             : isCancel           ? "Cancelled"
+                             : isPwOtpSent        ? "Security"
+                             : isPinOtpSent       ? "Security"
+                             : isViewedTab        ? "Settings"
+                             : isOpenedSettings   ? "Settings"
                              : "Event"}
                           </span>
                         </div>

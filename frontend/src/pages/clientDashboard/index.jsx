@@ -17,11 +17,13 @@ import Footer from "./components/Footer";
 import ProfitabilityCalculator from "./components/ProfitabilityCalculator";
 import FetchingOverlay from "./components/FetchingOverlay";
 import safeStorage from "../safeStorage";
+import { useActivityLog } from "./hooks/useActivityLog";
 import "./globals.css";
 
 export default function DashboardPage() {
   const { dashState, dark } = useDashboard();
   const { loadData, banner } = useDashboardData();
+  const { logActivity } = useActivityLog();
 
   // ── First-login password change ──────────────────────────────────────────────
   // Set by LoginForm when the backend returns mustChangePassword: true.
@@ -316,7 +318,7 @@ console.log("profitOpen:", profitOpen);
       </div>
 
       <button
-        onClick={() => setProfitOpen(true)}
+        onClick={() => { setProfitOpen(true); logActivity('opened_profitability_calculator'); }}
         onMouseEnter={e => { if (window.innerWidth > 768) e.currentTarget.style.transform = "translateX(0)"; }}
         onMouseLeave={e => { if (window.innerWidth > 768) e.currentTarget.style.transform = "translateX(calc(100% - 48px))"; }}
         title="Profitability Calculator"
