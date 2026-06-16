@@ -65,11 +65,19 @@ export function useAuthorization(onAuthorized) {
   // 1. Bootstrap session from URL params (_t / _u) if present.
   //    Must run synchronously before sendLoginOtp so getAdminEmail()
   //    can read hp_user from sessionStorage.
-  // 2. Send OTP email as soon as the AuthModal mounts.
+  // 2. Auto-send OTP only for email-only users. TOTP users choose their
+  //    method first; the OTP is sent when they explicitly pick Email OTP.
   useEffect(() => {
     bootstrapSessionFromUrlParams();
 
-     if (!otpSentRef.current) {
+    // Read totpEnabled after bootstrapping — hp_user may have just been set from URL params.
+    const hasTotpEnabled = (() => {
+      try {
+        return JSON.parse(sessionStorage.getItem('hp_user') || '{}').totpEnabled ?? false;
+      } catch { return false; }
+    })();
+
+    if (!otpSentRef.current && !hasTotpEnabled) {
       otpSentRef.current = true;
       sendLoginOtp().catch((err) => {
         console.error('Failed to send initial login OTP:', err);
@@ -114,6 +122,21 @@ export function useAuthorization(onAuthorized) {
         return prev - 1;
       });
     }, 1000);
+  }
+
+  async function sendOtp() {
+    if (otpSentRef.current || resendLoading) return;
+    setResendLoading(true);
+    setMessage(null);
+    try {
+      await sendLoginOtp();
+      otpSentRef.current = true;
+      startCooldown();
+    } catch (err) {
+      showMessage(err.message ?? 'Failed to send code. Please try again.');
+    } finally {
+      setResendLoading(false);
+    }
   }
 
   async function resend() {
@@ -163,5 +186,5 @@ const userEmail = (() => {
     }
   }
 
-  return { loading, resendLoading, resendCooldown, message, submit, resend, userEmail, totpEnabled, submitTotp };
+  return { loading, resendLoading, resendCooldown, message, submit, resend, sendOtp, userEmail, totpEnabled, submitTotp };
 }
