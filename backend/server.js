@@ -188,9 +188,6 @@ app.use((req, res, next) => {
   requireApiKey(req, res, next);
 });
 
-// ── TEMP: Return "charmander" for all /api routes ────────────────────────────
-app.use('/api', (req, res) => res.send('charmander'));
-
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/auth', authRoutes);
 app.use('/auth', publicRecoveryRouter);
