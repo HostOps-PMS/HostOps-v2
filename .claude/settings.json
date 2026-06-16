@@ -8,7 +8,10 @@
       "Bash(node -e \"const c=require\\('crypto'\\); console.log\\('RESPONSE_MASTER_KEY='+c.randomBytes\\(32\\).toString\\('hex'\\)\\); console.log\\('RESPONSE_HMAC_KEY='+c.randomBytes\\(32\\).toString\\('hex'\\)\\);\")",
       "Bash(ls \"c:\\\\Users\\\\hhsarmiento\\\\.claude\\\\projects\\\\c--Users-hhsarmiento-Desktop-HostOps-v2\\\\memory\\\\\" 2>/dev/null | head -20)",
       "Read(//c/Users/hhsarmiento/.claude/projects/c--Users-hhsarmiento-Desktop-HostOps-v2/memory\" 2>/dev/**)",
-      "Read(//c/Users/hhsarmiento/.claude/projects/c--Users-hhsarmiento-Desktop-HostOps-v2/memory/**)"
+      "Read(//c/Users/hhsarmiento/.claude/projects/c--Users-hhsarmiento-Desktop-HostOps-v2/memory/**)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\hhsarmiento\\.claude\\projects\\c--Users-hhsarmiento-Desktop-HostOps-v2\\memory"
