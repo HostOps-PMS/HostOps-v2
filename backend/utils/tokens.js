@@ -80,36 +80,45 @@ export function decryptToken(blob) {
   return decrypt(blob);
 }
 
+// ── Session fingerprint ──────────────────────────────────────────
+// SHA-256 of user-agent + accept-language + accept-encoding.
+// No IP binding — fingerprint survives mobile network switches.
+// Exported so middleware can re-derive and compare on every request.
+export function generateFingerprint(req) {
+  const ua   = req.get('user-agent')      || '';
+  const lang = req.get('accept-language') || '';
+  const enc  = req.get('accept-encoding') || '';
+  return crypto.createHash('sha256').update(`${ua}|${lang}|${enc}`).digest('hex');
+}
+
 // ── Access tokens (short-lived, sent on every request) ──────────
 // jti (JWT ID) is a unique uuid per token. It lets us revoke
 // individual tokens without touching the refresh token family.
-export function signAccessToken(user) {
-  return jwt.sign(
-    {
-      jti:   uuidv4(),
-      sub:   user._id.toString(),
-      email: user.email,
-      role:  user.role,
-    },
-    getSigningSecret(),
-    { expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m' }
-  );
+// req is optional — when provided, embeds a session fingerprint (fp)
+// derived from browser headers. Tokens without fp skip the check.
+export function signAccessToken(user, req = null) {
+  const payload = {
+    jti:   uuidv4(),
+    sub:   user._id.toString(),
+    email: user.email,
+    role:  user.role,
+  };
+  if (req) payload.fp = generateFingerprint(req);
+  return jwt.sign(payload, getSigningSecret(), { expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m' });
 }
 
 // ── Staff access tokens ──────────────────────────────────────────
-export function signStaffAccessToken(staff) {
-  return jwt.sign(
-    {
-      jti:      uuidv4(),
-      sub:      staff._id.toString(),
-      staffId:  staff._id.toString(),
-      clientId: staff.clientId.toString(),
-      email:    staff.email,
-      role:     'staff',
-    },
-    getSigningSecret(),
-    { expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m' }
-  );
+export function signStaffAccessToken(staff, req = null) {
+  const payload = {
+    jti:      uuidv4(),
+    sub:      staff._id.toString(),
+    staffId:  staff._id.toString(),
+    clientId: staff.clientId.toString(),
+    email:    staff.email,
+    role:     'staff',
+  };
+  if (req) payload.fp = generateFingerprint(req);
+  return jwt.sign(payload, getSigningSecret(), { expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m' });
 }
 
 // verifyAccessToken: decrypts the blob first, then verifies the JWT
@@ -151,19 +160,17 @@ export function signStaffRefreshToken(staff) {
 }
 
 // ── Client Account tokens ────────────────────────────────────────
-export function signClientAccountAccessToken(account) {
-  return jwt.sign(
-    {
-      jti:             uuidv4(),
-      sub:             account._id.toString(),
-      clientAccountId: account._id.toString(),
-      parentClientId:  account.parentClientId.toString(),
-      email:           account.email,
-      role:            'clientAccount',
-    },
-    getSigningSecret(),
-    { expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m' }
-  );
+export function signClientAccountAccessToken(account, req = null) {
+  const payload = {
+    jti:             uuidv4(),
+    sub:             account._id.toString(),
+    clientAccountId: account._id.toString(),
+    parentClientId:  account.parentClientId.toString(),
+    email:           account.email,
+    role:            'clientAccount',
+  };
+  if (req) payload.fp = generateFingerprint(req);
+  return jwt.sign(payload, getSigningSecret(), { expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m' });
 }
 
 export function signClientAccountRefreshToken(account) {

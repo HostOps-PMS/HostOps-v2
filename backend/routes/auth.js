@@ -134,7 +134,7 @@ function extractJti(encryptedOrRaw) {
 // Signs both tokens, stores the refresh token in DB with the access
 // token's jti bound to it (accessJti), then returns both.
 async function issueTokenPair(signFnAccess, signFnRefresh, entity, req, extra = {}) {
-  const rawAccess  = signFnAccess(entity);
+  const rawAccess  = signFnAccess(entity, req);
   const rawRefresh = signFnRefresh(entity);
   const isStaffEntity = !!entity.clientId;
 
@@ -559,7 +559,22 @@ router.post('/refresh', async (req, res, next) => {
 
     // Hash the decrypted token to look it up in DB
     const stored = await RefreshToken.findOne({ token: hashToken(rawToken) });
-    if (!stored || !stored.isActive()) return res.status(401).json({ error: 'Refresh token revoked' });
+    if (!stored) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Reuse attack detection: token exists in DB but was already consumed.
+    // A legitimately rotated token is always replaced — seeing a revoked one
+    // presented again means the old token was leaked. Nuke all active sessions
+    // for that identity so the attacker's copy is also invalidated.
+    if (stored.revokedAt) {
+      if (stored.staffId) {
+        await RefreshToken.updateMany({ staffId: stored.staffId, revokedAt: null }, { revokedAt: new Date() });
+      } else {
+        await RefreshToken.updateMany({ userId: stored.userId, staffId: null, revokedAt: null }, { revokedAt: new Date() });
+      }
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!stored.isActive()) return res.status(401).json({ error: 'Unauthorized' });
 
     // ── Staff refresh ─────────────────────────────────────────────
     if (decoded.role === 'staff') {
@@ -567,7 +582,7 @@ router.post('/refresh', async (req, res, next) => {
       if (!staff || !staff.isActive) return res.status(401).json({ error: 'Staff account not found or inactive' });
       if (staff.isArchive) return res.status(401).json({ error: 'This account has been disabled.', accountDisabled: true });
 
-      const rawNewAccess   = signStaffAccessToken(staff);
+      const rawNewAccess   = signStaffAccessToken(staff, req);
       const newRefreshToken = signStaffRefreshToken(staff);
       const { jti: newAccessJti } = verifyAccessToken(encryptToken(rawNewAccess));
 
@@ -600,7 +615,7 @@ router.post('/refresh', async (req, res, next) => {
     if (!user) return res.status(401).json({ error: 'User not found' });
     if (user.isArchive) return res.status(401).json({ error: 'This account has been disabled.', accountDisabled: true });
 
-    const rawNewAccess    = signAccessToken(user);
+    const rawNewAccess    = signAccessToken(user, req);
     const newRefreshToken = signRefreshToken(user);
     const { jti: newAccessJti } = verifyAccessToken(encryptToken(rawNewAccess));
 

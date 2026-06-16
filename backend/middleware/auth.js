@@ -1,6 +1,6 @@
 // src/middleware/auth.js
 import mongoose     from 'mongoose';
-import { verifyAccessToken } from '../utils/tokens.js';
+import { verifyAccessToken, generateFingerprint } from '../utils/tokens.js';
 import User         from '../models/user.js';
 import Staff        from '../models/staff.js';
 import RevokedToken from '../models/revokedToken.js';
@@ -27,7 +27,16 @@ export async function requireAuth(req, res, next) {
     // ── 5. Check jti revocation ──────────────────────────────────
     const isRevoked = await RevokedToken.exists({ jti: decoded.jti });
     if (isRevoked) {
-      return res.status(401).json({ error: 'Token has been revoked' });
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // ── 5a. Session fingerprint check ────────────────────────────
+    // Only enforced on tokens that carry fp (issued after this feature
+    // was deployed). Tokens without fp pass through — safe rollout.
+    if (decoded.fp) {
+      if (generateFingerprint(req) !== decoded.fp) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
     }
 
     // ── 6. Session-ownership check ───────────────────────────────
