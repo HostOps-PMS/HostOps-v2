@@ -14,6 +14,7 @@ import TeamLeaderStaffs from './pages/TeamLeader/staffs/index';
 import TeamLeaderDashboardPlaceholder from './pages/TeamLeader/dashboard/index';
 import AccountsPage from './pages/Accounts/index';
 import ActivityLogsPage from './pages/ActivityLogs/index';
+import ErrorPage404 from './pages/ErrorPage404';
 
 const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5174';
 
@@ -46,7 +47,7 @@ const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5174
 
 function PrivateRoute({ children }) {
   const token = sessionStorage.getItem('hp_access_token');
-  if (!token) { window.location.href = `${FRONTEND_URL}/login`; return null; }
+  if (!token) { return <ErrorPage404 />; }
   
   try {
     const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
@@ -66,7 +67,7 @@ function PrivateRoute({ children }) {
 
 function TeamLeaderRoute({ children }) {
   const token = sessionStorage.getItem('hp_access_token');
-  if (!token) { window.location.href = `${FRONTEND_URL}/login`; return null; }
+  if (!token) { return <ErrorPage404 />; }
 
   try {
     const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
@@ -74,7 +75,7 @@ function TeamLeaderRoute({ children }) {
       return <Navigate to="/dashboard" replace />;
     }
   } catch (e) {
-    window.location.href = `${FRONTEND_URL}/login`; return null;
+    return <ErrorPage404 />;
   }
 
   return children;
@@ -87,13 +88,13 @@ function TeamLeaderRoute({ children }) {
 // until the user passes it — so no content is shown before verification.
 function AdminEntryRedirect() {
   const token = sessionStorage.getItem('hp_access_token');
-  if (!token) { window.location.href = `${FRONTEND_URL}/login`; return null; }
+  if (!token) { return <ErrorPage404 />; }
   try {
     const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
     if (user.role === 'team_leader') return <Navigate to="/team-leader/staffs" replace />;
     return <Navigate to="/dashboard" replace />;
   } catch {
-    window.location.href = `${FRONTEND_URL}/login`; return null;
+    return <ErrorPage404 />;
   }
 }
 
