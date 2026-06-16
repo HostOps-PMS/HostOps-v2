@@ -176,6 +176,23 @@ export async function changePassword({ currentPassword, newPassword }, currentTo
 }
 
 // ─────────────────────────────────────────────────────────────────
+// verifyTotpLogin
+// Called after email OTP when the user has TOTP enabled.
+// Returns { accessToken, user, isAdmin } — same shape as verifyLoginOtp.
+// ─────────────────────────────────────────────────────────────────
+export async function verifyTotpLogin({ email, token }) {
+  const res = await fetch(`${API_BASE}/auth/totp/verify`, {
+    method:      'POST',
+    credentials: 'include',
+    headers:     { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
+    body:        JSON.stringify({ email, token }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Invalid authenticator code');
+  return data;
+}
+
+// ─────────────────────────────────────────────────────────────────
 // changePin
 // ─────────────────────────────────────────────────────────────────
 export async function changePin({ currentPin, newPin }, currentToken) {

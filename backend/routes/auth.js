@@ -342,7 +342,7 @@ router.post('/login', async (req, res, next) => {
         try { await sendVerificationEmail(user.email, user.firstName || user.businessName, rawOtp); }
         catch (e) { console.error('Login OTP email send failed:', e); }
 
-        return res.json({ requiresOtp: true });
+        return res.json({ requiresOtp: true, totpEnabled: user.totpEnabled || false });
       }
     }
 
