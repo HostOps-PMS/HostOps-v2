@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 
 import { NotificationsProvider } from './context/NotificationsContext';
+import { ThemeProvider } from './context/ThemeContext';
 import ToastContainer from './components/ToastContainer';
 import Dashboard     from './pages/dashboard';
 import Clients       from './pages/clients';
@@ -136,6 +137,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <ThemeProvider>
       <NotificationsProvider>
       <ToastContainer />
       {!authorized && (
@@ -229,6 +231,7 @@ export default function App() {
         <Route path="*" element={<AdminEntryRedirect />} />
       </Routes>
       </NotificationsProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

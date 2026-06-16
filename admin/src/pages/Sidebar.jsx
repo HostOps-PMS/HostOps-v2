@@ -4,9 +4,9 @@ import AccountSettingsModal from './dashboard/components/AccountSettingsModal';
 import { logoutUser } from './authorization/services/authService';
 import HostOpsLogo from '../assets/HostOpsLOGO.png';
 import { useNotifications } from '../context/NotificationsContext';
+import { useTheme } from '../context/ThemeContext';
 
 /* ─── Nav data ───────────────────────────────────────────────────── */
-// Businesses has a sub-item: Staffs
 const NAV_ITEMS = [
   {
     icon: (
@@ -118,11 +118,12 @@ const ChevronDown = ({ open }) => (
 
 /* ─── Section Label ─────────────────────────────────────────────── */
 function SectionLabel({ label, collapsed }) {
+  const { dark } = useTheme();
   if (collapsed) {
     return (
       <div style={{
         height: 1,
-        background: 'rgba(0,0,0,0.07)',
+        background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)',
         margin: '12px 4px',
         borderRadius: 1,
       }} />
@@ -132,7 +133,7 @@ function SectionLabel({ label, collapsed }) {
     <div style={{
       fontSize: 10,
       fontWeight: 600,
-      color: '#999',
+      color: dark ? '#4d8a6a' : '#999',
       letterSpacing: '0.1em',
       textTransform: 'uppercase',
       padding: '12px 10px 5px',
@@ -145,18 +146,16 @@ function SectionLabel({ label, collapsed }) {
 
 /* ─── Nav Item (with optional children / sub-items) ─────────────── */
 function SidebarNavLink({ to, icon, label, collapsed, children }) {
+  const { dark } = useTheme();
   const location = useLocation();
   const hasChildren = children && children.length > 0;
 
-  // Auto-open if the current path matches any child route
   const childActive = hasChildren && children.some(c => location.pathname.startsWith(c.to));
   const [subOpen, setSubOpen] = useState(childActive);
-
   const [hovered, setHovered] = useState(false);
 
   return (
     <div>
-      {/* Parent row */}
       <NavLink
         to={to}
         title={label}
@@ -173,17 +172,22 @@ function SidebarNavLink({ to, icon, label, collapsed, children }) {
           fontSize: 13,
           letterSpacing: '0.01em',
           transition: 'background 0.12s, color 0.12s',
-          background: (isActive || childActive) ? '#f0faf6' : hovered ? '#f7f7f7' : 'transparent',
-          color: (isActive || childActive) ? '#0d7a55' : hovered ? '#222' : '#888',
+          background: (isActive || childActive)
+            ? (dark ? '#0d2619' : '#f0faf6')
+            : hovered
+              ? (dark ? '#0f2416' : '#f7f7f7')
+              : 'transparent',
+          color: (isActive || childActive)
+            ? (dark ? '#26c47a' : '#0d7a55')
+            : hovered
+              ? (dark ? '#eaf5f0' : '#222')
+              : (dark ? '#7ab89a' : '#888'),
           fontWeight: (isActive || childActive) ? 600 : 400,
           marginBottom: 2,
         })}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        onClick={hasChildren ? (e) => {
-          // Don't prevent navigation, just toggle sub-menu too
-          setSubOpen(v => !v);
-        } : undefined}
+        onClick={hasChildren ? () => { setSubOpen(v => !v); } : undefined}
       >
         {({ isActive }) => (
           <>
@@ -195,8 +199,12 @@ function SidebarNavLink({ to, icon, label, collapsed, children }) {
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
-              background: (isActive || childActive) ? '#e1f5ee' : 'transparent',
-              color: (isActive || childActive) ? '#0d7a55' : 'inherit',
+              background: (isActive || childActive)
+                ? (dark ? '#152e1f' : '#e1f5ee')
+                : 'transparent',
+              color: (isActive || childActive)
+                ? (dark ? '#26c47a' : '#0d7a55')
+                : 'inherit',
               transition: 'background 0.12s',
             }}>
               {icon}
@@ -225,14 +233,13 @@ function SidebarNavLink({ to, icon, label, collapsed, children }) {
         )}
       </NavLink>
 
-      {/* Sub-items (only when expanded and not collapsed) */}
       {!collapsed && hasChildren && subOpen && (
         <div style={{ paddingLeft: 18, marginBottom: 2 }}>
-          {/* Vertical connector line */}
           <div style={{ position: 'relative' }}>
             <div style={{
               position: 'absolute', left: 14, top: 0, bottom: 0,
-              width: 1, background: 'rgba(0,0,0,0.07)',
+              width: 1,
+              background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)',
               borderRadius: 1,
             }} />
             {children.map(child => (
@@ -247,6 +254,7 @@ function SidebarNavLink({ to, icon, label, collapsed, children }) {
 
 /* ─── Sub Nav Link ──────────────────────────────────────────────── */
 function SubNavLink({ to, icon, label }) {
+  const { dark } = useTheme();
   const [hovered, setHovered] = useState(false);
   return (
     <NavLink
@@ -264,8 +272,16 @@ function SubNavLink({ to, icon, label }) {
         fontSize: 12,
         letterSpacing: '0.01em',
         transition: 'background 0.12s, color 0.12s',
-        background: isActive ? '#e8f5f0' : hovered ? '#f5f5f5' : 'transparent',
-        color: isActive ? '#1a9e6e' : hovered ? '#111' : '#555',
+        background: isActive
+          ? (dark ? '#0d2619' : '#e8f5f0')
+          : hovered
+            ? (dark ? '#0f2416' : '#f5f5f5')
+            : 'transparent',
+        color: isActive
+          ? (dark ? '#26c47a' : '#1a9e6e')
+          : hovered
+            ? (dark ? '#eaf5f0' : '#111')
+            : (dark ? '#7ab89a' : '#555'),
         fontWeight: isActive ? 600 : 400,
         marginBottom: 4,
       })}
@@ -279,7 +295,7 @@ function SubNavLink({ to, icon, label }) {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0,
             background: 'transparent',
-            color: isActive ? '#1a9e6e' : 'inherit',
+            color: isActive ? (dark ? '#26c47a' : '#1a9e6e') : 'inherit',
             transition: 'background 0.12s',
           }}>
             {icon}
@@ -295,6 +311,7 @@ function SubNavLink({ to, icon, label }) {
 
 /* ─── Button Item (Settings / Logout) ──────────────────────────── */
 function SidebarButton({ icon, label, onClick, collapsed, danger }) {
+  const { dark } = useTheme();
   const [hovered, setHovered] = useState(false);
   return (
     <button
@@ -312,8 +329,12 @@ function SidebarButton({ icon, label, onClick, collapsed, danger }) {
         cursor: 'pointer',
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         fontSize: 13,
-        background: hovered ? (danger ? '#fff1f1' : '#f7f7f7') : 'transparent',
-        color: hovered ? (danger ? '#c0392b' : '#111') : (danger ? '#d94040' : '#555'),
+        background: hovered
+          ? (danger ? (dark ? '#2a0d0d' : '#fff1f1') : (dark ? '#0d2619' : '#f7f7f7'))
+          : 'transparent',
+        color: hovered
+          ? (danger ? '#c0392b' : (dark ? '#eaf5f0' : '#111'))
+          : (danger ? '#d94040' : (dark ? '#7ab89a' : '#555')),
         border: 'none',
         width: '100%',
         textAlign: 'left',
@@ -383,6 +404,7 @@ function shuffleArray(arr) {
 }
 
 function LogoutConfirmModal({ isOpen, joke, onConfirm, onCancel }) {
+  const { dark } = useTheme();
   const [exiting, setExiting] = useState(false);
 
   useEffect(() => {
@@ -396,13 +418,25 @@ function LogoutConfirmModal({ isOpen, joke, onConfirm, onCancel }) {
 
   if (!isOpen) return null;
 
+  const surface      = dark ? '#132a1e' : '#fff';
+  const textMain     = dark ? '#eaf5f0' : '#111';
+  const textDim      = dark ? '#4d8a6a' : '#bbb';
+  const textJoke     = dark ? '#7ab89a' : '#888';
+  const iconBg       = dark ? '#0d2619' : '#f0faf6';
+  const iconBorder   = dark ? '1.5px solid #1e3a2a' : '1.5px solid #c8eedd';
+  const stayBg       = dark ? '#0d2619' : '#fff';
+  const stayHoverBg  = dark ? '#152e1f' : '#f5f5f5';
+  const stayBorder   = dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+  const stayHoverBorder = dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)';
+  const stayColor    = dark ? '#eaf5f0' : '#333';
+
   return (
     <div
       onClick={handleCancel}
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(0,0,0,0.45)',
+        background: 'rgba(0,0,0,0.55)',
         backdropFilter: 'blur(4px)',
         animation: exiting ? 'lo-backdrop-out 0.26s ease forwards' : 'lo-backdrop-in 0.22s ease forwards',
       }}
@@ -410,32 +444,32 @@ function LogoutConfirmModal({ isOpen, joke, onConfirm, onCancel }) {
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          background: '#fff',
+          background: surface,
           borderRadius: 20,
           padding: '36px 28px 26px',
           maxWidth: 380,
           width: 'calc(100% - 40px)',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.13), 0 4px 16px rgba(0,0,0,0.06)',
+          boxShadow: dark
+            ? '0 24px 64px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.3)'
+            : '0 24px 64px rgba(0,0,0,0.13), 0 4px 16px rgba(0,0,0,0.06)',
           animation: exiting
             ? 'lo-card-out 0.26s cubic-bezier(.4,0,.2,1) forwards'
             : 'lo-card-in 0.38s cubic-bezier(.34,1.56,.64,1) forwards',
           fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
           textAlign: 'center',
+          border: dark ? '0.5px solid #1e3a2a' : 'none',
         }}
       >
-        {/* animated brand icon */}
         <div style={{
           width: 68, height: 68, borderRadius: 20,
-          background: '#f0faf6',
-          border: '1.5px solid #c8eedd',
+          background: iconBg,
+          border: iconBorder,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           margin: '0 auto 20px',
           animation: exiting ? 'none' : 'lo-icon-in 0.42s cubic-bezier(.34,1.56,.64,1) 0.08s both',
         }}>
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#1a9e6e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ overflow: 'visible' }}>
-            {/* door frame — static */}
             <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-            {/* arrow — slides right on loop */}
             <g style={{ animation: 'lo-arrow-walk 1.8s ease-in-out infinite' }}>
               <polyline points="16 17 21 12 16 7" />
               <line x1="21" y1="12" x2="9" y2="12" />
@@ -444,14 +478,14 @@ function LogoutConfirmModal({ isOpen, joke, onConfirm, onCancel }) {
         </div>
 
         <div style={{
-          fontSize: 17, fontWeight: 700, color: '#111',
+          fontSize: 17, fontWeight: 700, color: textMain,
           marginBottom: 5, letterSpacing: '-0.02em',
           animation: exiting ? 'none' : 'lo-text-in 0.32s ease 0.14s both',
         }}>
           Are you sure you want to log out?
         </div>
         <div style={{
-          fontSize: 12, color: '#bbb', marginBottom: 18,
+          fontSize: 12, color: textDim, marginBottom: 18,
           animation: exiting ? 'none' : 'lo-text-in 0.32s ease 0.2s both',
         }}>
           Think twice before you leave.
@@ -459,9 +493,8 @@ function LogoutConfirmModal({ isOpen, joke, onConfirm, onCancel }) {
 
         <p style={{
           fontSize: 13,
-          color: '#888',
+          color: textJoke,
           lineHeight: 1.7,
-          marginBottom: 24,
           fontStyle: 'italic',
           animation: exiting ? 'none' : 'lo-joke-in 0.38s ease 0.26s both',
           margin: '0 0 24px',
@@ -478,14 +511,14 @@ function LogoutConfirmModal({ isOpen, joke, onConfirm, onCancel }) {
             style={{
               flex: 1, padding: '12px 0',
               borderRadius: 12,
-              border: '1.5px solid rgba(0,0,0,0.1)',
-              background: '#fff', color: '#333',
+              border: `1.5px solid ${stayBorder}`,
+              background: stayBg, color: stayColor,
               fontSize: 14, fontWeight: 600,
               cursor: 'pointer', fontFamily: 'inherit',
               transition: 'background 0.15s, border-color 0.15s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#f5f5f5'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.18)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.1)'; }}
+            onMouseEnter={e => { e.currentTarget.style.background = stayHoverBg; e.currentTarget.style.borderColor = stayHoverBorder; }}
+            onMouseLeave={e => { e.currentTarget.style.background = stayBg; e.currentTarget.style.borderColor = stayBorder; }}
           >
             Stay
           </button>
@@ -512,6 +545,7 @@ function LogoutConfirmModal({ isOpen, joke, onConfirm, onCancel }) {
 
 /* ─── Main Sidebar ──────────────────────────────────────────────── */
 export default function Sidebar({ onExport, exportLoading = false, alerts }) {
+  const { dark } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -535,20 +569,38 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
   const resolvedLoading    = notifContext.loading;
 
   const unreadCount = (resolvedAlerts || []).filter(a => a.unread).length;
-  const mobileInitials = [currentUser.firstName, currentUser.lastName]
-    .filter(Boolean).map(n => n[0].toUpperCase()).join('') || 'U';
   const [mobileNotifOpen,  setMobileNotifOpen]  = useState(false);
   const [mobileActiveTab,  setMobileActiveTab]  = useState('alerts');
   const [mobileReadIds,    setMobileReadIds]    = useState(new Set());
   const location = useLocation();
 
-  // Refetch when the mobile panel is opened and data is empty
   useEffect(() => {
     if (mobileNotifOpen && resolvedAlerts.length === 0 && !resolvedLoading) {
       notifContext.refetch();
     }
   }, [mobileNotifOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const isDashboard = location.pathname === '/dashboard' || location.pathname === '/dashboard/';
+
+  // Theme tokens
+  const sideBg       = dark ? '#132a1e' : '#fff';
+  const sideBorder   = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)';
+  const logoBorder   = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
+  const titleColor   = dark ? '#eaf5f0' : '#111';
+  const collBg       = dark ? '#0d2619' : '#f5f5f5';
+  const collBorder   = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)';
+  const collColor    = dark ? '#4d8a6a' : '#aaa';
+  const userHoverBg  = dark ? '#0d2619' : '#f7f7f7';
+  const userNameColor = dark ? '#eaf5f0' : '#222';
+  const userEmailColor = dark ? '#4d8a6a' : '#aaa';
+  const notifSurface = dark ? '#132a1e' : '#fff';
+  const notifBorder  = dark ? '#1e3a2a' : 'rgba(0,0,0,0.08)';
+  const notifText    = dark ? '#eaf5f0' : '#111';
+  const notifMuted   = dark ? '#7ab89a' : '#888';
+  const notifDim     = dark ? '#4d8a6a' : '#bbb';
+  const notifDiv     = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)';
+  const notifUnreadBg = dark ? '#0d2619' : '#f0faf6';
+  const notifReadBg  = dark ? '#132a1e' : '#fff';
+  const notifHover   = dark ? '#0d2619' : '#f8f9fa';
 
   const sidebarContent = (isMobile = false) => {
     const isCollapsed = collapsed && !isMobile;
@@ -564,15 +616,15 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
         style={{
           width: isMobile ? 260 : isCollapsed ? 68 : 240,
           minWidth: isMobile ? 260 : isCollapsed ? 68 : 240,
-          background: '#fff',
-          borderRight: '0.5px solid rgba(0,0,0,0.07)',
+          background: sideBg,
+          borderRight: `0.5px solid ${sideBorder}`,
           display: 'flex',
           flexDirection: 'column',
           padding: '12px 10px',
           height: '100vh',
           overflowY: 'auto',
           overflowX: 'hidden',
-          transition: 'width 0.25s cubic-bezier(.4,0,.2,1), min-width 0.25s cubic-bezier(.4,0,.2,1)',
+          transition: 'width 0.25s cubic-bezier(.4,0,.2,1), min-width 0.25s cubic-bezier(.4,0,.2,1), background 0.2s',
           boxSizing: 'border-box',
           position: 'relative',
         }}
@@ -582,7 +634,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
           display: 'flex',
           alignItems: 'center',
           gap: 10,
-          padding: isCollapsed ? '6px 4px' : '6px 4px',
+          padding: '6px 4px',
           marginBottom: 12,
           position: 'relative',
           justifyContent: isCollapsed ? 'center' : 'flex-start',
@@ -590,14 +642,14 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
           <div style={{
             width: 32,
             height: 32,
-            background: '#fff',
+            background: sideBg,
             borderRadius: 9,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
             overflow: 'hidden',
-            border: '0.5px solid rgba(0,0,0,0.08)',
+            border: `0.5px solid ${logoBorder}`,
           }}>
             <LogoIcon />
           </div>
@@ -605,7 +657,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
           {!isCollapsed && (
             <>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#111', letterSpacing: '-0.02em' }}>HostOps</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: titleColor, letterSpacing: '-0.02em' }}>HostOps</div>
               </div>
               {!isMobile && (
                 <button
@@ -615,13 +667,13 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                     width: 24,
                     height: 24,
                     borderRadius: '50%',
-                    background: '#f5f5f5',
-                    border: '0.5px solid rgba(0,0,0,0.1)',
+                    background: collBg,
+                    border: `0.5px solid ${collBorder}`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    color: '#aaa',
+                    color: collColor,
                     padding: 0,
                     flexShrink: 0,
                   }}
@@ -636,10 +688,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
             <button
               onClick={() => setCollapsed(false)}
               title="Expand sidebar"
-              style={{
-                position: 'absolute',
-                display: 'none',
-              }}
+              style={{ position: 'absolute', display: 'none' }}
             />
           )}
         </div>
@@ -653,13 +702,13 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
               width: 32,
               height: 32,
               borderRadius: '50%',
-              background: '#f5f5f5',
-              border: '0.5px solid rgba(0,0,0,0.1)',
+              background: collBg,
+              border: `0.5px solid ${collBorder}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              color: '#aaa',
+              color: collColor,
               padding: 0,
               margin: '0 auto 10px',
             }}
@@ -690,7 +739,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
         <div style={{
           display: 'flex',
           flexDirection: 'column',
-          borderTop: '0.5px solid rgba(0,0,0,0.07)',
+          borderTop: `0.5px solid ${sideBorder}`,
           paddingTop: 10,
           marginTop: 4,
         }}>
@@ -724,13 +773,13 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
               gap: 9,
               padding: isCollapsed ? '10px 0' : '10px 8px 4px',
               marginTop: 6,
-              borderTop: '0.5px solid rgba(0,0,0,0.06)',
+              borderTop: `0.5px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)'}`,
               cursor: 'pointer',
               borderRadius: 10,
               justifyContent: isCollapsed ? 'center' : 'flex-start',
               transition: 'background 0.12s',
             }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f7f7f7'}
+            onMouseEnter={e => e.currentTarget.style.background = userHoverBg}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
             <div style={{
@@ -750,10 +799,10 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
             </div>
             {!isCollapsed && (
               <div style={{ flex: 1, overflow: 'hidden' }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#222', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: userNameColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {fullName}
                 </div>
-                <div style={{ fontSize: 11, color: '#aaa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: 11, color: userEmailColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {email}
                 </div>
               </div>
@@ -778,12 +827,13 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
           position: 'fixed',
           top: 0, left: 0, right: 0,
           height: 52,
-          background: '#fff',
-          borderBottom: '0.5px solid rgba(0,0,0,0.08)',
+          background: sideBg,
+          borderBottom: `0.5px solid ${sideBorder}`,
           zIndex: 999,
           alignItems: 'center',
           padding: '0 16px',
           gap: 12,
+          transition: 'background 0.2s',
         }}
       >
         <button
@@ -791,7 +841,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
           style={{
             background: 'none', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 6, borderRadius: 8, color: '#444',
+            padding: 6, borderRadius: 8, color: dark ? '#7ab89a' : '#444',
           }}
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -799,25 +849,31 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
           </svg>
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 28, height: 28, background: '#fff', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '0.5px solid rgba(0,0,0,0.08)' }}>
+          <div style={{
+            width: 28, height: 28, background: sideBg, borderRadius: 8,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden', border: `0.5px solid ${logoBorder}`,
+          }}>
             <LogoIcon />
           </div>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#111', letterSpacing: '-0.02em' }}>HostOps</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: titleColor, letterSpacing: '-0.02em' }}>HostOps</span>
         </div>
 
         <div style={{ flex: 1 }} />
 
-        {/* Notification bell — pinaka-right */}
+        {/* Notification bell — mobile */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <button
             onClick={() => setMobileNotifOpen(prev => !prev)}
             style={{
               width: 34, height: 34, borderRadius: 10,
-              background: mobileNotifOpen ? '#e8f5e9' : '#f7f7f7',
-              border: mobileNotifOpen ? '0.5px solid #a5d6a7' : '0.5px solid rgba(0,0,0,0.08)',
+              background: mobileNotifOpen ? (dark ? '#0d2619' : '#e8f5e9') : (dark ? '#0d2619' : '#f7f7f7'),
+              border: mobileNotifOpen
+                ? `0.5px solid ${dark ? '#1e3a2a' : '#a5d6a7'}`
+                : `0.5px solid ${dark ? '#1e3a2a' : 'rgba(0,0,0,0.08)'}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer',
-              color: mobileNotifOpen ? '#1a9e6e' : '#888',
+              color: mobileNotifOpen ? '#1a9e6e' : (dark ? '#7ab89a' : '#888'),
               position: 'relative',
               transition: 'background 0.15s, border 0.15s, color 0.15s',
             }}
@@ -830,7 +886,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
               <span style={{
                 position: 'absolute', top: 5, right: 5,
                 width: 8, height: 8, borderRadius: '50%',
-                background: '#e53935', border: '1.5px solid #fff',
+                background: '#e53935', border: `1.5px solid ${sideBg}`,
               }} />
             )}
           </button>
@@ -842,20 +898,24 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                 top: 60, right: 8, left: 8,
                 maxWidth: 360,
                 marginLeft: 'auto',
-                background: '#fff',
+                background: notifSurface,
                 borderRadius: 14,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.13), 0 1.5px 6px rgba(0,0,0,0.07)',
-                border: '0.5px solid rgba(0,0,0,0.08)',
+                boxShadow: dark
+                  ? '0 8px 32px rgba(0,0,0,0.5), 0 1.5px 6px rgba(0,0,0,0.3)'
+                  : '0 8px 32px rgba(0,0,0,0.13), 0 1.5px 6px rgba(0,0,0,0.07)',
+                border: `0.5px solid ${notifBorder}`,
                 zIndex: 9999,
                 overflow: 'hidden',
                 fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
               }}
             >
+              <style>{`.mob-notif-item:hover { background: ${notifHover} !important; }`}</style>
+
               {/* Header */}
-              <div style={{ padding: '14px 16px 0', borderBottom: '0.5px solid rgba(0,0,0,0.07)' }}>
+              <div style={{ padding: '14px 16px 0', borderBottom: `0.5px solid ${notifBorder}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>Notifications</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: notifText }}>Notifications</span>
                     {unreadCount > 0 && (
                       <span style={{ background: '#1a9e6e', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 20, padding: '1px 7px', lineHeight: '16px' }}>
                         {unreadCount}
@@ -864,7 +924,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                   </div>
                   <button
                     onClick={() => setMobileReadIds(new Set((resolvedAlerts || []).map(a => a.id)))}
-                    style={{ fontSize: 11, color: '#aaa', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    style={{ fontSize: 11, color: notifDim, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                   >
                     Mark all read
                   </button>
@@ -882,7 +942,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                       style={{
                         fontSize: 12,
                         fontWeight: mobileActiveTab === tab.key ? 600 : 400,
-                        color: mobileActiveTab === tab.key ? '#1a9e6e' : '#888',
+                        color: mobileActiveTab === tab.key ? '#1a9e6e' : notifMuted,
                         background: 'none', border: 'none',
                         borderBottom: mobileActiveTab === tab.key ? '2px solid #1a9e6e' : '2px solid transparent',
                         padding: '4px 10px 8px',
@@ -893,7 +953,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                     >
                       {tab.label}
                       {tab.count > 0 && (
-                        <span style={{ fontSize: 10, color: mobileActiveTab === tab.key ? '#1a9e6e' : '#aaa', fontWeight: 500 }}>
+                        <span style={{ fontSize: 10, color: mobileActiveTab === tab.key ? '#1a9e6e' : notifDim, fontWeight: 500 }}>
                           {tab.count}
                         </span>
                       )}
@@ -905,26 +965,27 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
               {/* Content */}
               <div style={{ maxHeight: 360, overflowY: 'auto' }}>
                 {resolvedLoading ? (
-                  <div style={{ padding: '28px 0', textAlign: 'center', fontSize: 11, color: '#bbb' }}>Loading...</div>
+                  <div style={{ padding: '28px 0', textAlign: 'center', fontSize: 11, color: notifDim }}>Loading...</div>
                 ) : mobileActiveTab === 'alerts' ? (
                   (resolvedAlerts || []).length === 0 ? (
-                    <div style={{ padding: '36px 0', textAlign: 'center', fontSize: 12, color: '#aaa' }}>No alerts right now</div>
+                    <div style={{ padding: '36px 0', textAlign: 'center', fontSize: 12, color: notifMuted }}>No alerts right now</div>
                   ) : (
                     (resolvedAlerts || []).map((alert, i) => {
                       const isRead = mobileReadIds.has(alert.id) || !alert.unread;
                       return (
-                        <div key={alert.id ?? i} style={{
+                        <div key={alert.id ?? i} className="mob-notif-item" style={{
                           display: 'flex', alignItems: 'flex-start', gap: 10,
                           padding: '11px 16px',
-                          borderBottom: '0.5px solid rgba(0,0,0,0.05)',
-                          background: isRead ? '#fff' : '#f0faf6',
+                          borderBottom: `0.5px solid ${notifDiv}`,
+                          background: isRead ? notifReadBg : notifUnreadBg,
+                          transition: 'background 0.12s',
                         }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: isRead ? 500 : 600, color: '#111', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <div style={{ fontSize: 12, fontWeight: isRead ? 500 : 600, color: notifText, lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {alert.title}
                             </div>
                             {alert.desc && (
-                              <div style={{ fontSize: 11, color: '#888', marginTop: 1, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                              <div style={{ fontSize: 11, color: notifMuted, marginTop: 1, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                                 {alert.desc}
                               </div>
                             )}
@@ -945,11 +1006,11 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                   )
                 ) : (
                   (resolvedActivities || []).length === 0 ? (
-                    <div style={{ padding: '36px 0', textAlign: 'center', fontSize: 12, color: '#aaa' }}>No recent activity</div>
+                    <div style={{ padding: '36px 0', textAlign: 'center', fontSize: 12, color: notifMuted }}>No recent activity</div>
                   ) : (
                     (resolvedActivities || []).map((act, i) => {
                       const parts    = (act.actor || '').trim().split(/\s+/);
-                      const initials = parts.length >= 2
+                      const actInit  = parts.length >= 2
                         ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
                         : (parts[0] || '?').slice(0, 2).toUpperCase();
                       const COLORS = ['#1a9e6e','#2196f3','#9c27b0','#f44336','#ff9800','#00bcd4'];
@@ -957,22 +1018,24 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                       for (let c = 0; c < (act.actor || '').length; c++) hash = (act.actor || '').charCodeAt(c) + ((hash << 5) - hash);
                       const bg = COLORS[Math.abs(hash) % COLORS.length];
                       return (
-                        <div key={act.id ?? i} style={{
+                        <div key={act.id ?? i} className="mob-notif-item" style={{
                           display: 'flex', alignItems: 'flex-start', gap: 10,
                           padding: '11px 16px',
-                          borderBottom: '0.5px solid rgba(0,0,0,0.05)',
+                          borderBottom: `0.5px solid ${notifDiv}`,
+                          background: notifReadBg,
+                          transition: 'background 0.12s',
                         }}>
                           <div style={{ width: 34, height: 34, borderRadius: 10, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
-                            {initials}
+                            {actInit}
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 500, color: '#111', lineHeight: 1.4 }}>
+                            <div style={{ fontSize: 12, fontWeight: 500, color: notifText, lineHeight: 1.4 }}>
                               <span style={{ fontWeight: 600 }}>{act.actor}</span>
-                              {' '}<span style={{ color: '#555' }}>{act.action}</span>
+                              {' '}<span style={{ color: notifMuted }}>{act.action}</span>
                               {act.target && <span style={{ color: '#1a9e6e', fontWeight: 600 }}> {act.target}</span>}
                             </div>
                             {act.time && (
-                              <div style={{ fontSize: 10, color: '#bbb', marginTop: 2 }}>
+                              <div style={{ fontSize: 10, color: notifDim, marginTop: 2 }}>
                                 {(() => {
                                   const diff = Math.floor((Date.now() - new Date(act.time)) / 1000);
                                   if (diff < 60) return 'just now';
@@ -991,7 +1054,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
               </div>
 
               {/* Footer */}
-              <div style={{ padding: '10px 16px', borderTop: '0.5px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '10px 16px', borderTop: `0.5px solid ${notifBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <button
                   onClick={() => setMobileNotifOpen(false)}
                   style={{ fontSize: 11, color: '#1a9e6e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0 }}
@@ -1000,7 +1063,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                 </button>
                 <button
                   onClick={() => setMobileNotifOpen(false)}
-                  style={{ fontSize: 11, color: '#aaa', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  style={{ fontSize: 11, color: notifMuted, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                 >
                   Close
                 </button>
@@ -1015,8 +1078,8 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
           style={{
             display: 'flex', alignItems: 'center', gap: 5,
             padding: '7px 12px',
-            background: exportLoading ? '#e0e0e0' : '#1a9e6e',
-            color: exportLoading ? '#aaa' : '#fff',
+            background: exportLoading ? (dark ? '#0d2619' : '#e0e0e0') : '#1a9e6e',
+            color: exportLoading ? (dark ? '#4d8a6a' : '#aaa') : '#fff',
             border: 'none', borderRadius: 8,
             cursor: exportLoading ? 'not-allowed' : 'pointer',
             fontSize: 12, fontWeight: 600,
@@ -1048,7 +1111,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
             onClick={() => setMobileOpen(false)}
             style={{
               position: 'fixed', inset: 0,
-              background: 'rgba(0,0,0,0.3)',
+              background: 'rgba(0,0,0,0.4)',
               zIndex: 999,
               backdropFilter: 'blur(2px)',
             }}
@@ -1087,6 +1150,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
         @media (min-width: 769px) {
           .db-sidebar-mobile-bar { display: none !important; }
         }
+        @keyframes pdf-spin { to { transform: rotate(360deg); } }
         @keyframes lo-backdrop-in  { from { opacity: 0 } to { opacity: 1 } }
         @keyframes lo-backdrop-out { from { opacity: 1 } to { opacity: 0 } }
         @keyframes lo-card-in {

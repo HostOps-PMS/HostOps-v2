@@ -1,33 +1,37 @@
 import { useState, useEffect } from 'react';
 import { fetchClientProperties, createStaff, updateStaff } from '../services/staffApi';
 import { toast } from '../../../utils/toast';
+import { useTheme } from '../../../context/ThemeContext';
 
-const inputStyle = {
-  width: '100%',
-  padding: '10px 14px',
-  borderRadius: 10,
-  border: '1.5px solid #e8edf2',
-  fontSize: '0.875rem',
-  outline: 'none',
-  boxSizing: 'border-box',
-  background: '#f8fafc',
-  color: '#0f172a',
-  transition: 'border-color 0.15s, box-shadow 0.15s',
-  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-};
-
-const labelStyle = {
-  display: 'block',
-  fontSize: '0.75rem',
-  fontWeight: 700,
-  color: '#64748b',
-  marginBottom: 6,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
-};
+// inputStyle and labelStyle are now defined inside the component as functions
 
 export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
   const isEdit = mode === 'edit';
+  const { dark } = useTheme();
+
+  const inputStyle = {
+    width: '100%',
+    padding: '10px 14px',
+    borderRadius: 10,
+    border: `1.5px solid ${dark ? '#1e3a2a' : '#e8edf2'}`,
+    fontSize: '0.875rem',
+    outline: 'none',
+    boxSizing: 'border-box',
+    background: dark ? '#0d2619' : '#f8fafc',
+    color: dark ? '#eaf5f0' : '#0f172a',
+    transition: 'border-color 0.15s, box-shadow 0.15s',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+  };
+
+  const labelStyle = {
+    display: 'block',
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: dark ? '#7ab89a' : '#64748b',
+    marginBottom: 6,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  };
 
   const [form, setForm] = useState({
     clientId:    staff?.clientId?._id || staff?.clientId || '',
@@ -130,7 +134,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
         position: "fixed",
         inset: 0,
         zIndex: 9999,
-        background: "rgba(12,28,20,0.45)",
+        background: dark ? "rgba(0,0,0,0.65)" : "rgba(12,28,20,0.45)",
         backdropFilter: "blur(4px)",
         WebkitBackdropFilter: "blur(4px)",
         display: "flex",
@@ -143,7 +147,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
     >
       <div
         style={{
-          background: "#fff",
+          background: dark ? "#132a1e" : "#fff",
           borderRadius: 20,
           width: "100%",
           maxWidth: 560,
@@ -164,21 +168,21 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
         }}>
           <div>
             <h2 style={{
-              fontSize: '1.6rem', fontWeight: 800, color: '#0d1117',
+              fontSize: '1.6rem', fontWeight: 800, color: dark ? '#eaf5f0' : '#0d1117',
               lineHeight: 1.15, margin: 0, letterSpacing: '-0.02em',
             }}>
               {isEdit ? <>Edit <span style={{ color: '#26a676' }}>Staff</span></> : <>Create <span style={{ color: '#26a676' }}>Staff</span></>}
             </h2>
-            <p style={{ margin: '6px 0 0', fontSize: '.8125rem', color: '#9ca3af', fontWeight: 400 }}>
+            <p style={{ margin: '6px 0 0', fontSize: '.8125rem', color: dark ? '#4d8a6a' : '#9ca3af', fontWeight: 400 }}>
               {isEdit ? 'Update the staff account details below.' : 'Fill in the details to create a staff account.'}
             </p>
           </div>
           <button
             onClick={onClose}
             style={{
-              background: '#f3f4f6', border: 'none', borderRadius: 10,
+              background: dark ? '#0d2619' : '#f3f4f6', border: `1px solid ${dark ? '#1e3a2a' : 'transparent'}`, borderRadius: 10,
               width: 32, height: 32, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', cursor: 'pointer', color: '#6b7280',
+              justifyContent: 'center', cursor: 'pointer', color: dark ? '#4d8a6a' : '#6b7280',
               fontSize: '1rem', flexShrink: 0, marginTop: 2,
             }}
           >✕</button>
@@ -195,7 +199,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '12px 16px', borderRadius: 12,
-                background: '#f8faf9', border: '1px solid #e5efe9',
+                background: dark ? '#0d2619' : '#f8faf9', border: `1px solid ${dark ? '#1e3a2a' : '#e5efe9'}`,
                 marginBottom: 16,
               }}>
                 <div style={{
@@ -205,8 +209,8 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
                   color: '#fff', fontWeight: 700, fontSize: '0.95rem', flexShrink: 0,
                 }}>{ini}</div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0d1117' }}>{c.businessName}</div>
-                  <div style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: 1 }}>{c.email}</div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: dark ? '#eaf5f0' : '#0d1117' }}>{c.businessName}</div>
+                  <div style={{ fontSize: '0.78rem', color: dark ? '#4d8a6a' : '#9ca3af', marginTop: 1 }}>{c.email}</div>
                 </div>
               </div>
             );
@@ -279,8 +283,8 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
                       left: 0,
                       right: 0,
                       zIndex: 200,
-                      background: "#fff",
-                      border: "1.5px solid #e2e8f0",
+                      background: dark ? "#0d2619" : "#fff",
+                      border: `1.5px solid ${dark ? '#1e3a2a' : '#e2e8f0'}`,
                       borderRadius: 8,
                       boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
                       marginTop: 4,
@@ -307,7 +311,9 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
                           fontSize: "0.83rem",
                           outline: "none",
                           boxSizing: "border-box",
-                          background: "#fafafa",
+                          background: dark ? "#132a1e" : "#fafafa",
+                          color: dark ? '#eaf5f0' : '#0f172a',
+                          border: `1.5px solid ${dark ? '#1e3a2a' : '#e2e8f0'}`,
                         }}
                         onClick={(e) => e.stopPropagation()}
                       />
@@ -341,30 +347,30 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
                               fontSize: "0.875rem",
                               background:
                                 form.clientId === c._id
-                                  ? "#eef4ff"
+                                  ? (dark ? "#1e3a2a" : "#eef4ff")
                                   : "transparent",
-                              color: "#2d3748",
-                              borderBottom: "1px solid #f7f7f7",
+                              color: dark ? "#eaf5f0" : "#2d3748",
+                              borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f7f7f7'}`,
                               transition: "background 0.1s",
                             }}
                             onMouseEnter={(e) => {
                               if (form.clientId !== c._id)
-                                e.currentTarget.style.background = "#f7f9ff";
+                                e.currentTarget.style.background = dark ? "#1a3a2a" : "#f7f9ff";
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.background =
                                 form.clientId === c._id
-                                  ? "#eef4ff"
+                                  ? (dark ? "#1e3a2a" : "#eef4ff")
                                   : "transparent";
                             }}
                           >
-                            <div style={{ fontWeight: 600 }}>
+                            <div style={{ fontWeight: 600, color: dark ? '#eaf5f0' : '#0d1117' }}>
                               {c.businessName}
                             </div>
                             <div
                               style={{
                                 fontSize: "0.75rem",
-                                color: "#718096",
+                                color: dark ? "#4d8a6a" : "#718096",
                                 marginTop: 1,
                               }}
                             >
@@ -508,15 +514,15 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
                     textAlign: 'center',
                     fontSize: '1.2rem', fontWeight: 700,
                     borderRadius: 10,
-                    border: `1.5px solid ${form.pin[i] ? '#3b5fc0' : '#ececec'}`,
-                    background: form.pin[i] ? '#f0f4ff' : '#f7f8fa',
+                    border: `1.5px solid ${form.pin[i] ? '#26a676' : (dark ? '#1e3a2a' : '#ececec')}`,
+                    background: form.pin[i] ? (dark ? '#1e3a2a' : '#f0f4ff') : (dark ? '#0d2619' : '#f7f8fa'),
                     outline: 'none',
-                    color: '#1a202c',
+                    color: dark ? '#eaf5f0' : '#1a202c',
                     transition: 'border-color 0.15s, background 0.15s',
                     boxSizing: 'border-box',
                   }}
-                  onFocus={(e) => e.target.style.borderColor = '#3b5fc0'}
-                  onBlur={(e) => e.target.style.borderColor = form.pin[i] ? '#3b5fc0' : '#ececec'}
+                  onFocus={(e) => e.target.style.borderColor = '#26a676'}
+                  onBlur={(e) => e.target.style.borderColor = form.pin[i] ? '#26a676' : (dark ? '#1e3a2a' : '#ececec')}
                   autoComplete="new-password"
                 />
               ))}
@@ -587,7 +593,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
               form.clientId &&
               (properties.length > 0 ? (
                 <div style={{
-                  border: '1.5px solid #e8edf2',
+                  border: `1.5px solid ${dark ? '#1e3a2a' : '#e8edf2'}`,
                   borderRadius: 12,
                   overflow: 'hidden',
                   maxHeight: 240,
@@ -609,12 +615,12 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
                           gap: 12,
                           padding: '11px 14px',
                           cursor: 'pointer',
-                          background: checked ? '#f0fdf4' : '#fff',
-                          borderBottom: idx < properties.length - 1 ? '1px solid #f0f2f5' : 'none',
+                          background: checked ? (dark ? '#1e3a2a' : '#f0fdf4') : (dark ? '#0d2619' : '#fff'),
+                          borderBottom: idx < properties.length - 1 ? `1px solid ${dark ? '#1a3a2a' : '#f0f2f5'}` : 'none',
                           transition: 'background 0.12s',
                         }}
-                        onMouseEnter={e => { if (!checked) e.currentTarget.style.background = '#f8faf9'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = checked ? '#f0fdf4' : '#fff'; }}
+                        onMouseEnter={e => { if (!checked) e.currentTarget.style.background = dark ? '#132a1e' : '#f8faf9'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = checked ? (dark ? '#1e3a2a' : '#f0fdf4') : (dark ? '#0d2619' : '#fff'); }}
                       >
                         {/* Avatar */}
                         <div style={{
@@ -634,7 +640,7 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
                           flex: 1,
                           fontSize: '0.875rem',
                           fontWeight: checked ? 600 : 400,
-                          color: checked ? '#0d1117' : '#4a5568',
+                          color: checked ? (dark ? '#eaf5f0' : '#0d1117') : (dark ? '#7ab89a' : '#4a5568'),
                           transition: 'color 0.12s',
                         }}>
                           {prop.propertyName}
@@ -685,7 +691,8 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
           padding: '16px 32px 24px',
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
           gap: 10,
-          borderTop: '1px solid #f0f2f5',
+          borderTop: `1px solid ${dark ? '#1e3a2a' : '#f0f2f5'}`,
+          background: dark ? '#132a1e' : '#fff',
           flexShrink: 0,
         }}>
           <button
@@ -694,8 +701,8 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
             disabled={saving}
             style={{
               padding: '9px 22px', borderRadius: 10,
-              border: '1.5px solid #e5e7eb', background: '#fff',
-              fontSize: '0.875rem', fontWeight: 600, color: '#374151',
+              border: `1.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`, background: dark ? 'transparent' : '#fff',
+              fontSize: '0.875rem', fontWeight: 600, color: dark ? '#7ab89a' : '#374151',
               cursor: saving ? 'not-allowed' : 'pointer',
             }}
           >

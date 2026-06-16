@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTheme } from '../../../context/ThemeContext';
 
 function initials(businessName = '') {
   const parts = businessName.trim().split(/\s+/);
@@ -14,47 +15,49 @@ function formatDate(iso) {
 }
 
 function VerifiedBadge({ client }) {
+  const { dark } = useTheme();
   if (client.mustChangePassword && client.mustChangePin) {
     return (
       <span style={{
         fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4,
-        background: '#fff8e1', color: '#7a6a00', display: 'inline-block',
+        background: dark ? '#2a1f00' : '#fff8e1', color: dark ? '#fbbf24' : '#7a6a00', display: 'inline-block',
       }}>Unverified</span>
     );
   } else if (!client.mustChangePassword && !client.mustChangePin) {
     return (
       <span style={{
         fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4,
-        background: '#f0fdf4', color: '#16a34a', display: 'inline-block',
+        background: dark ? '#0d2619' : '#f0fdf4', color: dark ? '#4ade80' : '#16a34a', display: 'inline-block',
       }}>✓ Verified</span>
     );
   } else {
     return (
       <span style={{
         fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4,
-        background: '#eff6ff', color: '#2563eb', display: 'inline-block',
+        background: dark ? '#0d1a2a' : '#eff6ff', color: dark ? '#60a5fa' : '#2563eb', display: 'inline-block',
       }}>Partially Verified</span>
     );
   }
 }
 
 function RoleBadge({ role }) {
+  const { dark } = useTheme();
   if (role === 'admin') return (
     <span style={{
       fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4,
-      background: '#eff6ff', color: '#2563eb', display: 'inline-block',
+      background: dark ? '#0d1a2a' : '#eff6ff', color: dark ? '#60a5fa' : '#2563eb', display: 'inline-block',
     }}>Admin</span>
   );
   if (role === 'team_leader') return (
     <span style={{
       fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4,
-      background: '#e0e7ff', color: '#4338ca', display: 'inline-block',
+      background: dark ? '#1a1040' : '#e0e7ff', color: dark ? '#a78bfa' : '#4338ca', display: 'inline-block',
     }}>Team Leader</span>
   );
   return (
     <span style={{
       fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4,
-      background: '#f3f4f6', color: '#6b7280', display: 'inline-block',
+      background: dark ? '#1a1a1a' : '#f3f4f6', color: dark ? '#9ca3af' : '#6b7280', display: 'inline-block',
     }}>Client</span>
   );
 }
@@ -98,6 +101,7 @@ function isUnverified(client) {
 }
 
 export default function ClientsTable({ clients, loading, onRowClick, search, onSearchChange, onAddClient, onRefresh, onArchive, page, totalPages, totalCount, onPrev, onNext, onVisibleClientsChange }) {
+  const { dark } = useTheme();
   const [activeTab, setActiveTab] = useState('All');
   const tabScrollRef = useRef(null);
   const [tabScrollLeft, setTabScrollLeft] = useState(0);
@@ -147,7 +151,7 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
           <div style={{
             position: 'absolute', left: 0, top: 0, bottom: 0, zIndex: 10,
             display: 'flex', alignItems: 'center',
-            background: 'linear-gradient(to right, #f0f4f0 60%, transparent)',
+            background: dark ? 'linear-gradient(to right, #0c1c14 60%, transparent)' : 'linear-gradient(to right, #f0f4f0 60%, transparent)',
             paddingRight: 8, paddingLeft: 2, pointerEvents: 'none',
           }}>
             <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5">
@@ -159,7 +163,7 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
           <div style={{
             position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 10,
             display: 'flex', alignItems: 'center',
-            background: 'linear-gradient(to left, #f0f4f0 60%, transparent)',
+            background: dark ? 'linear-gradient(to left, #0c1c14 60%, transparent)' : 'linear-gradient(to left, #f0f4f0 60%, transparent)',
             paddingLeft: 8, paddingRight: 2, pointerEvents: 'none',
           }}>
             <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5">
@@ -186,13 +190,13 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
                   display: 'inline-flex', alignItems: 'center', gap: 7,
                   padding: '9px 18px 10px',
                   border: '1px solid',
-                  borderColor: isActive ? '#e8ecf0' : 'transparent',
-                  borderBottom: isActive ? '1px solid #fff' : 'none',
+                  borderColor: isActive ? (dark ? '#1e3a2a' : '#e8ecf0') : 'transparent',
+                  borderBottom: isActive ? `1px solid ${dark ? '#132a1e' : '#fff'}` : 'none',
                   borderRadius: '10px 10px 0 0',
-                  background: isActive ? '#fff' : 'transparent',
+                  background: isActive ? (dark ? '#132a1e' : '#fff') : 'transparent',
                   marginBottom: '-1px',
                   cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
-                  color: isActive ? '#10b981' : '#9ca3af',
+                  color: isActive ? '#10b981' : (dark ? '#4d8a6a' : '#9ca3af'),
                   transition: 'color 0.15s', whiteSpace: 'nowrap',
                   position: 'relative', zIndex: isActive ? 2 : 0,
                   boxShadow: 'none',
@@ -203,8 +207,8 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
                 <span style={{
                   fontSize: '0.72rem', fontWeight: 700,
                   padding: '1px 7px', borderRadius: 999,
-                  background: isActive ? '#d1fae5' : 'transparent',
-                  color: isActive ? '#10b981' : '#b0b7c3',
+                  background: isActive ? (dark ? '#0d2619' : '#d1fae5') : 'transparent',
+                  color: isActive ? '#10b981' : (dark ? '#4d8a6a' : '#b0b7c3'),
                 }}>
                   {tab.count}
                 </span>
@@ -216,13 +220,13 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
 
       {/* Filter bar + table */}
       <div style={{
-        background: '#fff', borderRadius: '0 12px 12px 12px',
-        border: '1px solid #e8ecf0', overflow: 'visible',
+        background: dark ? '#132a1e' : '#fff', borderRadius: '0 12px 12px 12px',
+        border: `1px solid ${dark ? '#1e3a2a' : '#e8ecf0'}`, overflow: 'visible',
         paddingBottom: 4, position: 'relative',
       }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
-          padding: '10px 12px 12px', borderBottom: '1px solid #f0f2f5', flexWrap: 'wrap', rowGap: 8,
+          padding: '10px 12px 12px', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f0f2f5'}`, flexWrap: 'wrap', rowGap: 8,
         }}>
           <div style={{ position: 'relative', flex: 1, minWidth: 120, maxWidth: 280 }}>
             <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2"
@@ -236,13 +240,13 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
               style={{
                 width: '100%', boxSizing: 'border-box',
                 padding: '7px 12px 7px 32px',
-                borderRadius: 8, border: '1px solid #e5e7eb',
-                fontSize: '0.83rem', outline: 'none', background: '#fafafa',
-                color: '#1a202c',
+                borderRadius: 8, border: `1px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`,
+                fontSize: '0.83rem', outline: 'none', background: dark ? '#0d2619' : '#fafafa',
+                color: dark ? '#eaf5f0' : '#1a202c',
               }}
             />
           </div>
-          <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginLeft: 'auto', whiteSpace: 'nowrap', flexShrink: 0 }}>
+          <span style={{ fontSize: '0.78rem', color: dark ? '#4d8a6a' : '#9ca3af', marginLeft: 'auto', whiteSpace: 'nowrap', flexShrink: 0 }}>
             {tabFiltered.length} {tabFiltered.length === 1 ? 'Business' : 'Businesses'}
           </span>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
@@ -251,7 +255,7 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '7px 10px', borderRadius: 8,
-              border: '1px solid #10b981', background: '#fff',
+              border: '1px solid #10b981', background: dark ? '#0d2619' : '#fff',
               fontSize: '0.82rem', fontWeight: 600, color: '#10b981',
               cursor: 'pointer', whiteSpace: 'nowrap',
             }}
@@ -267,23 +271,23 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
 
         {/* Table */}
         {loading ? (
-          <div style={{ padding: 48, textAlign: 'center', color: '#a0aec0', fontSize: '0.875rem' }}>
+          <div style={{ padding: 48, textAlign: 'center', color: dark ? '#4d8a6a' : '#a0aec0', fontSize: '0.875rem' }}>
             Loading businesses…
           </div>
         ) : tabFiltered.length === 0 ? (
-          <div style={{ padding: 48, textAlign: 'center', color: '#a0aec0', fontSize: '0.875rem' }}>
+          <div style={{ padding: 48, textAlign: 'center', color: dark ? '#4d8a6a' : '#a0aec0', fontSize: '0.875rem' }}>
             {clients.length === 0 ? 'No businesses found.' : 'No results match your filter.'}
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #f0f2f5' }}>
+                <tr style={{ borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f0f2f5'}` }}>
                   {['Business', 'Role', 'Status', 'Last Login', ''].map((h) => (
                     <th key={h} style={{
                       padding: '10px 16px',
                       textAlign: 'left', fontSize: '0.72rem', fontWeight: 700,
-                      color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase',
+                      color: dark ? '#4d8a6a' : '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase',
                       whiteSpace: 'nowrap', background: 'transparent',
                     }}>
                       {h}
@@ -298,12 +302,12 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
                       key={client._id}
                       onClick={() => onRowClick(client)}
                       style={{
-                        borderBottom: i < tabFiltered.length - 1 ? '1px solid #f7f8fa' : 'none',
+                        borderBottom: i < tabFiltered.length - 1 ? `1px solid ${dark ? '#1e3a2a' : '#f7f8fa'}` : 'none',
                         background: 'transparent',
                         transition: 'background 0.1s',
                         cursor: 'pointer',
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = '#f0fdf4'; }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = dark ? '#0d2619' : '#f0fdf4'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                     >
                       {/* Business name + email + avatar */}
@@ -311,17 +315,17 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <div style={{
                             width: 34, height: 34, borderRadius: 8, flexShrink: 0,
-                            background: '#d1fae5', color: '#059669',
+                            background: dark ? '#0d2619' : '#d1fae5', color: dark ? '#4ade80' : '#059669',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.03em',
                           }}>
                             {initials(client.businessName)}
                           </div>
                           <div>
-                            <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.875rem', color: dark ? '#eaf5f0' : '#111827' }}>
                               {client.businessName}
                             </div>
-                            <div style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: 2 }}>
+                            <div style={{ fontSize: '0.78rem', color: dark ? '#4d8a6a' : '#9ca3af', marginTop: 2 }}>
                               {client.email}
                             </div>
                           </div>
@@ -339,7 +343,7 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
                       </td>
 
                       {/* Last Login */}
-                      <td style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '12px 16px', fontSize: '0.78rem', color: dark ? '#4d8a6a' : '#9ca3af', whiteSpace: 'nowrap' }}>
                         {formatDate(client.lastLoginAt)}
                       </td>
 
@@ -350,8 +354,8 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
                             onClick={(e) => { e.stopPropagation(); onRowClick(client); }}
                             style={{
                               padding: '5px 14px', borderRadius: 6,
-                              border: '1px solid #e5e7eb', background: '#fff',
-                              fontSize: '0.78rem', fontWeight: 600, color: '#374151', cursor: 'pointer',
+                              border: '1px solid #fbbf24', background: dark ? '#2a1f00' : '#fffbeb',
+                              fontSize: '0.78rem', fontWeight: 600, color: dark ? '#fbbf24' : '#92400e', cursor: 'pointer',
                             }}
                           >
                             Details
@@ -385,9 +389,9 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '12px 20px',
-            borderTop: '1px solid #f0f2f5',
+            borderTop: `1px solid ${dark ? '#1e3a2a' : '#f0f2f5'}`,
           }}>
-            <span style={{ fontSize: '0.78rem', color: '#9ca3af' }}>
+            <span style={{ fontSize: '0.78rem', color: dark ? '#4d8a6a' : '#9ca3af' }}>
               Page {page} of {totalPages} · {totalCount} {totalCount === 1 ? 'Business' : 'Businesses'}
             </span>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -397,15 +401,15 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                   padding: '6px 14px', borderRadius: 8,
-                  border: '1px solid #e5e7eb',
-                  background: page === 1 ? '#f9fafb' : '#fff',
-                  color: page === 1 ? '#d1d5db' : '#374151',
+                  border: `1px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`,
+                  background: page === 1 ? (dark ? '#0a1a10' : '#f9fafb') : (dark ? '#0d2619' : '#fff'),
+                  color: page === 1 ? (dark ? '#2a4a35' : '#d1d5db') : (dark ? '#7ab89a' : '#374151'),
                   fontSize: '0.82rem', fontWeight: 600,
                   cursor: page === 1 ? 'not-allowed' : 'pointer',
                   transition: 'background 0.15s',
                 }}
-                onMouseEnter={e => { if (page !== 1) e.currentTarget.style.background = '#f3f4f6'; }}
-                onMouseLeave={e => { if (page !== 1) e.currentTarget.style.background = '#fff'; }}
+                onMouseEnter={e => { if (page !== 1) e.currentTarget.style.background = dark ? '#132a1e' : '#f3f4f6'; }}
+                onMouseLeave={e => { if (page !== 1) e.currentTarget.style.background = dark ? '#0d2619' : '#fff'; }}
               >
                 <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M13 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
@@ -418,15 +422,15 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                   padding: '6px 14px', borderRadius: 8,
-                  border: '1px solid #e5e7eb',
-                  background: page === totalPages ? '#f9fafb' : '#fff',
-                  color: page === totalPages ? '#d1d5db' : '#374151',
+                  border: `1px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`,
+                  background: page === totalPages ? (dark ? '#0a1a10' : '#f9fafb') : (dark ? '#0d2619' : '#fff'),
+                  color: page === totalPages ? (dark ? '#2a4a35' : '#d1d5db') : (dark ? '#7ab89a' : '#374151'),
                   fontSize: '0.82rem', fontWeight: 600,
                   cursor: page === totalPages ? 'not-allowed' : 'pointer',
                   transition: 'background 0.15s',
                 }}
-                onMouseEnter={e => { if (page !== totalPages) e.currentTarget.style.background = '#f3f4f6'; }}
-                onMouseLeave={e => { if (page !== totalPages) e.currentTarget.style.background = '#fff'; }}
+                onMouseEnter={e => { if (page !== totalPages) e.currentTarget.style.background = dark ? '#132a1e' : '#f3f4f6'; }}
+                onMouseLeave={e => { if (page !== totalPages) e.currentTarget.style.background = dark ? '#0d2619' : '#fff'; }}
               >
                 Next
                 <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5">

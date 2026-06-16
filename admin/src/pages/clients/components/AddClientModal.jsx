@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createClient, uploadPropertyPicture } from '../services/clientsService';
 import { toast } from '../../../utils/toast';
 import ImageCropModal from './ImageCropModal';
+import { useTheme } from '../../../context/ThemeContext';
 
 const INITIAL_FORM = {
   businessName: '',
@@ -52,6 +53,7 @@ export default function AddClientModal({ onClose, onSuccess }) {
   const [cropImageUrl, setCropImageUrl] = useState(null);
   const [initialCropData, setInitialCropData] = useState(null);
   const [activeTab, setActiveTab] = useState('details');
+  const { dark } = useTheme();
 
   const setField = (key) => (e) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -135,35 +137,40 @@ export default function AddClientModal({ onClose, onSuccess }) {
     <style>{`
       @keyframes ac-modal-overlay { from { opacity: 0; } to { opacity: 1; } }
       @keyframes ac-modal-card { from { opacity: 0; transform: translateY(20px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+      ${dark ? `.cl-modal-edit-form .db-field label { color: #7ab89a !important; }` : ''}
+      ${dark ? `.cl-modal-edit-form .db-field label span { color: #ef4444 !important; }` : ''}
+      ${dark ? `.cl-modal-edit-form .cl-edit-input { background: #0d2619 !important; color: #eaf5f0 !important; border-color: #1e3a2a !important; }` : ''}
+      ${dark ? `.cl-modal-edit-form .cl-edit-input::placeholder { color: #4d8a6a !important; }` : ''}
     `}</style>
     <div
       className="db-modal-overlay"
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12,28,20,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', animation: 'ac-modal-overlay 0.2s ease' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: dark ? 'rgba(0,0,0,0.65)' : 'rgba(12,28,20,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', animation: 'ac-modal-overlay 0.2s ease' }}
     >
-      <div className="db-modal" style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 20, padding: 0, overflow: 'hidden', animation: 'ac-modal-card 0.28s cubic-bezier(0.16,1,0.3,1)' }}>
+      <div className="db-modal" style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 20, padding: 0, overflow: 'hidden', animation: 'ac-modal-card 0.28s cubic-bezier(0.16,1,0.3,1)', background: dark ? '#132a1e' : '#fff' }}>
         {/* Header */}
         <div style={{
-          padding: '28px 32px 0 32px',
+          padding: '28px 32px 20px 32px',
           display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+          borderBottom: `1px solid ${dark ? '#1e3a2a' : '#eaf3ee'}`,
         }}>
           <div>
             <h2 style={{
-              fontSize: '1.6rem', fontWeight: 800, color: '#0d1117',
+              fontSize: '1.6rem', fontWeight: 800, color: dark ? '#eaf5f0' : '#0d1117',
               lineHeight: 1.15, margin: 0, letterSpacing: '-0.02em',
             }}>
               Add <span style={{ color: '#26a676' }}>Business</span>
             </h2>
-            <p style={{ margin: '6px 0 0', fontSize: '.8125rem', color: '#9ca3af', fontWeight: 400 }}>
+            <p style={{ margin: '6px 0 0', fontSize: '.8125rem', color: dark ? '#4d8a6a' : '#9ca3af', fontWeight: 400 }}>
               Fill in the details to register a new business.
             </p>
           </div>
           <button
             onClick={onClose}
             style={{
-              background: '#f3f4f6', border: 'none', borderRadius: 10,
+              background: dark ? '#0d2619' : '#f3f4f6', border: `1px solid ${dark ? '#1e3a2a' : 'transparent'}`, borderRadius: 10,
               width: 32, height: 32, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', cursor: 'pointer', color: '#6b7280',
+              justifyContent: 'center', cursor: 'pointer', color: dark ? '#4d8a6a' : '#6b7280',
               fontSize: '1rem', flexShrink: 0, marginTop: 2,
             }}
           >✕</button>
@@ -171,7 +178,7 @@ export default function AddClientModal({ onClose, onSuccess }) {
 
         {/* Body */}
         {/* Body */}
-        <div className="db-modal__body" style={{ overflowY: 'auto', flex: 1, padding: '20px 32px 8px' }}>
+        <div className="db-modal__body" style={{ overflowY: 'auto', flex: 1, padding: '20px 32px 8px', background: dark ? '#132a1e' : '#fff' }}>
           {error && (
             <div style={{
               background: '#fee2e2', color: '#b91c1c',
@@ -183,18 +190,18 @@ export default function AddClientModal({ onClose, onSuccess }) {
           )}
 
           {/* Tabs */}
-          <div style={{ display: 'flex', borderBottom: '2px solid #e5e9ec', marginBottom: 20 }}>
-            <button type="button" onClick={() => setActiveTab('details')} style={{ padding: '8px 20px', fontSize: '.85rem', fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', color: activeTab === 'details' ? '#26a676' : '#9ca3af', borderBottom: activeTab === 'details' ? '2px solid #26a676' : '2px solid transparent', marginBottom: -2 }}>Details</button>
-            <button type="button" onClick={() => setActiveTab('properties')} style={{ padding: '8px 20px', fontSize: '.85rem', fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', color: activeTab === 'properties' ? '#26a676' : '#9ca3af', borderBottom: activeTab === 'properties' ? '2px solid #26a676' : '2px solid transparent', marginBottom: -2 }}>Properties</button>
+          <div style={{ display: 'flex', borderBottom: `2px solid ${dark ? '#1e3a2a' : '#e5e9ec'}`, marginBottom: 20 }}>
+            <button type="button" onClick={() => setActiveTab('details')} style={{ padding: '8px 20px', fontSize: '.85rem', fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', color: activeTab === 'details' ? '#26a676' : (dark ? '#4d8a6a' : '#9ca3af'), borderBottom: activeTab === 'details' ? '2px solid #26a676' : '2px solid transparent', marginBottom: -2 }}>Details</button>
+            <button type="button" onClick={() => setActiveTab('properties')} style={{ padding: '8px 20px', fontSize: '.85rem', fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', color: activeTab === 'properties' ? '#26a676' : (dark ? '#4d8a6a' : '#9ca3af'), borderBottom: activeTab === 'properties' ? '2px solid #26a676' : '2px solid transparent', marginBottom: -2 }}>Properties</button>
           </div>
 
           {/* Details Tab */}
-          <div style={{ display: activeTab === 'details' ? 'flex' : 'none', flexDirection: 'column', gap: 0 }} className="cl-modal-edit-form">
+          <div style={{ display: activeTab === 'details' ? 'flex' : 'none', flexDirection: 'column', gap: 16 }} className="cl-modal-edit-form">
             <Field label="Business Name" required>
             <input type="text" placeholder="Example Business Inc." value={form.businessName}
               onChange={(e) => { const val = e.target.value; if (/^[a-zA-Z\s.,'&()-]*$/.test(val)) setForm(f => ({ ...f, businessName: val })); }}
               maxLength={100} className="cl-edit-input"
-              style={form.businessName && /[^a-zA-Z\s.,'&()-]/.test(form.businessName) ? { borderColor: '#ef4444' } : {}} />
+              style={{ background: dark ? '#0d2619' : '#fff', color: dark ? '#eaf5f0' : '#0d1117', border: `1.5px solid ${dark ? '#1e3a2a' : '#d1d5db'}`, ...(form.businessName && /[^a-zA-Z\s.,'&()-]/.test(form.businessName) ? { borderColor: '#ef4444' } : {}) }} />
             {form.businessName && /[^a-zA-Z\s.,'&()-]/.test(form.businessName) && (
               <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Letters and basic punctuation only.</span>
             )}
@@ -203,7 +210,7 @@ export default function AddClientModal({ onClose, onSuccess }) {
             <input type="email" placeholder="contact@example.com" value={form.email}
               onChange={setField('email')}
               maxLength={254} className="cl-edit-input"
-              style={form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) ? { borderColor: '#ef4444' } : {}} />
+              style={{ background: dark ? '#0d2619' : '#fff', color: dark ? '#eaf5f0' : '#0d1117', border: `1.5px solid ${dark ? '#1e3a2a' : '#d1d5db'}`, ...(form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) ? { borderColor: '#ef4444' } : {}) }} />
             {form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) && (
               <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Enter a valid email address (e.g. user@example.com).</span>
             )}
@@ -213,19 +220,7 @@ export default function AddClientModal({ onClose, onSuccess }) {
                 <input type={showPass ? 'text' : 'password'} placeholder="Min. 8 characters" value={form.password}
               onChange={setField('password')} maxLength={128} className="cl-edit-input"
               style={{ width: '100%', paddingRight: 40, ...(form.password && form.password.length < 8 ? { borderColor: '#ef4444' } : {}) }} />
-            {form.password && form.password.length < 8 && (
-              <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ At least 8 characters.</span>
-            )}
-            {form.password && form.password.length >= 8 && !/[A-Z]/.test(form.password) && (
-              <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Must include at least 1 uppercase letter.</span>
-            )}
-            {form.password && form.password.length >= 8 && /[A-Z]/.test(form.password) && !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) && (
-              <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Must include at least 1 special character (e.g. @, #, !).</span>
-            )}
-            {form.password && form.password.length >= 8 && /[A-Z]/.test(form.password) && /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) && (
-              <span style={{ color: '#26a676', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>✓ Strong password.</span>
-            )}
-                <button type="button" onClick={() => setShowPass((v) => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', padding: 0, display: 'grid', placeItems: 'center' }} title={showPass ? 'Hide password' : 'Show password'}>
+                <button type="button" onClick={() => setShowPass((v) => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: dark ? '#4d8a6a' : 'var(--color-muted)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }} title={showPass ? 'Hide password' : 'Show password'}>
                   {showPass ? (
                     <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 3l14 14M10 5C5.5 5 2 10 2 10s1.3 2 3.5 3.5M10 15c4.5 0 8-5 8-5s-1.3-2-3.5-3.5" strokeLinecap="round" /></svg>
                   ) : (
@@ -233,13 +228,25 @@ export default function AddClientModal({ onClose, onSuccess }) {
                   )}
                 </button>
               </div>
+              {form.password && form.password.length < 8 && (
+                <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ At least 8 characters.</span>
+              )}
+              {form.password && form.password.length >= 8 && !/[A-Z]/.test(form.password) && (
+                <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Must include at least 1 uppercase letter.</span>
+              )}
+              {form.password && form.password.length >= 8 && /[A-Z]/.test(form.password) && !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) && (
+                <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ Must include at least 1 special character (e.g. @, #, !).</span>
+              )}
+              {form.password && form.password.length >= 8 && /[A-Z]/.test(form.password) && /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) && (
+                <span style={{ color: '#26a676', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>✓ Strong password.</span>
+              )}
             </Field>
             <Field label="Temporary 6-Digit PIN" required>
               <input type="text" inputMode="numeric" pattern="\d{6}" maxLength={6} placeholder="Exactly 6 digits"
             value={form.pin}
             onChange={(e) => { const val = e.target.value.replace(/\D/g, '').slice(0, 6); setForm((f) => ({ ...f, pin: val })); }}
             className="cl-edit-input"
-            style={{ width: '100%', ...(form.pin && form.pin.length > 0 && form.pin.length < 6 ? { borderColor: '#ef4444' } : form.pin.length === 6 ? { borderColor: '#26a676' } : {}) }} />
+            style={{ width: '100%', background: dark ? '#0d2619' : '#fff', color: dark ? '#eaf5f0' : '#0d1117', border: `1.5px solid ${dark ? '#1e3a2a' : '#d1d5db'}`, ...(form.pin && form.pin.length > 0 && form.pin.length < 6 ? { borderColor: '#ef4444' } : form.pin.length === 6 ? { borderColor: '#26a676' } : {}) }} />
           {form.pin && form.pin.length > 0 && form.pin.length < 6 && (
             <span style={{ color: '#ef4444', fontSize: '.72rem', fontWeight: 600, marginTop: 3, display: 'block' }}>⚠ PIN must be exactly 6 digits ({form.pin.length}/6).</span>
           )}
@@ -254,7 +261,7 @@ export default function AddClientModal({ onClose, onSuccess }) {
             <div style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Properties</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
               {properties.map((prop, index) => (
-                <div key={index} style={{ border: '1px solid var(--color-border, #e5e9ec)', borderRadius: 'var(--radius-md, 10px)', padding: '10px', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--color-surface-2, #f8faf9)' }}>
+                <div key={index} style={{ border: `1px solid ${dark ? '#1e3a2a' : '#e5e9ec'}`, borderRadius: 'var(--radius-md, 10px)', padding: '10px', display: 'flex', flexDirection: 'column', gap: 8, background: dark ? '#0d2619' : '#f8faf9' }}>
                   <input type="file" accept="image/*" style={{ display: 'none' }} id={`picture-input-${index}`}
                     onChange={(e) => {
                       if (e.target.files && e.target.files.length > 0) {
@@ -282,17 +289,17 @@ export default function AddClientModal({ onClose, onSuccess }) {
                   <input type="text" placeholder="Property name *" value={prop.name}
                   onChange={(e) => { const val = e.target.value; if (/^[a-zA-Z\s.,'&()-]*$/.test(val)) setProperties(prev => prev.map((p, i) => i === index ? { ...p, name: val } : p)); }}
                   maxLength={150} className="cl-edit-input"
-                  style={{ fontSize: '.8rem', textAlign: 'center', ...(prop.name && /[^a-zA-Z\s.,'&()-]/.test(prop.name) ? { borderColor: '#ef4444' } : {}) }} />
+                  style={{ fontSize: '.8rem', textAlign: 'center', background: dark ? '#132a1e' : '#fff', color: dark ? '#eaf5f0' : '#0d1117', border: `1.5px solid ${dark ? '#1e3a2a' : '#d1d5db'}`, ...(prop.name && /[^a-zA-Z\s.,'&()-]/.test(prop.name) ? { borderColor: '#ef4444' } : {}) }} />
                 {prop.name && /[^a-zA-Z\s.,'&()-]/.test(prop.name) && (
                   <span style={{ color: '#ef4444', fontSize: '.65rem', fontWeight: 600, textAlign: 'center', display: 'block' }}>⚠ Letters only.</span>
                 )}
-                  <input type="text" placeholder="Smoobu API Key (optional)" value={prop.smoobuApiKey} onChange={setProp(index, 'smoobuApiKey')} maxLength={512} className="cl-edit-input" style={{ fontSize: '.75rem' }} />
+                  <input type="text" placeholder="Smoobu API Key (optional)" value={prop.smoobuApiKey} onChange={setProp(index, 'smoobuApiKey')} maxLength={512} className="cl-edit-input" style={{ fontSize: '.75rem', background: dark ? '#132a1e' : '#fff', color: dark ? '#eaf5f0' : '#0d1117', border: `1.5px solid ${dark ? '#1e3a2a' : '#d1d5db'}` }} />
                   <div style={{ display: 'flex', gap: 6 }}>
                     {prop.pictureUrl && (
-                      <button type="button" onClick={() => { setCropImageUrl(prop.originalPictureUrl); setInitialCropData(prop.cropData); setCroppingIndex(index); }} style={{ flex: 1, fontSize: '.7rem', padding: '4px 0', border: '1px solid #e5e9ec', borderRadius: 6, background: 'white', color: '#26a676', cursor: 'pointer', fontWeight: 600 }}>Adjust</button>
+                      <button type="button" onClick={() => { setCropImageUrl(prop.originalPictureUrl); setInitialCropData(prop.cropData); setCroppingIndex(index); }} style={{ flex: 1, fontSize: '.7rem', padding: '4px 0', border: `1px solid ${dark ? '#1e3a2a' : '#e5e9ec'}`, borderRadius: 6, background: dark ? '#0d2619' : 'white', color: '#26a676', cursor: 'pointer', fontWeight: 600 }}>Adjust</button>
                     )}
                     {properties.length > 1 && (
-                      <button type="button" onClick={() => removeProperty(index)} style={{ flex: 1, fontSize: '.7rem', padding: '4px 0', border: '1px solid #fecaca', borderRadius: 6, background: 'white', color: '#b91c1c', cursor: 'pointer', fontWeight: 600 }}>Remove</button>
+                      <button type="button" onClick={() => removeProperty(index)} style={{ flex: 1, fontSize: '.7rem', padding: '4px 0', border: `1px solid ${dark ? '#5c1a1a' : '#fecaca'}`, borderRadius: 6, background: dark ? '#2a0d0d' : 'white', color: '#b91c1c', cursor: 'pointer', fontWeight: 600 }}>Remove</button>
                     )}
                   </div>
                 </div>
@@ -314,7 +321,8 @@ export default function AddClientModal({ onClose, onSuccess }) {
           padding: '16px 32px 24px',
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
           gap: 10,
-          borderTop: '1px solid #f0f2f5',
+          borderTop: `1px solid ${dark ? '#1e3a2a' : '#f0f2f5'}`,
+          background: dark ? '#132a1e' : '#fff',
           marginTop: 4,
         }}>
           <button
@@ -322,8 +330,8 @@ export default function AddClientModal({ onClose, onSuccess }) {
             disabled={submitting}
             style={{
               padding: '9px 22px', borderRadius: 10,
-              border: '1.5px solid #e5e7eb', background: '#fff',
-              fontSize: '0.875rem', fontWeight: 600, color: '#374151',
+              border: `1.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`, background: dark ? 'transparent' : '#fff',
+              fontSize: '0.875rem', fontWeight: 600, color: dark ? '#7ab89a' : '#374151',
               cursor: submitting ? 'not-allowed' : 'pointer',
             }}
           >

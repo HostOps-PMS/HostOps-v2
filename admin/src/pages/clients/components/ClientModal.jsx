@@ -6,6 +6,7 @@ import ImageCropModal from './ImageCropModal';
 import OTPModal from '../../../components/OTPModal';
 import ConfirmModal from './ConfirmModal';
 import { sendLoginOtp } from '../../authorization/services/authService';
+import { useTheme } from '../../../context/ThemeContext';
 
 function mapPropertiesForEdit(properties = []) {
   return properties.map((p) => ({
@@ -38,11 +39,11 @@ function formatDate(iso) {
   });
 }
 
-function Field({ label, value }) {
+function Field({ label, value, dark }) {
   return (
     <div className="cl-modal-field">
-      <span className="cl-modal-field__label">{label}</span>
-      <span className="cl-modal-field__value">{value || '—'}</span>
+      <span className="cl-modal-field__label" style={{ color: dark ? '#7ab89a' : undefined }}>{label}</span>
+      <span className="cl-modal-field__value" style={{ color: dark ? '#eaf5f0' : undefined }}>{value || '—'}</span>
     </div>
   );
 }
@@ -66,7 +67,7 @@ function Divider({ label }) {
 }
 
 // ── Properties panel ──────────────────────────────────────────────
-function PropertiesPanel({ properties, loading, error, onViewSmoobu }) {
+function PropertiesPanel({ properties, loading, error, onViewSmoobu, dark }) {
   if (loading) {
     return (
       <div style={{ padding: '12px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -104,16 +105,16 @@ function PropertiesPanel({ properties, loading, error, onViewSmoobu }) {
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '10px 14px',
-            background: 'var(--color-surface-2, #f0f7f4)',
-            border: '1px solid var(--color-border)',
+            background: dark ? '#0d2619' : '#f0f7f4',
+            border: `1px solid ${dark ? '#1e3a2a' : 'var(--color-border)'}`,
             borderRadius: 'var(--radius-sm)',
           }}
         >
           <div>
-            <div style={{ fontSize: '.875rem', fontWeight: 600, color: 'var(--color-text)' }}>
+            <div style={{ fontSize: '.875rem', fontWeight: 600, color: dark ? '#eaf5f0' : 'var(--color-text)' }}>
               {p.propertyName || p.name}
             </div>
-            <div style={{ fontSize: '.75rem', color: 'var(--color-muted)', marginTop: 2, display: 'flex', gap: 10 }}>
+            <div style={{ fontSize: '.75rem', color: dark ? '#4d8a6a' : 'var(--color-muted)', marginTop: 2, display: 'flex', gap: 10 }}>
               <span>
                 {p.hasSmoobuKey
                   ? <span style={{ color: 'var(--color-success, #26a676)' }}>● Smoobu connected</span>
@@ -158,6 +159,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
 
   // ── Confirmation modal state ──────────────────────────────────────
   const [confirmDialog, setConfirmDialog] = useState(null);
+  const { dark } = useTheme();
   // confirmDialog shape: { title, message, confirmLabel, confirmVariant, onConfirm }
 
   const [properties, setProperties] = useState([]);
@@ -385,8 +387,14 @@ export default function ClientModal({ client, onClose, onUpdated }) {
 
   return (
     <>
-      <div className="db-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()} style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12,28,20,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
-        <div className="db-modal" style={{ width: '95vw', maxWidth: 480, maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 20, padding: 0, overflow: 'hidden' }}>
+      <style>{`
+        ${dark ? `.cl-modal-edit-form .cl-edit-input { background: #0d2619 !important; color: #eaf5f0 !important; border-color: #1e3a2a !important; }` : ''}
+        ${dark ? `.cl-modal-edit-form .cl-edit-input::placeholder { color: #4d8a6a !important; }` : ''}
+        ${dark ? `.cl-modal-edit-form .cl-modal-field__label { color: #7ab89a !important; }` : ''}
+        ${dark ? `.cl-modal-edit-form .cl-modal-field__label span { color: #ef4444 !important; }` : ''}
+      `}</style>
+      <div className="db-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()} style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: dark ? 'rgba(0,0,0,0.65)' : 'rgba(12,28,20,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
+        <div className="db-modal" style={{ width: '95vw', maxWidth: 480, maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 20, padding: 0, overflow: 'hidden', background: dark ? '#132a1e' : '#fff' }}>
           {/* Header */}
           <div style={{
             padding: '28px 32px 0 32px',
@@ -394,33 +402,33 @@ export default function ClientModal({ client, onClose, onUpdated }) {
           }}>
             <div>
               <h2 style={{
-                fontSize: '1.6rem', fontWeight: 800, color: '#0d1117',
-                lineHeight: 1.15, margin: 0, letterSpacing: '-0.02em',
-              }}>
-                Business <span style={{ color: '#26a676' }}>Details</span>
+                fontSize: '1.6rem', fontWeight: 800, color: dark ? '#eaf5f0' : '#0d1117',
+              lineHeight: 1.15, margin: 0, letterSpacing: '-0.02em',
+            }}>
+              Business <span style={{ color: '#26a676' }}>Details</span>
               </h2>
-              <p style={{ margin: '6px 0 0', fontSize: '.8125rem', color: '#9ca3af', fontWeight: 400 }}>
-                Please review the business details below.
+              <p style={{ margin: '6px 0 0', fontSize: '.8125rem', color: dark ? '#4d8a6a' : '#9ca3af', fontWeight: 400 }}>
+              Please review the business details below.
               </p>
             </div>
             <button
               onClick={onClose}
               style={{
-                background: '#f3f4f6', border: 'none', borderRadius: 10,
-                width: 32, height: 32, display: 'flex', alignItems: 'center',
-                justifyContent: 'center', cursor: 'pointer', color: '#6b7280',
-                fontSize: '1rem', flexShrink: 0, marginTop: 2,
-              }}
-            >✕</button>
+                background: dark ? '#0d2619' : '#f3f4f6', border: `1px solid ${dark ? '#1e3a2a' : 'transparent'}`, borderRadius: 10,
+              width: 32, height: 32, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', cursor: 'pointer', color: dark ? '#4d8a6a' : '#6b7280',
+              fontSize: '1rem', flexShrink: 0, marginTop: 2,
+            }}
+          >✕</button>
           </div>
 
           {/* Body */}
-          <div className="db-modal__body" style={{ overflowY: 'auto', flex: 1, padding: '20px 32px 8px' }}>
+          <div className="db-modal__body" style={{ overflowY: 'auto', flex: 1, padding: '20px 32px 8px', background: dark ? '#132a1e' : '#fff' }}>
             {/* Profile row */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '12px 16px', borderRadius: 12,
-              background: '#f8faf9', border: '1px solid #e5efe9',
+              background: dark ? '#0d2619' : '#f8faf9', border: `1px solid ${dark ? '#1e3a2a' : '#e5efe9'}`,
               marginBottom: 16,
             }}>
               <div style={{
@@ -432,10 +440,10 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                 {initials(client.businessName)}
               </div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0d1117' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: dark ? '#eaf5f0' : '#0d1117' }}>
                   {client.businessName}
                 </div>
-                <div style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: 1 }}>{client.email}</div>
+                <div style={{ fontSize: '0.78rem', color: dark ? '#4d8a6a' : '#9ca3af', marginTop: 1 }}>{client.email}</div>
               </div>
             </div>
 
@@ -454,15 +462,15 @@ export default function ClientModal({ client, onClose, onUpdated }) {
             
             <>
               <div className="cl-modal-grid">
-                <Field label="Role" value={
+                <Field dark={dark} label="Role" value={
                   <span className={`db-badge ${client.role === 'admin' ? 'db-badge--info' : 'db-badge--neutral'}`}>
                     {client.role}
                   </span>
                 } />
-                <Field label="Status" value={statusBadge} />
-                <Field label="Last Login"           value={formatDate(client.lastLoginAt)} />
-                <Field label="Joined"               value={formatDate(client.createdAt)} />
-                <Field label="Updated At"           value={formatDate(client.updatedAt)} />
+                <Field dark={dark} label="Status" value={statusBadge} />
+                <Field dark={dark} label="Last Login"           value={formatDate(client.lastLoginAt)} />
+                <Field dark={dark} label="Joined"               value={formatDate(client.createdAt)} />
+                <Field dark={dark} label="Updated At"           value={formatDate(client.updatedAt)} />
               </div>
               {/* Properties section */}
               <div style={{ marginTop: 16 }}>
@@ -478,6 +486,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                   loading={loadingProps}
                   error={propsError}
                   onViewSmoobu={(property) => setSmoobuProperty(property)}
+                  dark={dark}
                 />
               </div>
             </>
@@ -488,7 +497,8 @@ export default function ClientModal({ client, onClose, onUpdated }) {
             padding: '16px 32px 24px',
             display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
             gap: 10,
-            borderTop: '1px solid #f0f2f5',
+            borderTop: `1px solid ${dark ? '#1e3a2a' : '#f0f2f5'}`,
+            background: dark ? '#132a1e' : '#fff',
             marginTop: 4,
           }}>
             {isEditing ? (
@@ -525,8 +535,8 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                   onClick={onClose}
                   style={{
                     padding: '9px 22px', borderRadius: 10,
-                    border: '1.5px solid #e5e7eb', background: '#fff',
-                    fontSize: '0.875rem', fontWeight: 600, color: '#374151',
+                    border: `1.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`, background: dark ? 'transparent' : '#fff',
+                    fontSize: '0.875rem', fontWeight: 600, color: dark ? '#7ab89a' : '#374151',
                     cursor: 'pointer',
                   }}
                 >
@@ -552,37 +562,37 @@ export default function ClientModal({ client, onClose, onUpdated }) {
 
       {/* ── Edit modal — separate modal on top of ClientModal ── */}
       {isEditing && (
-        <div className="db-modal-overlay" onClick={(e) => e.target === e.currentTarget && setIsEditing(false)} style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12,28,20,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
-          <div className="db-modal" style={{ width: '95vw', maxWidth: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 20, padding: 0, overflow: 'hidden' }}>
+        <div className="db-modal-overlay" onClick={(e) => e.target === e.currentTarget && setIsEditing(false)} style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: dark ? 'rgba(0,0,0,0.65)' : 'rgba(12,28,20,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
+          <div className="db-modal" style={{ width: '95vw', maxWidth: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 20, padding: 0, overflow: 'hidden', background: dark ? '#132a1e' : '#fff' }}>
             <div style={{ padding: '28px 32px 0 32px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <div>
-                <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0d1117', lineHeight: 1.15, margin: 0, letterSpacing: '-0.02em' }}>
+                <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: dark ? '#eaf5f0' : '#0d1117', lineHeight: 1.15, margin: 0, letterSpacing: '-0.02em' }}>
                   Edit <span style={{ color: '#26a676' }}>Business</span>
                 </h2>
-                <p style={{ margin: '6px 0 0', fontSize: '.8125rem', color: '#9ca3af', fontWeight: 400 }}>
+                <p style={{ margin: '6px 0 0', fontSize: '.8125rem', color: dark ? '#4d8a6a' : '#9ca3af', fontWeight: 400 }}>
                   Update the business information below.
                 </p>
               </div>
-              <button onClick={() => { setSaveError(null); setIsEditing(false); }} style={{ background: '#f3f4f6', border: 'none', borderRadius: 10, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#6b7280', fontSize: '1rem', flexShrink: 0, marginTop: 2 }}>✕</button>
+              <button onClick={() => { setSaveError(null); setIsEditing(false); }} style={{ background: dark ? '#0d2619' : '#f3f4f6', border: `1px solid ${dark ? '#1e3a2a' : 'transparent'}`, borderRadius: 10, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: dark ? '#4d8a6a' : '#6b7280', fontSize: '1rem', flexShrink: 0, marginTop: 2 }}>✕</button>
             </div>
-            <div className="db-modal__body" style={{ overflowY: 'auto', flex: 1, padding: '20px 32px 8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 12, background: '#f8faf9', border: '1px solid #e5efe9' }}>
+            <div className="db-modal__body" style={{ overflowY: 'auto', flex: 1, padding: '20px 32px 8px', background: dark ? '#132a1e' : '#fff' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 12, background: dark ? '#0d2619' : '#f8faf9', border: `1px solid ${dark ? '#1e3a2a' : '#e5efe9'}` }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #26a676, #1d8a62)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '0.95rem', flexShrink: 0 }}>{initials(client.businessName)}</div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0d1117' }}>{client.businessName}</div>
-                  <div style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: 1 }}>{client.email}</div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: dark ? '#eaf5f0' : '#0d1117' }}>{client.businessName}</div>
+                  <div style={{ fontSize: '0.78rem', color: dark ? '#4d8a6a' : '#9ca3af', marginTop: 1 }}>{client.email}</div>
                 </div>
               </div>
               {saveError && (
                 <div style={{ background: '#fee2e2', color: '#b91c1c', borderRadius: 'var(--radius-sm)', padding: '10px 14px', fontSize: '.8125rem', fontWeight: 500, marginBottom: 12 }}>⚠️ {saveError}</div>
               )}
               {/* Tabs */}
-              <div style={{ display: 'flex', borderBottom: '2px solid #e5e9ec' }}>
-                <button type="button" onClick={() => setActiveTab('details')} style={{ padding: '8px 20px', fontSize: '.85rem', fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', color: activeTab === 'details' ? '#26a676' : '#9ca3af', borderBottom: activeTab === 'details' ? '2px solid #26a676' : '2px solid transparent', marginBottom: -2 }}>Details</button>
-                <button type="button" onClick={() => setActiveTab('properties')} style={{ padding: '8px 20px', fontSize: '.85rem', fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', color: activeTab === 'properties' ? '#26a676' : '#9ca3af', borderBottom: activeTab === 'properties' ? '2px solid #26a676' : '2px solid transparent', marginBottom: -2 }}>Properties</button>
+              <div style={{ display: 'flex', borderBottom: `2px solid ${dark ? '#1e3a2a' : '#e5e9ec'}` }}>
+                <button type="button" onClick={() => setActiveTab('details')} style={{ padding: '8px 20px', fontSize: '.85rem', fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', color: activeTab === 'details' ? '#26a676' : (dark ? '#4d8a6a' : '#9ca3af'), borderBottom: activeTab === 'details' ? '2px solid #26a676' : '2px solid transparent', marginBottom: -2 }}>Details</button>
+                <button type="button" onClick={() => setActiveTab('properties')} style={{ padding: '8px 20px', fontSize: '.85rem', fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', color: activeTab === 'properties' ? '#26a676' : (dark ? '#4d8a6a' : '#9ca3af'), borderBottom: activeTab === 'properties' ? '2px solid #26a676' : '2px solid transparent', marginBottom: -2 }}>Properties</button>
               </div>
               <div style={{ display: activeTab === 'details' ? 'block' : 'none' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }} className="cl-modal-edit-form">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }} className="cl-modal-edit-form">
                 <div className="cl-modal-field">
                   <label className="cl-modal-field__label" htmlFor="edit-businessName">Business Name</label>
                   <input id="edit-businessName" name="businessName" type="text" className="cl-edit-input" placeholder="e.g. Acme Properties Inc." value={form.businessName}
@@ -636,7 +646,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                   <div style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 2, marginTop: 10 }}>Properties</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
                   {form.properties.map((prop, index) => (
-                    <div key={prop._id || index} style={{ border: '1px solid var(--color-border, #e5e9ec)', borderRadius: 'var(--radius-md, 10px)', padding: '10px', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--color-surface-2, #f8faf9)', cursor: 'pointer' }}>
+                    <div key={prop._id || index} style={{ border: `1px solid ${dark ? '#1e3a2a' : '#e5e9ec'}`, borderRadius: 'var(--radius-md, 10px)', padding: '10px', display: 'flex', flexDirection: 'column', gap: 8, background: dark ? '#0d2619' : '#f8faf9', cursor: 'pointer' }}>
                       {/* Picture */}
                       <input type="file" accept="image/*" style={{ display: 'none' }} id={`edit-picture-input-${index}`} onChange={(e) => { if (e.target.files && e.target.files.length > 0) { const file = e.target.files[0]; const url = URL.createObjectURL(file); setForm((prev) => ({ ...prev, properties: prev.properties.map((p, i) => i === index ? { ...p, pictureFile: file, originalPictureUrl: url, cropDirty: true } : p) })); setCropImageUrl(url); setInitialCropData(null); setCroppingIndex(index); } e.target.value = null; }} />
                       <div style={{ width: '100%', aspectRatio: '4/3', borderRadius: 8, overflow: 'hidden', background: prop.pictureUrl ? 'transparent' : 'linear-gradient(135deg, rgba(198,221,213,0.3), rgba(38,166,118,0.05))', border: prop.pictureUrl ? 'none' : '2px dashed #c8ddd5', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}
@@ -743,8 +753,8 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                 </div>
                 </div>
             </div>
-            <div style={{ padding: '16px 32px 24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid #f0f2f5', marginTop: 4 }}>
-              <button onClick={() => { setSaveError(null); setIsEditing(false); }} disabled={saving} style={{ padding: '9px 22px', borderRadius: 10, border: '1.5px solid #e5e7eb', background: '#fff', fontSize: '0.875rem', fontWeight: 600, color: '#374151', cursor: saving ? 'not-allowed' : 'pointer' }}>Cancel</button>
+            <div style={{ padding: '16px 32px 24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, borderTop: `1px solid ${dark ? '#1e3a2a' : '#f0f2f5'}`, background: dark ? '#132a1e' : '#fff', marginTop: 4 }}>
+              <button onClick={() => { setSaveError(null); setIsEditing(false); }} disabled={saving} style={{ padding: '9px 22px', borderRadius: 10, border: `1.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`, background: dark ? 'transparent' : '#fff', fontSize: '0.875rem', fontWeight: 600, color: dark ? '#7ab89a' : '#374151', cursor: saving ? 'not-allowed' : 'pointer' }}>Cancel</button>
               <button onClick={handleSave} disabled={saving} style={{ padding: '9px 26px', borderRadius: 10, border: 'none', background: saving ? '#9ca3af' : '#0d1117', fontSize: '0.875rem', fontWeight: 700, color: '#fff', cursor: saving ? 'not-allowed' : 'pointer', boxShadow: saving ? 'none' : '0 2px 8px rgba(13,17,23,0.18)' }}>{saving ? 'Saving…' : 'Save Changes'}</button>
             </div>
           </div>
