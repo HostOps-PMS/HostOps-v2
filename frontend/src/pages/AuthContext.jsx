@@ -161,6 +161,10 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const controller = new AbortController();
 
+    // Signal to any lingering pagehide timer from the previous page that this
+    // is a reload, not a true close. The timer checks this flag before beaconing.
+    try { localStorage.removeItem('_hp_unload_pending'); } catch { /* ignore */ }
+
     async function hydrate() {
       try {
         const res = await fetch(`${HP_API_BASE}/auth/refresh`, {
@@ -203,12 +207,18 @@ export function AuthProvider({ children }) {
   // This revoked the refresh token BEFORE the page reloaded, so the
   // hydrate() call above always got 401 → token = null → redirect to "/".
   //
-  // THE FIX — pagehide + focus-cancel timer:
-  // 'pagehide' fires on both close and refresh. We delay the beacon by
-  // 500ms. If the window receives a 'focus' event within that window
-  // (meaning the page just reloaded and the browser tab is active again),
-  // we cancel the beacon. A true tab/window close never regains focus,
-  // so the beacon fires normally after the delay.
+  // THE FIX — pagehide + localStorage handshake:
+  // 'pagehide' fires on both close AND refresh. We write a flag to
+  // localStorage and delay the beacon by 500ms. On a page reload the NEW
+  // page's mount effect (above) removes that flag before the timer fires.
+  // When the timer fires it checks: if the flag is gone → it was a reload,
+  // skip the beacon. If the flag is still there → true close, send beacon.
+  //
+  // Why localStorage instead of the old focus-cancel approach:
+  // The previous 'focus' handler was on the OLD window. On refresh the old
+  // window is torn down before it can receive a focus event, so the cancel
+  // never fired on Safari and some Chromium builds → beacon was sent →
+  // refresh token revoked → hydrate() got 401 → redirect to login.
   useEffect(() => {
     let revokeTimer = null;
 
@@ -217,28 +227,27 @@ export function AuthProvider({ children }) {
       const token = accessTokenRef.current;
       if (!token) return;
 
+      try { localStorage.setItem('_hp_unload_pending', '1'); } catch { /* ignore */ }
+
       revokeTimer = setTimeout(() => {
+        revokeTimer = null;
+        // If the new page already mounted, it cleared this flag → reload, skip.
+        try {
+          if (!localStorage.getItem('_hp_unload_pending')) return;
+          localStorage.removeItem('_hp_unload_pending');
+        } catch { /* ignore */ }
+
         const blob = new Blob(
           [JSON.stringify({ token })],
           { type: 'application/json' }
         );
         navigator.sendBeacon(`${HP_API_BASE}/auth/revoke-token`, blob);
-        revokeTimer = null;
       }, 500);
     }
 
-    function handleFocus() {
-      if (revokeTimer !== null) {
-        clearTimeout(revokeTimer);
-        revokeTimer = null;
-      }
-    }
-
     window.addEventListener('pagehide', handlePageHide);
-    window.addEventListener('focus',    handleFocus);
     return () => {
       window.removeEventListener('pagehide', handlePageHide);
-      window.removeEventListener('focus',    handleFocus);
       if (revokeTimer !== null) clearTimeout(revokeTimer);
     };
   }, []);
