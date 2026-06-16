@@ -1,4 +1,7 @@
+import { useTheme } from '../../context/ThemeContext';
+
 export default function ArchiveConfirmModal({ mode = 'archive', name, onConfirm, onClose, loading }) {
+  const { dark } = useTheme();
   const isArchive = mode === 'archive';
 
   return (
@@ -20,7 +23,7 @@ export default function ArchiveConfirmModal({ mode = 'archive', name, onConfirm,
       `}</style>
 
       <div style={{
-        background: '#fff',
+        background: dark ? '#132a1e' : '#fff',
         borderRadius: 18,
         width: 380, maxWidth: '92vw',
         boxShadow: '0 24px 64px rgba(0,0,0,0.20), 0 4px 16px rgba(0,0,0,0.08)',
@@ -42,7 +45,7 @@ export default function ArchiveConfirmModal({ mode = 'archive', name, onConfirm,
           {/* Icon */}
           <div style={{
             width: 56, height: 56, borderRadius: 16,
-            background: isArchive ? '#fef3c7' : '#d1fae5',
+            background: isArchive ? (dark ? '#2a1f00' : '#fef3c7') : (dark ? '#052e16' : '#d1fae5'),
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 18px',
           }}>
@@ -61,14 +64,14 @@ export default function ArchiveConfirmModal({ mode = 'archive', name, onConfirm,
             )}
           </div>
 
-          <h3 style={{ margin: '0 0 6px', fontSize: '1.05rem', fontWeight: 800, color: '#111827', letterSpacing: '-0.01em' }}>
+          <h3 style={{ margin: '0 0 6px', fontSize: '1.05rem', fontWeight: 800, color: dark ? '#eaf5f0' : '#111827', letterSpacing: '-0.01em' }}>
             {isArchive ? 'Archive Account' : 'Restore Account'}
           </h3>
 
-          <p style={{ margin: '0 0 16px', fontSize: '0.875rem', color: '#4b5563', lineHeight: 1.6 }}>
+          <p style={{ margin: '0 0 16px', fontSize: '0.875rem', color: dark ? '#7ab89a' : '#4b5563', lineHeight: 1.6 }}>
             {isArchive
-              ? <>Archive <strong style={{ color: '#111827' }}>{name}</strong>? They won't be able to log in while archived.</>
-              : <>Restore <strong style={{ color: '#111827' }}>{name}</strong>? They will be able to log in again.</>
+              ? <>Archive <strong style={{ color: dark ? '#eaf5f0' : '#111827' }}>{name}</strong>? This will archive the account.</>
+              : <>Restore <strong style={{ color: dark ? '#eaf5f0' : '#111827' }}>{name}</strong>? They will be able to log in again.</>
             }
           </p>
 
@@ -76,10 +79,10 @@ export default function ArchiveConfirmModal({ mode = 'archive', name, onConfirm,
             display: 'inline-flex', alignItems: 'center', gap: 7,
             padding: '8px 14px',
             borderRadius: 10,
-            background: isArchive ? '#fffbeb' : '#f0fdf4',
-            border: `1px solid ${isArchive ? '#fde68a' : '#bbf7d0'}`,
+            background: isArchive ? (dark ? '#1a1200' : '#fffbeb') : (dark ? '#052e16' : '#f0fdf4'),
+            border: `1px solid ${isArchive ? (dark ? '#3d2e00' : '#fde68a') : (dark ? '#166534' : '#bbf7d0')}`,
             fontSize: '0.78rem', fontWeight: 600,
-            color: isArchive ? '#92400e' : '#065f46',
+            color: isArchive ? (dark ? '#fbbf24' : '#92400e') : (dark ? '#4ade80' : '#065f46'),
           }}>
             <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
               {isArchive
@@ -103,13 +106,13 @@ export default function ArchiveConfirmModal({ mode = 'archive', name, onConfirm,
             disabled={loading}
             style={{
               flex: 1, padding: '10px 0', borderRadius: 10,
-              border: '1.5px solid #e5e7eb', background: '#fff',
-              color: '#374151', fontWeight: 600, fontSize: '0.875rem',
+              border: `1.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`, background: dark ? 'transparent' : '#fff',
+              color: dark ? '#7ab89a' : '#374151', fontWeight: 600, fontSize: '0.875rem',
               cursor: loading ? 'not-allowed' : 'pointer',
               transition: 'background 0.12s',
             }}
-            onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#f9fafb'; }}
-            onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+            onMouseEnter={e => { if (!loading) e.currentTarget.style.background = dark ? '#0d2619' : '#f9fafb'; }}
+            onMouseLeave={e => e.currentTarget.style.background = dark ? 'transparent' : '#fff'}
           >
             Cancel
           </button>
