@@ -33,7 +33,7 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
   const [appealSubmitted, setAppealSubmitted]   = useState(false);
   const [hasPendingAppeal, setHasPendingAppeal] = useState(false);
 
-  const API_BASE = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
+  const API_BASE = import.meta.env.VITE_API_URL || 'https://api.hostops.online';
 
   // When the disabled screen appears, check if this email already has a pending appeal.
   React.useEffect(() => {

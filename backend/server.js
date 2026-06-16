@@ -53,7 +53,7 @@ const IMAGE_PROXY_ORIGINS = process.env.ALLOWED_ORIGINS
       'https://go.hostops.online',
       'https://hostops-frontend.onrender.com',
       'https://hostops-v2-admin.onrender.com',
-      'https://hostpilot-smoobu.onrender.com',
+      'https://api.hostops.online',
     ];
 
 app.use(
@@ -80,7 +80,7 @@ app.use(
           'https://*.tile.openstreetmap.org',
           'https://tile.openstreetmap.org',
           'https://api.hostops.online',
-          'https://hostpilot-smoobu.onrender.com',
+          'https://api.hostops.online',
         ],
         fontSrc:    ["'self'"],
         objectSrc:  ["'none'"],
@@ -119,7 +119,7 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
       'https://go.hostops.online',
       'https://hostops-frontend.onrender.com',
       'https://hostops-v2-admin.onrender.com',
-      'https://hostpilot-smoobu.onrender.com',
+      'https://api.hostops.online',
     ];
 
 app.use(
