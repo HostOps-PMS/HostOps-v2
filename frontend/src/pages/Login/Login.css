@@ -454,7 +454,7 @@ html, body, #root {
   }
 
 .lp-slide-tagline {
-    font-size: 36px;
+    font-size: clamp(22px, 4dvh, 36px);
     margin-bottom: 8px;
     line-height: 1.15;
   }
@@ -502,6 +502,8 @@ html, body, #root {
     left: 28px;
     right: 28px;
     bottom: calc(70dvh + 16px);
+    max-height: calc(30dvh - 90px);
+    overflow: hidden;
   }
 }
 
@@ -523,5 +525,39 @@ html, body, #root {
 
 .lp-slide-brand {
     font-size: 20px;
+  }
+}
+
+/* ─── SHORT VIEWPORT HEIGHT — tagline adapts cleanly ─────────── */
+
+/* Medium-short: hide sub text to free up space for tagline */
+@media (max-width: 768px) and (max-height: 780px) {
+  .lp-slide-sub {
+    display: none !important;
+  }
+}
+
+/* Short: smaller tagline, more form height */
+@media (max-width: 768px) and (max-height: 650px) {
+  .lp-slide-tagline {
+    font-size: 20px !important;
+    margin-bottom: 4px !important;
+  }
+  .lp-form-panel.lp-form-slide-up {
+    max-height: 75dvh;
+  }
+  .lp-card:has(.lp-form-slide-up) .lp-slide-content > div:last-child {
+    bottom: calc(75dvh + 12px);
+    max-height: calc(25dvh - 90px);
+  }
+}
+
+/* Very short (landscape phones, etc): only logo visible above form */
+@media (max-width: 768px) and (max-height: 520px) {
+  .lp-form-panel.lp-form-slide-up {
+    max-height: 82dvh;
+  }
+  .lp-card:has(.lp-form-slide-up) .lp-slide-content > div:last-child {
+    display: none;
   }
 }
