@@ -459,6 +459,11 @@ html, body, #root {
     line-height: 1.15;
   }
 
+  /* Always collapse to 2 natural lines on mobile — prevents height overflow */
+  .lp-slide-tagline br {
+    display: none;
+  }
+
   .lp-slide-dots {
     display: none;
   }
@@ -502,7 +507,7 @@ html, body, #root {
     left: 28px;
     right: 28px;
     bottom: calc(70dvh + 16px);
-    max-height: calc(30dvh - 90px);
+    top: 88px;
     overflow: hidden;
   }
 }
@@ -530,8 +535,8 @@ html, body, #root {
 
 /* ─── SHORT VIEWPORT HEIGHT — tagline adapts cleanly ─────────── */
 
-/* Medium-short: hide sub text to free up space for tagline */
-@media (max-width: 768px) and (max-height: 780px) {
+/* Short: hide sub text only on fairly short screens */
+@media (max-width: 768px) and (max-height: 680px) {
   .lp-slide-sub {
     display: none !important;
   }
@@ -548,7 +553,6 @@ html, body, #root {
   }
   .lp-card:has(.lp-form-slide-up) .lp-slide-content > div:last-child {
     bottom: calc(75dvh + 12px);
-    max-height: calc(25dvh - 90px);
   }
 }
 

@@ -147,7 +147,7 @@ const [showLogin, setShowLogin] = useState(window.innerWidth > 768);
             </div>
             <div>
               <div className="lp-slide-tagline">
-                Your<br />properties,<br /><em>always</em><br />in view.
+                Your<br /> properties,<br /> <em>always</em><br /> in view.
               </div>
               <p className="lp-slide-sub">Real-time insights for every property you manage.</p>
               <div className="lp-slide-dots">
