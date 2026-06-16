@@ -159,7 +159,7 @@ export function AuthProvider({ children }) {
 
   // ── Silent refresh on mount ───────────────────────────────────────
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
 
     async function hydrate() {
       try {
@@ -167,29 +167,29 @@ export function AuthProvider({ children }) {
           method:      'POST',
           credentials: 'include',
           headers:     { 'x-api-key': import.meta.env.VITE_API_KEY },
+          signal:      controller.signal,
         });
 
-        if (!cancelled && res.ok) {
+        if (res.ok) {
           const data = await res.json();
           accessTokenRef.current = data.accessToken || null;
           if (data.sk)   sessionKeyRef.current = data.sk;
           if (data.user) setUser(data.user);
-        } else if (!cancelled) {
+        } else {
           accessTokenRef.current = null;
           sessionKeyRef.current  = null;
         }
-      } catch {
-        if (!cancelled) {
-          accessTokenRef.current = null;
-          sessionKeyRef.current  = null;
-        }
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        accessTokenRef.current = null;
+        sessionKeyRef.current  = null;
       } finally {
-        if (!cancelled) setIsReady(true);
+        if (!controller.signal.aborted) setIsReady(true);
       }
     }
 
     hydrate();
-    return () => { cancelled = true; };
+    return () => { controller.abort(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Tab-close beacon ──────────────────────────────────────────────
