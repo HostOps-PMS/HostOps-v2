@@ -4,7 +4,7 @@ import { useAuth } from '../../AuthContext';
 import safeStorage from '../../safeStorage';
 import RecoveryModal from './RecoveryModal';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://hostpilot-smoobu.onrender.com';
+const API_BASE = import.meta.env.VITE_API_BASE || 'https://api.hostops.online';
 const PIN_LENGTH = 6;
 
 const PIN_TIPS = [

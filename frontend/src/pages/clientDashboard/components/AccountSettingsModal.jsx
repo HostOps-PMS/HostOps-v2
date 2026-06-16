@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../AuthContext";
 import { useActivityLog } from "../hooks/useActivityLog";
 import { useDashboard } from "../context/DashboardContext";
-const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "https://hostpilot-smoobu.onrender.com";
+const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "https://api.hostops.online";
 
 function getEmailFromToken(token) {
   try {

@@ -68,7 +68,7 @@ import { fetchWithAuth, uploadHeaders } from '../../../lib/authUtils';
 const API_BASE = (
   import.meta.env.VITE_API_BASE_URL ??
   import.meta.env.VITE_API_URL ??
-  'https://hostpilot-smoobu.onrender.com'
+  'https://api.hostops.online'
 ).replace(/\/$/, '');
 
 function apiUrl(path) { return `${API_BASE}${path}`; }

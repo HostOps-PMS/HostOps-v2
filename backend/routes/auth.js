@@ -37,14 +37,14 @@ const router = express.Router();
 // origin, not the backend, causing a 404.
 //
 // Priority:
-//   1. API_BASE_URL env var  (e.g. "https://hostpilot-smoobu.onrender.com")
+//   1. API_BASE_URL env var  (e.g. "https://api.hostops.online")
 //   2. RENDER_EXTERNAL_URL   (set automatically on Render.com deployments)
 //   3. Fallback to hardcoded production URL — change this if your backend
 //      URL is different.
 const API_BASE_INTERNAL = (
   process.env.API_BASE_URL ||
   process.env.RENDER_EXTERNAL_URL ||
-  'https://hostpilot-smoobu.onrender.com'
+  'https://api.hostops.online'
 ).replace(/\/$/, ''); // strip trailing slash
 
 function proxyImageUrl(userId, propertyId) {

@@ -7,11 +7,11 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://hostpilot-smoobu.onrender.com',
+        target: 'https://api.hostops.online',
         changeOrigin: true,
       },
       '/auth': {
-        target: 'https://hostpilot-smoobu.onrender.com',
+        target: 'https://api.hostops.online',
         changeOrigin: true,
       },
     },
