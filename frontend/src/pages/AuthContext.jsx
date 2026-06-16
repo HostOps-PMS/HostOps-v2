@@ -175,14 +175,17 @@ export function AuthProvider({ children }) {
           accessTokenRef.current = data.accessToken || null;
           if (data.sk)   sessionKeyRef.current = data.sk;
           if (data.user) setUser(data.user);
+          console.info('[Auth] hydrate OK — session restored');
         } else {
           accessTokenRef.current = null;
           sessionKeyRef.current  = null;
+          console.warn('[Auth] hydrate FAILED — status', res.status, '— session expired or revoked; please log in again');
         }
       } catch (err) {
         if (err.name === 'AbortError') return;
         accessTokenRef.current = null;
         sessionKeyRef.current  = null;
+        console.error('[Auth] hydrate ERROR —', err.message);
       } finally {
         if (!controller.signal.aborted) setIsReady(true);
       }
