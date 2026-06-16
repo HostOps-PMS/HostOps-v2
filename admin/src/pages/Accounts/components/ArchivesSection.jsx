@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTheme } from '../../../context/ThemeContext';
 import { getClients, unarchiveClient } from '../../clients/services/clientsService';
 import { fetchStaffs, unarchiveStaff } from '../../Staffs/services/staffApi';
 import { fetchDisabledAppeals, resolveAppeal } from '../services/recoveryRequestsApi';
@@ -18,13 +19,14 @@ const VIEW_OPTS = [
 ];
 
 function ViewToggle({ view, onViewChange }) {
+  const { dark } = useTheme();
   return (
-    <div style={{ display: 'inline-flex', background: '#eef0f3', borderRadius: 8, padding: 3, flexShrink: 0 }}>
+    <div style={{ display: 'inline-flex', background: dark ? '#0d2619' : '#eef0f3', borderRadius: 8, padding: 3, flexShrink: 0 }}>
       {VIEW_OPTS.map(v => {
         const active = view === v.id;
         return (
           <button key={v.id} onClick={() => onViewChange(v.id)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 11px', borderRadius: 6, border: 'none', background: active ? '#fff' : 'transparent', color: active ? (v.id === 'archives' ? '#92400e' : '#065f46') : '#6b7280', fontWeight: active ? 700 : 500, fontSize: '0.76rem', cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: active ? '0 1px 5px rgba(0,0,0,0.10)' : 'none', transition: 'all 0.16s ease' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 11px', borderRadius: 6, border: 'none', background: active ? (dark ? '#132a1e' : '#fff') : 'transparent', color: active ? (v.id === 'archives' ? (dark ? '#fbbf24' : '#92400e') : (dark ? '#4ade80' : '#065f46')) : (dark ? '#4d8a6a' : '#6b7280'), fontWeight: active ? 700 : 500, fontSize: '0.76rem', cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: active ? '0 1px 5px rgba(0,0,0,0.10)' : 'none', transition: 'all 0.16s ease' }}
           >
             <span style={{ color: active ? (v.id === 'archives' ? '#f59e0b' : '#10b981') : '#b0b7c3', display: 'flex', transition: 'color 0.16s' }}>{v.icon}</span>
             {v.label}
@@ -43,9 +45,10 @@ const TYPE_BADGE = {
 };
 
 function TypeBadge({ subTab }) {
+  const { dark } = useTheme();
   const s = TYPE_BADGE[subTab] || TYPE_BADGE.businesses;
   return (
-    <span style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+    <span style={{ background: dark ? '#0d2619' : s.bg, color: dark ? '#7ab89a' : s.color, border: `1px solid ${dark ? '#1e3a2a' : s.border}`, borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
       {s.label}
     </span>
   );
@@ -68,6 +71,7 @@ const SUB_TAB_LABELS = {
 
 /* ══════════════════════════════════════════════════════════ */
 export default function ArchivesSection({ view, onViewChange, onRowsChange }) {
+  const { dark } = useTheme();
   const [subTab,    setSubTab]    = useState('all');
   const [businesses, setBusinesses] = useState([]);
   const [leaders,    setLeaders]    = useState([]);
@@ -136,7 +140,7 @@ export default function ArchivesSection({ view, onViewChange, onRowsChange }) {
     }
   }
 
-  const appealsByEmail = Object.fromEntries(appeals.map(a => [a.email, a]));
+const appealsByEmail = Object.fromEntries((Array.isArray(appeals) ? appeals : []).map(a => [a.email, a]));
   const total  = businesses.length + staffs.length + leaders.length;
   const counts = { all: total, businesses: businesses.length, staffs: staffs.length, leaders: leaders.length };
 
@@ -178,14 +182,14 @@ export default function ArchivesSection({ view, onViewChange, onRowsChange }) {
                   display: 'inline-flex', alignItems: 'center', gap: 7,
                   padding: '9px 18px 10px',
                   border: '1px solid',
-                  borderColor: active ? '#e8ecf0' : 'transparent',
-                  borderBottom: active ? '1px solid #fff' : 'none',
+                  borderColor: active ? (dark ? '#1e3a2a' : '#e8ecf0') : 'transparent',
+                  borderBottom: active ? `1px solid ${dark ? '#132a1e' : '#fff'}` : 'none',
                   borderRadius: '10px 10px 0 0',
-                  background: active ? '#fff' : 'transparent',
+                  background: active ? (dark ? '#132a1e' : '#fff') : 'transparent',
                   marginBottom: '-1px',
                   cursor: 'pointer',
                   fontSize: '0.82rem', fontWeight: 600,
-                  color: active ? '#d97706' : '#9ca3af',
+                  color: active ? '#d97706' : (dark ? '#4d8a6a' : '#9ca3af'),
                   transition: 'color 0.15s', whiteSpace: 'nowrap',
                   position: 'relative', zIndex: active ? 2 : 0,
                 }}
@@ -193,8 +197,8 @@ export default function ArchivesSection({ view, onViewChange, onRowsChange }) {
                 {t.label}
                 <span style={{
                   fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 999,
-                  background: active ? '#fef3c7' : 'transparent',
-                  color: active ? '#92400e' : '#b0b7c3',
+                  background: active ? (dark ? '#2a1f00' : '#fef3c7') : 'transparent',
+                  color: active ? (dark ? '#fbbf24' : '#92400e') : (dark ? '#4d8a6a' : '#b0b7c3'),
                 }}>
                   {loading ? '…' : counts[t.id]}
                 </span>
@@ -210,18 +214,18 @@ export default function ArchivesSection({ view, onViewChange, onRowsChange }) {
       </div>
 
       {/* ── White box — same style as AccountsTable ── */}
-      <div style={{ background: '#fff', borderRadius: '0 12px 12px 12px', border: '1px solid #e8ecf0', paddingBottom: 4 }}>
+      <div style={{ background: dark ? '#132a1e' : '#fff', borderRadius: '0 12px 12px 12px', border: `1px solid ${dark ? '#1e3a2a' : '#e8ecf0'}`, paddingBottom: 4 }}>
 
         {/* Filter bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px 12px', borderBottom: '1px solid #f0f2f5' }}>
-          <span style={{ fontSize: '0.76rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px 12px', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f0f2f5'}` }}>
+          <span style={{ fontSize: '0.76rem', color: dark ? '#4d8a6a' : '#9ca3af', whiteSpace: 'nowrap' }}>
             {loading ? '…' : rows.length} archived {SUB_TAB_LABELS[subTab] || subTab}
           </span>
           <button
             onClick={load} disabled={loading}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 13px', borderRadius: 7, border: '1px solid #e5e7eb', background: '#fff', color: '#374151', fontSize: '0.78rem', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', transition: 'background 0.15s', marginLeft: 'auto', flexShrink: 0 }}
-            onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#f9fafb'; }}
-            onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 13px', borderRadius: 7, border: `1px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`, background: dark ? '#0d2619' : '#fff', color: dark ? '#7ab89a' : '#374151', fontSize: '0.78rem', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', transition: 'background 0.15s', marginLeft: 'auto', flexShrink: 0 }}
+            onMouseEnter={e => { if (!loading) e.currentTarget.style.background = dark ? '#132a1e' : '#f9fafb'; }}
+            onMouseLeave={e => e.currentTarget.style.background = dark ? '#0d2619' : '#fff'}
           >
             <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: loading ? 'ac-arc-spin 0.8s linear infinite' : 'none' }}>
               <path d="M4 4a8 8 0 0112 0M16 16a8 8 0 01-12 0" strokeLinecap="round"/>
@@ -242,7 +246,7 @@ export default function ArchivesSection({ view, onViewChange, onRowsChange }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
               <tbody>
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} style={{ borderBottom: i < 4 ? '1px solid #f7f8fa' : 'none' }}>
+                  <tr key={i} style={{ borderBottom: i < 4 ? `1px solid ${dark ? '#1e3a2a' : '#f7f8fa'}` : 'none' }}>
                     <td style={{ padding: '13px 16px 13px 20px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div className="ac-arc-sk" style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0 }} />
@@ -264,19 +268,19 @@ export default function ArchivesSection({ view, onViewChange, onRowsChange }) {
             </table>
           </div>
         ) : rows.length === 0 ? (
-          <div style={{ padding: 48, textAlign: 'center', color: '#a0aec0', fontSize: '0.875rem' }}>
+          <div style={{ padding: 48, textAlign: 'center', color: dark ? '#4d8a6a' : '#a0aec0', fontSize: '0.875rem' }}>
             No archived {SUB_TAB_LABELS[subTab] || subTab}.
           </div>
         ) : (
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #f0f2f5' }}>
-                  <th style={{ padding: '9px 16px 9px 20px', textAlign: 'left',  fontSize: '0.7rem', fontWeight: 700, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Account</th>
-                  <th style={{ padding: '9px 16px',           textAlign: 'left',  fontSize: '0.7rem', fontWeight: 700, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Type</th>
-                  <th style={{ padding: '9px 16px',           textAlign: 'left',  fontSize: '0.7rem', fontWeight: 700, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Status</th>
-                  <th style={{ padding: '9px 16px',           textAlign: 'left',  fontSize: '0.7rem', fontWeight: 700, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Archived On</th>
-                  <th style={{ padding: '9px 16px',           textAlign: 'right', fontSize: '0.7rem', fontWeight: 700, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Actions</th>
+                <tr style={{ borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f0f2f5'}` }}>
+                  <th style={{ padding: '9px 16px 9px 20px', textAlign: 'left',  fontSize: '0.7rem', fontWeight: 700, color: dark ? '#4d8a6a' : '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Account</th>
+                  <th style={{ padding: '9px 16px',           textAlign: 'left',  fontSize: '0.7rem', fontWeight: 700, color: dark ? '#4d8a6a' : '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Type</th>
+                  <th style={{ padding: '9px 16px',           textAlign: 'left',  fontSize: '0.7rem', fontWeight: 700, color: dark ? '#4d8a6a' : '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Status</th>
+                  <th style={{ padding: '9px 16px',           textAlign: 'left',  fontSize: '0.7rem', fontWeight: 700, color: dark ? '#4d8a6a' : '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Archived On</th>
+                  <th style={{ padding: '9px 16px',           textAlign: 'right', fontSize: '0.7rem', fontWeight: 700, color: dark ? '#4d8a6a' : '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -291,22 +295,22 @@ export default function ArchivesSection({ view, onViewChange, onRowsChange }) {
                       <tr
                         key={r._id}
                         style={{
-                          borderBottom: (!isExpanded && !isLast) ? '1px solid #f7f8fa' : 'none',
+                          borderBottom: (!isExpanded && !isLast) ? `1px solid ${dark ? '#1e3a2a' : '#f7f8fa'}` : 'none',
                           borderLeft: '3px solid transparent',
                           background: 'transparent', transition: 'background 0.1s',
                         }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#fafbff'}
+                        onMouseEnter={e => e.currentTarget.style.background = dark ? '#0d2619' : '#fafbff'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                       >
                         {/* Account */}
                         <td style={{ padding: '11px 16px 11px 20px', minWidth: 200 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#d97706', flexShrink: 0 }}>
+                            <div style={{ width: 30, height: 30, borderRadius: '50%', background: dark ? '#2a1f00' : '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#d97706', flexShrink: 0 }}>
                               {initials}
                             </div>
                             <div>
-                              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#111827' }}>{getName(r)}</div>
-                              <div style={{ fontSize: '0.74rem', color: '#9ca3af', marginTop: 1 }}>{r.email}</div>
+                              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: dark ? '#eaf5f0' : '#111827' }}>{getName(r)}</div>
+                              <div style={{ fontSize: '0.74rem', color: dark ? '#4d8a6a' : '#9ca3af', marginTop: 1 }}>{r.email}</div>
                             </div>
                           </div>
                         </td>
@@ -329,12 +333,12 @@ export default function ArchivesSection({ view, onViewChange, onRowsChange }) {
                               Pending Appeal
                             </button>
                           ) : (
-                            <span style={{ background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>Archived</span>
+                            <span style={{ background: dark ? '#1a1a1a' : '#f3f4f6', color: dark ? '#9ca3af' : '#6b7280', border: `1px solid ${dark ? '#2a2a2a' : '#e5e7eb'}`, borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>Archived</span>
                           )}
                         </td>
 
                         {/* Archived On */}
-                        <td style={{ padding: '11px 16px', fontSize: '0.78rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '11px 16px', fontSize: '0.78rem', color: dark ? '#4d8a6a' : '#9ca3af', whiteSpace: 'nowrap' }}>
                           {formatDate(r.updatedAt)}
                         </td>
 
@@ -358,7 +362,7 @@ export default function ArchivesSection({ view, onViewChange, onRowsChange }) {
 
                       {/* Expanded appeal detail */}
                       {isExpanded && appeal && (
-                        <tr key={`${r._id}-appeal`} style={{ borderBottom: !isLast ? '1px solid #f7f8fa' : 'none' }}>
+                        <tr key={`${r._id}-appeal`} style={{ borderBottom: !isLast ? `1px solid ${dark ? '#1e3a2a' : '#f7f8fa'}` : 'none' }}>
                           <td colSpan={5} style={{ padding: '0 16px 12px 20px' }}>
                             <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderLeft: '3px solid #f59e0b', borderRadius: 10, padding: '12px 16px' }}>
                               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -379,7 +383,7 @@ export default function ArchivesSection({ view, onViewChange, onRowsChange }) {
                                   <button
                                     onClick={() => handleAppealAction(appeal, 'dismiss')}
                                     disabled={appealAction === appeal._id}
-                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid #e5e7eb', background: '#f9fafb', fontSize: '0.78rem', fontWeight: 600, color: '#6b7280', cursor: appealAction === appeal._id ? 'not-allowed' : 'pointer', opacity: appealAction === appeal._id ? 0.6 : 1 }}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: `1px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`, background: dark ? '#0d2619' : '#f9fafb', fontSize: '0.78rem', fontWeight: 600, color: dark ? '#7ab89a' : '#6b7280', cursor: appealAction === appeal._id ? 'not-allowed' : 'pointer', opacity: appealAction === appeal._id ? 0.6 : 1 }}
                                   >
                                     Dismiss
                                   </button>
