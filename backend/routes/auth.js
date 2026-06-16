@@ -155,20 +155,26 @@ async function issueTokenPair(signFnAccess, signFnRefresh, entity, req, extra = 
 
 // ── Helper: set the encrypted rt cookie ─────────────────────────
 // Single place that controls cookie options so they stay consistent.
-// Production (HTTPS): Secure=true + SameSite=None for cross-origin support.
-// Development (HTTP):  Secure=false + SameSite=Lax — SameSite=None requires
-//   Secure=true, and Secure cookies are never sent over plain HTTP, so the
-//   browser silently drops them and every /auth/refresh returns 401.
-function setRefreshCookie(res, rawRefreshToken) {
-  const isProd = process.env.NODE_ENV === 'production';
+// Detects HTTPS from the actual connection or reverse-proxy header (x-forwarded-proto),
+// NOT from NODE_ENV. Render.com always terminates TLS at the load balancer and
+// forwards plain HTTP to the app with x-forwarded-proto=https — so NODE_ENV-based
+// detection incorrectly treats a production HTTPS request as HTTP when NODE_ENV is
+// not set to 'production', producing SameSite=lax cookies that cross-origin POSTs
+// (e.g. localhost dev → render.com) cannot send.
+function setRefreshCookie(res, rawRefreshToken, req) {
+  const isHttps = req
+    ? (req.secure || req.get('x-forwarded-proto') === 'https')
+    : process.env.NODE_ENV === 'production';
   // COOKIE_SAME_SITE controls cross-origin vs same-site behaviour:
-  //   'none' — use while API is on onrender.com and frontend is on hostops.online (cross-origin)
-  //   'lax'  — set this once api.hostops.online custom domain is live (same-site, blocks Edge TP)
-  // Defaults to 'none' so deploying this code before DNS is wired up doesn't break anything.
-  const sameSite = isProd ? (process.env.COOKIE_SAME_SITE || 'none') : 'lax';
+  //   'none' — required while frontend and API are on different origins (cross-site)
+  //   'lax'  — use once both are on the same eTLD+1 (same-site)
+  // Defaults to 'none' for HTTPS so cross-origin requests (localhost dev, different
+  // subdomains) can send the cookie. SameSite=none requires Secure=true, which is
+  // automatically true whenever the connection is HTTPS.
+  const sameSite = isHttps ? (process.env.COOKIE_SAME_SITE || 'none') : 'lax';
   res.cookie('rt', encryptToken(rawRefreshToken), {
     httpOnly: true,
-    secure:   isProd,
+    secure:   isHttps,
     sameSite,
     maxAge:   7 * 24 * 60 * 60 * 1000,
     path:     '/auth',
@@ -302,7 +308,7 @@ router.post('/login', async (req, res, next) => {
       staff.lastLoginAt = new Date();
       await staff.save();
 
-      setRefreshCookie(res, rawRefresh);
+      setRefreshCookie(res, rawRefresh, req);
       const staffSk = createSessionKey(accessJti, accessTokenExpiryMs());
 
       return res.json({
@@ -381,7 +387,7 @@ router.post('/login', async (req, res, next) => {
     if (user.activityLog.length > 50) user.activityLog = user.activityLog.slice(-50);
     await user.save();
 
-    setRefreshCookie(res, refreshTokenToUse);
+    setRefreshCookie(res, refreshTokenToUse, req);
     const userSk = createSessionKey(userLoginJti, accessTokenExpiryMs());
     res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin, ...(userSk ? { sk: userSk } : {}) });
   } catch (err) {
@@ -418,7 +424,7 @@ router.post('/staff-login', async (req, res, next) => {
     staff.lastLoginAt = new Date();
     await staff.save();
 
-    setRefreshCookie(res, rawRefresh);
+    setRefreshCookie(res, rawRefresh, req);
     const staffLoginSk = createSessionKey(staffLoginJti, accessTokenExpiryMs());
 
     res.json({
@@ -493,7 +499,7 @@ router.post('/verify-login-otp', async (req, res, next) => {
       if (user.activityLog.length > 50) user.activityLog = user.activityLog.slice(-50);
       await user.save();
 
-      setRefreshCookie(res, rawRefresh);
+      setRefreshCookie(res, rawRefresh, req);
       const otpSk = createSessionKey(otpJti, accessTokenExpiryMs());
 
       const isAdmin = user.tag === 'Main Admin' || user.role === 'admin' || user.email === process.env.ADMIN_ROLE;
@@ -606,7 +612,7 @@ router.post('/refresh', async (req, res, next) => {
         accessJti: newAccessJti,
       });
 
-      setRefreshCookie(res, newRefreshToken);
+      setRefreshCookie(res, newRefreshToken, req);
       const staffRefreshSk = createSessionKey(newAccessJti, accessTokenExpiryMs());
 
       return res.json({
@@ -638,7 +644,7 @@ router.post('/refresh', async (req, res, next) => {
       accessJti: newAccessJti,
     });
 
-    setRefreshCookie(res, newRefreshToken);
+    setRefreshCookie(res, newRefreshToken, req);
     const userRefreshSk = createSessionKey(newAccessJti, accessTokenExpiryMs());
     res.json({ accessToken: encryptToken(rawNewAccess), ...(userRefreshSk ? { sk: userRefreshSk } : {}) });
   } catch (err) { next(err); }
@@ -1221,7 +1227,7 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
         signStaffAccessToken, signStaffRefreshToken, staff, req
       );
 
-      setRefreshCookie(res, rawRefresh);
+      setRefreshCookie(res, rawRefresh, req);
       const pinStaffSk = createSessionKey(pinStaffJti, accessTokenExpiryMs());
 
       return res.json({
@@ -1255,7 +1261,7 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
       signAccessToken, signRefreshToken, ownUser, req
     );
 
-    setRefreshCookie(res, rawRefresh);
+    setRefreshCookie(res, rawRefresh, req);
     const pinUserSk = createSessionKey(pinUserJti, accessTokenExpiryMs());
 
     return res.json({ ok: true, accessToken: encAccessToken, user: sanitizeUser(ownUser), ...(pinUserSk ? { sk: pinUserSk } : {}) });
@@ -1398,7 +1404,7 @@ router.post('/totp/verify', async (req, res, next) => {
     user.lastLoginAt = new Date();
     await user.save();
 
-    setRefreshCookie(res, rawRefresh);
+    setRefreshCookie(res, rawRefresh, req);
     const totpSk = createSessionKey(totpJti, accessTokenExpiryMs());
 
     const isAdmin = user.tag === 'Main Admin' || user.role === 'admin' || user.email === process.env.ADMIN_ROLE;
