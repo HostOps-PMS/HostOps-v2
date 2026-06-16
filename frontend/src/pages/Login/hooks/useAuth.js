@@ -21,7 +21,7 @@ export function useAuthSubmit(asyncFn, { onSuccess, onError } = {}) {
       const result = await asyncFn(formData);
       onSuccess?.(result);
     } catch (err) {
-      onError?.(err.message);
+      onError?.(err.message, err);
     } finally {
       setLoading(false);
     }

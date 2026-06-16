@@ -1,4 +1,4 @@
-export default function OtpInput({ digits, inputRefs, onChange, onKeyDown, onPaste, hasError }) {
+export default function OtpInput({ digits, inputRefs, onChange, onKeyDown, onPaste, hasError, disabled }) {
   return (
     <div className="am-otp-row" style={{ justifyContent: 'center' }}>
       {digits.map((digit, i) => (
@@ -24,6 +24,7 @@ export default function OtpInput({ digits, inputRefs, onChange, onKeyDown, onPas
             onChange={(e) => onChange(i, e.target.value)}
             onKeyDown={(e) => onKeyDown(i, e)}
             onPaste={onPaste}
+            disabled={disabled}
           />
         </div>
       ))}

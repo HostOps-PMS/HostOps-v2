@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import OtpInput from './OtpInput';
 import { useOtp }           from '../hooks/useOtp';
 import { useAuthorization } from '../hooks/useAuthorization';
+import LockoutTimer         from './LockoutTimer';
 
 import pro1 from '../../../assets/pro1.jpg';
 import pro2 from '../../../assets/pro2.jpg';
@@ -137,18 +138,22 @@ const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
               const success = await auth.submitTotp(otp.otp);
               if (!success) otp.reset();
             }} autoComplete="off">
-              <OtpInput
-                digits={otp.digits}
-                inputRefs={otp.inputRefs}
-                onChange={otp.onChange}
-                onKeyDown={otp.onKeyDown}
-                onPaste={otp.onPaste}
-                hasError={auth.message?.type === 'error'}
-              />
+              {auth.lockoutTimer <= 0 && (
+                <OtpInput
+                  digits={otp.digits}
+                  inputRefs={otp.inputRefs}
+                  onChange={otp.onChange}
+                  onKeyDown={otp.onKeyDown}
+                  onPaste={otp.onPaste}
+                  hasError={auth.message?.type === 'error'}
+                  disabled={auth.lockoutTimer > 0}
+                />
+              )}
+              <LockoutTimer lockoutTimer={auth.lockoutTimer} />
               <button
                 className="am-btn am-btn--modern"
                 type="submit"
-                disabled={!otp.isComplete || auth.loading}
+                disabled={!otp.isComplete || auth.loading || auth.lockoutTimer > 0}
               >
                 {auth.loading ? <><span className="am-btn-spinner" />Verifying…</> : 'Continue →'}
               </button>
@@ -175,18 +180,22 @@ const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
             )}
 
             <form onSubmit={handleSubmit} autoComplete="off">
-              <OtpInput
-                digits={otp.digits}
-                inputRefs={otp.inputRefs}
-                onChange={otp.onChange}
-                onKeyDown={otp.onKeyDown}
-                onPaste={otp.onPaste}
-                hasError={auth.message?.type === 'error'}
-              />
+              {auth.lockoutTimer <= 0 && (
+                <OtpInput
+                  digits={otp.digits}
+                  inputRefs={otp.inputRefs}
+                  onChange={otp.onChange}
+                  onKeyDown={otp.onKeyDown}
+                  onPaste={otp.onPaste}
+                  hasError={auth.message?.type === 'error'}
+                  disabled={auth.lockoutTimer > 0}
+                />
+              )}
+              <LockoutTimer lockoutTimer={auth.lockoutTimer} initialTimer={90} />
               <button
                 className="am-btn am-btn--modern"
                 type="submit"
-                disabled={!otp.isComplete || auth.loading}
+                disabled={!otp.isComplete || auth.loading || auth.lockoutTimer > 0}
               >
                 {auth.loading ? <><span className="am-btn-spinner" />Verifying…</> : 'Continue →'}
               </button>
