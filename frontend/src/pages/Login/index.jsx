@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import LoginForm from './components/LoginForm';
 import ForgotPasswordForm from './components/ForgotPasswordForm';
 import LoginOTPForm from './components/LoginOTPForm';
+import LoginTOTPForm from './components/LoginTOTPForm';
+import LoginVerifyMethodForm from './components/LoginVerifyMethodForm';
 import PropertySelectForm from './components/PropertySelectForm';
 import PinModal from './components/PinModal';
 import Message from './components/Message';
@@ -13,7 +15,9 @@ import './Login.css';
 const VIEWS = {
   LOGIN:                           'login',
   FORGOT:                          'forgot',
+  LOGIN_VERIFY_METHOD:             'login_verify_method',
   LOGIN_OTP:                       'login_otp',
+  LOGIN_TOTP:                      'login_totp',
   PROPERTY_SELECT:                 'property_select',
   PIN_MODAL:                       'pin_modal',
   CLIENT_ACCOUNT_PROPERTY_SELECT:  'client_account_property_select',
@@ -30,7 +34,7 @@ const SLIDES = [
 export default function LoginPage() {
   const [view,    setView]    = useState(VIEWS.LOGIN);
   const [message, setMessage] = useState({ text: '', type: '' });
-  const [otpData, setOtpData] = useState({ email: '', rememberMe: false });
+  const [otpData, setOtpData] = useState({ email: '', rememberMe: false, totpEnabled: false });
   const [currentSlide, setCurrentSlide] = useState(0);
 
   // Stores the full auth payload returned after successful OTP verification.
@@ -173,10 +177,15 @@ const [showLogin, setShowLogin] = useState(window.innerWidth > 768);
               showMsg={showMsg}
               hideMsg={hideMsg}
               onForgot={() => handleViewChange(VIEWS.FORGOT)}
-              onRequiresOtp={(email, rememberMe) => {
-                setOtpData({ email, rememberMe });
-                handleViewChange(VIEWS.LOGIN_OTP);
-                showMsg('Please verify your device to continue.', 'success');
+              onRequiresOtp={(email, rememberMe, totpEnabled) => {
+                setOtpData({ email, rememberMe, totpEnabled });
+                if (totpEnabled) {
+                  handleViewChange(VIEWS.LOGIN_VERIFY_METHOD);
+                  showMsg('Please verify your identity to continue.', 'success');
+                } else {
+                  handleViewChange(VIEWS.LOGIN_OTP);
+                  showMsg('Please verify your device to continue.', 'success');
+                }
               }}
               onClientAccountLogin={(data) => {
                 // ── Client Account login ───────────────────────────────────────
@@ -194,13 +203,32 @@ const [showLogin, setShowLogin] = useState(window.innerWidth > 768);
             />
           )}
 
+          {view === VIEWS.LOGIN_VERIFY_METHOD && (
+            <LoginVerifyMethodForm
+              email={otpData.email}
+              onChooseTotp={() => handleViewChange(VIEWS.LOGIN_TOTP)}
+              onChooseEmail={() => handleViewChange(VIEWS.LOGIN_OTP)}
+              onBack={() => handleViewChange(VIEWS.LOGIN)}
+            />
+          )}
+
           {view === VIEWS.LOGIN_OTP && (
             <LoginOTPForm
               email={otpData.email}
               rememberMe={otpData.rememberMe}
               showMsg={showMsg}
               hideMsg={hideMsg}
-              onBack={() => handleViewChange(VIEWS.LOGIN)}
+              onBack={() => handleViewChange(otpData.totpEnabled ? VIEWS.LOGIN_VERIFY_METHOD : VIEWS.LOGIN)}
+              onAuthSuccess={handleAuthSuccess}
+            />
+          )}
+
+          {view === VIEWS.LOGIN_TOTP && (
+            <LoginTOTPForm
+              email={otpData.email}
+              showMsg={showMsg}
+              hideMsg={hideMsg}
+              onBack={() => handleViewChange(VIEWS.LOGIN_VERIFY_METHOD)}
               onAuthSuccess={handleAuthSuccess}
             />
           )}
@@ -310,7 +338,9 @@ const [showLogin, setShowLogin] = useState(window.innerWidth > 768);
           {view !== VIEWS.PROPERTY_SELECT &&
            view !== VIEWS.PIN_MODAL &&
            view !== VIEWS.CLIENT_ACCOUNT_PROPERTY_SELECT &&
-           view !== VIEWS.CLIENT_ACCOUNT_PIN_MODAL && (
+           view !== VIEWS.CLIENT_ACCOUNT_PIN_MODAL &&
+           view !== VIEWS.LOGIN_VERIFY_METHOD &&
+           view !== VIEWS.LOGIN_TOTP && (
             <a href="https://hostops.online/" className="lp-back-home">
               ← Back to homepage
             </a>

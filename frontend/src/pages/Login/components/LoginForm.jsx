@@ -74,7 +74,7 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
   const { submit, loading } = useAuthSubmit(loginUser, {
     onSuccess: (data) => {
       if (data.requiresOtp) {
-        onRequiresOtp(email, rememberMe);
+        onRequiresOtp(email, rememberMe, data.totpEnabled || false);
         return;
       }
 

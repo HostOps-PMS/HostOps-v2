@@ -105,6 +105,43 @@ async function changePin({ currentPin, newPin }, auth) {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// TOTP helpers — /auth/totp/*
+// ─────────────────────────────────────────────────────────────────
+async function setupTotp(auth) {
+  const res = await auth.fetchWithAuth(`${API_BASE}/auth/totp/setup`, { method: "POST" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Failed to start setup.");
+  return data;
+}
+
+async function verifyTotpSetup(auth, token6, deviceName) {
+  const res = await auth.fetchWithAuth(`${API_BASE}/auth/totp/verify-setup`, {
+    method: "POST",
+    body: JSON.stringify({ token: token6, deviceName }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Invalid code.");
+  return data;
+}
+
+async function disableTotp(auth) {
+  const res = await auth.fetchWithAuth(`${API_BASE}/auth/totp/disable`, { method: "POST" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Failed to disable.");
+  return data;
+}
+
+async function fetchTotpDevices(auth) {
+  const res = await auth.fetchWithAuth(`${API_BASE}/auth/totp/devices`);
+  const data = await res.json().catch(() => ({}));
+  return data.devices || [];
+}
+
+async function deleteTotpDevice(auth, deviceId) {
+  await auth.fetchWithAuth(`${API_BASE}/auth/totp/devices/${deviceId}`, { method: "DELETE" });
+}
+
+// ─────────────────────────────────────────────────────────────────
 // OTPInput — 6-box OTP input, same pattern as the reset page
 // ─────────────────────────────────────────────────────────────────
 function OTPInput({ length = 6, onComplete, isError, isLoading, version, dark = false }) {
@@ -568,6 +605,17 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
 
   const overlayRef = useRef(null);
 
+  // ── TOTP / 2FA state ─────────────────────────────────────────────
+  const [totpEnabled, setTotpEnabled] = useState(user?.totpEnabled ?? false);
+  const [totpStep, setTotpStep] = useState('idle'); // 'idle' | 'qr' | 'verify' | 'disabling'
+  const [totpQr, setTotpQr] = useState('');
+  const [totpSecret, setTotpSecret] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [deviceName, setDeviceName] = useState('');
+  const [devices, setDevices] = useState([]);
+  const [totpLoading, setTotpLoading] = useState(false);
+  const [totpMsg, setTotpMsg] = useState(null); // { text, type }
+
   // ── Activity log ─────────────────────────────────────────────────
   const [activityLog, setActivityLog] = useState([]);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -609,6 +657,11 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       setSuccessContext("");
       verifiedTokenRef.current = null;
 
+      setTotpStep('idle');
+      setTotpCode('');
+      setTotpMsg(null);
+      setDeviceName('');
+
       logActivity('opened_account_settings');
     }
   }, [isOpen]);
@@ -619,6 +672,13 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
       fetchActivityLog();
     }
   }, [isOpen, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch enrolled TOTP devices when security tab is active and TOTP is enabled
+  useEffect(() => {
+    if (isOpen && totpEnabled) {
+      fetchTotpDevices(auth).then(setDevices).catch(() => {});
+    }
+  }, [isOpen, totpEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close on Escape key
   useEffect(() => {
@@ -1181,7 +1241,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
 
           {/* ── Tabs ── */}
           <div style={{ display: "flex", borderBottom: `1px solid ${dark ? "#1e3a2a" : "#eaf3ee"}`, padding: "0 20px" }}>
-            {["profile", ...(isStaffUser ? [] : ["password"]), "pin", "activity"].map((tab) => (
+            {["profile", ...(isStaffUser ? [] : ["password"]), "pin", "security", "activity"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => {
@@ -1210,7 +1270,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
   <><span className="acc-tab-label-password">Change Password</span><span className="acc-tab-label-short">Password</span></>
 ) : tab === "pin" ? (
   <><span className="acc-tab-label-password">Change PIN</span><span className="acc-tab-label-short">PIN</span></>
-) : "Activity"}
+) : tab === "security" ? "Security" : "Activity"}
               </button>
             ))}
           </div>
@@ -1478,6 +1538,267 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                 </div>
               );
             })()}
+
+            {/* ── SECURITY TAB ── */}
+            {activeTab === "security" && (
+              <div style={styles.section}>
+                <p style={styles.sectionLabel}>Authenticator App</p>
+
+                {/* Status row */}
+                <div style={{ ...styles.readOnlyRow, marginBottom: 16, justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <i className="ti ti-device-mobile" style={{ ...styles.readOnlyIcon, fontSize: 18 }} />
+                    <div>
+                      <p style={styles.readOnlyKey}>Two-Factor Authentication</p>
+                      <p style={{ ...styles.readOnlyVal, color: totpEnabled ? '#1e8760' : '#9ab8a9' }}>
+                        {totpEnabled ? 'Enabled' : 'Disabled'}
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      width: 36, height: 20, borderRadius: 10, cursor: totpLoading ? 'not-allowed' : 'pointer',
+                      background: totpEnabled ? '#1e8760' : '#d4e8dd',
+                      position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                      opacity: totpLoading ? 0.6 : 1,
+                    }}
+                    onClick={async () => {
+                      if (totpLoading) return;
+                      if (totpEnabled) {
+                        setTotpStep('disabling');
+                        setTotpMsg(null);
+                      } else {
+                        setTotpLoading(true);
+                        setTotpMsg(null);
+                        try {
+                          const { secret, qrCode } = await setupTotp(auth);
+                          setTotpQr(qrCode);
+                          setTotpSecret(secret);
+                          setTotpStep('qr');
+                        } catch (err) {
+                          setTotpMsg({ text: err.message, type: 'error' });
+                        } finally {
+                          setTotpLoading(false);
+                        }
+                      }
+                    }}
+                  >
+                    <div style={{
+                      position: 'absolute', top: 3, width: 14, height: 14, borderRadius: '50%',
+                      background: '#fff', transition: 'left 0.2s',
+                      left: totpEnabled ? 19 : 3,
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
+                    }} />
+                  </div>
+                </div>
+
+                {totpLoading && totpStep === 'idle' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#9ab8a9', marginBottom: 12 }}>
+                    <i className="ti ti-loader-2" style={{ fontSize: 14, animation: 'spin 0.8s linear infinite' }} />
+                    Setting up…
+                  </div>
+                )}
+
+                {totpMsg && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, marginBottom: 12,
+                    color: totpMsg.type === 'error' ? '#c13515' : '#1e8760' }}>
+                    <i className={totpMsg.type === 'error' ? 'ti ti-alert-circle' : 'ti ti-circle-check'} style={{ fontSize: 14 }} />
+                    {totpMsg.text}
+                  </div>
+                )}
+
+                {/* QR code step */}
+                {totpStep === 'qr' && (
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: 12, color: dark ? '#9ab8a9' : '#4a6b5a', marginBottom: 12, lineHeight: 1.6 }}>
+                      Scan this QR code with your authenticator app<br />
+                      <strong>(Google Authenticator, Authy, etc.)</strong>
+                    </p>
+                    <img
+                      src={totpQr}
+                      alt="TOTP QR Code"
+                      style={{ width: 180, height: 180, borderRadius: 12, border: `1px solid ${dark ? '#1e3a2a' : '#eaf3ee'}`, marginBottom: 12 }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Device name (e.g. iPhone 13, Work Phone)"
+                      value={deviceName}
+                      onChange={e => setDeviceName(e.target.value)}
+                      style={{ ...styles.input, marginBottom: 12, textAlign: 'center' }}
+                      className="acc-input"
+                    />
+                    <p style={{ fontSize: 11, color: '#9ab8a9', marginBottom: 16 }}>
+                      Or enter this code manually:<br />
+                      <strong style={{ fontSize: 13, color: dark ? '#eaf5f0' : '#0c1c14', letterSpacing: '0.1em', fontFamily: 'monospace' }}>
+                        {totpSecret}
+                      </strong>
+                    </p>
+                    <button
+                      onClick={() => setTotpStep('verify')}
+                      style={{ ...styles.saveBtn(false), width: '100%', justifyContent: 'center' }}
+                      className="acc-save-btn"
+                    >
+                      I've scanned it — Next →
+                    </button>
+                    <button
+                      onClick={() => { setTotpStep('idle'); setTotpCode(''); setTotpMsg(null); }}
+                      style={{ ...styles.cancelBtn, width: '100%', marginTop: 8, textAlign: 'center' }}
+                      className="acc-cancel-btn"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
+                {/* Verify step */}
+                {totpStep === 'verify' && (
+                  <div>
+                    <p style={{ fontSize: 12, color: dark ? '#9ab8a9' : '#4a6b5a', marginBottom: 12, lineHeight: 1.6 }}>
+                      Enter the <strong>6-digit code</strong> from your authenticator app to confirm setup.
+                    </p>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="000000"
+                      value={totpCode}
+                      onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      style={{ ...styles.input, textAlign: 'center', fontSize: 22, letterSpacing: '0.3em', fontWeight: 700, marginBottom: 12 }}
+                      className="acc-input"
+                    />
+                    <button
+                      disabled={totpCode.length < 6 || totpLoading}
+                      onClick={async () => {
+                        setTotpLoading(true);
+                        setTotpMsg(null);
+                        try {
+                          await verifyTotpSetup(auth, totpCode, deviceName);
+                          const u = { ...user, totpEnabled: true };
+                          setUser(u);
+                          setTotpEnabled(true);
+                          setTotpStep('idle');
+                          setTotpMsg({ text: 'Authenticator enabled successfully!', type: 'success' });
+                          setDevices(prev => [...prev, { name: deviceName || 'Authenticator App', addedAt: new Date().toISOString() }]);
+                          setDeviceName('');
+                          fetchTotpDevices(auth).then(setDevices).catch(() => {});
+                        } catch (err) {
+                          setTotpMsg({ text: err.message, type: 'error' });
+                          setTotpCode('');
+                        } finally {
+                          setTotpLoading(false);
+                        }
+                      }}
+                      style={{ ...styles.saveBtn(totpLoading || totpCode.length < 6), width: '100%', justifyContent: 'center' }}
+                      className="acc-save-btn"
+                    >
+                      {totpLoading
+                        ? <><i className="ti ti-loader-2" style={{ fontSize: 14, animation: 'spin 0.8s linear infinite' }} /> Verifying…</>
+                        : <><i className="ti ti-check" style={{ fontSize: 14 }} /> Confirm & Enable</>}
+                    </button>
+                    <button
+                      onClick={() => { setTotpStep('qr'); setTotpCode(''); setTotpMsg(null); }}
+                      style={{ ...styles.cancelBtn, width: '100%', marginTop: 8, textAlign: 'center' }}
+                      className="acc-cancel-btn"
+                    >
+                      ← Back
+                    </button>
+                  </div>
+                )}
+
+                {/* Disable confirm step */}
+                {totpStep === 'disabling' && (
+                  <div style={{ background: dark ? '#2a0f0f' : '#fff5f5', border: `1px solid ${dark ? '#5c1a1a' : '#fcd4cc'}`, borderRadius: 10, padding: '14px 16px' }}>
+                    <p style={{ fontSize: 13, color: '#c13515', fontWeight: 600, marginBottom: 6 }}>
+                      Disable Authenticator App?
+                    </p>
+                    <p style={{ fontSize: 12, color: dark ? '#9ab8a9' : '#6a8b7c', marginBottom: 14, lineHeight: 1.6 }}>
+                      Your account will be less secure. You can always re-enable it later.
+                    </p>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => setTotpStep('idle')}
+                        style={{ ...styles.cancelBtn, flex: 1 }}
+                        className="acc-cancel-btn"
+                      >
+                        Keep it
+                      </button>
+                      <button
+                        disabled={totpLoading}
+                        onClick={async () => {
+                          setTotpLoading(true);
+                          setTotpMsg(null);
+                          try {
+                            await disableTotp(auth);
+                            const u = { ...user, totpEnabled: false };
+                            setUser(u);
+                            setTotpEnabled(false);
+                            setTotpStep('idle');
+                            setDevices([]);
+                            setTotpMsg({ text: 'Authenticator disabled.', type: 'success' });
+                          } catch (err) {
+                            setTotpMsg({ text: err.message, type: 'error' });
+                            setTotpStep('idle');
+                          } finally {
+                            setTotpLoading(false);
+                          }
+                        }}
+                        style={{
+                          flex: 1, padding: '9px 0', borderRadius: 10, border: 'none',
+                          background: totpLoading ? '#9ab8a9' : '#c13515', color: '#fff',
+                          fontSize: 13, fontWeight: 700, cursor: totpLoading ? 'not-allowed' : 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        }}
+                      >
+                        {totpLoading
+                          ? <><i className="ti ti-loader-2" style={{ fontSize: 14, animation: 'spin 0.8s linear infinite' }} /> Disabling…</>
+                          : 'Yes, disable'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Idle — not yet enabled */}
+                {totpStep === 'idle' && !totpEnabled && (
+                  <p style={{ fontSize: 12, color: '#9ab8a9', lineHeight: 1.6, marginTop: 4 }}>
+                    Add an extra layer of security to your account. Toggle the switch above to get started.
+                  </p>
+                )}
+
+                {/* Enrolled devices list */}
+                {totpEnabled && devices.length > 0 && totpStep === 'idle' && (
+                  <div style={{ marginTop: 16 }}>
+                    <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: '#9ab8a9', textTransform: 'uppercase', marginBottom: 10 }}>
+                      Enrolled Devices
+                    </p>
+                    {devices.map((d, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: dark ? '#0d2619' : '#f7faf8', borderRadius: 10, border: `1px solid ${dark ? '#1e3a2a' : '#eaf3ee'}`, marginBottom: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <i className="ti ti-device-mobile-check" style={{ fontSize: 16, color: '#1e8760' }} />
+                          <div>
+                            <p style={{ fontSize: 13, fontWeight: 600, color: dark ? '#eaf5f0' : '#0c1c14', margin: 0 }}>{d.name}</p>
+                            <p style={{ fontSize: 11, color: '#9ab8a9', margin: 0 }}>
+                              Added {new Date(d.addedAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </p>
+                          </div>
+                        </div>
+                        {devices.length > 1 && (
+                          <button
+                            onClick={async () => {
+                              await deleteTotpDevice(auth, d._id);
+                              setDevices(prev => prev.filter((_, idx) => idx !== i));
+                            }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ab8a9', fontSize: 14, padding: 4 }}
+                            title="Remove device"
+                          >
+                            <i className="ti ti-trash" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* ── ACTIVITY TAB ── */}
             {activeTab === "activity" && (() => {
