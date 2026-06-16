@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useNotifications } from '../../../context/NotificationsContext';
+import { useTheme } from '../../../context/ThemeContext';
 
 // ─────────────────────────────────────────────────────────────────
 // Helpers
@@ -16,7 +17,6 @@ function timeAgo(timeStr) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-// Derive initials + a stable background color from a name string
 function getInitialsAvatar(name) {
   if (!name) return { initials: '?', bg: '#9e9e9e' };
   const parts    = name.trim().split(/\s+/);
@@ -30,10 +30,9 @@ function getInitialsAvatar(name) {
   return { initials, bg };
 }
 
-// SVG icon set — no emojis anywhere
 const TypeIcon = ({ type, size = 15 }) => {
   const s = { width: size, height: size, flexShrink: 0 };
-  const sw = '1.9'; // strokeWidth — slightly bolder for small sizes
+  const sw = '1.9';
   switch (type) {
     case 'booking':
       return (
@@ -88,7 +87,6 @@ const TypeIcon = ({ type, size = 15 }) => {
   }
 };
 
-// Light pastel bg + saturated icon color — always enough contrast
 const ALERT_TYPE_STYLE = {
   booking:      { bg: '#e6f4ea', color: '#1e7e45' },
   cancellation: { bg: '#fdecea', color: '#c0392b' },
@@ -98,13 +96,20 @@ const ALERT_TYPE_STYLE = {
   default:      { bg: '#f0f0f0', color: '#444'    },
 };
 
-function getAlertStyle(type) {
-  return ALERT_TYPE_STYLE[type] ?? ALERT_TYPE_STYLE.default;
+const ALERT_TYPE_STYLE_DARK = {
+  booking:      { bg: '#0d2a18', color: '#4ade80' },
+  cancellation: { bg: '#2a0d0d', color: '#f87171' },
+  payment:      { bg: '#0d1a2a', color: '#60a5fa' },
+  warning:      { bg: '#2a1f00', color: '#fbbf24' },
+  info:         { bg: '#1a0d2a', color: '#a78bfa' },
+  default:      { bg: '#132a1e', color: '#7ab89a' },
+};
+
+function getAlertStyle(type, dark) {
+  const map = dark ? ALERT_TYPE_STYLE_DARK : ALERT_TYPE_STYLE;
+  return map[type] ?? map.default;
 }
 
-// ─────────────────────────────────────────────────────────────────
-// InitialsAvatar — always renders initials, never a broken <img>
-// ─────────────────────────────────────────────────────────────────
 function InitialsAvatar({ name, size = 34, radius = 10, bg }) {
   const derived = getInitialsAvatar(name);
   return (
@@ -129,11 +134,28 @@ function InitialsAvatar({ name, size = 34, radius = 10, bg }) {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Moon / Sun SVG icons
+// ─────────────────────────────────────────────────────────────────
+const MoonIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <path d="M17 12A7 7 0 119 4a5 5 0 008 8z" strokeLinejoin="round"/>
+  </svg>
+);
+
+const SunIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <circle cx="10" cy="10" r="4"/>
+    <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42" strokeLinecap="round"/>
+  </svg>
+);
+
+// ─────────────────────────────────────────────────────────────────
 // NotificationDropdown
 // ─────────────────────────────────────────────────────────────────
 function NotificationDropdown({ alerts = [], activities = [], loading, onClose }) {
   const [activeTab, setActiveTab] = useState('alerts');
   const [readIds,   setReadIds]   = useState(new Set());
+  const { dark } = useTheme();
 
   const unreadAlerts = (alerts || []).filter(a => a.unread && !readIds.has(a.id)).length;
 
@@ -142,6 +164,17 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
   };
 
   const items = activeTab === 'alerts' ? (alerts || []) : (activities || []);
+
+  const surface   = dark ? '#132a1e' : '#fff';
+  const border    = dark ? '#1e3a2a' : 'rgba(0,0,0,0.08)';
+  const textMain  = dark ? '#eaf5f0' : '#111';
+  const textMuted = dark ? '#7ab89a' : '#888';
+  const textDim   = dark ? '#4d8a6a' : '#bbb';
+  const itemBorderB = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)';
+  const unreadBg  = dark ? '#0d2619' : '#f0faf6';
+  const readBg    = dark ? '#132a1e' : '#fff';
+  const hoverBg   = dark ? '#0d2619' : '#f8f9fa';
+  const scrollThumb = dark ? '#1e3a2a' : '#e0e0e0';
 
   return (
     <div
@@ -154,10 +187,12 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
         maxWidth: 360,
         marginLeft: 'auto',
         width: 'auto',
-        background: '#fff',
+        background: surface,
         borderRadius: 14,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.13), 0 1.5px 6px rgba(0,0,0,0.07)',
-        border: '0.5px solid rgba(0,0,0,0.08)',
+        boxShadow: dark
+          ? '0 8px 32px rgba(0,0,0,0.5), 0 1.5px 6px rgba(0,0,0,0.3)'
+          : '0 8px 32px rgba(0,0,0,0.13), 0 1.5px 6px rgba(0,0,0,0.07)',
+        border: `0.5px solid ${border}`,
         zIndex: 9999,
         overflow: 'hidden',
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
@@ -169,19 +204,19 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
           from { opacity: 0; transform: translateY(-8px) scale(0.97); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
-        .notif-item:hover { background: #f8f9fa !important; }
-        .notif-tab-btn:hover { background: rgba(0,0,0,0.04) !important; }
-        .notif-mark-all:hover { color: #1a9e6e !important; }
+        .notif-item:hover { background: ${hoverBg} !important; }
+        .notif-tab-btn:hover { background: rgba(${dark ? '255,255,255' : '0,0,0'},0.04) !important; }
+        .notif-mark-all:hover { color: #26c47a !important; }
         .notif-scrollable::-webkit-scrollbar { width: 4px; }
         .notif-scrollable::-webkit-scrollbar-track { background: transparent; }
-        .notif-scrollable::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 4px; }
+        .notif-scrollable::-webkit-scrollbar-thumb { background: ${scrollThumb}; border-radius: 4px; }
       `}</style>
 
       {/* Header */}
-      <div style={{ padding: '14px 16px 0', borderBottom: '0.5px solid rgba(0,0,0,0.07)' }}>
+      <div style={{ padding: '14px 16px 0', borderBottom: `0.5px solid ${border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>Notifications</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: textMain }}>Notifications</span>
             {unreadAlerts > 0 && (
               <span style={{
                 background: '#1a9e6e', color: '#fff',
@@ -195,7 +230,7 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
           <button
             className="notif-mark-all"
             onClick={markAllRead}
-            style={{ fontSize: 11, color: '#aaa', background: 'none', border: 'none', cursor: 'pointer', padding: 0, transition: 'color 0.15s' }}
+            style={{ fontSize: 11, color: textDim, background: 'none', border: 'none', cursor: 'pointer', padding: 0, transition: 'color 0.15s' }}
           >
             Mark all read
           </button>
@@ -214,7 +249,7 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
               style={{
                 fontSize: 12,
                 fontWeight: activeTab === tab.key ? 600 : 400,
-                color: activeTab === tab.key ? '#1a9e6e' : '#888',
+                color: activeTab === tab.key ? '#1a9e6e' : textMuted,
                 background: 'none',
                 border: 'none',
                 borderBottom: activeTab === tab.key ? '2px solid #1a9e6e' : '2px solid transparent',
@@ -229,7 +264,7 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
             >
               {tab.label}
               {tab.count > 0 && (
-                <span style={{ fontSize: 10, color: activeTab === tab.key ? '#1a9e6e' : '#aaa', fontWeight: 500 }}>
+                <span style={{ fontSize: 10, color: activeTab === tab.key ? '#1a9e6e' : textDim, fontWeight: 500 }}>
                   {tab.count}
                 </span>
               )}
@@ -242,26 +277,24 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
       <div className="notif-scrollable" style={{ maxHeight: 360, overflowY: 'auto' }}>
         {loading ? (
           <div style={{ padding: '28px 0', textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: '#bbb' }}>Loading...</div>
+            <div style={{ fontSize: 11, color: textDim }}>Loading...</div>
           </div>
         ) : items.length === 0 ? (
           <div style={{ padding: '36px 0', textAlign: 'center' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8, color: '#ccc' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8, color: dark ? '#1e3a2a' : '#ccc' }}>
               <svg width="28" height="28" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M10 2a6 6 0 00-6 6v3l-1.5 2H17.5L16 11V8a6 6 0 00-6-6z"/>
                 <path d="M8.5 17a1.5 1.5 0 003 0" strokeLinecap="round"/>
               </svg>
             </div>
-            <div style={{ fontSize: 12, color: '#aaa' }}>
+            <div style={{ fontSize: 12, color: textMuted }}>
               {activeTab === 'alerts' ? 'No alerts right now' : 'No recent activity'}
             </div>
           </div>
         ) : activeTab === 'alerts' ? (
           (alerts || []).map((alert, i) => {
-            const typeStyle = getAlertStyle(alert.type);
+            const typeStyle = getAlertStyle(alert.type, dark);
             const isRead    = readIds.has(alert.id) || !alert.unread;
-            // Prefer clientName for the avatar name; fall back to title
-            const avatarName = alert.clientName || alert.title || '';
             return (
               <div
                 key={alert.id ?? i}
@@ -269,13 +302,12 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
                 style={{
                   display: 'flex', alignItems: 'flex-start', gap: 10,
                   padding: '11px 16px',
-                  borderBottom: '0.5px solid rgba(0,0,0,0.05)',
+                  borderBottom: `0.5px solid ${itemBorderB}`,
                   cursor: 'default',
-                  background: isRead ? '#fff' : '#f0faf6',
+                  background: isRead ? readBg : unreadBg,
                   transition: 'background 0.12s',
                 }}
               >
-                {/* Type icon — always use our controlled bg+color, never backend avatarBg */}
                 <div style={{
                   width: 34, height: 34, borderRadius: 10,
                   background: typeStyle.bg,
@@ -285,17 +317,16 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
                   <TypeIcon type={alert.type} size={17} />
                 </div>
 
-                {/* Text */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
-                    fontSize: 12, fontWeight: isRead ? 500 : 600, color: '#111',
+                    fontSize: 12, fontWeight: isRead ? 500 : 600, color: textMain,
                     lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
                     {alert.title}
                   </div>
                   {alert.desc && (
                     <div style={{
-                      fontSize: 11, color: '#888', marginTop: 1, lineHeight: 1.4,
+                      fontSize: 11, color: textMuted, marginTop: 1, lineHeight: 1.4,
                       display: '-webkit-box', WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical', overflow: 'hidden',
                     }}>
@@ -309,9 +340,8 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
                   )}
                 </div>
 
-                {/* Meta */}
                 <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                  <div style={{ fontSize: 10, color: '#bbb', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 10, color: textDim, whiteSpace: 'nowrap' }}>
                     {timeAgo(alert.time)}
                   </div>
                   {!isRead && (
@@ -325,50 +355,44 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
             );
           })
         ) : (
-          (activities || []).map((act, i) => {
-            // Build a display name from actor for the initials avatar
-            const avatarName = act.actor || '';
-            return (
-              <div
-                key={act.id ?? i}
-                className="notif-item"
-                style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 10,
-                  padding: '11px 16px',
-                  borderBottom: '0.5px solid rgba(0,0,0,0.05)',
-                  cursor: 'default',
-                  background: '#fff',
-                  transition: 'background 0.12s',
-                }}
-              >
-                {/* InitialsAvatar from actor name — no broken images */}
-                <InitialsAvatar name={avatarName} size={34} radius={10} />
+          (activities || []).map((act, i) => (
+            <div
+              key={act.id ?? i}
+              className="notif-item"
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+                padding: '11px 16px',
+                borderBottom: `0.5px solid ${itemBorderB}`,
+                cursor: 'default',
+                background: readBg,
+                transition: 'background 0.12s',
+              }}
+            >
+              <InitialsAvatar name={act.actor || ''} size={34} radius={10} />
 
-                {/* Text */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: '#111', lineHeight: 1.4 }}>
-                    <span style={{ fontWeight: 600 }}>{act.actor}</span>
-                    {' '}
-                    <span style={{ color: '#555' }}>{act.action}</span>
-                    {act.target && (
-                      <span style={{ color: '#1a9e6e', fontWeight: 600 }}> {act.target}</span>
-                    )}
-                  </div>
-                  {act.time && (
-                    <div style={{ fontSize: 10, color: '#bbb', marginTop: 2 }}>
-                      {timeAgo(act.time)}
-                    </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: textMain, lineHeight: 1.4 }}>
+                  <span style={{ fontWeight: 600 }}>{act.actor}</span>
+                  {' '}
+                  <span style={{ color: textMuted }}>{act.action}</span>
+                  {act.target && (
+                    <span style={{ color: '#1a9e6e', fontWeight: 600 }}> {act.target}</span>
                   )}
                 </div>
+                {act.time && (
+                  <div style={{ fontSize: 10, color: textDim, marginTop: 2 }}>
+                    {timeAgo(act.time)}
+                  </div>
+                )}
               </div>
-            );
-          })
+            </div>
+          ))
         )}
       </div>
 
       {/* Footer */}
       {items.length > 0 && (
-        <div style={{ padding: '10px 16px', borderTop: '0.5px solid rgba(0,0,0,0.06)', textAlign: 'center' }}>
+        <div style={{ padding: '10px 16px', borderTop: `0.5px solid ${border}`, textAlign: 'center' }}>
           <button
             onClick={onClose}
             style={{ fontSize: 11, color: '#1a9e6e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0 }}
@@ -387,10 +411,8 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
 export default function TopBar({ onAction, onExport, exportLoading = false, alerts, activities, notifLoading, showExport = false }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef(null);
+  const { dark, toggleDark } = useTheme();
 
-  // Fallback to global NotificationsContext when no props are explicitly
-  // passed — this is what makes the bell work on every page, not just
-  // the Dashboard (which fetches its own overview and passes props down).
   const notifContext       = useNotifications();
   const resolvedAlerts     = alerts     ?? notifContext.alerts;
   const resolvedActivities = activities ?? notifContext.activities;
@@ -403,13 +425,11 @@ export default function TopBar({ onAction, onExport, exportLoading = false, aler
   const fullName  = [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ') || 'User';
   const initials  = [currentUser.firstName, currentUser.lastName]
     .filter(Boolean).map(n => n[0].toUpperCase()).join('') || 'U';
-  const firstName = currentUser.firstName || 'there';
 
-const location = useLocation();
+  const location = useLocation();
   const isDashboard = location.pathname === '/dashboard' || location.pathname === '/dashboard/';
   const unreadCount = (resolvedAlerts || []).filter(a => a.unread).length;
 
-  // Close dropdown on outside click
   useEffect(() => {
     if (!notifOpen) return;
     function handleOutside(e) {
@@ -427,19 +447,24 @@ const location = useLocation();
       alignItems: 'center',
       gap: 10,
       padding: '10px 16px',
-      background: '#fff',
-      borderBottom: '0.5px solid rgba(0,0,0,0.08)',
+      background: dark ? '#132a1e' : '#fff',
+      borderBottom: `0.5px solid ${dark ? '#1e3a2a' : 'rgba(0,0,0,0.08)'}`,
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       position: 'sticky',
       top: 0,
       zIndex: 100,
       minHeight: 60,
       flexWrap: 'wrap',
+      transition: 'background 0.2s, border-color 0.2s',
     }}>
 
       {/* Left — Title */}
       <div style={{ flex: 1, minWidth: 120 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: '#111', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{
+          fontSize: 16, fontWeight: 700,
+          color: dark ? '#eaf5f0' : '#111',
+          letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
           Admin Dashboard
         </div>
       </div>
@@ -447,10 +472,7 @@ const location = useLocation();
       {/* Right — Actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
 
-        {/* Export PDF button — only rendered when the page explicitly opts in
-            via showExport AND provides an onExport handler. This is what
-            keeps it out of the TopBar on every page except the Dashboard,
-            even if other pages happen to pass an onExport prop too. */}
+        {/* Export PDF button */}
         {isDashboard && onExport && (
           <>
             <button
@@ -459,8 +481,8 @@ const location = useLocation();
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '8px 14px',
-                background: exportLoading ? '#e0e0e0' : '#1a9e6e',
-                color: exportLoading ? '#aaa' : '#fff',
+                background: exportLoading ? (dark ? '#0d2619' : '#e0e0e0') : '#1a9e6e',
+                color: exportLoading ? (dark ? '#4d8a6a' : '#aaa') : '#fff',
                 border: 'none', borderRadius: 10,
                 cursor: exportLoading ? 'not-allowed' : 'pointer',
                 fontSize: 12, fontWeight: 600,
@@ -471,7 +493,6 @@ const location = useLocation();
               title="Export dashboard as PDF"
             >
               {exportLoading ? (
-                /* Spinner */
                 <svg
                   width="13" height="13" viewBox="0 0 24 24"
                   fill="none" stroke="currentColor" strokeWidth="2.2"
@@ -481,7 +502,6 @@ const location = useLocation();
                   <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
                 </svg>
               ) : (
-                /* Download icon */
                 <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
                   <path d="M3 16h14" strokeLinecap="round" />
@@ -493,17 +513,38 @@ const location = useLocation();
           </>
         )}
 
+        {/* Dark mode toggle */}
+        <button
+          onClick={toggleDark}
+          title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+          style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: dark ? '#0d2619' : '#f7f7f7',
+            border: `0.5px solid ${dark ? '#1e3a2a' : 'rgba(0,0,0,0.08)'}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+            color: dark ? '#7ab89a' : '#888',
+            transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+          }}
+        >
+          {dark ? <SunIcon /> : <MoonIcon />}
+        </button>
+
         {/* Notification bell */}
         <div ref={notifRef} style={{ position: 'relative' }}>
           <button
             onClick={() => setNotifOpen(prev => !prev)}
             style={{
               width: 36, height: 36, borderRadius: 10,
-              background: notifOpen ? '#e8f5e9' : '#f7f7f7',
-              border: notifOpen ? '0.5px solid #a5d6a7' : '0.5px solid rgba(0,0,0,0.08)',
+              background: notifOpen
+                ? (dark ? '#0d2619' : '#e8f5e9')
+                : (dark ? '#0d2619' : '#f7f7f7'),
+              border: notifOpen
+                ? `0.5px solid ${dark ? '#1e3a2a' : '#a5d6a7'}`
+                : `0.5px solid ${dark ? '#1e3a2a' : 'rgba(0,0,0,0.08)'}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer',
-              color: notifOpen ? '#1a9e6e' : '#888',
+              color: notifOpen ? '#1a9e6e' : (dark ? '#7ab89a' : '#888'),
               position: 'relative',
               transition: 'background 0.15s, border 0.15s, color 0.15s',
             }}
@@ -514,12 +555,11 @@ const location = useLocation();
               <path d="M8.5 17a1.5 1.5 0 003 0" strokeLinecap="round" />
             </svg>
 
-            {/* Unread badge */}
             {unreadCount > 0 && (
               <span style={{
                 position: 'absolute', top: 5, right: 5,
                 width: 8, height: 8, borderRadius: '50%',
-                background: '#e53935', border: '1.5px solid #fff',
+                background: '#e53935', border: `1.5px solid ${dark ? '#132a1e' : '#fff'}`,
               }} />
             )}
           </button>
