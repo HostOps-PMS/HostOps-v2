@@ -71,7 +71,7 @@ export async function requireAuth(req, res, next) {
       });
 
       if (!owningSession || !owningSession.isActive()) {
-        return res.status(403).json({ error: 'Forbidden: session has been revoked' });
+        return res.status(401).json({ error: 'Unauthorized: session expired' });
       }
 
       const clientUser = await User.findById(staff.clientId).select('+properties.smoobuApiKey');
@@ -122,7 +122,7 @@ export async function requireAuth(req, res, next) {
     });
 
     if (!owningSession || !owningSession.isActive()) {
-      return res.status(403).json({ error: 'Forbidden: session has been revoked' });
+      return res.status(401).json({ error: 'Unauthorized: session expired' });
     }
 
     const user = await User.findById(decoded.sub).select('+properties.smoobuApiKey');
