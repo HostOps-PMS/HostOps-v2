@@ -20,7 +20,7 @@ export default function Staffs() {
 
   const { staffs, loading, error, propertyMap, reload } = useStaffs(serverId);
 
-  const filtered = staffs.filter((s) => {
+  const filtered = (Array.isArray(staffs) ? staffs : []).filter((s) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return (

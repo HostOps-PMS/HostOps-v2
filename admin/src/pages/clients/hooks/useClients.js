@@ -15,7 +15,8 @@ export function useClients() {
     setError(null);
     try {
       const data = await getClients();
-      setClients(data);
+      const normalized = Array.isArray(data) ? data : (data?.clients ?? data?.users ?? data?.data ?? []);
+      setClients(normalized);
     } catch (err) {
       setError(err.message ?? 'Failed to load clients');
     } finally {

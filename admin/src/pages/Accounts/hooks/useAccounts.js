@@ -1,18 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { authHeaders } from '../../../lib/authUtils';
+import { fetchWithAuth } from '../../../lib/authUtils';
 
 const API = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
 
 export async function fetchRecoveryRequest(email) {
-  const res = await fetch(`${API}/api/accounts/recovery-request?email=${encodeURIComponent(email)}`, { headers: authHeaders() });
+  const res = await fetchWithAuth(`${API}/api/accounts/recovery-request?email=${encodeURIComponent(email)}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
 export async function unlockAccount({ email, accountType }) {
-  const res = await fetch(`${API}/api/accounts/unlock`, {
+  const res = await fetchWithAuth(`${API}/api/accounts/unlock`, {
     method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ email, accountType }),
   });
   if (!res.ok) {
@@ -40,7 +39,7 @@ export function useAccounts() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API}/api/accounts`, { headers: authHeaders() });
+      const res = await fetchWithAuth(`${API}/api/accounts`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setUsers(data.users   || []);

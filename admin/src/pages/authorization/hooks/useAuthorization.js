@@ -14,6 +14,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { verifyOtp, resendOtp, sendLoginOtp, verifyTotp } from '../services/authService';
+import { setToken, setSessionKey } from '../../../lib/authUtils';
 
 const RESEND_COOLDOWN_SEC = 60;
 
@@ -87,9 +88,11 @@ export function useAuthorization(onAuthorized) {
     setLoading(true);
     setMessage(null);
     try {
-      await verifyOtp(otp);
+      const data = await verifyOtp(otp);
+      // OTP verification issues a new token + session key — store both
+      if (data?.accessToken) setToken(data.accessToken);
+      if (data?.sk)          setSessionKey(data.sk);
       showMessage('Code verified! Redirecting…', 'success');
-      // Brief delay so the success message is visible before unmounting
       setTimeout(() => onAuthorized(), 600);
       return true;
     } catch (err) {
@@ -146,7 +149,9 @@ const userEmail = (() => {
     setLoading(true);
     setMessage(null);
     try {
-      await verifyTotp(token);
+      const data = await verifyTotp(token);
+      if (data?.accessToken) setToken(data.accessToken);
+      if (data?.sk)          setSessionKey(data.sk);
       showMessage('Code verified! Redirecting…', 'success');
       setTimeout(() => onAuthorized(), 600);
       return true;

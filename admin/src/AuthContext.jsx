@@ -1,6 +1,4 @@
-import { getToken, authHeaders as buildAuthHeaders } from './lib/authUtils';
-
-const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? '';
+import { getToken, setSessionKey, fetchWithAuth as coreFetchWithAuth } from './lib/authUtils';
 
 function getUser() {
   try {
@@ -18,14 +16,6 @@ function setUser(user) {
   }
 }
 
-async function fetchWithAuth(url, options = {}) {
-  const headers = {
-    ...buildAuthHeaders(),
-    ...(options.headers || {}),
-  };
-  return fetch(url, { ...options, headers });
-}
-
 export function useAuth() {
-  return { getToken, getUser, setUser, fetchWithAuth };
+  return { getToken, getUser, setUser, setSessionKey, fetchWithAuth: coreFetchWithAuth };
 }

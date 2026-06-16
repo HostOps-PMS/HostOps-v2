@@ -1,12 +1,9 @@
-import { authHeaders, uploadHeaders } from '../../../lib/authUtils';
+import { fetchWithAuth, uploadHeaders } from '../../../lib/authUtils';
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'https://hostpilot-smoobu.onrender.com';
 
 async function request(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { ...authHeaders(), ...options.headers },
-    ...options,
-  });
+  const res = await fetchWithAuth(`${BASE}${path}`, options);
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
