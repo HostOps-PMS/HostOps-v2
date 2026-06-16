@@ -59,8 +59,34 @@ export function useAuthorization(onAuthorized) {
   const [loading, setLoading]               = useState(false);
   const [resendLoading, setResendLoading]   = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [lockoutTimer, setLockoutTimer]     = useState(() => {
+    const expiry = localStorage.getItem('hp_otp_lockout');
+    if (expiry) {
+      const remaining = Math.ceil((parseInt(expiry, 10) - Date.now()) / 1000);
+      if (remaining > 0) return remaining;
+      localStorage.removeItem('hp_otp_lockout');
+    }
+    return 0;
+  });
   const [message, setMessage]               = useState(null);
-  const otpSentRef                          = useRef(false); 
+  const otpSentRef                          = useRef(false);
+
+  useEffect(() => {
+    if (lockoutTimer <= 0) {
+      localStorage.removeItem('hp_otp_lockout');
+      return;
+    }
+    const interval = setInterval(() => {
+      setLockoutTimer((prev) => {
+        if (prev <= 1) {
+          localStorage.removeItem('hp_otp_lockout');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lockoutTimer]);
 
   // 1. Bootstrap session from URL params (_t / _u) if present.
   //    Must run synchronously before sendLoginOtp so getAdminEmail()
@@ -104,7 +130,14 @@ export function useAuthorization(onAuthorized) {
       setTimeout(() => onAuthorized(), 600);
       return true;
     } catch (err) {
-      showMessage(err.message ?? 'Invalid code. Please try again.');
+      if (err.status === 429) {
+        const remaining = err.retryAfter || 90;
+        setLockoutTimer(remaining);
+        localStorage.setItem('hp_otp_lockout', Date.now() + remaining * 1000);
+        showMessage('Too many attempts. Please wait.');
+      } else {
+        showMessage(err.message ?? 'Invalid code. Please try again.');
+      }
       return false;
     } finally {
       setLoading(false);
@@ -179,12 +212,19 @@ const userEmail = (() => {
       setTimeout(() => onAuthorized(), 600);
       return true;
     } catch (err) {
-      showMessage(err.message ?? 'Invalid code. Please try again.');
+      if (err.status === 429) {
+        const remaining = err.retryAfter || 90;
+        setLockoutTimer(remaining);
+        localStorage.setItem('hp_otp_lockout', Date.now() + remaining * 1000);
+        showMessage('Too many attempts. Please wait.');
+      } else {
+        showMessage(err.message ?? 'Invalid code. Please try again.');
+      }
       return false;
     } finally {
       setLoading(false);
     }
   }
 
-  return { loading, resendLoading, resendCooldown, message, submit, resend, sendOtp, userEmail, totpEnabled, submitTotp };
+  return { loading, resendLoading, resendCooldown, lockoutTimer, message, submit, resend, sendOtp, userEmail, totpEnabled, submitTotp };
 }
