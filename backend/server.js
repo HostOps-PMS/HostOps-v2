@@ -50,6 +50,7 @@ const CLOUDINARY_HOSTNAME = 'https://res.cloudinary.com';
 const IMAGE_PROXY_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim().replace(/\/$/, ''))
   : [
+      'https://go.hostops.online',
       'https://hostops-frontend.onrender.com',
       'https://hostops-v2-admin.onrender.com',
       'https://hostpilot-smoobu.onrender.com',
@@ -111,6 +112,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim().replace(/\/$/, ''))
   : [
+      'https://go.hostops.online',
       'https://hostops-frontend.onrender.com',
       'https://hostops-v2-admin.onrender.com',
       'https://hostpilot-smoobu.onrender.com',

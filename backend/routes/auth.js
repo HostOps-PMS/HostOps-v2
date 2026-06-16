@@ -160,10 +160,15 @@ async function issueTokenPair(signFnAccess, signFnRefresh, entity, req, extra = 
 //   browser silently drops them and every /auth/refresh returns 401.
 function setRefreshCookie(res, rawRefreshToken) {
   const isProd = process.env.NODE_ENV === 'production';
+  // COOKIE_SAME_SITE controls cross-origin vs same-site behaviour:
+  //   'none' — use while API is on onrender.com and frontend is on hostops.online (cross-origin)
+  //   'lax'  — set this once api.hostops.online custom domain is live (same-site, blocks Edge TP)
+  // Defaults to 'none' so deploying this code before DNS is wired up doesn't break anything.
+  const sameSite = isProd ? (process.env.COOKIE_SAME_SITE || 'none') : 'lax';
   res.cookie('rt', encryptToken(rawRefreshToken), {
     httpOnly: true,
     secure:   isProd,
-    sameSite: isProd ? 'none' : 'lax',
+    sameSite,
     maxAge:   7 * 24 * 60 * 60 * 1000,
     path:     '/auth',
   });

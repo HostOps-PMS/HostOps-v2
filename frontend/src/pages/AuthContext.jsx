@@ -10,7 +10,7 @@ import React, {
 import safeStorage from './safeStorage';
 import { decryptApiResponse, generateSessionHint } from './utils/responseDecryption';
 
-const HP_API_BASE = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
+const HP_API_BASE = import.meta.env.VITE_API_URL || 'https://api.hostops.online';
 
 const AuthContext = createContext(null);
 

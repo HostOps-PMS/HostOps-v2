@@ -1,7 +1,7 @@
 // frontend/src/pages/Login/services/authservice.js
 import safeStorage from '../../safeStorage';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.hostops.online';
 
 // ─────────────────────────────────────────────────────────────────
 // loginUser
