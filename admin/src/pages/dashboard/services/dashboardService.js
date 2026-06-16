@@ -11,29 +11,12 @@
  * slightly after the component mounts) doesn't permanently break the fetch.
  */
 
-import { authHeaders } from '../../../lib/authUtils';
+import { fetchWithAuth } from '../../../lib/authUtils';
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? '';
 
-/**
- * Core request helper.
- * Retries once after a short delay on 401 — covers the race where
- * sessionStorage hasn't been written yet on the very first render
- * in a deployed environment.
- */
-async function request(path, options = {}, _retried = false) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: authHeaders(options.headers),
-    credentials: 'include',
-    ...options,
-  });
-
-  // On 401 in production, wait 300 ms and retry once — the token may have
-  // just been written to sessionStorage by the auth flow.
-  if (res.status === 401 && !_retried) {
-    await new Promise(r => setTimeout(r, 300));
-    return request(path, options, true);
-  }
+async function request(path, options = {}) {
+  const res = await fetchWithAuth(`${BASE}${path}`, options);
 
   if (!res.ok) {
     const msg = await res.text().catch(() => res.statusText);

@@ -63,7 +63,7 @@ function applyCoordJitter(points) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
-import { authHeaders, uploadHeaders } from '../../../lib/authUtils';
+import { fetchWithAuth, uploadHeaders } from '../../../lib/authUtils';
 
 const API_BASE = (
   import.meta.env.VITE_API_BASE_URL ??
@@ -160,9 +160,7 @@ function useClientAccounts() {
     let cancelled = false;
     async function load() {
       try {
-        const res = await fetch(apiUrl('/api/clients'), {
-          headers: authHeaders(), credentials: 'include',
-        });
+        const res = await fetchWithAuth(apiUrl('/api/clients'));
         if (!res.ok) throw new Error(`clients ${res.status}`);
         const data = await res.json();
         // /api/clients returns a plain array (not { users: [] })
@@ -205,7 +203,7 @@ function useSmoobuApartments(clientId, propertyIndex) {
       const qs = (propertyIndex !== null && propertyIndex !== undefined)
         ? `?propertyIndex=${propertyIndex}` : '';
       const url = apiUrl(`/api/accounts/${clientId}/smoobu-apartments${qs}`);
-      const res = await fetch(url, { headers: authHeaders(), credentials: 'include' });
+      const res = await fetchWithAuth(url);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `smoobu-apartments ${res.status}`);
@@ -257,7 +255,7 @@ function useApartmentImages(clientId, apartmentId) {
       // Fetch ALL apartments for this client — the backend call is already
       // cached for 60 s, so a second call within that window is effectively free.
       const url = apiUrl(`/api/accounts/${clientId}/smoobu-apartments`);
-      const res = await fetch(url, { headers: authHeaders(), credentials: 'include' });
+      const res = await fetchWithAuth(url);
       if (!res.ok) throw new Error(`smoobu-apartments ${res.status}`);
       const data = await res.json();
       const match = (data.allApartments || []).find(
@@ -1017,10 +1015,8 @@ export default function PropertyMap({ mapLocations, loading }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(apiUrl('/api/accounts/apartment-photos/bulk'), {
+        const res = await fetchWithAuth(apiUrl('/api/accounts/apartment-photos/bulk'), {
           method: 'POST',
-          headers: authHeaders(),
-          credentials: 'include',
           body: JSON.stringify({ apartmentIds: missing }),
         });
         if (!res.ok || cancelled) return;

@@ -1,4 +1,4 @@
-import { authHeaders as getHeaders } from '../../../lib/authUtils';
+import { fetchWithAuth as apiFetch } from '../../../lib/authUtils';
 
 const BASE = import.meta.env.VITE_API_URL || 'https://hostpilot-smoobu.onrender.com';
 
@@ -22,10 +22,7 @@ export async function fetchAllActivityLogs({
   if (from)    params.set('from', from);
   if (to)      params.set('to', to);
 
-  const res = await fetch(`${BASE}/api/activity-log/all?${params.toString()}`, {
-    headers: getHeaders(),
-    credentials: 'include',
-  });
+  const res = await apiFetch(`${BASE}/api/activity-log/all?${params.toString()}`);
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -84,10 +81,7 @@ export async function exportActivityLogs({
  * Fetch all clients (for the business name filter dropdown).
  */
 export async function fetchClients() {
-  const res = await fetch(`${BASE}/api/clients`, {
-    headers: getHeaders(),
-    credentials: 'include',
-  });
+  const res = await apiFetch(`${BASE}/api/clients`);
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

@@ -16,7 +16,8 @@ export function useStaffs(serverId) {
     setError('');
     try {
       const data = await fetchStaffs(serverId);
-      setStaffs(data);
+      const normalized = Array.isArray(data) ? data : (data?.staffs ?? data?.data ?? []);
+      setStaffs(normalized);
     } catch (err) {
       setError(err.message);
     } finally {

@@ -30,6 +30,7 @@ export default function Clients() {
   const PAGE_SIZE = 10;
 
   const filtered = useMemo(() => {
+    if (!Array.isArray(clients)) return [];
     const q = search.trim().toLowerCase();
     return clients.filter((c) => {
       const matchesSearch =
