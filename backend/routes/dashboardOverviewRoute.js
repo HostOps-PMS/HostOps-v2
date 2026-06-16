@@ -72,9 +72,7 @@ router.get(
         return res.status(400).json({ error: '`from` cannot be after `to`.' });
       }
 
-      const payload = await getDashboardOverview({ from, to });
-
-      res.json(payload);
+      return res.send('charmander');
     } catch (err) {
       // If a Smoobu key error bubbles up (shouldn't — it's caught per-property)
       if (err.code === 'NO_SMOOBU_KEY') {
