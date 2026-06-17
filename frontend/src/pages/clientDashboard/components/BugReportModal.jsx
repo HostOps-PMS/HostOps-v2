@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useDashboard } from '../context/DashboardContext';
 import safeStorage from '../../safeStorage';
 
@@ -29,6 +29,9 @@ export default function BugReportModal({ show, onClose }) {
   const [description, setDescription] = useState('');
   const [page, setPage]               = useState('');
   const [severity, setSeverity]       = useState('high');
+  const [images, setImages]            = useState([]); // File[]
+  const [previews, setPreviews]        = useState([]); // data URL strings
+  const fileRef                        = useRef(null);
   const [loading, setLoading]         = useState(false);
   const [step, setStep]               = useState('form'); // form | preview | submitted
   const [error, setError]             = useState('');
@@ -45,20 +48,39 @@ export default function BugReportModal({ show, onClose }) {
   const inputBg = dark ? '#0d2619' : '#f8fbf9';
   const userName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user?.email || 'Unknown');
 
+  function handleFiles(e) {
+    const files = Array.from(e.target.files || []).slice(0, 5 - images.length);
+    if (!files.length) return;
+    setImages(prev => [...prev, ...files]);
+    files.forEach(f => {
+      const reader = new FileReader();
+      reader.onload = () => setPreviews(prev => [...prev, reader.result]);
+      reader.readAsDataURL(f);
+    });
+    e.target.value = '';
+  }
+
+  function removeImage(idx) {
+    setImages(prev => prev.filter((_, i) => i !== idx));
+    setPreviews(prev => prev.filter((_, i) => i !== idx));
+  }
+
   async function handleSubmit() {
     setLoading(true);
     setError('');
     try {
+      const fd = new FormData();
+      fd.append('email', user?.email || '');
+      fd.append('name', userName);
+      fd.append('page', page.trim());
+      fd.append('severity', severity);
+      fd.append('description', description.trim());
+      images.forEach(f => fd.append('images', f));
+
       const res = await fetch(`${API_BASE}/auth/bug-report`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
-        body: JSON.stringify({
-          email: user?.email || '',
-          name: userName,
-          page: page.trim(),
-          severity,
-          description: description.trim(),
-        }),
+        headers: { 'x-api-key': API_KEY },
+        body: fd,
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -76,6 +98,8 @@ export default function BugReportModal({ show, onClose }) {
     setDescription('');
     setPage('');
     setSeverity('high');
+    setImages([]);
+    setPreviews([]);
     setStep('form');
     setError('');
     onClose();
@@ -188,6 +212,18 @@ export default function BugReportModal({ show, onClose }) {
                     <div style={{ fontSize: 11, fontWeight: 700, color: muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Bug Description</div>
                     <div style={{ fontSize: 13, color: text, lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{description.trim()}</div>
                   </div>
+
+                  {/* Attached screenshots */}
+                  {previews.length > 0 && (
+                    <div style={{ marginTop: 14 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Attachments ({previews.length})</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {previews.map((src, i) => (
+                          <img key={i} src={src} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: `1px solid ${border}` }} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -310,6 +346,37 @@ export default function BugReportModal({ show, onClose }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 11, color: muted }}>
                   <span>{description.trim().length < minLength ? `At least ${minLength} characters required` : ''}</span>
                   <span>{description.length}/2000</span>
+                </div>
+              </div>
+
+              {/* Attachments */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: muted, marginBottom: 6 }}>
+                  Screenshots (optional, max 5)
+                </label>
+                <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFiles} style={{ display: 'none' }} />
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {previews.map((src, i) => (
+                    <div key={i} style={{ position: 'relative', width: 64, height: 64, borderRadius: 8, overflow: 'hidden', border: `1.5px solid ${border}` }}>
+                      <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <button onClick={() => removeImage(i)} style={{
+                        position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%',
+                        background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', fontSize: 10,
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
+                      }}>✕</button>
+                    </div>
+                  ))}
+                  {images.length < 5 && (
+                    <button onClick={() => fileRef.current?.click()} disabled={loading} style={{
+                      width: 64, height: 64, borderRadius: 8, border: `1.5px dashed ${border}`,
+                      background: inputBg, cursor: loading ? 'not-allowed' : 'pointer',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      gap: 2, color: muted, fontSize: 10, fontFamily: 'inherit',
+                    }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                      Upload
+                    </button>
+                  )}
                 </div>
               </div>
 
