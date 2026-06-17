@@ -526,12 +526,26 @@ router.post('/clients', requireAdmin, async (req, res, next) => {
   try {
     const data = createClientSchema.parse(req.body);
 
+    // ── SECURITY: Role escalation prevention ──────────────────────
+    // Only the Main Admin (tag === 'Main Admin') can assign 'admin'
+    // or 'team_leader' roles. All other admins can only create
+    // 'client' accounts — this prevents privilege escalation even
+    // if an attacker gains admin access via Burp Suite interception.
+    const callerIsMainAdmin = req.user?.tag === 'Main Admin' && req.user?.role === 'admin';
+    if (data.role && data.role !== 'client' && !callerIsMainAdmin) {
+      return res.status(403).json({
+        error: 'Only the Main Admin can assign admin or team_leader roles.',
+      });
+    }
+    // Force role to 'client' if not explicitly set by Main Admin
+    const safeRole = callerIsMainAdmin ? (data.role || 'client') : 'client';
+
     const existing = await User.findOne({ email: data.email.toLowerCase() });
     if (existing) {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
-    if (data.role === 'team_leader') {
+    if (safeRole === 'team_leader') {
       if (!data.serverId) {
         return res.status(400).json({ error: 'Server assignment is required for Team Leaders.' });
       }
@@ -546,7 +560,8 @@ router.post('/clients', requireAdmin, async (req, res, next) => {
       email:              data.email.toLowerCase(),
       password:           data.password,
       pin:                data.pin,
-      role:               data.role,
+      role:               safeRole,          // ← sanitized role
+      tag:                '',                // ← never from request
       propertyTagPrefix:  data.propertyTagPrefix || '',
       serverId:           data.serverId || null,
       isVerified:         true,
@@ -606,9 +621,22 @@ router.patch('/clients/:id', requireAdmin, async (req, res, next) => {
   try {
     const data = updateClientSchema.parse(req.body);
 
+    // ── SECURITY: Role escalation prevention ──────────────────────
+    const callerIsMainAdmin = req.user?.tag === 'Main Admin' && req.user?.role === 'admin';
+    if (data.role !== undefined && data.role !== 'client' && !callerIsMainAdmin) {
+      return res.status(403).json({
+        error: 'Only the Main Admin can assign admin or team_leader roles.',
+      });
+    }
+
     const client = await User.findById(req.params.id).select('+pin +password');
     if (!client) {
       return res.status(404).json({ error: 'Client not found' });
+    }
+
+    // ── SECURITY: Prevent modifying the Main Admin account ────────
+    if (client.tag === 'Main Admin' && String(client._id) !== String(req.user._id)) {
+      return res.status(403).json({ error: 'The Main Admin account cannot be modified.' });
     }
 
     // Assign fields directly (not via .set()) so Mongoose reliably marks
@@ -616,7 +644,7 @@ router.patch('/clients/:id', requireAdmin, async (req, res, next) => {
     // correctly for password and pin.
     if (data.businessName      !== undefined) client.businessName      = data.businessName;
     if (data.serverId          !== undefined) client.serverId          = data.serverId || null;
-    if (data.role              !== undefined) client.role              = data.role;
+    if (data.role              !== undefined) client.role              = callerIsMainAdmin ? data.role : 'client';
     if (data.propertyTagPrefix !== undefined) client.propertyTagPrefix = data.propertyTagPrefix;
     if (data.password          !== undefined) {
       client.password           = data.password;
@@ -626,6 +654,7 @@ router.patch('/clients/:id', requireAdmin, async (req, res, next) => {
       client.pin                = data.pin;
       client.mustChangePin      = true;
     }
+    // tag is NEVER settable from request — omitted intentionally
 
     await client.save();
 
