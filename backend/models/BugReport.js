@@ -1,0 +1,53 @@
+import mongoose from 'mongoose';
+
+const bugReportSchema = new mongoose.Schema(
+  {
+    email: {
+      type: String,
+      required: true,
+      lowercase: true,
+      trim: true,
+      index: true,
+    },
+
+    name: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+
+    page: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+
+    severity: {
+      type: String,
+      enum: ['low', 'medium', 'high', 'critical'],
+      default: 'medium',
+      index: true,
+    },
+
+    description: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 2000,
+    },
+
+    status: {
+      type: String,
+      enum: ['open', 'in_progress', 'resolved', 'dismissed'],
+      default: 'open',
+      index: true,
+    },
+
+    resolvedAt: { type: Date, default: null },
+    resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'user', default: null },
+    resolvedNote: { type: String, default: '', trim: true },
+  },
+  { timestamps: true }
+);
+
+export default mongoose.model('BugReport', bugReportSchema);
