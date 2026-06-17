@@ -30,7 +30,7 @@ function validateNewPassword(password) {
  */
 export default function FirstLoginModal({ onComplete }) {
   const { dark } = useDashboard();
-  const { getToken } = useAuth();
+  const { getToken, setToken, setSessionKey } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword]         = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -57,6 +57,13 @@ export default function FirstLoginModal({ onComplete }) {
     setLoading(true);
     try {
       const data = await changePassword({ currentPassword, newPassword }, getToken());
+
+      // Store the fresh token pair returned by the backend so the
+      // subsequent mustChangePin step can authenticate without re-login.
+      if (data.accessToken) {
+        setToken(data.accessToken);
+        if (data.sk) setSessionKey(data.sk);
+      }
 
       // Update stored user with the fresh user object returned by the backend
       if (data.user) {
