@@ -91,6 +91,15 @@ async function handleBugReport(req, res, next) {
 // ═══════════════════════════════════════════════════════════════
 export const adminBugReportRouter = express.Router();
 
+// Client fetches their own reports (any authenticated user)
+adminBugReportRouter.get('/my-bug-reports', requireAuth, async (req, res, next) => {
+  try {
+    const reports = await BugReport.find({ email: req.user.email.toLowerCase() })
+      .sort({ createdAt: -1 }).lean();
+    res.json(reports);
+  } catch (err) { next(err); }
+});
+
 adminBugReportRouter.get('/bug-reports', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { status, severity } = req.query;
