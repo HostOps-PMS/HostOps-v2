@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { changePin } from '../../Login/services/authservice';
 import { useAuth } from '../../AuthContext';
 import safeStorage from '../../safeStorage';
 import FetchingOverlay from './FetchingOverlay';
@@ -26,6 +25,7 @@ function validateNewPin(pin) {
 export default function FirstLoginPinModal({ onComplete }) {
   const auth = useAuth();
   const { dark } = useDashboard();
+  const API_BASE = import.meta.env.VITE_API_URL || 'https://api.hostops.online';
 
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin]         = useState('');
@@ -52,12 +52,13 @@ export default function FirstLoginPinModal({ onComplete }) {
 
     setLoading(true);
     try {
-      // ── FIX: pass the in-memory access token so the backend's
-      // requireAuth middleware receives the Authorization header.
-      // Without this, the request arrives with no Bearer token and
-      // the server returns 401 "Missing token".
-      const currentToken = auth.getToken();
-      const data = await changePin({ currentPin, newPin }, currentToken);
+      const res = await auth.fetchWithAuth(`${API_BASE}/auth/change-pin`, {
+        method:      'POST',
+        credentials: 'include',
+        body:        JSON.stringify({ currentPin, newPin }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'PIN change failed');
 
       // Construct the full updated user object
       let updatedUser = null;

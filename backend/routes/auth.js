@@ -834,6 +834,7 @@ router.post('/change-password', requireAuth, async (req, res, next) => {
       );
       setRefreshCookie(res, rawRefresh, req);
       const staffSk = createSessionKey(accessJti, accessTokenExpiryMs());
+      deleteSessionKey(req._jti);
 
       return res.json({
         message:     'Password changed successfully.',
@@ -875,6 +876,7 @@ router.post('/change-password', requireAuth, async (req, res, next) => {
     );
     setRefreshCookie(res, rawRefresh, req);
     const userSk = createSessionKey(accessJti, accessTokenExpiryMs());
+    deleteSessionKey(req._jti);
 
     res.json({
       message:     'Password changed successfully.',
@@ -997,7 +999,7 @@ router.post('/forgot-password', async (req, res, next) => {
       await user.save();
       try { await sendResetEmail(user.email, user.firstName || user.businessName, rawToken); }
       catch (e) { console.error('Reset email send failed:', e); }
-      return res.json({ message: 'If that email is registered, a reset link has been sent.' });
+      return res.json({ message: 'If that email is registered, a reset code has been sent.' });
     }
 
     const staff = await Staff.findOne({ email: normalizedEmail });
@@ -1009,7 +1011,7 @@ router.post('/forgot-password', async (req, res, next) => {
       catch (e) { console.error('Staff reset OTP email send failed:', e); }
     }
 
-    res.json({ message: 'If that email is registered, a reset link has been sent.' });
+    res.json({ message: 'If that email is registered, a reset code has been sent.' });
   } catch (err) { next(err); }
 });
 
