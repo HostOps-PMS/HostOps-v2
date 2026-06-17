@@ -65,6 +65,29 @@ const NAV_ITEMS = [
     label: 'Accounts',
     to: '/accounts',
   },
+];
+
+const MONITORING_ITEMS = [
+  {
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M10 2a6 6 0 00-6 6c0 3-1.5 4.5-2 5h16c-.5-.5-2-2-2-5a6 6 0 00-6-6z" strokeLinejoin="round" />
+        <path d="M8.5 17.5a1.5 1.5 0 003 0" strokeLinecap="round" />
+      </svg>
+    ),
+    label: 'Alerts Center',
+    to: '/alerts',
+  },
+  {
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="10" cy="10" r="8" />
+        <path d="M10 6v4l3 3" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+    label: 'Recent Activities',
+    to: '/recent-activities',
+  },
   {
     icon: (
       <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -96,6 +119,19 @@ const LogoIcon = () => (
   <img src={HostOpsLogo} alt="HostOps" style={{ width: 34, height: 34, objectFit: 'contain' }} />
 );
 
+const MoonIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <path d="M17 12A7 7 0 119 4a5 5 0 008 8z" strokeLinejoin="round" />
+  </svg>
+);
+
+const SunIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <circle cx="10" cy="10" r="4" />
+    <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42" strokeLinecap="round" />
+  </svg>
+);
+
 const ChevronLeft = ({ collapsed }) => (
   <svg
     width="12" height="12" viewBox="0 0 12 12" fill="none"
@@ -124,22 +160,34 @@ function SectionLabel({ label, collapsed }) {
       <div style={{
         height: 1,
         background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)',
-        margin: '12px 4px',
+        margin: '10px 4px',
         borderRadius: 1,
       }} />
     );
   }
   return (
     <div style={{
-      fontSize: 10,
-      fontWeight: 600,
-      color: dark ? '#4d8a6a' : '#999',
-      letterSpacing: '0.1em',
-      textTransform: 'uppercase',
-      padding: '12px 10px 5px',
-      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      padding: '10px 10px 4px',
     }}>
-      {label}
+      <span style={{
+        fontSize: 9.5,
+        fontWeight: 700,
+        color: dark ? '#4d8a6a' : '#aaa',
+        letterSpacing: '0.12em',
+        textTransform: 'uppercase',
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      }}>
+        {label}
+      </span>
+      <div style={{
+        flex: 1,
+        height: 1,
+        background: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)',
+        borderRadius: 1,
+      }} />
     </div>
   );
 }
@@ -155,7 +203,7 @@ function SidebarNavLink({ to, icon, label, collapsed, children }) {
   const [hovered, setHovered] = useState(false);
 
   return (
-    <div>
+    <div style={{ position: 'relative' }}>
       <NavLink
         to={to}
         title={label}
@@ -163,7 +211,7 @@ function SidebarNavLink({ to, icon, label, collapsed, children }) {
           display: 'flex',
           alignItems: 'center',
           gap: 10,
-          padding: collapsed ? '7px' : '8px 10px',
+          padding: collapsed ? '7px' : '7px 10px',
           justifyContent: collapsed ? 'center' : 'flex-start',
           borderRadius: 10,
           cursor: 'pointer',
@@ -173,17 +221,17 @@ function SidebarNavLink({ to, icon, label, collapsed, children }) {
           letterSpacing: '0.01em',
           transition: 'background 0.12s, color 0.12s',
           background: (isActive || childActive)
-            ? (dark ? '#0d2619' : '#f0faf6')
+            ? (dark ? '#0d2619' : '#eef9f4')
             : hovered
-              ? (dark ? '#0f2416' : '#f7f7f7')
+              ? (dark ? '#0f2416' : '#f5f5f5')
               : 'transparent',
           color: (isActive || childActive)
-            ? (dark ? '#26c47a' : '#0d7a55')
+            ? (dark ? '#26c47a' : '#0a6644')
             : hovered
               ? (dark ? '#eaf5f0' : '#222')
-              : (dark ? '#7ab89a' : '#888'),
+              : (dark ? '#7ab89a' : '#6b7280'),
           fontWeight: (isActive || childActive) ? 600 : 400,
-          marginBottom: 2,
+          marginBottom: 1,
         })}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
@@ -191,19 +239,34 @@ function SidebarNavLink({ to, icon, label, collapsed, children }) {
       >
         {({ isActive }) => (
           <>
+            {/* Left accent bar */}
+            {(isActive || childActive) && !collapsed && (
+              <span style={{
+                position: 'absolute',
+                left: 0,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: 3,
+                height: 18,
+                borderRadius: 2,
+                background: dark ? '#26c47a' : '#0a6644',
+              }} />
+            )}
             <span style={{
               width: 30,
               height: 30,
-              borderRadius: 8,
+              borderRadius: 9,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
               background: (isActive || childActive)
-                ? (dark ? '#152e1f' : '#e1f5ee')
-                : 'transparent',
+                ? (dark ? '#1a3d28' : '#d6f0e4')
+                : hovered
+                  ? (dark ? '#132a1e' : '#ebebeb')
+                  : 'transparent',
               color: (isActive || childActive)
-                ? (dark ? '#26c47a' : '#0d7a55')
+                ? (dark ? '#26c47a' : '#0a6644')
                 : 'inherit',
               transition: 'background 0.12s',
             }}>
@@ -346,12 +409,16 @@ function SidebarButton({ icon, label, onClick, collapsed, danger }) {
       <span style={{
         width: 30,
         height: 30,
-        borderRadius: 8,
+        borderRadius: 9,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
+        background: hovered
+          ? (danger ? (dark ? '#3d1010' : '#ffe0e0') : (dark ? '#132a1e' : '#ebebeb'))
+          : 'transparent',
         color: 'inherit',
+        transition: 'background 0.12s',
       }}>
         {icon}
       </span>
@@ -545,7 +612,7 @@ function LogoutConfirmModal({ isOpen, joke, onConfirm, onCancel }) {
 
 /* ─── Main Sidebar ──────────────────────────────────────────────── */
 export default function Sidebar({ onExport, exportLoading = false, alerts }) {
-  const { dark } = useTheme();
+  const { dark, toggleDark } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -634,22 +701,23 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
           display: 'flex',
           alignItems: 'center',
           gap: 10,
-          padding: '6px 4px',
-          marginBottom: 12,
+          padding: '6px 4px 8px',
+          marginBottom: 8,
           position: 'relative',
           justifyContent: isCollapsed ? 'center' : 'flex-start',
+          borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)'}`,
         }}>
           <div style={{
-            width: 32,
-            height: 32,
-            background: sideBg,
-            borderRadius: 9,
+            width: 34,
+            height: 34,
+            background: dark ? '#0d2619' : '#f0faf6',
+            borderRadius: 10,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
             overflow: 'hidden',
-            border: `0.5px solid ${logoBorder}`,
+            border: `1px solid ${dark ? '#1e3a2a' : '#d6f0e4'}`,
           }}>
             <LogoIcon />
           </div>
@@ -657,7 +725,8 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
           {!isCollapsed && (
             <>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: titleColor, letterSpacing: '-0.02em' }}>HostOps</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: titleColor, letterSpacing: '-0.03em' }}>HostOps</div>
+                <div style={{ fontSize: 10, color: dark ? '#4d8a6a' : '#aaa', letterSpacing: '0.05em', marginTop: 1 }}>Admin Panel</div>
               </div>
               {!isMobile && (
                 <button
@@ -730,6 +799,19 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
               children={item.children}
             />
           ))}
+
+          {/* ── Monitoring section ──────────────────────────── */}
+          <SectionLabel label="Monitoring" collapsed={isCollapsed} />
+
+          {MONITORING_ITEMS.map((item) => (
+            <SidebarNavLink
+              key={item.to}
+              to={item.to}
+              icon={item.icon}
+              label={item.label}
+              collapsed={isCollapsed}
+            />
+          ))}
         </nav>
 
         {/* Spacer */}
@@ -739,9 +821,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
         <div style={{
           display: 'flex',
           flexDirection: 'column',
-          borderTop: `0.5px solid ${sideBorder}`,
-          paddingTop: 10,
-          marginTop: 4,
+          paddingTop: 4,
         }}>
           <SectionLabel label="Account" collapsed={isCollapsed} />
 
@@ -860,6 +940,24 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
         </div>
 
         <div style={{ flex: 1 }} />
+
+        {/* Dark mode toggle — mobile */}
+        <button
+          onClick={toggleDark}
+          title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+          style={{
+            width: 34, height: 34, borderRadius: 10,
+            background: dark ? '#0d2619' : '#f7f7f7',
+            border: `0.5px solid ${dark ? '#1e3a2a' : 'rgba(0,0,0,0.08)'}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+            color: dark ? '#7ab89a' : '#888',
+            flexShrink: 0,
+            transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+          }}
+        >
+          {dark ? <SunIcon /> : <MoonIcon />}
+        </button>
 
         {/* Notification bell — mobile */}
         <div style={{ position: 'relative', flexShrink: 0 }}>

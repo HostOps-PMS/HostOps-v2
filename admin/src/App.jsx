@@ -15,6 +15,8 @@ import TeamLeaderStaffs from './pages/TeamLeader/staffs/index';
 import TeamLeaderDashboardPlaceholder from './pages/TeamLeader/dashboard/index';
 import AccountsPage from './pages/Accounts/index';
 import ActivityLogsPage from './pages/ActivityLogs/index';
+import AlertsCenterPage from './pages/AlertsCenter/index';
+import RecentActivitiesPage from './pages/RecentActivities/index';
 import ErrorPage404 from './pages/ErrorPage404';
 
 const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5174';
@@ -201,6 +203,26 @@ export default function App() {
           element={
             <PrivateRoute>
               <ActivityLogsPage />
+            </PrivateRoute>
+          }
+        />
+
+        {/* ── Alerts Center ────────────────────────────────────── */}
+        <Route
+          path="/alerts"
+          element={
+            <PrivateRoute>
+              <AlertsCenterPage />
+            </PrivateRoute>
+          }
+        />
+
+        {/* ── Recent Activities ─────────────────────────────────── */}
+        <Route
+          path="/recent-activities"
+          element={
+            <PrivateRoute>
+              <RecentActivitiesPage />
             </PrivateRoute>
           }
         />
