@@ -172,7 +172,7 @@ export default function AlertsCenter() {
           {/* ── Tab bar + card wrapper (single flex child to avoid cl-content gap) ── */}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
           {/* ── Tab bar (outside card, transparent bg) ── */}
-          <div style={{ position: 'relative', overflowX: 'clip', overflowY: 'visible' }}>
+          <div style={{ position: 'sticky', top: 0, zIndex: 100, overflowX: 'clip', overflowY: 'visible', background: dark ? '#0c1c14' : 'var(--color-bg, #f2f4f7)' }}>
             <div className="al-tab-scroll" style={{ display: 'flex', alignItems: 'flex-end', background: 'transparent', marginBottom: '-1px', overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
               {tabs.map(t => {
                 const active = tab === t.id;
