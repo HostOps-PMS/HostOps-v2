@@ -145,6 +145,8 @@ router.post('/staffs', requireAdminOrTeamLeader, async (req, res, next) => {
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({
             business_name: client.businessName,
+            first_name:    data.firstName,
+            last_name:     data.lastName || '',
             email:         data.email.toLowerCase(),
             temporary_pin: data.pin,
           }),
