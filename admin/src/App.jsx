@@ -146,7 +146,7 @@ export default function App() {
         <AuthorizationModal onAuthorized={handleAuthorized} />
       )}
 
-      <Routes>
+      {authorized && <Routes>
         {/* ── Entry point from the login app cross-origin redirect ── */}
         <Route path="/admin" element={<AdminEntryRedirect />} />
 
@@ -251,7 +251,7 @@ export default function App() {
         />
 
         <Route path="*" element={<AdminEntryRedirect />} />
-      </Routes>
+      </Routes>}
       </NotificationsProvider>
       </ThemeProvider>
     </BrowserRouter>
