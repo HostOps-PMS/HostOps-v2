@@ -1,5 +1,6 @@
 // frontend/src/pages/apiService.js
 import { decryptApiResponse, generateSessionHint } from './utils/responseDecryption';
+import safeStorage from './safeStorage';
 
 const HP_API_BASE = import.meta.env.VITE_API_URL || 'https://api.hostops.online';
 
@@ -125,10 +126,8 @@ export async function fetchDashboard({ from, to, apartmentId, propertyDbId }, au
  */
 export async function fetchMessages(reservationId, auth) {
   let query = '';
-  try {
-    const propertyDbId = sessionStorage.getItem('hp_selected_property_id');
-    if (propertyDbId) query = `?propertyDbId=${encodeURIComponent(propertyDbId)}`;
-  } catch { /* sessionStorage blocked — proceed without propertyDbId */ }
+  const propertyDbId = safeStorage.getItem('hp_selected_property_id');
+  if (propertyDbId) query = `?propertyDbId=${encodeURIComponent(propertyDbId)}`;
   return authFetch(`/api/messages/${reservationId}${query}`, {}, auth);
 }
 
