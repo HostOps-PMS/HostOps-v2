@@ -4,6 +4,17 @@
 @import './global.css';
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
 
+/* ─── Hide all scrollbars (keep scroll functionality) ── */
+.db-layout *,
+.pm-modal-overlay * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.db-layout *::-webkit-scrollbar,
+.pm-modal-overlay *::-webkit-scrollbar {
+  display: none;
+}
+
 /* ─── Layout ─────────────────────────────────────────── */
 .db-layout {
   display: flex;
