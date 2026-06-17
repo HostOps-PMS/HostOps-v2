@@ -2,28 +2,53 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import Sidebar from '../Sidebar';
 import TopBar from '../dashboard/components/TopBar';
 import { useTheme } from '../../context/ThemeContext';
+import { fetchAllActivityLogs } from '../ActivityLogs/services/activityLogApi';
 
-// ── Sample data ───────────────────────────────────────────────────────────────
-const SAMPLE_ACTIVITIES = [
-  { id: 1,  type: 'login',    description: 'Logged into admin panel',          user: 'Houston Harvey',    email: 'houstonharvey289@gmail.com',   role: 'Admin',    business: '—',           ip: '112.200.14.8',   time: '2026-06-16T08:30:00' },
-  { id: 2,  type: 'booking',  description: 'New booking confirmed — Room 302', user: 'Raul Dela',         email: 'exodianxies@gmail.com',        role: 'Client',   business: 'Haido Ville', ip: '175.45.22.9',    time: '2026-06-16T08:12:00' },
-  { id: 3,  type: 'payment',  description: 'Payment received ₱4,500.00',       user: 'Knesss',            email: 'valhalla.leo0@gmail.com',      role: 'Client',   business: 'Haido Ville', ip: '103.56.11.4',    time: '2026-06-16T07:58:00' },
-  { id: 4,  type: 'settings', description: 'Changed account password',         user: 'Innovation Admin',  email: 'h.sarmiento@telexph.com',      role: 'Admin',    business: '—',           ip: '112.200.14.8',   time: '2026-06-16T07:44:00' },
-  { id: 5,  type: 'login',    description: 'Logged into client portal',        user: 'Astra',             email: 'dkosalvation49@gmail.com',     role: 'Client',   business: 'Haido Ville', ip: '45.132.8.22',    time: '2026-06-16T07:30:00' },
-  { id: 6,  type: 'booking',  description: 'Booking cancellation requested',   user: 'RayCease',          email: 'lakesapphire121@gmail.com',    role: 'Client',   business: '—',           ip: '182.3.45.100',   time: '2026-06-16T07:10:00' },
-  { id: 7,  type: 'system',   description: 'Exported activity logs PDF',       user: 'Innovation Admin',  email: 'h.sarmiento@telexph.com',      role: 'Admin',    business: '—',           ip: '112.200.14.8',   time: '2026-06-16T06:55:00' },
-  { id: 8,  type: 'payment',  description: 'Refund processed ₱2,200.00',       user: 'Andoks',            email: 'eclipsavali@gmail.com',        role: 'Client',   business: 'Haido Ville', ip: '120.28.77.5',    time: '2026-06-16T06:40:00' },
-  { id: 9,  type: 'login',    description: 'Logged into team leader portal',   user: 'Houston Harvey',    email: 'houstonharvey289@gmail.com',   role: 'Leader',   business: '—',           ip: '112.200.14.8',   time: '2026-06-16T06:22:00' },
-  { id: 10, type: 'settings', description: 'Updated PIN code',                 user: 'Knesss',            email: 'valhalla.leo0@gmail.com',      role: 'Client',   business: 'Haido Ville', ip: '103.56.11.4',    time: '2026-06-16T06:00:00' },
-  { id: 11, type: 'booking',  description: 'Check-in confirmed — Villa A',     user: 'Astra',             email: 'dkosalvation49@gmail.com',     role: 'Client',   business: 'Haido Ville', ip: '45.132.8.22',    time: '2026-06-15T22:30:00' },
-  { id: 12, type: 'system',   description: 'Staff account created',            user: 'Innovation Admin',  email: 'h.sarmiento@telexph.com',      role: 'Admin',    business: '—',           ip: '112.200.14.8',   time: '2026-06-15T21:15:00' },
-  { id: 13, type: 'payment',  description: 'Payment failed — card declined',   user: 'RayCease',          email: 'lakesapphire121@gmail.com',    role: 'Client',   business: '—',           ip: '182.3.45.100',   time: '2026-06-15T20:40:00' },
-  { id: 14, type: 'login',    description: 'Logged into admin panel',          user: 'Innovation Admin',  email: 'h.sarmiento@telexph.com',      role: 'Admin',    business: '—',           ip: '112.200.14.8',   time: '2026-06-15T18:00:00' },
-  { id: 15, type: 'settings', description: 'Smoobu API key updated',           user: 'Innovation Admin',  email: 'h.sarmiento@telexph.com',      role: 'Admin',    business: 'Haido Ville', ip: '112.200.14.8',   time: '2026-06-15T16:30:00' },
-  { id: 16, type: 'booking',  description: 'Check-out completed — Room 205',   user: 'Andoks',            email: 'eclipsavali@gmail.com',        role: 'Client',   business: 'Haido Ville', ip: '120.28.77.5',    time: '2026-06-15T12:00:00' },
-  { id: 17, type: 'system',   description: 'Monthly report generated',         user: 'System',            email: '—',                            role: 'System',   business: '—',           ip: '127.0.0.1',      time: '2026-06-01T00:05:00' },
-  { id: 18, type: 'payment',  description: 'Invoice sent ₱8,750.00',           user: 'Innovation Admin',  email: 'h.sarmiento@telexph.com',      role: 'Admin',    business: 'Haido Ville', ip: '112.200.14.8',   time: '2026-06-15T09:20:00' },
-];
+// ── Action → type mapping ─────────────────────────────────────────────────────
+const ACTION_LABELS = {
+  login:                   'Logged in',
+  logout:                  'Logged out',
+  password_changed:        'Password changed',
+  pin_changed:             'PIN changed',
+  opened_account_settings: 'Opened account settings',
+  exported_pdf:            'Exported PDF report',
+  changed_date_filter:     'Changed date filter',
+  filtered_by_channel:     'Filtered by channel',
+  switched_calendar_view:  'Switched calendar view',
+  opened_message_thread:   'Opened message thread',
+  switched_property:       'Switched property',
+  opened_messages_page:    'Opened messages page',
+  sent_message:            'Sent a message',
+  viewed_dashboard:        'Viewed dashboard',
+};
+
+function mapActionToType(action) {
+  if (!action) return 'system';
+  if (action === 'login' || action === 'logout') return 'login';
+  if (['password_changed', 'pin_changed', 'opened_account_settings'].includes(action)) return 'settings';
+  if (action.includes('book') || action.includes('reservation') || action.includes('check_in') || action.includes('check_out')) return 'booking';
+  if (action.includes('pay') || action.includes('payment') || action.includes('invoice') || action.includes('refund')) return 'payment';
+  return 'system';
+}
+
+function mapLog(log) {
+  const first = log.performedBy?.firstName || '';
+  const last  = log.performedBy?.lastName  || '';
+  const name  = [first, last].filter(Boolean).join(' ') || log.performedBy?.email || 'Unknown';
+  const rawRole = log.performedBy?.role || '';
+  const role = rawRole === 'admin' ? 'Admin' : rawRole === 'staff' ? 'Leader' : rawRole === 'client' ? 'Client' : 'System';
+  return {
+    id:          log._id,
+    type:        mapActionToType(log.action),
+    description: ACTION_LABELS[log.action] || log.action,
+    user:        name,
+    email:       log.performedBy?.email || '',
+    role,
+    business:    log.businessName || '—',
+    ip:          log.ipAddress    || '—',
+    time:        log.createdAt,
+  };
+}
 
 const TYPE_META = {
   login:    { label: 'Login',    color: '#1e8760', bg: '#eaf8f1', darkColor: '#4ade80', darkBg: '#0d2619', icon: 'M13 10H3M9 6l4 4-4 4M17 4v12' },
@@ -70,6 +95,24 @@ export default function RecentActivities() {
   const [page,   setPage]   = useState(1);
   const [exportLoading, setExportLoading] = useState(false);
 
+  const [activities, setActivities] = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    fetchAllActivityLogs({ page: 1, limit: 200 })
+      .then(data => {
+        if (cancelled) return;
+        setActivities((data.activityLog || []).map(mapLog));
+      })
+      .catch(err => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
   const tabScrollRef = useRef(null);
   const [tabScrollLeft, setTabScrollLeft] = useState(0);
   const [tabScrollable, setTabScrollable] = useState(false);
@@ -105,22 +148,22 @@ export default function RecentActivities() {
   const inputBg   = dark ? '#0d2619' : '#f9fafb';
 
   const tabs = [
-    { id: 'all',      label: 'All',      count: SAMPLE_ACTIVITIES.length,
+    { id: 'all',      label: 'All',      count: activities.length,
       icon: <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h14M3 10h14M3 15h14" strokeLinecap="round"/></svg> },
-    { id: 'login',    label: 'Logins',   count: SAMPLE_ACTIVITIES.filter(a => a.type === 'login').length,
+    { id: 'login',    label: 'Logins',   count: activities.filter(a => a.type === 'login').length,
       icon: <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 10H3M9 6l4 4-4 4" strokeLinecap="round" strokeLinejoin="round"/><path d="M17 4v12" strokeLinecap="round"/></svg> },
-    { id: 'booking',  label: 'Bookings', count: SAMPLE_ACTIVITIES.filter(a => a.type === 'booking').length,
+    { id: 'booking',  label: 'Bookings', count: activities.filter(a => a.type === 'booking').length,
       icon: <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="14" height="13" rx="2"/><path d="M3 8h14M7 2v4M13 2v4" strokeLinecap="round"/></svg> },
-    { id: 'payment',  label: 'Payments', count: SAMPLE_ACTIVITIES.filter(a => a.type === 'payment').length,
+    { id: 'payment',  label: 'Payments', count: activities.filter(a => a.type === 'payment').length,
       icon: <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="16" height="11" rx="2"/><path d="M2 9h16" strokeLinecap="round"/><rect x="5" y="12" width="3" height="2" rx="0.5" fill="currentColor" stroke="none"/></svg> },
-    { id: 'settings', label: 'Settings', count: SAMPLE_ACTIVITIES.filter(a => a.type === 'settings').length,
+    { id: 'settings', label: 'Settings', count: activities.filter(a => a.type === 'settings').length,
       icon: <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="10" cy="10" r="3"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42" strokeLinecap="round"/></svg> },
-    { id: 'system',   label: 'System',   count: SAMPLE_ACTIVITIES.filter(a => a.type === 'system').length,
+    { id: 'system',   label: 'System',   count: activities.filter(a => a.type === 'system').length,
       icon: <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="16" height="11" rx="2"/><path d="M6 17h8M10 14v3" strokeLinecap="round"/></svg> },
   ];
 
   const filtered = useMemo(() => {
-    let list = SAMPLE_ACTIVITIES;
+    let list = activities;
     if (tab !== 'all') list = list.filter(a => a.type === tab);
     if (role)          list = list.filter(a => a.role === role);
     if (search)        list = list.filter(a =>
@@ -130,7 +173,7 @@ export default function RecentActivities() {
       a.ip.includes(search)
     );
     return list;
-  }, [tab, search, role]);
+  }, [activities, tab, search, role]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -196,13 +239,13 @@ export default function RecentActivities() {
             </div>
             <button
               onClick={handleExport}
-              disabled={exportLoading}
+              disabled={exportLoading || loading}
               className="ra-export-btn"
               style={{
-                background: exportLoading ? (dark ? '#0d2619' : '#e0e0e0') : '#1a9e6e',
-                color: exportLoading ? (dark ? '#4d8a6a' : '#aaa') : '#fff',
-                cursor: exportLoading ? 'not-allowed' : 'pointer',
-                boxShadow: exportLoading ? 'none' : '0 2px 8px rgba(26,158,110,0.20)',
+                background: (exportLoading || loading) ? (dark ? '#0d2619' : '#e0e0e0') : '#1a9e6e',
+                color: (exportLoading || loading) ? (dark ? '#4d8a6a' : '#aaa') : '#fff',
+                cursor: (exportLoading || loading) ? 'not-allowed' : 'pointer',
+                boxShadow: (exportLoading || loading) ? 'none' : '0 2px 8px rgba(26,158,110,0.20)',
               }}
               title="Export CSV"
             >
@@ -254,7 +297,7 @@ export default function RecentActivities() {
                       fontSize: '0.72rem', fontWeight: 700, padding: '1px 7px', borderRadius: 999,
                       background: active ? (dark ? '#0d2619' : '#d1fae5') : 'transparent',
                       color: active ? (dark ? '#26c47a' : '#10b981') : (dark ? '#4d8a6a' : '#b0b7c3'),
-                    }}>{t.count}</span>
+                    }}>{loading ? '…' : t.count}</span>
                   </button>
                 );
               })}
@@ -318,11 +361,25 @@ export default function RecentActivities() {
                 </button>
               )}
               <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: textMuted, whiteSpace: 'nowrap' }}>
-                {filtered.length} activit{filtered.length !== 1 ? 'ies' : 'y'}
+                {loading ? 'Loading…' : `${filtered.length} activit${filtered.length !== 1 ? 'ies' : 'y'}`}
               </span>
             </div>
 
+            {/* ── Loading / error states ── */}
+            {loading && (
+              <div style={{ padding: '48px 20px', textAlign: 'center', color: textMuted, fontSize: '0.88rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ animation: 'ra-spin 0.8s linear infinite', flexShrink: 0 }}><circle cx="12" cy="12" r="10" strokeOpacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
+                Loading activities…
+              </div>
+            )}
+            {!loading && error && (
+              <div style={{ padding: '48px 20px', textAlign: 'center', color: '#e84545', fontSize: '0.88rem' }}>
+                ⚠ {error}
+              </div>
+            )}
+
             {/* ── Table ── */}
+            {!loading && !error && (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead>
@@ -383,7 +440,8 @@ export default function RecentActivities() {
                           {act.business !== '—' ? act.business : <span style={{ color: dark ? '#2d5c3e' : '#d1d5db' }}>—</span>}
                         </td>
                         <td style={{ padding: '13px 16px', color: textMuted, fontFamily: 'monospace', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
-                          {act.ip}
+                          <div style={{ fontFamily: 'monospace' }}>{act.ip}</div>
+                          <div style={{ fontSize: '0.7rem', color: dark ? '#4d8a6a' : '#9ca3af', marginTop: 2 }}>{timeAgo(act.time)}</div>
                         </td>
                       </tr>
                     );
@@ -391,9 +449,10 @@ export default function RecentActivities() {
                 </tbody>
               </table>
             </div>
+            )}
 
             {/* ── Pagination ── */}
-            {totalPages > 1 && (
+            {!loading && !error && totalPages > 1 && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderTop: `1px solid ${border}` }}>
                 <span style={{ fontSize: '0.75rem', color: dark ? '#4d8a6a' : '#9ca3af' }}>Page {page} of {totalPages} · {filtered.length} activit{filtered.length !== 1 ? 'ies' : 'y'}</span>
                 <div style={{ display: 'flex', gap: 6 }}>

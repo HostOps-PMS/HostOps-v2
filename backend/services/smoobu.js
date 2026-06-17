@@ -40,14 +40,24 @@ async function smoobuRequest(path, apiKey, userId) {
     },
   });
 
+  const text = await res.text();
+
   if (!res.ok) {
-    const text = await res.text();
     const err = new Error(`Smoobu ${res.status}: ${text}`);
     err.status = res.status;
     throw err;
   }
 
-  const data = await res.json();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    console.warn(`[smoobu] non-JSON response for ${path} (status ${res.status}):`, text.slice(0, 200));
+    const err = new Error(`Smoobu returned non-JSON for ${path}`);
+    err.status = 502;
+    throw err;
+  }
+
   setCache(cacheKey, data);
   return data;
 }
@@ -86,14 +96,27 @@ async function smoobuRequestAllPages(basePath, apiKey, userId, { showCancellatio
 // GET API KEY
 // ─────────────────────────────────────────────────────────────────
 export function getApiKeyForUser(user) {
+  // Root-level key (MODE A — per-user Smoobu account)
   if (user.smoobuApiKey && user.smoobuApiKey.trim()) {
     return user.smoobuApiKey.trim();
   }
 
+  // Shared env key (MODE B — legacy shared account)
   const envKey = process.env.SMOOBU_API_KEY;
   if (envKey && envKey.trim()) {
     return envKey.trim();
   }
+
+  // Per-property key fallback: keys stored on user.properties[].smoobuApiKey.
+  // The dashboard route injects the selected property's key at root level before
+  // calling smoobu functions, but other routes (messages, etc.) may not have a
+  // propertyDbId context — fall back to the first property key found.
+  // All properties for a given user typically share the same Smoobu account,
+  // so the first key is a safe default when no specific property is selected.
+  const propKey = (user.properties || [])
+    .map((p) => p.smoobuApiKey?.trim())
+    .find(Boolean);
+  if (propKey) return propKey;
 
   const err = new Error('No Smoobu API key connected. Please connect your Smoobu account.');
   err.code = 'NO_SMOOBU_KEY';
@@ -104,9 +127,15 @@ function getCacheUserId(user) {
   // Include a fingerprint of the active smoobuApiKey in the cache key so that
   // switching properties (which changes the API key) busts the cache immediately.
   // Without this, the old property's cached data is returned even after switching.
-  const keyHint = user.smoobuApiKey
-    ? user.smoobuApiKey.trim().slice(-8)   // last 8 chars — enough to differentiate
-    : 'env';
+  let keyHint;
+  if (user.smoobuApiKey?.trim()) {
+    keyHint = user.smoobuApiKey.trim().slice(-8);
+  } else if (process.env.SMOOBU_API_KEY?.trim()) {
+    keyHint = 'env';
+  } else {
+    const propKey = (user.properties || []).map((p) => p.smoobuApiKey?.trim()).find(Boolean);
+    keyHint = propKey ? propKey.slice(-8) : 'none';
+  }
   return `${String(user._id)}:${keyHint}`;
 }
 
@@ -288,6 +317,9 @@ export async function getInbox(user, { limit = 250 } = {}) {
         apiKey,
         userId
       );
+      if (page === 1) {
+        console.log('[smoobu] /threads response keys:', Object.keys(data || {}), '| threads:', (data.threads || []).length, '| page_count:', data.page_count);
+      }
       const threads = data.threads || [];
       allThreads.push(...threads);
 
@@ -591,11 +623,10 @@ export async function getReservationMessages(user, reservationId) {
   try {
     return smoobuRequest(`/reservations/${reservationId}/messages`, apiKey, userId);
   } catch (err) {
-    // Smoobu returns non-2xx when a reservation has no messages thread yet.
-    // Treat as empty rather than surfacing a 500.
-    if (err.status === 404 || err.status === 422) {
-      return { messages: [] };
-    }
+    // 404 means no message thread exists yet for this reservation — return empty.
+    // All other errors (500, 502, auth errors) are real failures and should surface.
+    if (err.status === 404) return { messages: [] };
+    console.warn(`[smoobu] messages for reservation ${reservationId} failed (${err.status}): ${err.message}`);
     throw err;
   }
 }

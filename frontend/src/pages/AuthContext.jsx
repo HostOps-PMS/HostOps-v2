@@ -83,15 +83,21 @@ export function AuthProvider({ children }) {
   }, []);
 
   // ── Silent token refresh ──────────────────────────────────────────
-  // The refreshPromiseRef mutex ensures that if multiple callers (e.g.
-  // concurrent fetchWithAuth retries or an authFetch from apiService)
-  // trigger this at the same time, only ONE POST /auth/refresh is sent.
-  // All concurrent callers share the same in-flight promise and receive
-  // the same result — the server never sees the same RT cookie twice.
+  // Two-layer mutex to prevent duplicate /auth/refresh calls:
+  //
+  // 1. refreshPromiseRef (per-tab): dedups concurrent callers within the
+  //    same tab (e.g. two simultaneous 401 retries). All share one promise.
+  //
+  // 2. navigator.locks 'hp-token-refresh' (cross-tab): serialises refresh
+  //    calls across browser tabs. Without this, two tabs whose access tokens
+  //    expire simultaneously both POST /auth/refresh with the same RT cookie —
+  //    one succeeds and rotates the token; the other presents the now-revoked
+  //    token, triggering reuse-attack detection that wipes all sessions.
+  //    With the lock, Tab B waits, then refreshes with the updated cookie.
   const refreshToken = useCallback(async () => {
     if (refreshPromiseRef.current) return refreshPromiseRef.current;
 
-    refreshPromiseRef.current = (async () => {
+    const doRefresh = async () => {
       try {
         const res = await fetch(`${HP_API_BASE}/auth/refresh`, {
           method:      'POST',
@@ -116,7 +122,11 @@ export function AuthProvider({ children }) {
       } finally {
         refreshPromiseRef.current = null;
       }
-    })();
+    };
+
+    refreshPromiseRef.current = (typeof navigator !== 'undefined' && navigator.locks)
+      ? navigator.locks.request('hp-token-refresh', doRefresh)
+      : doRefresh();
 
     return refreshPromiseRef.current;
   }, [setUser]);
@@ -187,46 +197,62 @@ export function AuthProvider({ children }) {
     // Retry up to 2 times for 5xx / network errors (Render cold-start can
     // return 502/503 for ~30 s while the container wakes up). Never retry
     // on 401/403 — those are genuine auth failures and must not be masked.
-    async function hydrate(attempt = 0) {
+    //
+    // Uses the same 'hp-token-refresh' Web Lock as refreshToken() so that
+    // a tab opening while another tab is mid-refresh doesn't send two
+    // simultaneous /auth/refresh requests with the same RT cookie.
+    // Loop-based (not recursive) to avoid re-acquiring the lock on retries.
+    async function hydrate() {
+      const doHydrate = async () => {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          if (controller.signal.aborted) return;
+          try {
+            const res = await fetch(`${HP_API_BASE}/auth/refresh`, {
+              method:      'POST',
+              credentials: 'include',
+              headers:     { 'x-api-key': import.meta.env.VITE_API_KEY },
+              signal:      controller.signal,
+            });
+
+            if (res.ok) {
+              const data = await res.json();
+              accessTokenRef.current = data.accessToken || null;
+              if (data.sk)   sessionKeyRef.current = data.sk;
+              if (data.user) setUser(data.user);
+              console.info('[Auth] hydrate OK — session restored');
+              return;
+            }
+
+            if (res.status >= 500 && attempt < 2) {
+              console.warn('[Auth] hydrate — server error', res.status, '— retrying (attempt', attempt + 1, ')');
+              await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+            } else {
+              accessTokenRef.current = null;
+              sessionKeyRef.current  = null;
+              const body = await res.json().catch(() => ({}));
+              console.warn('[Auth] hydrate FAILED — status', res.status, 'code', body.code ?? '—');
+              return;
+            }
+          } catch (err) {
+            if (err.name === 'AbortError') return;
+            if (attempt < 2) {
+              console.warn('[Auth] hydrate — network error, retrying (attempt', attempt + 1, '):', err.message);
+              await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+            } else {
+              accessTokenRef.current = null;
+              sessionKeyRef.current  = null;
+              console.error('[Auth] hydrate ERROR —', err.message);
+            }
+          }
+        }
+      };
+
       try {
-        const res = await fetch(`${HP_API_BASE}/auth/refresh`, {
-          method:      'POST',
-          credentials: 'include',
-          headers:     { 'x-api-key': import.meta.env.VITE_API_KEY },
-          signal:      controller.signal,
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          accessTokenRef.current = data.accessToken || null;
-          if (data.sk)   sessionKeyRef.current = data.sk;
-          if (data.user) setUser(data.user);
-          console.info('[Auth] hydrate OK — session restored');
-          return; // success path exits here; finally still runs
-        }
-
-        if (res.status >= 500 && attempt < 2) {
-          // Server error (cold start / 502) — back off and retry
-          console.warn('[Auth] hydrate — server error', res.status, '— retrying (attempt', attempt + 1, ')');
-          await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
-          if (!controller.signal.aborted) { await hydrate(attempt + 1); return; }
+        if (typeof navigator !== 'undefined' && navigator.locks) {
+          await navigator.locks.request('hp-token-refresh', doHydrate);
         } else {
-          accessTokenRef.current = null;
-          sessionKeyRef.current  = null;
-          const body = await res.json().catch(() => ({}));
-          console.warn('[Auth] hydrate FAILED — status', res.status, 'code', body.code ?? '—');
+          await doHydrate();
         }
-      } catch (err) {
-        if (err.name === 'AbortError') return;
-        // Network error (server unreachable / cold start) — retry
-        if (attempt < 2) {
-          console.warn('[Auth] hydrate — network error, retrying (attempt', attempt + 1, '):', err.message);
-          await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
-          if (!controller.signal.aborted) { await hydrate(attempt + 1); return; }
-        }
-        accessTokenRef.current = null;
-        sessionKeyRef.current  = null;
-        console.error('[Auth] hydrate ERROR —', err.message);
       } finally {
         if (!controller.signal.aborted) setIsReady(true);
       }

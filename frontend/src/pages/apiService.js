@@ -120,9 +120,16 @@ export async function fetchDashboard({ from, to, apartmentId, propertyDbId }, au
 
 /**
  * Fetches messages for a specific reservation.
+ * Passes propertyDbId so the backend can inject the per-property Smoobu API key,
+ * matching the same injection the dashboard route does for inbox threads.
  */
 export async function fetchMessages(reservationId, auth) {
-  return authFetch(`/api/messages/${reservationId}`, {}, auth);
+  let query = '';
+  try {
+    const propertyDbId = sessionStorage.getItem('hp_selected_property_id');
+    if (propertyDbId) query = `?propertyDbId=${encodeURIComponent(propertyDbId)}`;
+  } catch { /* sessionStorage blocked — proceed without propertyDbId */ }
+  return authFetch(`/api/messages/${reservationId}${query}`, {}, auth);
 }
 
 /**

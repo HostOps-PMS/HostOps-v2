@@ -639,6 +639,32 @@ router.post('/messages/reply', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.get('/messages/:reservationId', async (req, res, next) => {
   try {
+    // ── Per-property Smoobu API key injection ────────────────────────────────
+    // Same logic as GET /api/dashboard: when the frontend passes ?propertyDbId=
+    // the user has per-property smoobuApiKeys stored on user.properties[].
+    // We inject the matching key at root level so getApiKeyForUser() picks it up.
+    const propertyDbId = req.query.propertyDbId;
+    if (propertyDbId) {
+      if (!mongoose.Types.ObjectId.isValid(propertyDbId)) {
+        return res.status(400).json({ error: 'Invalid property ID' });
+      }
+      const matchedProp = (req.user.properties || []).find(
+        (p) => String(p._id) === String(propertyDbId)
+      );
+      if (!matchedProp) {
+        return res.status(403).json({ error: 'You do not own this property' });
+      }
+      if (req.isStaff && !req.staffPropertyDbIds?.includes(String(propertyDbId))) {
+        return res.status(403).json({ error: 'You do not have access to this property' });
+      }
+      if (matchedProp?.smoobuApiKey?.trim()) {
+        const baseUser = typeof req.user.toObject === 'function'
+          ? req.user.toObject()
+          : { ...req.user };
+        req.user = { ...baseUser, smoobuApiKey: matchedProp.smoobuApiKey.trim() };
+      }
+    }
+
     await assertReservationOwnership(req, req.params.reservationId);
 
     const data = await getReservationMessages(req.user, req.params.reservationId);
@@ -660,8 +686,40 @@ router.get('/messages/:reservationId', async (req, res, next) => {
     if (err.status === 404 || err.message?.includes('not found')) {
       return res.status(404).json({ error: err.message });
     }
+    // Pass Smoobu error status through so the frontend gets a meaningful code
+    // (e.g. 502 for non-JSON body, 422 for unprocessable) instead of always 500.
+    if (err.status && err.status >= 400) {
+      return res.status(err.status).json({ error: err.message });
+    }
     next(err);
   }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// GET /api/debug/threads
+// Hits Smoobu's /threads endpoint directly and returns the raw response
+// so we can see what Smoobu is actually returning (keys, count, errors).
+// Remove this endpoint after debugging is complete.
+// ─────────────────────────────────────────────────────────────────
+router.get('/debug/threads', async (req, res, next) => {
+  try {
+    const { getApiKeyForUser } = await import('../services/smoobu.js');
+    const apiKey = getApiKeyForUser(req.user);
+    const smoobuRes = await fetch('https://login.smoobu.com/api/threads?page=1&pageSize=10', {
+      headers: { 'Api-Key': apiKey, 'Cache-Control': 'no-cache' },
+    });
+    const text = await smoobuRes.text();
+    let parsed = null;
+    try { parsed = JSON.parse(text); } catch { /* non-JSON */ }
+    res.json({
+      status:       smoobuRes.status,
+      statusText:   smoobuRes.statusText,
+      responseKeys: parsed ? Object.keys(parsed) : null,
+      threadsCount: parsed?.threads?.length ?? null,
+      pageCount:    parsed?.page_count ?? null,
+      rawPreview:   text.slice(0, 500),
+    });
+  } catch (err) { next(err); }
 });
 
 // ─────────────────────────────────────────────────────────────────
