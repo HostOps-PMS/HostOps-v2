@@ -92,7 +92,7 @@ publicBugReportRouter.get('/my-reports', async (req, res, next) => {
     const email = (req.query.email || '').toLowerCase().trim();
     if (!email) return res.json([]);
     const reports = await BugReport.find({ email })
-      .select('page severity description status createdAt')
+      .select('page severity description status resolvedNote createdAt')
       .sort({ createdAt: -1 })
       .limit(20)
       .lean();

@@ -1005,6 +1005,11 @@ export default function Navbar() {
                               </div>
                               <div style={{ fontSize: '12px', fontWeight: 600, color: dark ? '#eaf5f0' : '#0c1c14', marginBottom: 2 }}>{r.page || 'General'}</div>
                               <div style={{ fontSize: '11px', color: dark ? '#7ab89a' : '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>
+                              {r.status === 'dismissed' && r.resolvedNote && (
+                                <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, background: dark ? '#2a0d0d' : '#fef2f2', border: `1px solid ${dark ? '#5c1a1a' : '#fecaca'}`, fontSize: '11px', color: dark ? '#f87171' : '#dc2626', lineHeight: 1.4 }}>
+                                  <strong>Reason:</strong> {r.resolvedNote}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -1225,6 +1230,11 @@ export default function Navbar() {
                             </div>
                             <div style={{ fontSize: '12px', fontWeight: 600, color: dark ? '#eaf5f0' : '#0c1c14', marginBottom: 2 }}>{r.page || 'General'}</div>
                             <div style={{ fontSize: '11px', color: dark ? '#7ab89a' : '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>
+                            {r.status === 'dismissed' && r.resolvedNote && (
+                              <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, background: dark ? '#2a0d0d' : '#fef2f2', border: `1px solid ${dark ? '#5c1a1a' : '#fecaca'}`, fontSize: '11px', color: dark ? '#f87171' : '#dc2626', lineHeight: 1.4 }}>
+                                <strong>Reason:</strong> {r.resolvedNote}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
