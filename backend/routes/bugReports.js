@@ -5,7 +5,7 @@ import BugReport from '../models/BugReport.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const NOTIFY_EMAIL = 'innovation@telexph.com';
+const NOTIFY_EMAIL = 'cjcoloma02@gmail.com';
 
 // ═══════════════════════════════════════════════════════════════
 // PUBLIC ROUTER — no auth required (clients submit from footer)
