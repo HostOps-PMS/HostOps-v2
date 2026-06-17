@@ -53,6 +53,8 @@ export default function BugReportsPage() {
   const [page, setPage]         = useState(1);
   const [selected, setSelected] = useState(null);
   const [updating, setUpdating] = useState(false);
+  const [declineTarget, setDeclineTarget] = useState(null);
+  const [declineReason, setDeclineReason] = useState('');
 
   const surface  = dark ? '#132a1e' : '#fff';
   const border   = dark ? '#1e3a2a' : '#e5e7eb';
@@ -77,12 +79,12 @@ export default function BugReportsPage() {
 
   useEffect(() => { loadReports(); }, []);
 
-  async function updateStatus(id, status) {
+  async function updateStatus(id, status, note = '') {
     setUpdating(true);
     try {
       const res = await fetchWithAuth(`${API_BASE}/api/bug-reports/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, resolvedNote: note }),
       });
       if (!res.ok) throw new Error('Failed to update');
       const updated = await res.json();
@@ -294,7 +296,7 @@ export default function BugReportsPage() {
                                     background: dark ? '#052e16' : '#d1fae5', color: dark ? '#4ade80' : '#059669',
                                     cursor: updating ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
                                   }}>Approve</button>
-                                  <button onClick={() => updateStatus(r._id, 'dismissed')} disabled={updating} style={{
+                                  <button onClick={() => { setDeclineTarget(r); setDeclineReason(''); }} disabled={updating} style={{
                                     padding: '4px 10px', borderRadius: 6, border: 'none', fontSize: '0.72rem', fontWeight: 600,
                                     background: dark ? '#2a0d0d' : '#fee2e2', color: dark ? '#f87171' : '#dc2626',
                                     cursor: updating ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
@@ -409,7 +411,11 @@ export default function BugReportsPage() {
                     {Object.entries(STATUS_META).map(([key, meta]) => {
                       const active = selected.status === key;
                       return (
-                        <button key={key} onClick={() => !active && updateStatus(selected._id, key)} disabled={active || updating}
+                        <button key={key} onClick={() => {
+                          if (active) return;
+                          if (key === 'dismissed') { setDeclineTarget(selected); setDeclineReason(''); }
+                          else updateStatus(selected._id, key);
+                        }} disabled={active || updating}
                           style={{
                             padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
                             border: `1.5px solid ${active ? (dark ? meta.darkColor : meta.color) : border}`,
@@ -422,6 +428,66 @@ export default function BugReportsPage() {
                       );
                     })}
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Decline Reason Modal ── */}
+          {declineTarget && (
+            <div onClick={() => setDeclineTarget(null)} style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 10001,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+            }}>
+              <div onClick={e => e.stopPropagation()} style={{
+                background: surface, borderRadius: 16, border: `1px solid ${border}`,
+                width: '100%', maxWidth: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+                animation: 'br-enter 0.2s ease', padding: '24px',
+              }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: textMain, margin: '0 0 6px' }}>Decline Bug Report</h3>
+                <p style={{ fontSize: 12, color: textMuted, margin: '0 0 16px', lineHeight: 1.5 }}>
+                  Explain why this report is being declined. The client will see this reason.
+                </p>
+
+                <textarea
+                  autoFocus
+                  value={declineReason}
+                  onChange={e => setDeclineReason(e.target.value)}
+                  placeholder="e.g. This is expected behavior, not a bug…"
+                  rows={3}
+                  maxLength={500}
+                  style={{
+                    width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: 10,
+                    border: `1.5px solid ${border}`, fontSize: 13, color: textMain,
+                    background: inputBg, outline: 'none', resize: 'vertical',
+                    fontFamily: 'inherit', lineHeight: 1.5,
+                  }}
+                  onFocus={e => { e.target.style.borderColor = '#ef4444'; }}
+                  onBlur={e => { e.target.style.borderColor = border; }}
+                />
+                <div style={{ fontSize: 11, color: textMuted, textAlign: 'right', marginTop: 4 }}>{declineReason.length}/500</div>
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                  <button onClick={() => setDeclineTarget(null)} disabled={updating} style={{
+                    flex: 1, padding: '10px 16px', borderRadius: 10,
+                    border: `1px solid ${border}`, background: 'transparent',
+                    color: textMain, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                  }}>Cancel</button>
+                  <button
+                    onClick={async () => {
+                      await updateStatus(declineTarget._id, 'dismissed', declineReason.trim());
+                      setDeclineTarget(null);
+                      setDeclineReason('');
+                    }}
+                    disabled={updating || !declineReason.trim()}
+                    style={{
+                      flex: 1, padding: '10px 16px', borderRadius: 10, border: 'none',
+                      background: !declineReason.trim() ? (dark ? '#1e3a2a' : '#e5e7eb') : '#ef4444',
+                      color: !declineReason.trim() ? (dark ? '#4d8a6a' : '#9ca3af') : '#fff',
+                      fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                      cursor: !declineReason.trim() || updating ? 'not-allowed' : 'pointer',
+                    }}
+                  >{updating ? 'Declining…' : 'Decline Report'}</button>
                 </div>
               </div>
             </div>
