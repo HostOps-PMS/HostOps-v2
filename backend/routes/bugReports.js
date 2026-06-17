@@ -27,8 +27,19 @@ const upload = multer({
 // ═══════════════════════════════════════════════════════════════
 export const publicBugReportRouter = express.Router();
 
-publicBugReportRouter.post('/bug-report', upload.array('images', 5), async (req, res, next) => {
+publicBugReportRouter.post('/bug-report', (req, res, next) => {
+  upload.array('images', 5)(req, res, (err) => {
+    if (err) {
+      console.error('[BugReport] Multer error:', err.message);
+      return res.status(400).json({ error: err.message });
+    }
+    handleBugReport(req, res, next);
+  });
+});
+
+async function handleBugReport(req, res, next) {
   try {
+    console.log('[BugReport] Body:', JSON.stringify(req.body));
     const data = z.object({
       email:       z.string().email().max(254).trim(),
       name:        z.string().max(100).trim().optional().default(''),
@@ -67,10 +78,13 @@ publicBugReportRouter.post('/bug-report', upload.array('images', 5), async (req,
     return res.status(201).json({ message: 'Bug report submitted successfully.' });
   } catch (err) {
     if (req.files) req.files.forEach(f => { try { fs.unlinkSync(f.path); } catch {} });
-    if (err.name === 'ZodError') return res.status(400).json({ error: 'Validation failed', details: err.errors });
+    if (err.name === 'ZodError') {
+      console.error('[BugReport] Zod errors:', JSON.stringify(err.errors));
+      return res.status(400).json({ error: 'Validation failed', details: err.errors });
+    }
     next(err);
   }
-});
+}
 
 // ═══════════════════════════════════════════════════════════════
 // ADMIN ROUTER — requires auth + admin role
