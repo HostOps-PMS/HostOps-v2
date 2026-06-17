@@ -236,21 +236,43 @@ export default function ClientModal({ client, onClose, onUpdated }) {
 
   // ── Replaces window.confirm for remove property ───────────────────
   const removeProperty = (index) => {
+    const prop = form.properties[index];
+    const isNewProperty = !prop._id; // Not yet in the database
+
     setConfirmDialog({
       title: 'Remove Property',
-      message: 'Are you sure you want to remove this property? This action cannot be undone.',
+      message: isNewProperty
+        ? 'Are you sure you want to remove this property?'
+        : 'Are you sure you want to remove this property? This action cannot be undone.',
       confirmLabel: 'Remove',
       confirmVariant: 'danger',
       onConfirm: () => {
         setConfirmDialog(null);
-        setOtpAction({ type: 'remove-prop', index });
-        sendLoginOtp().catch(err => alert(err.message));
+        if (isNewProperty) {
+          // No OTP needed — property hasn't been saved to DB yet
+          setForm(f => ({ ...f, properties: f.properties.filter((_, i) => i !== index) }));
+        } else {
+          // Existing property — require OTP verification
+          setOtpAction({ type: 'remove-prop', index });
+          sendLoginOtp().catch(err => alert(err.message));
+        }
       },
     });
   };
 
   // ── Replaces window.confirm for show API key ──────────────────────
   const showApiKey = (index, propertyId) => {
+    // New property (not yet in DB) — no OTP needed
+    if (!propertyId) {
+      setForm(f => ({
+        ...f,
+        properties: f.properties.map((p, i) => (
+          i === index ? { ...p, isUnmasked: true } : p
+        ))
+      }));
+      return;
+    }
+
     setConfirmDialog({
       title: 'Show API Key',
       message: 'Proceed in showing the API key? You will need to verify via OTP.',

@@ -183,7 +183,7 @@ export function AuthProvider({ children }) {
     try { localStorage.removeItem('hostpilot_user'); } catch { /* ignore */ }
     try { sessionStorage.removeItem('hp_must_change_password'); } catch { /* ignore */ }
     try { sessionStorage.removeItem('hp_must_change_pin'); } catch { /* ignore */ }
-    try { sessionStorage.removeItem('hp_selected_property_id'); } catch { /* ignore */ }
+    try { safeStorage.removeItem('hp_selected_property_id'); } catch { /* ignore */ }
   }, []);
 
   // ── Silent refresh on mount ───────────────────────────────────────
