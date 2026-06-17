@@ -40,14 +40,24 @@ async function smoobuRequest(path, apiKey, userId) {
     },
   });
 
+  const text = await res.text();
+
   if (!res.ok) {
-    const text = await res.text();
     const err = new Error(`Smoobu ${res.status}: ${text}`);
     err.status = res.status;
     throw err;
   }
 
-  const data = await res.json();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    console.warn(`[smoobu] non-JSON response for ${path} (status ${res.status}):`, text.slice(0, 200));
+    const err = new Error(`Smoobu returned non-JSON for ${path}`);
+    err.status = 502;
+    throw err;
+  }
+
   setCache(cacheKey, data);
   return data;
 }
@@ -288,6 +298,9 @@ export async function getInbox(user, { limit = 250 } = {}) {
         apiKey,
         userId
       );
+      if (page === 1) {
+        console.log('[smoobu] /threads response keys:', Object.keys(data || {}), '| threads:', (data.threads || []).length, '| page_count:', data.page_count);
+      }
       const threads = data.threads || [];
       allThreads.push(...threads);
 
@@ -591,12 +604,12 @@ export async function getReservationMessages(user, reservationId) {
   try {
     return smoobuRequest(`/reservations/${reservationId}/messages`, apiKey, userId);
   } catch (err) {
-    // Smoobu returns non-2xx when a reservation has no messages thread yet.
-    // Treat as empty rather than surfacing a 500.
-    if (err.status === 404 || err.status === 422) {
-      return { messages: [] };
-    }
-    throw err;
+    // 401/403 are real auth errors — surface them.
+    // Everything else (404, 422, 502 for non-JSON body, Smoobu 500) means the
+    // reservation has no messages thread yet — return empty rather than 500.
+    if (err.status === 401 || err.status === 403) throw err;
+    console.warn(`[smoobu] messages for reservation ${reservationId} failed (${err.status}): ${err.message}`);
+    return { messages: [] };
   }
 }
 
