@@ -1,6 +1,6 @@
 import { fetchWithAuth } from '../../../lib/authUtils';
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'https://api.hostops.online';
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'https://api.hostops.online';
 
 export function apiFetch(path, opts = {}) {
   return fetchWithAuth(`${API_BASE}${path}`, opts);
