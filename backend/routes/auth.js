@@ -63,7 +63,7 @@ function sanitizeUser(user) {
     lastName:           obj.lastName,
     businessName:       obj.businessName,
     role:               obj.role,
-    tag:                obj.tag,
+    // tag is intentionally omitted — never expose Main Admin identity
     isVerified:         obj.isVerified,
     mustChangePassword: obj.mustChangePassword,
     mustChangePin:      obj.mustChangePin,
@@ -218,6 +218,11 @@ router.post('/register', async (req, res, next) => {
     const rawToken = randomToken();
     const hashed   = hashToken(rawToken);
 
+    // ── SECURITY: Hardcode role to 'client' ────────────────────────
+    // Even though the Zod schema above strips unknown fields, we
+    // explicitly set role here as defense-in-depth. An attacker who
+    // somehow bypasses validation can never escalate to admin/team_leader
+    // through the public registration endpoint.
     const user = await User.create({
       email:             data.email.toLowerCase(),
       password:          data.password,
@@ -226,6 +231,8 @@ router.post('/register', async (req, res, next) => {
       businessName:      [data.firstName, data.lastName].filter(Boolean).join(' ').trim() || data.firstName,
       propertyTagPrefix: data.propertyTagPrefix || '',
       smoobuApiKey:      data.smoobuApiKey || null,
+      role:              'client',   // ← forced, never from request
+      tag:               '',         // ← forced, never from request
       isVerified:        false,
       verifyToken:       hashed,
       verifyTokenExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -336,7 +343,7 @@ router.post('/login', async (req, res, next) => {
       return res.status(403).json({ error: 'Please verify your email first' });
     }
 
-    const isAdmin = user.tag === 'Main Admin' || user.role === 'admin' || user.email === process.env.ADMIN_ROLE;
+    const isAdmin = (user.tag === 'Main Admin' && user.role === 'admin') || user.email === process.env.ADMIN_ROLE;
     let isTrusted = false;
 
     if (!isAdmin) {
@@ -502,7 +509,7 @@ router.post('/verify-login-otp', async (req, res, next) => {
       setRefreshCookie(res, rawRefresh, req);
       const otpSk = createSessionKey(otpJti, accessTokenExpiryMs());
 
-      const isAdmin = user.tag === 'Main Admin' || user.role === 'admin' || user.email === process.env.ADMIN_ROLE;
+      const isAdmin = user.tag === 'Main Admin' && user.role === 'admin' || user.email === process.env.ADMIN_ROLE;
       return res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin, ...(otpSk ? { sk: otpSk } : {}) });
     }
 
