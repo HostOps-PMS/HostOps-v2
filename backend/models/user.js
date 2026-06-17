@@ -137,6 +137,32 @@ userSchema.pre('save', function(next) {
   next();
 });
 
+// ── SECURITY: Protect role and tag at the database level ──────────
+// This is the last line of defense. Even if every route-level check
+// is somehow bypassed, these guards prevent privilege escalation.
+userSchema.pre('save', function(next) {
+  // Guard 1: 'tag' can never be changed once set (protects Main Admin identity).
+  // Only allow setting tag on brand-new documents (isNew).
+  if (!this.isNew && this.isModified('tag')) {
+    // Revert to the original value — the DB value is authoritative.
+    this.tag = this.get('tag', null, { getters: false });
+    // If Mongoose still thinks it's modified (edge case), unmark it.
+    this.unmarkModified('tag');
+  }
+
+  // Guard 2: Only the Main Admin document (tag === 'Main Admin') can
+  // have role === 'admin'. Any other document trying to set admin role
+  // gets forced back to 'client'.
+  if (this.role === 'admin' && this.tag !== 'Main Admin') {
+    // Allow only if ADMIN_ROLE env matches (for the initial seed)
+    if (!process.env.ADMIN_ROLE || this.email !== process.env.ADMIN_ROLE) {
+      this.role = 'client';
+    }
+  }
+
+  next();
+});
+
 // ── Hash password and pin before save ─────────────────────────────
 userSchema.pre('save', async function(next) {
   if (this.isModified('password')) {
@@ -161,7 +187,11 @@ userSchema.methods.toJSON = function() {
   delete obj.verifyTokenExpiry;
   delete obj.resetToken;
   delete obj.resetTokenExpiry;
+  delete obj.loginOtp;
+  delete obj.loginOtpExpiry;
+  delete obj.totpSecret;
   delete obj.lastPinFailAt;
+  delete obj.tag;              // never expose Main Admin identity
   delete obj.__v;
   if (Array.isArray(obj.properties)) {
     obj.properties = obj.properties.map(({ smoobuApiKey, ...rest }) => rest);
