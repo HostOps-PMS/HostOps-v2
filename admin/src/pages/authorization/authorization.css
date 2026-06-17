@@ -733,3 +733,19 @@ appearance: none;
   }
 }
 
+/* ── Lock authorization card to light mode regardless of dark-mode toggle ──
+   html[data-theme="dark"] .am-form-panel has specificity (0,2,1) which beats
+   html[data-theme="dark"] (0,1,1) from App.css, so these always win.
+   All child elements that consume var(--color-*) inherit the light values. ── */
+html[data-theme="dark"] .am-form-panel {
+  --color-surface:     #ffffff;
+  --color-surface-2:   #f0f5f2;
+  --color-border:      #e3ede8;
+  --color-text:        #0c1c14;
+  --color-muted:       #6a8b7c;
+  --color-placeholder: #9ab8a9;
+  --color-brand-light: rgba(38, 166, 118, 0.12);
+  --shadow-card:       0 20px 60px rgba(4, 14, 9, 0.10);
+  background:          #ffffff;
+}
+
