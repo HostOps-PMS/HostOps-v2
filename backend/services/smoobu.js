@@ -604,12 +604,11 @@ export async function getReservationMessages(user, reservationId) {
   try {
     return smoobuRequest(`/reservations/${reservationId}/messages`, apiKey, userId);
   } catch (err) {
-    // 401/403 are real auth errors — surface them.
-    // Everything else (404, 422, 502 for non-JSON body, Smoobu 500) means the
-    // reservation has no messages thread yet — return empty rather than 500.
-    if (err.status === 401 || err.status === 403) throw err;
+    // 404 means no message thread exists yet for this reservation — return empty.
+    // All other errors (500, 502, auth errors) are real failures and should surface.
+    if (err.status === 404) return { messages: [] };
     console.warn(`[smoobu] messages for reservation ${reservationId} failed (${err.status}): ${err.message}`);
-    return { messages: [] };
+    throw err;
   }
 }
 

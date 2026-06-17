@@ -660,8 +660,40 @@ router.get('/messages/:reservationId', async (req, res, next) => {
     if (err.status === 404 || err.message?.includes('not found')) {
       return res.status(404).json({ error: err.message });
     }
+    // Pass Smoobu error status through so the frontend gets a meaningful code
+    // (e.g. 502 for non-JSON body, 422 for unprocessable) instead of always 500.
+    if (err.status && err.status >= 400) {
+      return res.status(err.status).json({ error: err.message });
+    }
     next(err);
   }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// GET /api/debug/threads
+// Hits Smoobu's /threads endpoint directly and returns the raw response
+// so we can see what Smoobu is actually returning (keys, count, errors).
+// Remove this endpoint after debugging is complete.
+// ─────────────────────────────────────────────────────────────────
+router.get('/debug/threads', async (req, res, next) => {
+  try {
+    const { getApiKeyForUser } = await import('../services/smoobu.js');
+    const apiKey = getApiKeyForUser(req.user);
+    const smoobuRes = await fetch('https://login.smoobu.com/api/threads?page=1&pageSize=10', {
+      headers: { 'Api-Key': apiKey, 'Cache-Control': 'no-cache' },
+    });
+    const text = await smoobuRes.text();
+    let parsed = null;
+    try { parsed = JSON.parse(text); } catch { /* non-JSON */ }
+    res.json({
+      status:       smoobuRes.status,
+      statusText:   smoobuRes.statusText,
+      responseKeys: parsed ? Object.keys(parsed) : null,
+      threadsCount: parsed?.threads?.length ?? null,
+      pageCount:    parsed?.page_count ?? null,
+      rawPreview:   text.slice(0, 500),
+    });
+  } catch (err) { next(err); }
 });
 
 // ─────────────────────────────────────────────────────────────────
