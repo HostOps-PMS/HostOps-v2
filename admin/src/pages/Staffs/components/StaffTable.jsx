@@ -232,7 +232,7 @@ return (
           {showClientDropdown && (
             <div
               style={{
-                position: 'absolute', top: 'calc(100% + 4px)', left: 0,
+                position: 'absolute', top: 'calc(100% + 4px)', right: 0,
                 zIndex: 300, background: dark ? '#132a1e' : '#fff',
                 border: `1.5px solid ${dark ? '#1e3a2a' : '#e2e8f0'}`, borderRadius: 10,
                 boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
