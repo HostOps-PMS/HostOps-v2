@@ -1,5 +1,19 @@
 // frontend/src/pages/Login/services/authservice.js
 import safeStorage from '../../safeStorage';
+import fpPromise from '@fingerprintjs/fingerprintjs';
+
+let fpCache = null;
+async function getDeviceFingerprint() {
+  if (fpCache) return fpCache;
+  try {
+    const fp = await fpPromise.load();
+    const result = await fp.get();
+    fpCache = result.visitorId;
+    return fpCache;
+  } catch (e) {
+    return 'unknown';
+  }
+}
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.hostops.online';
 
@@ -9,10 +23,15 @@ const API_BASE = import.meta.env.VITE_API_URL || 'https://api.hostops.online';
 // Caller is responsible for auth.setToken(data.accessToken).
 // ─────────────────────────────────────────────────────────────────
 export async function loginUser({ email, password, deviceId }) {
+  const fpHash = await getDeviceFingerprint();
   const res = await fetch(`${API_BASE}/auth/login`, {
     method:      'POST',
     credentials: 'include',
-    headers:     { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
+    headers:     { 
+      'Content-Type': 'application/json', 
+      'x-api-key': import.meta.env.VITE_API_KEY,
+      'x-device-fp': fpHash
+    },
     body:        JSON.stringify({ email, password, deviceId }),
   });
   const data = await res.json();

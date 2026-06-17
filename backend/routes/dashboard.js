@@ -7,6 +7,7 @@ import {
   getApartments, getBookings, getRates, getDashboard,
   getReservationMessages, sendReplyToGuest
 } from '../services/smoobu.js';
+import { isEncrypted } from '../utils/encryption.js';
 
 const router = express.Router();
 
@@ -330,7 +331,8 @@ router.get('/dashboard', async (req, res, next) => {
         }
       }
 
-      if (matchedProp?.smoobuApiKey?.trim()) {
+      const propKey = matchedProp?.smoobuApiKey?.trim();
+      if (propKey && !isEncrypted(propKey)) {
         // Spread req.user into a plain object and inject the matched property's
         // smoobuApiKey at root level so smoobu.js picks it up via MODE A.
         const baseUser = typeof req.user.toObject === 'function'
@@ -339,7 +341,7 @@ router.get('/dashboard', async (req, res, next) => {
 
         userForDashboard = {
           ...baseUser,
-          smoobuApiKey: matchedProp.smoobuApiKey.trim(),
+          smoobuApiKey: propKey,
         };
         usingSelectedPropertyApiKey = true;
       }
@@ -657,11 +659,12 @@ router.get('/messages/:reservationId', async (req, res, next) => {
       if (req.isStaff && !req.staffPropertyDbIds?.includes(String(propertyDbId))) {
         return res.status(403).json({ error: 'You do not have access to this property' });
       }
-      if (matchedProp?.smoobuApiKey?.trim()) {
+      const msgPropKey = matchedProp?.smoobuApiKey?.trim();
+      if (msgPropKey && !isEncrypted(msgPropKey)) {
         const baseUser = typeof req.user.toObject === 'function'
           ? req.user.toObject()
           : { ...req.user };
-        req.user = { ...baseUser, smoobuApiKey: matchedProp.smoobuApiKey.trim() };
+        req.user = { ...baseUser, smoobuApiKey: msgPropKey };
       }
     }
 
@@ -688,8 +691,12 @@ router.get('/messages/:reservationId', async (req, res, next) => {
     }
     // Pass Smoobu error status through so the frontend gets a meaningful code
     // (e.g. 502 for non-JSON body, 422 for unprocessable) instead of always 500.
+    // Map upstream 401 → 502 (Bad Gateway) so fetchWithAuth doesn't mistake a
+    // Smoobu "invalid API key" response for a session-expiry and trigger an
+    // unnecessary token refresh + clear() cycle.
     if (err.status && err.status >= 400) {
-      return res.status(err.status).json({ error: err.message });
+      const httpStatus = err.status === 401 ? 502 : err.status;
+      return res.status(httpStatus).json({ error: err.message });
     }
     next(err);
   }

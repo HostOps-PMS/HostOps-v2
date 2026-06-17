@@ -10,6 +10,8 @@
 //            (shared key). routes/dashboard.js then applies propertyTagPrefix
 //            filtering so each user only sees their own subset.
 
+import { isEncrypted } from '../utils/encryption.js';
+
 const BASE = 'https://login.smoobu.com/api';
 const cache = new Map();
 
@@ -111,12 +113,13 @@ export function getApiKeyForUser(user) {
   // The dashboard route injects the selected property's key at root level before
   // calling smoobu functions, but other routes (messages, etc.) may not have a
   // propertyDbId context — fall back to the first property key found.
-  // Wrapped in try-catch per property: some entries may have corrupted or
-  // undecryptable ciphertext (the getter throws on bad input).
+  // decrypt() returns ciphertext (not null) on failure, so we must also check
+  // isEncrypted() to skip keys that failed to decrypt — otherwise ciphertext
+  // gets sent to Smoobu as the API key, which returns 401.
   for (const p of user.properties || []) {
     try {
       const k = p.smoobuApiKey?.trim();
-      if (k) return k;
+      if (k && !isEncrypted(k)) return k;
     } catch { /* corrupted/undecryptable key — skip this property */ }
   }
 
@@ -137,7 +140,7 @@ function getCacheUserId(user) {
   } else {
     let propKey = null;
     for (const p of user.properties || []) {
-      try { const k = p.smoobuApiKey?.trim(); if (k) { propKey = k; break; } } catch { /* skip */ }
+      try { const k = p.smoobuApiKey?.trim(); if (k && !isEncrypted(k)) { propKey = k; break; } } catch { /* skip */ }
     }
     keyHint = propKey ? propKey.slice(-8) : 'none';
   }

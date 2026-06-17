@@ -15,7 +15,9 @@ import TeamLeaderStaffs from './pages/TeamLeader/staffs/index';
 import TeamLeaderDashboardPlaceholder from './pages/TeamLeader/dashboard/index';
 import AccountsPage from './pages/Accounts/index';
 import ActivityLogsPage from './pages/ActivityLogs/index';
-import AlertsCenterPage from './pages/AlertsCenter/index';
+import AlertsCenterPage from './pages/AlertsCenter';
+
+import HoneypotDashboard from './pages/HoneypotDashboard';
 import RecentActivitiesPage from './pages/RecentActivities/index';
 import BugReportsPage from './pages/BugReports/index';
 import ErrorPage404 from './pages/ErrorPage404';
@@ -204,6 +206,16 @@ export default function App() {
           element={
             <PrivateRoute>
               <ActivityLogsPage />
+            </PrivateRoute>
+          }
+        />
+
+        {/* ── Honeypot Security ──────────────────────────────────── */}
+        <Route
+          path="/honeypot"
+          element={
+            <PrivateRoute>
+              <HoneypotDashboard />
             </PrivateRoute>
           }
         />

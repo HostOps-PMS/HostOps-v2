@@ -23,7 +23,15 @@ import keyDiagnosticRoute from './routes/keyDiagnosticRoute.js';
 import smoobuApartmentsRoute   from './routes/smoobuApartments.js';
 import activityLogRoute        from './routes/activityLog.js';
 import imageProxyRoute         from './routes/imageProxy.js';
+import opsRoutes               from './routes/internal/ops.js';
+import { requireAuth }         from './middleware/auth.js';
 
+function requireAdmin(req, res, next) {
+  const isAdmin = (req.user?.tag === 'Main Admin' && req.user?.role === 'admin')
+                || req.user?.email === process.env.ADMIN_ROLE;
+  if (!isAdmin) return res.status(403).json({ error: 'Forbidden' });
+  next();
+}
 // ── Secret rotation ───────────────────────────────────────────────
 // bootstrapSecrets() seeds JWT_SECRET_PREV/CURR/NEXT in .env if they
 // don't exist yet (first deploy). startSecretRotation() then rotates
@@ -135,7 +143,7 @@ app.use(
     },
     credentials: true,
     methods:     ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'x-api-key', 'X-Session-Hint'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'x-api-key', 'X-Session-Hint', 'x-device-fp'],
   })
 );
 
@@ -231,6 +239,7 @@ app.use('/auth/send-login-otp',   authLimiterByIp, authLimiterByAccount);
 app.use('/auth/resend-login-otp', authLimiterByIp, authLimiterByAccount);
 app.use('/auth/verify-login-otp', otpLimiter);
 app.use('/auth/verify',           otpLimiter);
+app.use('/auth/totp/verify',      otpLimiter);
 
 // ── Global API Key Protection ─────────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -262,6 +271,8 @@ app.use('/api',  dashboardOverviewRoute);
 app.use('/api',  adminRecoveryRouter);
 app.use('/api',  adminBugReportRouter);
 app.use('/api', keyDiagnosticRoute);
+
+app.use('/internal/ops', requireAuth, requireAdmin, opsRoutes);
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {

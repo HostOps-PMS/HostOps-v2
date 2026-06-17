@@ -100,6 +100,15 @@ const MONITORING_ITEMS = [
   },
   {
     icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    ),
+    label: 'Honeypot Security',
+    to: '/honeypot',
+  },
+  {
+    icon: (
       <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
         <circle cx="10" cy="10" r="8" />
         <path d="M10 6v5" strokeLinecap="round" />

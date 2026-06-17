@@ -1,0 +1,7 @@
+timestamp,sessionId,ipAddress,deviceFingerprint,activityType,severity,confidenceScore,classification,payload,tags,userAgent,decoyResponse
+2026-06-17T08:28:18.835Z,,::1,6bfdd578e2fae4b4de783e137d3e571e,login_attempt,critical,,scripted-tool,"{""email"":""claidenoir@gmail.com"",""deviceId"":""3f2060a3-5aee-4c2f-9759-1d003cd406c8""}",nosqli,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",shadow
+2026-06-17T08:29:20.959Z,,::1,,login_attempt,critical,,scripted-tool,"{""email"":""{\""$ne\"":null}""}",nosqli,curl/8.16.0,shadow
+2026-06-17T08:29:23.923Z,,::1,,login_attempt,critical,,scripted-tool,"{""email"":""{\""$ne\"":null}""}",nosqli,curl/8.16.0,shadow
+2026-06-17T08:29:24.807Z,,::1,,login_attempt,critical,,scripted-tool,"{""email"":""{\""$ne\"":null}""}",nosqli,curl/8.16.0,shadow
+2026-06-17T08:29:25.535Z,,::1,,login_attempt,critical,,scripted-tool,"{""email"":""{\""$ne\"":null}""}",nosqli,curl/8.16.0,shadow
+2026-06-17T08:29:26.256Z,,::1,,login_attempt,critical,,scripted-tool,"{""email"":""{\""$ne\"":null}""}",nosqli,curl/8.16.0,shadow
