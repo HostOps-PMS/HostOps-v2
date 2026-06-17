@@ -11,7 +11,7 @@ const WAIT_HINTS = [
   "Asking the server nicely. It said sure.",
   "Hold on, the data is putting on its shoes…",
   "Calculating how rich you are. One sec.",
-];
+]; 
 
 function shuffled(length) {
   const arr = Array.from({ length }, (_, i) => i);
