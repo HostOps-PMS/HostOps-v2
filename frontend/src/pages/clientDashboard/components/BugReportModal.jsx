@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useDashboard } from '../context/DashboardContext';
 import safeStorage from '../../safeStorage';
+import RichTextInput from './RichTextInput';
 
 const API_BASE = (import.meta.env.VITE_API_URL || 'https://api.hostops.online').replace(/\/$/, '');
 const API_KEY  = import.meta.env.VITE_API_KEY || '';
@@ -39,7 +40,8 @@ export default function BugReportModal({ show, onClose }) {
   if (!show) return null;
 
   const minLength = 10;
-  const canPreview = description.trim().length >= minLength && page.trim().length > 0;
+  const plainText = description.replace(/<[^>]*>/g, '').trim();
+  const canPreview = plainText.length >= minLength && page.trim().length > 0;
 
   const bg      = dark ? '#132a1e' : '#ffffff';
   const border  = dark ? '#1e3a2a' : '#e3ede8';
@@ -210,7 +212,7 @@ export default function BugReportModal({ show, onClose }) {
                   {/* Description */}
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Bug Description</div>
-                    <div style={{ fontSize: 13, color: text, lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{description.trim()}</div>
+                    <div style={{ fontSize: 13, color: text, lineHeight: 1.65 }} dangerouslySetInnerHTML={{ __html: description }} />
                   </div>
 
                   {/* Attached screenshots */}
@@ -327,26 +329,15 @@ export default function BugReportModal({ show, onClose }) {
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: muted, marginBottom: 5 }}>
                   Bug description <span style={{ color: '#ef4444' }}>*</span>
                 </label>
-                <textarea
+                <RichTextInput
                   value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  placeholder={"Describe the bug:\n• What you did\n• What you expected\n• What actually happened"}
-                  rows={5}
-                  maxLength={2000}
+                  onChange={setDescription}
+                  placeholder="Describe the bug: what you did, what you expected, what actually happened…"
+                  dark={dark}
                   disabled={loading}
-                  style={{
-                    width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 10,
-                    border: `1.5px solid ${border}`, fontSize: 14, color: text,
-                    background: inputBg, outline: 'none', resize: 'vertical',
-                    fontFamily: 'inherit', lineHeight: 1.5, transition: 'border-color 0.15s',
-                  }}
-                  onFocus={e => { e.target.style.borderColor = '#26a676'; }}
-                  onBlur={e => { e.target.style.borderColor = border; }}
+                  minLength={minLength}
+                  maxLength={2000}
                 />
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 11, color: muted }}>
-                  <span>{description.trim().length < minLength ? `At least ${minLength} characters required` : ''}</span>
-                  <span>{description.length}/2000</span>
-                </div>
               </div>
 
               {/* Attachments */}
