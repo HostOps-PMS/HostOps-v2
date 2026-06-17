@@ -55,6 +55,9 @@ export default function BugReportsPage() {
   const [updating, setUpdating] = useState(false);
   const [declineTarget, setDeclineTarget] = useState(null);
   const [declineReason, setDeclineReason] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendSuccess, setSendSuccess] = useState(false);
+  const [emailPreview, setEmailPreview] = useState(null);
 
   const surface  = dark ? '#132a1e' : '#fff';
   const border   = dark ? '#1e3a2a' : '#e5e7eb';
@@ -386,9 +389,9 @@ export default function BugReportsPage() {
 
                   <div style={{ marginBottom: 20 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Bug Description</div>
-                    <div style={{ fontSize: 13, color: textMain, lineHeight: 1.65, whiteSpace: 'pre-wrap', background: inputBg, border: `1px solid ${border}`, borderRadius: 10, padding: '14px 16px' }}>
-                      {selected.description}
-                    </div>
+                    <div style={{ fontSize: 13, color: textMain, lineHeight: 1.65, background: inputBg, border: `1px solid ${border}`, borderRadius: 10, padding: '14px 16px' }}
+                      dangerouslySetInnerHTML={{ __html: selected.description }}
+                    />
                   </div>
 
                   {/* Attached screenshots */}
@@ -428,6 +431,21 @@ export default function BugReportsPage() {
                       );
                     })}
                   </div>
+
+                  {/* Send to Email */}
+                  <hr style={{ border: 'none', borderTop: `1px solid ${border}`, margin: '16px 0' }} />
+                  <button
+                    onClick={() => { setEmailPreview(selected); setSendSuccess(false); }}
+                    style={{
+                      width: '100%', padding: '10px 16px', borderRadius: 10, border: 'none',
+                      background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff',
+                      fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                      fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    Send Report via Email
+                  </button>
                 </div>
               </div>
             </div>
@@ -492,6 +510,125 @@ export default function BugReportsPage() {
               </div>
             </div>
           )}
+
+          {/* ── Email Preview Modal ── */}
+          {emailPreview && (() => {
+            const r = emailPreview;
+            const sevColors = { low: '#22c55e', medium: '#f59e0b', high: '#f97316', critical: '#ef4444' };
+            const sl = (r.severity || 'high').charAt(0).toUpperCase() + (r.severity || 'high').slice(1);
+            const dt = new Date(r.createdAt).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+            return (
+              <div onClick={() => !sending && setEmailPreview(null)} style={{
+                position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10002,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+              }}>
+                <div onClick={e => e.stopPropagation()} style={{
+                  background: dark ? '#132a1e' : '#fff', borderRadius: 16, border: `1px solid ${border}`,
+                  width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto',
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                }}>
+                  {/* Preview header */}
+                  <div style={{ padding: '16px 20px', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={textMuted} strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: textMain }}>Email Preview</span>
+                    </div>
+                    <button onClick={() => !sending && setEmailPreview(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: textMuted, fontSize: 18, padding: 4 }}>
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                    </button>
+                  </div>
+
+                  {/* To field */}
+                  <div style={{ padding: '10px 20px', borderBottom: `1px solid ${border}`, fontSize: 12, color: textMuted }}>
+                    <strong>To:</strong> <span style={{ color: textMain }}>cjcoloma02@gmail.com</span>
+                  </div>
+                  <div style={{ padding: '10px 20px', borderBottom: `1px solid ${border}`, fontSize: 12, color: textMuted }}>
+                    <strong>Subject:</strong> <span style={{ color: textMain }}>[BUG REPORT] [{sl.toUpperCase()}] {r.page || 'General'}</span>
+                  </div>
+
+                  {/* Email body preview */}
+                  <div style={{ padding: 20 }}>
+                    <div style={{ background: dark ? '#0c1c14' : '#fafafa', border: `1px solid ${border}`, borderRadius: 12, overflow: 'hidden' }}>
+                      {/* Email header bar */}
+                      <div style={{ background: '#0c1c14', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ color: '#26a676', fontSize: 14, fontWeight: 700 }}>HostOps Bug Report</span>
+                        <span style={{ padding: '2px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700, color: '#fff', background: sevColors[r.severity] || '#f97316' }}>{sl}</span>
+                      </div>
+
+                      {/* Email content */}
+                      <div style={{ padding: '20px', background: '#fff', color: '#111827', fontSize: 13, lineHeight: 1.6 }}>
+                        <p style={{ margin: '0 0 16px' }}>Good day,</p>
+                        <p style={{ margin: '0 0 16px' }}>Please see the bug report details below.</p>
+
+                        <hr style={{ border: 'none', borderTop: '1.5px solid #e5e7eb', margin: '0 0 16px' }} />
+
+                        <p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>Date/Time Discovered:</p>
+                        <p style={{ margin: '0 0 14px', fontSize: 13 }}>{dt}</p>
+
+                        <p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>Reported By:</p>
+                        <p style={{ margin: '0 0 14px', fontSize: 13 }}>{r.name || '—'} &lt;{r.email}&gt;</p>
+
+                        <p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>Page/Module Affected:</p>
+                        <p style={{ margin: '0 0 14px', fontSize: 13 }}>{r.page || '—'}</p>
+
+                        <hr style={{ border: 'none', borderTop: '1.5px solid #e5e7eb', margin: '0 0 16px' }} />
+
+                        <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#111827', textTransform: 'uppercase', letterSpacing: 0.5 }}><em>Bug Description:</em></p>
+                        <div style={{ fontSize: 13, lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: r.description }} />
+
+                        {r.images?.length > 0 && (
+                          <>
+                            <hr style={{ border: 'none', borderTop: '1.5px solid #e5e7eb', margin: '16px 0' }} />
+                            <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Attachments:</p>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              {r.images.map((img, i) => (
+                                <img key={i} src={img.url} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid #e5e7eb' }} />
+                              ))}
+                            </div>
+                          </>
+                        )}
+
+                        <hr style={{ border: 'none', borderTop: '1.5px solid #e5e7eb', margin: '16px 0 10px' }} />
+                        <div style={{ fontSize: 11, color: '#9ca3af', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Report ID: <code style={{ fontSize: 10 }}>{r._id}</code></span>
+                          <span>Submitted via HostOps Client Dashboard</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ padding: '0 20px 20px', display: 'flex', gap: 8 }}>
+                    <button onClick={() => setEmailPreview(null)} disabled={sending} style={{
+                      flex: 1, padding: '10px 16px', borderRadius: 10,
+                      border: `1px solid ${border}`, background: 'transparent',
+                      color: textMain, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                    }}>Cancel</button>
+                    <button
+                      onClick={async () => {
+                        setSending(true); setSendSuccess(false);
+                        try {
+                          const res = await fetchWithAuth(`${API_BASE}/api/bug-reports/${r._id}/send-email`, { method: 'POST' });
+                          if (res.ok) { setSendSuccess(true); setTimeout(() => { setEmailPreview(null); setSendSuccess(false); }, 1500); }
+                        } catch {} finally { setSending(false); }
+                      }}
+                      disabled={sending || sendSuccess}
+                      style={{
+                        flex: 2, padding: '10px 16px', borderRadius: 10, border: 'none',
+                        background: sendSuccess ? '#059669' : 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                        color: '#fff', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                        cursor: sending || sendSuccess ? 'not-allowed' : 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      }}
+                    >
+                      {sendSuccess ? (<><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg> Sent!</>) :
+                       sending ? 'Sending…' : (<><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> Confirm & Send</>)}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>
