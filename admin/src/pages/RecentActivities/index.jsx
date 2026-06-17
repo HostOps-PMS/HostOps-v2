@@ -87,6 +87,17 @@ export default function RecentActivities() {
     setTabScrollable(el.scrollWidth > el.clientWidth);
   }, []);
 
+  const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+  const roleDropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (roleDropdownRef.current && !roleDropdownRef.current.contains(e.target)) setShowRoleDropdown(false);
+    }
+    if (showRoleDropdown) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showRoleDropdown]);
+
   const surface   = dark ? '#132a1e' : '#fff';
   const border    = dark ? '#1e3a2a' : '#e5e7eb';
   const textMain  = dark ? '#eaf5f0' : '#111827';
@@ -267,13 +278,40 @@ export default function RecentActivities() {
                   style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px 8px 32px', borderRadius: 9, border: `1px solid ${border}`, background: inputBg, color: textMain, fontSize: '0.82rem', outline: 'none', fontFamily: 'inherit' }}
                 />
               </div>
-              <select value={role} onChange={e => { setRole(e.target.value); setPage(1); }} style={{ padding: '8px 12px', borderRadius: 9, border: `1px solid ${border}`, background: inputBg, color: textMain, fontSize: '0.82rem', outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-                <option value="">All Roles</option>
-                <option value="Admin">Admin</option>
-                <option value="Client">Client</option>
-                <option value="Leader">Team Leader</option>
-                <option value="System">System</option>
-              </select>
+              <div ref={roleDropdownRef} style={{ position: 'relative', flexShrink: 0 }}>
+                <div onClick={() => setShowRoleDropdown(v => !v)} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '7px 10px 7px 12px', borderRadius: 8,
+                  border: `1px solid ${border}`, background: inputBg,
+                  cursor: 'pointer', fontSize: '0.82rem',
+                  color: role ? '#059669' : textMuted,
+                  fontWeight: role ? 600 : 500,
+                  userSelect: 'none', whiteSpace: 'nowrap',
+                }}>
+                  <span>{role || 'All Roles'}</span>
+                  <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}><path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </div>
+                {showRoleDropdown && (
+                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 300, background: surface, border: `1.5px solid ${border}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 160, overflow: 'hidden' }}>
+                    {[{ value: '', label: 'All Roles' }, { value: 'Admin', label: 'Admin' }, { value: 'Client', label: 'Client' }, { value: 'Leader', label: 'Team Leader' }, { value: 'System', label: 'System' }].map(opt => (
+                      <div key={opt.value} onClick={() => { setRole(opt.value); setPage(1); setShowRoleDropdown(false); }} style={{
+                        padding: '9px 14px', cursor: 'pointer', fontSize: '0.85rem',
+                        background: role === opt.value ? (dark ? '#0d2619' : '#f0fdf4') : 'transparent',
+                        color: role === opt.value ? '#059669' : (dark ? '#7ab89a' : '#374151'),
+                        fontWeight: role === opt.value ? 600 : 400,
+                        borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f7f7f7'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      }}
+                        onMouseEnter={e => { if (role !== opt.value) e.currentTarget.style.background = dark ? '#132a1e' : '#f8faf9'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = role === opt.value ? (dark ? '#0d2619' : '#f0fdf4') : 'transparent'; }}
+                      >
+                        {opt.label}
+                        {role === opt.value && <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="2,6 5,9 10,3"/></svg>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               {hasFilters && (
                 <button onClick={handleClear} style={{ padding: '8px 14px', borderRadius: 9, border: `1px solid ${border}`, background: 'transparent', color: textMuted, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
                   Clear
