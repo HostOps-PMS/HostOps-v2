@@ -256,7 +256,6 @@ export default function InboxPage() {
     if (!selected?.reservationId) return;
     setMessages([]);
     setMsgError("");
-    if (selected.hasThread === false) { setLoadingMsgs(false); return; }
     setLoadingMsgs(true);
     fetchMessages(selected.reservationId, auth)
       .then(async (res) => {
