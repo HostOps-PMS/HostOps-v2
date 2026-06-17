@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import Sidebar from '../Sidebar';
 import TopBar from '../dashboard/components/TopBar';
 import { useTheme } from '../../context/ThemeContext';
@@ -72,6 +72,23 @@ export default function AlertsCenter() {
   const [status,   setStatus]   = useState('');
   const [page, setPage] = useState(1);
   const [exportLoading, setExportLoading] = useState(false);
+
+  const tabScrollRef = useRef(null);
+  const [tabScrollLeft, setTabScrollLeft] = useState(0);
+  const [tabScrollable, setTabScrollable] = useState(false);
+
+  function handleTabScroll() {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    setTabScrollLeft(el.scrollLeft);
+    setTabScrollable(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  }
+
+  useEffect(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    setTabScrollable(el.scrollWidth > el.clientWidth);
+  }, []);
 
   const surface   = dark ? '#132a1e' : '#fff';
   const border    = dark ? '#1e3a2a' : '#e5e7eb';
@@ -173,7 +190,17 @@ export default function AlertsCenter() {
           <div style={{ display: 'flex', flexDirection: 'column' }}>
           {/* ── Tab bar (outside card, transparent bg) ── */}
           <div style={{ position: 'sticky', top: 0, zIndex: 100, overflowX: 'clip', overflowY: 'visible', background: dark ? '#0c1c14' : 'var(--color-bg, #f2f4f7)' }}>
-            <div className="al-tab-scroll" style={{ display: 'flex', alignItems: 'flex-end', background: 'transparent', marginBottom: '-1px', overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+            {tabScrollLeft > 0 && (
+              <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, zIndex: 10, display: 'flex', alignItems: 'center', background: dark ? 'linear-gradient(to right, #0c1c14 60%, transparent)' : 'linear-gradient(to right, #f0f4f0 60%, transparent)', paddingRight: 8, paddingLeft: 2, pointerEvents: 'none' }}>
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5"><path d="M13 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </div>
+            )}
+            {tabScrollable && (
+              <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 10, display: 'flex', alignItems: 'center', background: dark ? 'linear-gradient(to left, #0c1c14 60%, transparent)' : 'linear-gradient(to left, #f0f4f0 60%, transparent)', paddingLeft: 8, paddingRight: 2, pointerEvents: 'none' }}>
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5"><path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </div>
+            )}
+            <div className="al-tab-scroll" ref={tabScrollRef} onScroll={handleTabScroll} style={{ display: 'flex', alignItems: 'flex-end', background: 'transparent', marginBottom: '-1px', overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
               {tabs.map(t => {
                 const active = tab === t.id;
                 const activeColor = t.warn ? (dark ? '#f87171' : '#dc2626') : (dark ? '#26c47a' : '#10b981');
