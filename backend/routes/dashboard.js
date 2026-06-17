@@ -650,21 +650,23 @@ router.get('/messages/:reservationId', async (req, res, next) => {
       if (!mongoose.Types.ObjectId.isValid(propertyDbId)) {
         return res.status(400).json({ error: 'Invalid property ID' });
       }
+      // Key injection only — not a security boundary. assertReservationOwnership
+      // below is the real access gate (checks Smoobu apartment IDs for staff,
+      // propertyTagPrefix for MODE B users). If the propertyDbId doesn't match
+      // (e.g. stale from localStorage) just skip injection and fall through to
+      // getApiKeyForUser's MODE A/B resolution.
       const matchedProp = (req.user.properties || []).find(
         (p) => String(p._id) === String(propertyDbId)
       );
-      if (!matchedProp) {
-        return res.status(403).json({ error: 'You do not own this property' });
-      }
-      if (req.isStaff && !req.staffPropertyDbIds?.includes(String(propertyDbId))) {
-        return res.status(403).json({ error: 'You do not have access to this property' });
-      }
-      const msgPropKey = matchedProp?.smoobuApiKey?.trim();
-      if (msgPropKey && !isEncrypted(msgPropKey)) {
-        const baseUser = typeof req.user.toObject === 'function'
-          ? req.user.toObject()
-          : { ...req.user };
-        req.user = { ...baseUser, smoobuApiKey: msgPropKey };
+      const staffHasDbAccess = !req.isStaff || req.staffPropertyDbIds?.includes(String(propertyDbId));
+      if (matchedProp && staffHasDbAccess) {
+        const msgPropKey = matchedProp.smoobuApiKey?.trim();
+        if (msgPropKey && !isEncrypted(msgPropKey)) {
+          const baseUser = typeof req.user.toObject === 'function'
+            ? req.user.toObject()
+            : { ...req.user };
+          req.user = { ...baseUser, smoobuApiKey: msgPropKey };
+        }
       }
     }
 
