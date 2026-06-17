@@ -217,7 +217,7 @@ export default function RecentActivities() {
           {/* ── Tab bar + card wrapper (single flex child to avoid cl-content gap) ── */}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
           {/* ── Tab bar (outside card, transparent bg) ── */}
-          <div style={{ position: 'sticky', top: 0, zIndex: 100, overflowX: 'clip', overflowY: 'visible', background: dark ? '#0c1c14' : 'var(--color-bg, #f2f4f7)' }}>
+          <div style={{ position: 'sticky', top: 0, zIndex: 100, overflow: 'visible', background: dark ? '#0c1c14' : 'var(--color-bg, #f2f4f7)' }}>
             {tabScrollLeft > 0 && (
               <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, zIndex: 10, display: 'flex', alignItems: 'center', background: dark ? 'linear-gradient(to right, #0c1c14 60%, transparent)' : 'linear-gradient(to right, #f0f4f0 60%, transparent)', paddingRight: 8, paddingLeft: 2, pointerEvents: 'none' }}>
                 <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5"><path d="M13 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round"/></svg>
