@@ -722,10 +722,10 @@ export default function ClientSmoobuView({ client, property, onClose }) {
     >
       <div
         className="db-modal"
-        style={{ maxWidth: 1400, width: '98vw', maxHeight: '95vh', display: 'flex', flexDirection: 'column', borderRadius: 20, overflow: 'hidden' }}
+        style={{ maxWidth: 1400, width: '98vw', maxHeight: '95vh', display: 'flex', flexDirection: 'column', borderRadius: 20, overflow: 'hidden', background: dark ? '#132a1e' : '#fff' }}
       >
         {/* ── Header ── */}
-        <div className="db-modal__head" style={{ padding: '18px 24px', borderBottom: '1px solid var(--color-border, #e5e9ec)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div className="db-modal__head" style={{ padding: '18px 24px', borderBottom: '1px solid var(--color-border, #e5e9ec)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0, background: dark ? '#132a1e' : '#fff' }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--color-text, #1a2e2a)' }}>
               {client.businessName || `${client.firstName || ''} ${client.lastName || ''}`.trim() || 'Client'}{' '}
@@ -735,7 +735,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
               Performance overview and booking data.
             </div>
           </div>
-          <button className="db-modal__close" onClick={onClose}>✕</button>
+          <button className="db-modal__close" onClick={onClose} style={{ color: dark ? '#7ab89a' : undefined }}>✕</button>
         </div>
 
         {/* ── Scrollable body ── */}
@@ -1284,6 +1284,22 @@ export default function ClientSmoobuView({ client, property, onClose }) {
             background: linear-gradient(90deg, #1e3a2a 25%, #152e20 50%, #1e3a2a 75%) !important;
             background-size: 200% 100% !important;
           }
+          .db-modal {
+            background: #132a1e !important;
+          }
+          .db-modal__head {
+            background: #132a1e !important;
+          }
+          .db-modal__foot {
+            background: #132a1e !important;
+          }
+          .db-btn--ghost {
+            color: #7ab89a !important;
+            border-color: #1e3a2a !important;
+          }
+          .db-btn--ghost:hover {
+            background: #0d2619 !important;
+          }
           ` : ''}
           input[type="date"]::-webkit-date-and-time-value {
             text-align: left;
@@ -1324,7 +1340,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
         `}</style>
 
         {/* ── Footer ── */}
-        <div className="db-modal__foot" style={{ padding: '14px 24px', borderTop: '1px solid var(--color-border, #e5e9ec)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+        <div className="db-modal__foot" style={{ padding: '14px 24px', borderTop: '1px solid var(--color-border, #e5e9ec)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0, background: dark ? '#132a1e' : '#fff' }}>
           <button className="db-btn db-btn--ghost" onClick={onClose}>Close</button>
         </div>
       </div>
