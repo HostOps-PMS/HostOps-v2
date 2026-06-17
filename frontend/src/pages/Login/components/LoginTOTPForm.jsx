@@ -23,7 +23,14 @@ export default function LoginTOTPForm({ email, showMsg, hideMsg, onBack, onAuthS
       return;
     }
     const interval = setInterval(() => {
-      setLockoutTimer((prev) => prev - 1);
+      setLockoutTimer((prev) => {
+        if (prev <= 1) {
+          localStorage.removeItem('hp_otp_lockout');
+          hideMsg();
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
     return () => clearInterval(interval);
   }, [lockoutTimer]);
