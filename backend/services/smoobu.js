@@ -96,14 +96,27 @@ async function smoobuRequestAllPages(basePath, apiKey, userId, { showCancellatio
 // GET API KEY
 // ─────────────────────────────────────────────────────────────────
 export function getApiKeyForUser(user) {
+  // Root-level key (MODE A — per-user Smoobu account)
   if (user.smoobuApiKey && user.smoobuApiKey.trim()) {
     return user.smoobuApiKey.trim();
   }
 
+  // Shared env key (MODE B — legacy shared account)
   const envKey = process.env.SMOOBU_API_KEY;
   if (envKey && envKey.trim()) {
     return envKey.trim();
   }
+
+  // Per-property key fallback: keys stored on user.properties[].smoobuApiKey.
+  // The dashboard route injects the selected property's key at root level before
+  // calling smoobu functions, but other routes (messages, etc.) may not have a
+  // propertyDbId context — fall back to the first property key found.
+  // All properties for a given user typically share the same Smoobu account,
+  // so the first key is a safe default when no specific property is selected.
+  const propKey = (user.properties || [])
+    .map((p) => p.smoobuApiKey?.trim())
+    .find(Boolean);
+  if (propKey) return propKey;
 
   const err = new Error('No Smoobu API key connected. Please connect your Smoobu account.');
   err.code = 'NO_SMOOBU_KEY';
@@ -114,9 +127,15 @@ function getCacheUserId(user) {
   // Include a fingerprint of the active smoobuApiKey in the cache key so that
   // switching properties (which changes the API key) busts the cache immediately.
   // Without this, the old property's cached data is returned even after switching.
-  const keyHint = user.smoobuApiKey
-    ? user.smoobuApiKey.trim().slice(-8)   // last 8 chars — enough to differentiate
-    : 'env';
+  let keyHint;
+  if (user.smoobuApiKey?.trim()) {
+    keyHint = user.smoobuApiKey.trim().slice(-8);
+  } else if (process.env.SMOOBU_API_KEY?.trim()) {
+    keyHint = 'env';
+  } else {
+    const propKey = (user.properties || []).map((p) => p.smoobuApiKey?.trim()).find(Boolean);
+    keyHint = propKey ? propKey.slice(-8) : 'none';
+  }
   return `${String(user._id)}:${keyHint}`;
 }
 
