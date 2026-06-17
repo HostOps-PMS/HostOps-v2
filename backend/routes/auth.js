@@ -818,7 +818,7 @@ router.post('/change-password', requireAuth, async (req, res, next) => {
       staff.mustChangePassword = false;
       await staff.save();
 
-      await RefreshToken.updateMany({ userId: staff._id, revokedAt: null }, { revokedAt: new Date() });
+      await RefreshToken.updateMany({ staffId: staff._id, revokedAt: null }, { revokedAt: new Date() });
 
       const header     = req.headers.authorization || '';
       const accessBlob = header.startsWith('Bearer ') ? header.slice(7) : null;
@@ -827,7 +827,20 @@ router.post('/change-password', requireAuth, async (req, res, next) => {
         if (jti) await revokeAccessJti(jti, staff._id, 'password_change');
       }
 
-      return res.json({ message: 'Password changed successfully.', staff: sanitizeStaff(staff) });
+      // Issue a fresh token pair so that a pending mustChangePin step
+      // can complete without the user having to log in again.
+      const { encAccessToken, rawRefresh, accessJti } = await issueTokenPair(
+        signStaffAccessToken, signStaffRefreshToken, staff, req
+      );
+      setRefreshCookie(res, rawRefresh, req);
+      const staffSk = createSessionKey(accessJti, accessTokenExpiryMs());
+
+      return res.json({
+        message:     'Password changed successfully.',
+        staff:       sanitizeStaff(staff),
+        accessToken: encAccessToken,
+        ...(staffSk ? { sk: staffSk } : {}),
+      });
     }
 
     // ── Regular user ───────────────────────────────────────────────
@@ -855,7 +868,20 @@ router.post('/change-password', requireAuth, async (req, res, next) => {
       if (jti) await revokeAccessJti(jti, user._id, 'password_change');
     }
 
-    res.json({ message: 'Password changed successfully.', user: sanitizeUser(user) });
+    // Issue a fresh token pair so that a pending mustChangePin step
+    // can complete without the user having to log in again.
+    const { encAccessToken, rawRefresh, accessJti } = await issueTokenPair(
+      signAccessToken, signRefreshToken, user, req
+    );
+    setRefreshCookie(res, rawRefresh, req);
+    const userSk = createSessionKey(accessJti, accessTokenExpiryMs());
+
+    res.json({
+      message:     'Password changed successfully.',
+      user:        sanitizeUser(user),
+      accessToken: encAccessToken,
+      ...(userSk ? { sk: userSk } : {}),
+    });
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ error: 'Validation failed', details: err.errors });
     next(err);
