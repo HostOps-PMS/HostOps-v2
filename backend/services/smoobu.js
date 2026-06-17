@@ -588,7 +588,16 @@ export async function getReservationMessages(user, reservationId) {
   await verifyReservationOwnership(user, reservationId);
   const apiKey = getApiKeyForUser(user);
   const userId = getCacheUserId(user);
-  return smoobuRequest(`/reservations/${reservationId}/messages`, apiKey, userId);
+  try {
+    return smoobuRequest(`/reservations/${reservationId}/messages`, apiKey, userId);
+  } catch (err) {
+    // Smoobu returns non-2xx when a reservation has no messages thread yet.
+    // Treat as empty rather than surfacing a 500.
+    if (err.status === 404 || err.status === 422) {
+      return { messages: [] };
+    }
+    throw err;
+  }
 }
 
 export async function sendReplyToGuest(user, reservationId, { subject, messageBody }) {
