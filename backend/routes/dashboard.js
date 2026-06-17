@@ -639,6 +639,32 @@ router.post('/messages/reply', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.get('/messages/:reservationId', async (req, res, next) => {
   try {
+    // ── Per-property Smoobu API key injection ────────────────────────────────
+    // Same logic as GET /api/dashboard: when the frontend passes ?propertyDbId=
+    // the user has per-property smoobuApiKeys stored on user.properties[].
+    // We inject the matching key at root level so getApiKeyForUser() picks it up.
+    const propertyDbId = req.query.propertyDbId;
+    if (propertyDbId) {
+      if (!mongoose.Types.ObjectId.isValid(propertyDbId)) {
+        return res.status(400).json({ error: 'Invalid property ID' });
+      }
+      const matchedProp = (req.user.properties || []).find(
+        (p) => String(p._id) === String(propertyDbId)
+      );
+      if (!matchedProp) {
+        return res.status(403).json({ error: 'You do not own this property' });
+      }
+      if (req.isStaff && !req.staffPropertyDbIds?.includes(String(propertyDbId))) {
+        return res.status(403).json({ error: 'You do not have access to this property' });
+      }
+      if (matchedProp?.smoobuApiKey?.trim()) {
+        const baseUser = typeof req.user.toObject === 'function'
+          ? req.user.toObject()
+          : { ...req.user };
+        req.user = { ...baseUser, smoobuApiKey: matchedProp.smoobuApiKey.trim() };
+      }
+    }
+
     await assertReservationOwnership(req, req.params.reservationId);
 
     const data = await getReservationMessages(req.user, req.params.reservationId);
