@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { authHeaders } from '../../../lib/authUtils';
-import { updateClient, getClientSmoobuData, createClientProperty, updateClientProperty, deleteClientProperty, getClientPropertyApiKey, uploadPropertyPicture } from '../services/clientsService';
+import { updateClient, getClientSmoobuData, createClientProperty, updateClientProperty, deleteClientProperty, getClientPropertyApiKey, uploadPropertyPicture, getClientProperties } from '../services/clientsService';
 import ClientSmoobuView from './ClientSmoobuView';
 import ImageCropModal from './ImageCropModal';
 import OTPModal from '../../../components/OTPModal';
@@ -182,15 +181,8 @@ export default function ClientModal({ client, onClose, onUpdated }) {
     setLoadingProps(true);
     setPropsError(null);
     try {
-      const BASE = import.meta.env.VITE_API_BASE_URL ?? '';
-      const res = await fetch(`${BASE}/api/clients/${client._id}/properties`, {
-        headers: authHeaders(),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `HTTP ${res.status}`);
-      }
-      setProperties(await res.json());
+      const data = await getClientProperties(client._id);
+      setProperties(data);
     } catch (err) {
       setPropsError(err.message ?? 'Failed to load properties');
     } finally {
