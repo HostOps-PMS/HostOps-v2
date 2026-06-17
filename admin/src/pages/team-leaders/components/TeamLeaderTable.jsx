@@ -80,7 +80,7 @@ export default function TeamLeaderTable({
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginBottom: 0, flexWrap: 'nowrap', gap: 10, paddingBottom: 0,
-        overflow: 'hidden', position: 'sticky', top: 0, zIndex: 100,
+        overflow: 'visible', position: 'sticky', top: 0, zIndex: 100,
         background: dark ? '#0c1c14' : 'var(--color-bg, #f2f4f7)',
       }}>
         {tabScrollLeft > 0 && (

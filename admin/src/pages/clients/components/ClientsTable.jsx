@@ -146,7 +146,7 @@ export default function ClientsTable({ clients, loading, onRowClick, search, onS
       <div style={{
         marginBottom: 0, paddingBottom: 0,
         position: 'sticky', top: 0, zIndex: 100,
-        overflowX: 'clip', overflowY: 'visible',
+        overflow: 'visible',
         background: dark ? '#0c1c14' : 'var(--color-bg, #f2f4f7)',
       }}>
         {tabScrollLeft > 0 && (
