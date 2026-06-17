@@ -67,7 +67,9 @@ function Divider({ label }) {
 }
 
 // ── Properties panel ──────────────────────────────────────────────
-function PropertiesPanel({ properties, loading, error, onViewSmoobu, dark }) {
+function PropertiesPanel({ properties: rawProperties, loading, error, onViewSmoobu, dark }) {
+  const properties = Array.isArray(rawProperties) ? rawProperties : [];
+
   if (loading) {
     return (
       <div style={{ padding: '12px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
