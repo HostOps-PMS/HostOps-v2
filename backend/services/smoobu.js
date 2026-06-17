@@ -111,12 +111,14 @@ export function getApiKeyForUser(user) {
   // The dashboard route injects the selected property's key at root level before
   // calling smoobu functions, but other routes (messages, etc.) may not have a
   // propertyDbId context — fall back to the first property key found.
-  // All properties for a given user typically share the same Smoobu account,
-  // so the first key is a safe default when no specific property is selected.
-  const propKey = (user.properties || [])
-    .map((p) => p.smoobuApiKey?.trim())
-    .find(Boolean);
-  if (propKey) return propKey;
+  // Wrapped in try-catch per property: some entries may have corrupted or
+  // undecryptable ciphertext (the getter throws on bad input).
+  for (const p of user.properties || []) {
+    try {
+      const k = p.smoobuApiKey?.trim();
+      if (k) return k;
+    } catch { /* corrupted/undecryptable key — skip this property */ }
+  }
 
   const err = new Error('No Smoobu API key connected. Please connect your Smoobu account.');
   err.code = 'NO_SMOOBU_KEY';
@@ -133,7 +135,10 @@ function getCacheUserId(user) {
   } else if (process.env.SMOOBU_API_KEY?.trim()) {
     keyHint = 'env';
   } else {
-    const propKey = (user.properties || []).map((p) => p.smoobuApiKey?.trim()).find(Boolean);
+    let propKey = null;
+    for (const p of user.properties || []) {
+      try { const k = p.smoobuApiKey?.trim(); if (k) { propKey = k; break; } } catch { /* skip */ }
+    }
     keyHint = propKey ? propKey.slice(-8) : 'none';
   }
   return `${String(user._id)}:${keyHint}`;
