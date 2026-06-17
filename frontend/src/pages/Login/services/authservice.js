@@ -106,23 +106,30 @@ export async function checkSession(currentToken) {
     if (res.ok) return true;
   }
 
-  // Attempt silent refresh via HttpOnly cookie
-  try {
-    const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
-      method:      'POST',
-      credentials: 'include',
-      headers:     { 'x-api-key': import.meta.env.VITE_API_KEY },
-    });
-    if (refreshRes.ok) {
-      const data = await refreshRes.json();
-      // Return the new token so the caller can store it in memory
-      return data.accessToken || true;
+  // Attempt silent refresh via HttpOnly cookie.
+  // Uses the same 'hp-token-refresh' Web Lock as AuthContext so this
+  // call cannot race with hydrate() or refreshToken() in another tab.
+  const doRefresh = async () => {
+    try {
+      const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
+        method:      'POST',
+        credentials: 'include',
+        headers:     { 'x-api-key': import.meta.env.VITE_API_KEY },
+      });
+      if (refreshRes.ok) {
+        const data = await refreshRes.json();
+        return data.accessToken || true;
+      }
+    } catch (error) {
+      console.error('Silent refresh failed:', error);
     }
-  } catch (error) {
-    console.error('Silent refresh failed:', error);
-  }
+    return false;
+  };
 
-  return false;
+  if (typeof navigator !== 'undefined' && navigator.locks) {
+    return navigator.locks.request('hp-token-refresh', doRefresh);
+  }
+  return doRefresh();
 }
 
 // ─────────────────────────────────────────────────────────────────
