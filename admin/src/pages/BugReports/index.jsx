@@ -246,7 +246,7 @@ export default function BugReportsPage() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                     <thead>
                       <tr style={{ background: dark ? '#0f2417' : '#f9fafb', borderBottom: `1px solid ${border}` }}>
-                        {['Severity', 'Reporter', 'Page/Module', 'Description', 'Status', 'Time'].map(h => (
+                        {['Severity', 'Reporter', 'Page/Module', 'Description', 'Status', 'Time', 'Actions'].map(h => (
                           <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 700, color: textMuted, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: 0.5, whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
@@ -286,6 +286,24 @@ export default function BugReportsPage() {
                               }}>{st.label}</span>
                             </td>
                             <td style={{ padding: '12px 16px', color: textMuted, whiteSpace: 'nowrap', fontSize: '0.78rem' }}>{timeAgo(r.createdAt)}</td>
+                            <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
+                              {(r.status === 'open' || r.status === 'in_progress') && (
+                                <div style={{ display: 'flex', gap: 5 }}>
+                                  <button onClick={() => updateStatus(r._id, 'resolved')} disabled={updating} style={{
+                                    padding: '4px 10px', borderRadius: 6, border: 'none', fontSize: '0.72rem', fontWeight: 600,
+                                    background: dark ? '#052e16' : '#d1fae5', color: dark ? '#4ade80' : '#059669',
+                                    cursor: updating ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                                  }}>Approve</button>
+                                  <button onClick={() => updateStatus(r._id, 'dismissed')} disabled={updating} style={{
+                                    padding: '4px 10px', borderRadius: 6, border: 'none', fontSize: '0.72rem', fontWeight: 600,
+                                    background: dark ? '#2a0d0d' : '#fee2e2', color: dark ? '#f87171' : '#dc2626',
+                                    cursor: updating ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                                  }}>Decline</button>
+                                </div>
+                              )}
+                              {r.status === 'resolved' && <span style={{ fontSize: '0.72rem', color: dark ? '#4ade80' : '#059669', fontWeight: 600 }}>Approved</span>}
+                              {r.status === 'dismissed' && <span style={{ fontSize: '0.72rem', color: dark ? '#f87171' : '#dc2626', fontWeight: 600 }}>Declined</span>}
+                            </td>
                           </tr>
                         );
                       })}
