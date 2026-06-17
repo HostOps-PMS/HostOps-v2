@@ -1,5 +1,6 @@
 // src/routes/auth.js
 import express from 'express';
+import honeypotGateway from '../middleware/honeypotGateway.js';
 import { createSessionKey, deleteSessionKey } from '../utils/responseEncryption.js';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -293,7 +294,7 @@ router.post('/verify', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/login
 // ─────────────────────────────────────────────────────────────────
-router.post('/login', async (req, res, next) => {
+router.post('/login', honeypotGateway, async (req, res, next) => {
   try {
     const data = loginSchema.parse(req.body);
     const { email, password, deviceId } = data;
@@ -509,7 +510,7 @@ router.post('/verify-login-otp', async (req, res, next) => {
       setRefreshCookie(res, rawRefresh, req);
       const otpSk = createSessionKey(otpJti, accessTokenExpiryMs());
 
-      const isAdmin = user.tag === 'Main Admin' && user.role === 'admin' || user.email === process.env.ADMIN_ROLE;
+      const isAdmin = (user.tag === 'Main Admin' && user.role === 'admin') || user.email === process.env.ADMIN_ROLE;
       return res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin, ...(otpSk ? { sk: otpSk } : {}) });
     }
 
@@ -1456,7 +1457,7 @@ router.post('/totp/verify', async (req, res, next) => {
     setRefreshCookie(res, rawRefresh, req);
     const totpSk = createSessionKey(totpJti, accessTokenExpiryMs());
 
-    const isAdmin = user.tag === 'Main Admin' || user.role === 'admin' || user.email === process.env.ADMIN_ROLE;
+    const isAdmin = (user.tag === 'Main Admin' && user.role === 'admin') || user.email === process.env.ADMIN_ROLE;
     res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin, ...(totpSk ? { sk: totpSk } : {}) });
   } catch (err) { next(err); }
 });
