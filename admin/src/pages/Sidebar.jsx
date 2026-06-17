@@ -98,6 +98,17 @@ const MONITORING_ITEMS = [
     label: 'Activity Logs',
     to: '/activity-logs',
   },
+  {
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="10" cy="10" r="8" />
+        <path d="M10 6v5" strokeLinecap="round" />
+        <circle cx="10" cy="14" r="0.5" fill="currentColor" />
+      </svg>
+    ),
+    label: 'Bug Reports',
+    to: '/bug-reports',
+  },
 ];
 
 const SettingsIcon = () => (

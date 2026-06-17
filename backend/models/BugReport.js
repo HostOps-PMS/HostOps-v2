@@ -36,6 +36,11 @@ const bugReportSchema = new mongoose.Schema(
       maxlength: 2000,
     },
 
+    images: [{
+      url:      { type: String, required: true },
+      publicId: { type: String, default: '' },
+    }],
+
     status: {
       type: String,
       enum: ['open', 'in_progress', 'resolved', 'dismissed'],

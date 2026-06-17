@@ -17,6 +17,7 @@ import AccountsPage from './pages/Accounts/index';
 import ActivityLogsPage from './pages/ActivityLogs/index';
 import AlertsCenterPage from './pages/AlertsCenter/index';
 import RecentActivitiesPage from './pages/RecentActivities/index';
+import BugReportsPage from './pages/BugReports/index';
 import ErrorPage404 from './pages/ErrorPage404';
 
 const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5174';
@@ -223,6 +224,16 @@ export default function App() {
           element={
             <PrivateRoute>
               <RecentActivitiesPage />
+            </PrivateRoute>
+          }
+        />
+
+        {/* ── Bug Reports ────────────────────────────────────── */}
+        <Route
+          path="/bug-reports"
+          element={
+            <PrivateRoute>
+              <BugReportsPage />
             </PrivateRoute>
           }
         />
