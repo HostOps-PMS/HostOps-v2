@@ -1,4 +1,5 @@
 // components/AlertsCenter.jsx
+import { useNavigate } from 'react-router-dom';
 
 // ── Static fallback alerts (shown while loading or no Smoobu data) ──
 const FALLBACK_ALERTS = [
@@ -23,6 +24,7 @@ const ALERT_STYLES = {
  * @param {boolean} [props.loading]
  */
 export default function AlertsCenter({ alerts, loading }) {
+  const navigate       = useNavigate();
   const displayAlerts  = (!loading && alerts && alerts.length > 0) ? alerts : FALLBACK_ALERTS;
   const isLive         = !loading && alerts && alerts.length > 0;
   const urgentCount    = displayAlerts.filter(a => a.type === 'danger' || a.type === 'warning').length;
@@ -168,16 +170,18 @@ export default function AlertsCenter({ alerts, loading }) {
 
       {/* View all button */}
       <div style={{ padding: '8px 20px 16px', textAlign: 'center' }}>
-        <button style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '8px 24px',
-          borderRadius: 'var(--radius-pill)',
-          background: 'var(--color-brand-light)',
-          color: 'var(--color-brand)',
-          fontWeight: 600, fontSize: '.8rem',
-          border: '1px solid #c6ead9',
-          cursor: 'pointer', fontFamily: 'var(--font-body)',
-        }}>
+        <button
+          onClick={() => navigate('/alerts')}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '8px 24px',
+            borderRadius: 'var(--radius-pill)',
+            background: 'var(--color-brand-light)',
+            color: 'var(--color-brand)',
+            fontWeight: 600, fontSize: '.8rem',
+            border: '1px solid #c6ead9',
+            cursor: 'pointer', fontFamily: 'var(--font-body)',
+          }}>
           View all alerts ↗
         </button>
       </div>

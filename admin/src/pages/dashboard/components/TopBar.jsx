@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../../context/NotificationsContext';
 import { useTheme } from '../../../context/ThemeContext';
 
@@ -156,6 +156,7 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
   const [activeTab, setActiveTab] = useState('alerts');
   const [readIds,   setReadIds]   = useState(new Set());
   const { dark } = useTheme();
+  const navigate = useNavigate();
 
   const unreadAlerts = (alerts || []).filter(a => a.unread && !readIds.has(a.id)).length;
 
@@ -394,7 +395,10 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
       {items.length > 0 && (
         <div style={{ padding: '10px 16px', borderTop: `0.5px solid ${border}`, textAlign: 'center' }}>
           <button
-            onClick={onClose}
+            onClick={() => {
+              onClose();
+              navigate(activeTab === 'alerts' ? '/alerts' : '/recent-activities');
+            }}
             style={{ fontSize: 11, color: '#1a9e6e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0 }}
           >
             View all in dashboard

@@ -1,4 +1,5 @@
 // components/RecentActivities.jsx
+import { useNavigate } from 'react-router-dom';
 
 // ── Static fallback activities (shown while loading or no Smoobu data) ──
 const FALLBACK_ACTIVITIES = [
@@ -36,6 +37,7 @@ function hashColor(str) {
  * @param {boolean} [props.loading]
  */
 export default function RecentActivities({ activities, loading }) {
+  const navigate = useNavigate();
   const displayActivities = (!loading && activities && activities.length > 0)
     ? activities
     : FALLBACK_ACTIVITIES;
@@ -79,7 +81,7 @@ export default function RecentActivities({ activities, loading }) {
             </span>
           )}
         </div>
-        <button className="db-table-card__action">View all →</button>
+        <button className="db-table-card__action" onClick={() => navigate('/recent-activities')}>View all →</button>
       </div>
 
       {/* Activity list */}
@@ -148,16 +150,18 @@ export default function RecentActivities({ activities, loading }) {
 
       {/* View all button — bottom */}
       <div style={{ padding: '20px 20px 24px', textAlign: 'center' }}>
-        <button style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '8px 24px',
-          borderRadius: 'var(--radius-pill)',
-          background: 'var(--color-brand-light)',
-          color: 'var(--color-brand)',
-          fontWeight: 600, fontSize: '.8rem',
-          border: '1px solid #c6ead9',
-          cursor: 'pointer', fontFamily: 'var(--font-body)',
-        }}>
+        <button
+          onClick={() => navigate('/recent-activities')}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '8px 24px',
+            borderRadius: 'var(--radius-pill)',
+            background: 'var(--color-brand-light)',
+            color: 'var(--color-brand)',
+            fontWeight: 600, fontSize: '.8rem',
+            border: '1px solid #c6ead9',
+            cursor: 'pointer', fontFamily: 'var(--font-body)',
+          }}>
           View all activities ↗
         </button>
       </div>
