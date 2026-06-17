@@ -436,22 +436,20 @@ export default function AlertsCenter() {
 
             {/* ── Pagination ── */}
             {totalPages > 1 && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderTop: `1px solid ${border}`, flexWrap: 'wrap', gap: 8 }}>
-                <span style={{ fontSize: '0.78rem', color: textMuted }}>
-                  Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
-                </span>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ padding: '5px 12px', borderRadius: 8, border: `1px solid ${border}`, background: 'transparent', color: page === 1 ? (dark ? '#2d5c3e' : '#d1d5db') : textMuted, cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontFamily: 'inherit' }}>
-                    ← Prev
-                  </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).filter(n => Math.abs(n - page) <= 2).map(n => (
-                    <button key={n} onClick={() => setPage(n)} style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${n === page ? (dark ? '#26c47a' : '#1a9e6e') : border}`, background: n === page ? (dark ? '#0d2619' : '#f0faf6') : 'transparent', color: n === page ? (dark ? '#26c47a' : '#1a9e6e') : textMuted, fontWeight: n === page ? 700 : 400, cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'inherit' }}>
-                      {n}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderTop: `1px solid ${border}` }}>
+                <span style={{ fontSize: '0.75rem', color: dark ? '#4d8a6a' : '#9ca3af' }}>Page {page} of {totalPages} · {filtered.length} alert{filtered.length !== 1 ? 's' : ''}</span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[['prev', page === 1, () => setPage(p => Math.max(1, p - 1))], ['next', page === totalPages, () => setPage(p => Math.min(totalPages, p + 1))]].map(([dir, disabled, onClick]) => (
+                    <button key={dir} onClick={onClick} disabled={disabled}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, border: `1px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`, background: disabled ? (dark ? '#0a1a10' : '#f9fafb') : (dark ? '#0d2619' : '#fff'), color: disabled ? (dark ? '#2a4a35' : '#d1d5db') : (dark ? '#7ab89a' : '#374151'), fontSize: '0.78rem', fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer', transition: 'background 0.15s', fontFamily: 'inherit' }}
+                      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = dark ? '#132a1e' : '#f3f4f6'; }}
+                      onMouseLeave={e => { if (!disabled) e.currentTarget.style.background = disabled ? (dark ? '#0a1a10' : '#f9fafb') : (dark ? '#0d2619' : '#fff'); }}
+                    >
+                      {dir === 'prev' && <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M13 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                      {dir === 'prev' ? 'Prev' : 'Next'}
+                      {dir === 'next' && <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                     </button>
                   ))}
-                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{ padding: '5px 12px', borderRadius: 8, border: `1px solid ${border}`, background: 'transparent', color: page === totalPages ? (dark ? '#2d5c3e' : '#d1d5db') : textMuted, cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontFamily: 'inherit' }}>
-                    Next →
-                  </button>
                 </div>
               </div>
             )}
