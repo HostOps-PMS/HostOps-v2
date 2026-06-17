@@ -11,7 +11,8 @@
       "Read(//c/Users/hhsarmiento/.claude/projects/c--Users-hhsarmiento-Desktop-HostOps-v2/memory/**)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(xargs grep -l \"business\\\\|account\\\\|createAccount\\\\|registerAccount\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\hhsarmiento\\.claude\\projects\\c--Users-hhsarmiento-Desktop-HostOps-v2\\memory"

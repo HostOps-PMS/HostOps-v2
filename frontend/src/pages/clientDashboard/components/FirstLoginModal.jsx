@@ -3,6 +3,7 @@ import { changePassword } from '../../Login/services/authservice';
 import safeStorage from '../../safeStorage';
 import FetchingOverlay from './FetchingOverlay';
 import { useDashboard } from '../context/DashboardContext';
+import { useAuth } from '../../AuthContext';
 
 // Inline password validation — mirrors the rules in src/utils/validators.js
 function validateNewPassword(password) {
@@ -29,6 +30,7 @@ function validateNewPassword(password) {
  */
 export default function FirstLoginModal({ onComplete }) {
   const { dark } = useDashboard();
+  const { getToken } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword]         = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -54,7 +56,7 @@ export default function FirstLoginModal({ onComplete }) {
 
     setLoading(true);
     try {
-      const data = await changePassword({ currentPassword, newPassword });
+      const data = await changePassword({ currentPassword, newPassword }, getToken());
 
       // Update stored user with the fresh user object returned by the backend
       if (data.user) {

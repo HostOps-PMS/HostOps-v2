@@ -558,6 +558,24 @@ router.post('/clients', requireAdmin, async (req, res, next) => {
       })),
     });
 
+    const credentialsWebhookUrl = process.env.GHL_CREDENTIALS_WEBHOOK_URL;
+    if (credentialsWebhookUrl) {
+      try {
+        await fetch(credentialsWebhookUrl, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            business_name:      data.businessName,
+            email:              data.email.toLowerCase(),
+            temporary_password: data.password,
+            temporary_pin:      data.pin,
+          }),
+        });
+      } catch (err) {
+        console.error('Failed to trigger GHL credentials webhook:', err);
+      }
+    }
+
     res.status(201).json({
       message: 'Account created successfully.',
       userId:  user._id,
