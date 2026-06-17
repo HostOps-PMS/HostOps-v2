@@ -10,32 +10,40 @@ function getUser() {
 }
 
 const SEVERITY_OPTIONS = [
-  { value: 'low',      label: 'Low',      color: '#22c55e', desc: 'Minor visual issue' },
-  { value: 'medium',   label: 'Medium',   color: '#f59e0b', desc: 'Feature not working properly' },
-  { value: 'high',     label: 'High',     color: '#f97316', desc: 'Major feature broken' },
-  { value: 'critical', label: 'Critical', color: '#ef4444', desc: 'System unusable / data loss' },
+  { value: 'low',      label: 'Low',      color: '#22c55e' },
+  { value: 'medium',   label: 'Medium',   color: '#f59e0b' },
+  { value: 'high',     label: 'High',     color: '#f97316' },
+  { value: 'critical', label: 'Critical', color: '#ef4444' },
 ];
+
+function sevColor(v) { return SEVERITY_OPTIONS.find(s => s.value === v)?.color || '#f97316'; }
+function sevLabel(v) { return SEVERITY_OPTIONS.find(s => s.value === v)?.label || 'High'; }
+
+function fmtNow() {
+  return new Date().toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+}
 
 export default function BugReportModal({ show, onClose }) {
   const { dark } = useDashboard();
   const user = getUser();
   const [description, setDescription] = useState('');
   const [page, setPage]               = useState('');
-  const [severity, setSeverity]       = useState('medium');
+  const [severity, setSeverity]       = useState('high');
   const [loading, setLoading]         = useState(false);
-  const [submitted, setSubmitted]     = useState(false);
+  const [step, setStep]               = useState('form'); // form | preview | submitted
   const [error, setError]             = useState('');
 
   if (!show) return null;
 
   const minLength = 10;
-  const canSubmit = description.trim().length >= minLength && !loading;
+  const canPreview = description.trim().length >= minLength && page.trim().length > 0;
 
   const bg      = dark ? '#132a1e' : '#ffffff';
   const border  = dark ? '#1e3a2a' : '#e3ede8';
   const text    = dark ? '#eaf5f0' : '#0c1c14';
   const muted   = dark ? '#7ab89a' : '#6b7280';
   const inputBg = dark ? '#0d2619' : '#f8fbf9';
+  const userName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user?.email || 'Unknown');
 
   async function handleSubmit() {
     setLoading(true);
@@ -45,9 +53,9 @@ export default function BugReportModal({ show, onClose }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
         body: JSON.stringify({
-          email:       user?.email || '',
-          name:        user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : '',
-          page,
+          email: user?.email || '',
+          name: userName,
+          page: page.trim(),
           severity,
           description: description.trim(),
         }),
@@ -56,7 +64,7 @@ export default function BugReportModal({ show, onClose }) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to submit');
       }
-      setSubmitted(true);
+      setStep('submitted');
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {
@@ -67,11 +75,13 @@ export default function BugReportModal({ show, onClose }) {
   function handleClose() {
     setDescription('');
     setPage('');
-    setSeverity('medium');
-    setSubmitted(false);
+    setSeverity('high');
+    setStep('form');
     setError('');
     onClose();
   }
+
+  const sc = sevColor(severity);
 
   return (
     <>
@@ -82,25 +92,28 @@ export default function BugReportModal({ show, onClose }) {
       }}>
         <div onClick={e => e.stopPropagation()} style={{
           background: bg, borderRadius: 20, padding: '28px 24px 24px',
-          width: '100%', maxWidth: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+          width: '100%', maxWidth: step === 'preview' ? 500 : 440,
+          boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
           position: 'relative', animation: 'bugmodal-in 0.22s ease',
           border: `1px solid ${border}`, maxHeight: '90vh', overflowY: 'auto',
+          transition: 'max-width 0.2s ease',
         }}>
           {/* Close */}
           <button onClick={handleClose} style={{
             position: 'absolute', top: 14, right: 14, background: 'none',
-            border: 'none', cursor: 'pointer', color: muted, fontSize: 18, padding: 4, lineHeight: 1,
+            border: 'none', cursor: 'pointer', color: muted, fontSize: 18, padding: 4, lineHeight: 1, zIndex: 1,
           }} aria-label="Close">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
             </svg>
           </button>
 
-          {submitted ? (
+          {/* ── SUBMITTED ── */}
+          {step === 'submitted' && (
             <div style={{ textAlign: 'center' }}>
               <div style={{
                 width: 52, height: 52, borderRadius: '50%',
-                background: dark ? '#0d2619' : '#eaf8f1', border: `1.5px solid #26a676`,
+                background: dark ? '#0d2619' : '#eaf8f1', border: '1.5px solid #26a676',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
               }}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -109,7 +122,7 @@ export default function BugReportModal({ show, onClose }) {
               </div>
               <h2 style={{ fontSize: 18, fontWeight: 700, color: text, margin: '0 0 10px' }}>Report Submitted</h2>
               <p style={{ color: muted, fontSize: 14, lineHeight: 1.6, margin: '0 0 24px' }}>
-                Thank you! Our team will review your bug report and take action as soon as possible.
+                Your bug report has been sent to our team. We'll review it and take action as soon as possible.
               </p>
               <button onClick={handleClose} style={{
                 width: '100%', padding: '12px 20px', borderRadius: 12, border: 'none',
@@ -117,9 +130,95 @@ export default function BugReportModal({ show, onClose }) {
                 fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
               }}>Close</button>
             </div>
-          ) : (
+          )}
+
+          {/* ── PREVIEW ── */}
+          {step === 'preview' && (
             <>
-              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={muted} strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                <h2 style={{ fontSize: 16, fontWeight: 700, color: text, margin: 0 }}>Preview Bug Report</h2>
+              </div>
+
+              {/* Formal report card */}
+              <div style={{
+                border: `1px solid ${border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 16,
+              }}>
+                {/* Header bar */}
+                <div style={{
+                  background: dark ? '#0c1c14' : '#f8faf9', padding: '12px 16px',
+                  borderBottom: `1px solid ${border}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: text }}>
+                    [BUG REPORT] [{sevLabel(severity).toUpperCase()}]
+                  </span>
+                  <span style={{
+                    display: 'inline-block', padding: '2px 10px', borderRadius: 20,
+                    fontSize: 11, fontWeight: 700, color: '#fff', background: sc,
+                  }}>{sevLabel(severity)}</span>
+                </div>
+
+                {/* Body */}
+                <div style={{ padding: '16px' }}>
+                  {/* Date/Time */}
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>Date/Time Discovered</div>
+                    <div style={{ fontSize: 13, color: text }}>{fmtNow()}</div>
+                  </div>
+
+                  {/* Reported By */}
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>Reported By</div>
+                    <div style={{ fontSize: 13, color: text }}>{userName}</div>
+                    <div style={{ fontSize: 12, color: muted }}>{user?.email || ''}</div>
+                  </div>
+
+                  {/* Page/Module */}
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>Page/Module Affected</div>
+                    <div style={{ fontSize: 13, color: text }}>{page}</div>
+                  </div>
+
+                  {/* Divider */}
+                  <hr style={{ border: 'none', borderTop: `1px solid ${border}`, margin: '14px 0' }} />
+
+                  {/* Description */}
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Bug Description</div>
+                    <div style={{ fontSize: 13, color: text, lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{description.trim()}</div>
+                  </div>
+                </div>
+              </div>
+
+              {error && (
+                <div style={{
+                  padding: '10px 14px', borderRadius: 10, marginBottom: 14,
+                  background: dark ? '#2a0d0d' : '#fef2f2', border: `1px solid ${dark ? '#5c1a1a' : '#fecaca'}`,
+                  color: dark ? '#f87171' : '#dc2626', fontSize: 13,
+                }}>{error}</div>
+              )}
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { setStep('form'); setError(''); }} disabled={loading} style={{
+                  flex: 1, padding: '11px 16px', borderRadius: 10,
+                  border: `1px solid ${border}`, background: 'transparent',
+                  color: text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                }}>← Edit</button>
+                <button onClick={handleSubmit} disabled={loading} style={{
+                  flex: 2, padding: '11px 16px', borderRadius: 10, border: 'none',
+                  background: 'linear-gradient(135deg, #26a676, #1e8760)', color: '#fff',
+                  fontSize: 13, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(38,166,118,0.3)',
+                }}>{loading ? 'Submitting…' : 'Submit Bug Report'}</button>
+              </div>
+            </>
+          )}
+
+          {/* ── FORM ── */}
+          {step === 'form' && (
+            <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                 <span style={{ fontSize: 20 }}>🐛</span>
                 <h2 style={{ fontSize: 18, fontWeight: 700, color: text, margin: 0 }}>Report a Bug</h2>
@@ -142,12 +241,12 @@ export default function BugReportModal({ show, onClose }) {
               {/* Page / Module */}
               <div style={{ marginBottom: 14 }}>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: muted, marginBottom: 5 }}>
-                  Page or feature affected
+                  Page or feature affected <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input
                   value={page}
                   onChange={e => setPage(e.target.value)}
-                  placeholder="e.g. Dashboard, Bookings, Calendar…"
+                  placeholder="e.g. Dashboard → Bookings → Booking Details Page"
                   maxLength={200}
                   disabled={loading}
                   style={{
@@ -190,13 +289,13 @@ export default function BugReportModal({ show, onClose }) {
               {/* Description */}
               <div style={{ marginBottom: 20 }}>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: muted, marginBottom: 5 }}>
-                  What happened?
+                  Bug description <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <textarea
                   value={description}
                   onChange={e => setDescription(e.target.value)}
-                  placeholder="Describe the bug — what you did, what you expected, and what actually happened…"
-                  rows={4}
+                  placeholder={"Describe the bug:\n• What you did\n• What you expected\n• What actually happened"}
+                  rows={5}
                   maxLength={2000}
                   disabled={loading}
                   style={{
@@ -214,22 +313,18 @@ export default function BugReportModal({ show, onClose }) {
                 </div>
               </div>
 
-              {error && (
-                <div style={{
-                  padding: '10px 14px', borderRadius: 10, marginBottom: 14,
-                  background: dark ? '#2a0d0d' : '#fef2f2', border: `1px solid ${dark ? '#5c1a1a' : '#fecaca'}`,
-                  color: dark ? '#f87171' : '#dc2626', fontSize: 13,
-                }}>{error}</div>
-              )}
-
-              <button onClick={handleSubmit} disabled={!canSubmit} style={{
+              <button onClick={() => setStep('preview')} disabled={!canPreview} style={{
                 width: '100%', padding: '12px 20px', borderRadius: 12, border: 'none',
-                background: canSubmit ? 'linear-gradient(135deg, #26a676, #1e8760)' : (dark ? '#1e3a2a' : '#e5e7eb'),
-                color: canSubmit ? '#fff' : (dark ? '#4d8a6a' : '#9ca3af'),
-                fontSize: 14, fontWeight: 600, cursor: canSubmit ? 'pointer' : 'not-allowed',
+                background: canPreview ? 'linear-gradient(135deg, #26a676, #1e8760)' : (dark ? '#1e3a2a' : '#e5e7eb'),
+                color: canPreview ? '#fff' : (dark ? '#4d8a6a' : '#9ca3af'),
+                fontSize: 14, fontWeight: 600, cursor: canPreview ? 'pointer' : 'not-allowed',
                 fontFamily: 'inherit', marginBottom: 8, transition: 'all 0.15s',
-                boxShadow: canSubmit ? '0 2px 8px rgba(38,166,118,0.3)' : 'none',
-              }}>{loading ? 'Submitting…' : 'Submit Bug Report'}</button>
+                boxShadow: canPreview ? '0 2px 8px rgba(38,166,118,0.3)' : 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}>
+                Preview Report
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
 
               <button onClick={handleClose} disabled={loading} style={{
                 width: '100%', padding: '10px 20px', borderRadius: 12, border: 'none',

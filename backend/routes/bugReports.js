@@ -38,31 +38,47 @@ publicBugReportRouter.post('/bug-report', async (req, res, next) => {
       status:      'open',
     });
 
-    // Send email notification (non-blocking)
     const sevColors = { low: '#22c55e', medium: '#f59e0b', high: '#f97316', critical: '#ef4444' };
     const sevLabel  = data.severity.charAt(0).toUpperCase() + data.severity.slice(1);
+    const now       = new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila', month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+    const descHtml  = data.description.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
 
     resend.emails.send({
       from:    process.env.EMAIL_FROM || 'HostOps <onboarding@resend.dev>',
       to:      NOTIFY_EMAIL,
-      subject: `[Bug Report] [${sevLabel}] ${data.description.slice(0, 80)}`,
+      subject: `[BUG REPORT] [${sevLabel.toUpperCase()}] ${data.page || 'General'} — ${data.description.slice(0, 60)}`,
       html: `
-        <div style="font-family:'DM Sans',sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
-          <div style="background:#0c1c14;padding:20px 24px;display:flex;align-items:center;gap:12px">
-            <div style="color:#26a676;font-size:18px;font-weight:700">🐛 Bug Report</div>
+        <div style="font-family:'DM Sans',Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
+          <div style="background:#0c1c14;padding:20px 24px">
+            <div style="color:#26a676;font-size:16px;font-weight:700;margin-bottom:4px">🐛 HostOps Bug Report</div>
+            <div style="display:inline-block;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;color:#fff;background:${sevColors[data.severity]}">${sevLabel}</div>
           </div>
           <div style="padding:24px">
-            <div style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;color:#fff;background:${sevColors[data.severity]};margin-bottom:16px">${sevLabel}</div>
-            <table style="width:100%;border-collapse:collapse;font-size:14px">
-              <tr><td style="padding:8px 0;color:#6b7280;width:100px">From</td><td style="padding:8px 0;color:#111827;font-weight:500">${data.name || '—'} &lt;${data.email}&gt;</td></tr>
-              <tr><td style="padding:8px 0;color:#6b7280">Page</td><td style="padding:8px 0;color:#111827">${data.page || '—'}</td></tr>
-              <tr><td style="padding:8px 0;color:#6b7280">Report ID</td><td style="padding:8px 0;color:#111827;font-family:monospace">${report._id}</td></tr>
+            <p style="margin:0 0 20px;color:#374151;font-size:14px;line-height:1.5">Please see the bug report details below.</p>
+
+            <hr style="border:none;border-top:1.5px solid #e5e7eb;margin:0 0 18px"/>
+
+            <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Date/Time Discovered:</p>
+            <p style="margin:0 0 16px;font-size:14px;color:#111827">${now}</p>
+
+            <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Reported By:</p>
+            <p style="margin:0 0 16px;font-size:14px;color:#111827">${data.name || '—'} &lt;${data.email}&gt;</p>
+
+            <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Page/Module Affected:</p>
+            <p style="margin:0 0 16px;font-size:14px;color:#111827">${data.page || '—'}</p>
+
+            <hr style="border:none;border-top:1.5px solid #e5e7eb;margin:0 0 18px"/>
+
+            <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:#111827;text-transform:uppercase;letter-spacing:0.5px"><em>Bug Description:</em></p>
+            <div style="font-size:14px;color:#111827;line-height:1.7">${descHtml}</div>
+
+            <hr style="border:none;border-top:1.5px solid #e5e7eb;margin:20px 0 14px"/>
+            <table style="width:100%;font-size:12px;color:#9ca3af">
+              <tr>
+                <td>Report ID: <span style="font-family:monospace">${report._id}</span></td>
+                <td style="text-align:right">Submitted via HostOps Client Dashboard</td>
+              </tr>
             </table>
-            <div style="margin-top:16px;padding:16px;background:#f8faf9;border:1px solid #e3ede8;border-radius:10px">
-              <div style="font-size:12px;color:#6b7280;margin-bottom:6px;font-weight:600">Description</div>
-              <div style="font-size:14px;color:#111827;line-height:1.6;white-space:pre-wrap">${data.description}</div>
-            </div>
-            <div style="margin-top:20px;font-size:12px;color:#9ca3af">Submitted ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })} PHT</div>
           </div>
         </div>
       `,
