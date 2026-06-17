@@ -4,12 +4,18 @@ import { v2 as cloudinary } from 'cloudinary';
 import multer from 'multer';
 import fs from 'fs';
 import os from 'os';
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 import BugReport from '../models/BugReport.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const REPORT_EMAIL = 'cjcoloma02@gmail.com';
+const gmailTransport = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: REPORT_EMAIL,
+    pass: process.env.GMAIL_APP_PASSWORD || 'lmyy fikh ukfs sxnn',
+  },
+});
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -158,8 +164,8 @@ adminBugReportRouter.post('/bug-reports/:id/send-email', requireAuth, requireAdm
       `<div style="display:inline-block;margin:4px"><img src="${img.url}" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb" /></div>`
     ).join('');
 
-    await resend.emails.send({
-      from:    process.env.EMAIL_FROM || 'HostOps <onboarding@resend.dev>',
+    await gmailTransport.sendMail({
+      from:    `HostOps Bug Report <${REPORT_EMAIL}>`,
       to:      REPORT_EMAIL,
       subject: `[BUG REPORT] [${sevLabel.toUpperCase()}] ${report.page || 'General'} — ${(report.description || '').replace(/<[^>]*>/g, '').slice(0, 60)}`,
       html: `
