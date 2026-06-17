@@ -154,6 +154,20 @@ export default function RecentActivities() {
             @keyframes ra-enter { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
             .ra-row:hover { background: ${dark ? '#0d2619' : '#f8fffe'} !important; }
             .ra-tab-scroll::-webkit-scrollbar { display: none; }
+            .ra-export-btn {
+              display: inline-flex; align-items: center; gap: 7px;
+              padding: 8px 16px; border-radius: 9px; border: none;
+              font-size: 0.82rem; font-weight: 600; white-space: nowrap;
+              transition: background 0.15s; cursor: pointer;
+            }
+            .ra-export-label { display: inline; }
+            @media (max-width: 768px) {
+              .ra-export-btn {
+                width: 38px; height: 38px; padding: 0;
+                justify-content: center; border-radius: 12px;
+              }
+              .ra-export-label { display: none; }
+            }
           `}</style>
 
           {/* ── Header ── */}
@@ -165,22 +179,20 @@ export default function RecentActivities() {
             <button
               onClick={handleExport}
               disabled={exportLoading}
+              className="ra-export-btn"
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 7,
-                padding: '8px 16px', borderRadius: 9, border: 'none',
                 background: exportLoading ? (dark ? '#0d2619' : '#e0e0e0') : '#1a9e6e',
                 color: exportLoading ? (dark ? '#4d8a6a' : '#aaa') : '#fff',
                 cursor: exportLoading ? 'not-allowed' : 'pointer',
-                fontSize: '0.82rem', fontWeight: 600, whiteSpace: 'nowrap',
-                transition: 'background 0.15s',
                 boxShadow: exportLoading ? 'none' : '0 2px 8px rgba(26,158,110,0.20)',
               }}
+              title="Export CSV"
             >
               {exportLoading
                 ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ animation: 'ra-spin 0.8s linear infinite' }}><circle cx="12" cy="12" r="10" strokeOpacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
                 : <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16h14" strokeLinecap="round"/></svg>
               }
-              {exportLoading ? 'Exporting…' : 'Export CSV'}
+              <span className="ra-export-label">{exportLoading ? 'Exporting…' : 'Export CSV'}</span>
             </button>
           </header>
 
