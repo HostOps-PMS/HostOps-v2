@@ -90,6 +90,20 @@ export default function AlertsCenter() {
     setTabScrollable(el.scrollWidth > el.clientWidth);
   }, []);
 
+  const [showSevDropdown, setShowSevDropdown] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const sevDropdownRef = useRef(null);
+  const statusDropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (sevDropdownRef.current && !sevDropdownRef.current.contains(e.target)) setShowSevDropdown(false);
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(e.target)) setShowStatusDropdown(false);
+    }
+    if (showSevDropdown || showStatusDropdown) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showSevDropdown, showStatusDropdown]);
+
   const surface   = dark ? '#132a1e' : '#fff';
   const border    = dark ? '#1e3a2a' : '#e5e7eb';
   const textMain  = dark ? '#eaf5f0' : '#111827';
@@ -276,18 +290,75 @@ export default function AlertsCenter() {
                 />
               </div>
               {/* Severity filter */}
-              <select value={severity} onChange={e => { setSeverity(e.target.value); setPage(1); }} style={{ padding: '8px 12px', borderRadius: 9, border: `1px solid ${border}`, background: inputBg, color: textMain, fontSize: '0.82rem', outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-                <option value="">All Severities</option>
-                <option value="critical">Critical</option>
-                <option value="warning">Warning</option>
-                <option value="info">Info</option>
-              </select>
+              <div ref={sevDropdownRef} style={{ position: 'relative', flexShrink: 0 }}>
+                <div onClick={() => { setShowSevDropdown(v => !v); setShowStatusDropdown(false); }} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '7px 10px 7px 12px', borderRadius: 8,
+                  border: `1px solid ${border}`, background: inputBg,
+                  cursor: 'pointer', fontSize: '0.82rem',
+                  color: severity ? '#059669' : textMuted,
+                  fontWeight: severity ? 600 : 500,
+                  userSelect: 'none', whiteSpace: 'nowrap',
+                }}>
+                  <span>{severity ? (severity.charAt(0).toUpperCase() + severity.slice(1)) : 'All Severities'}</span>
+                  <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}><path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </div>
+                {showSevDropdown && (
+                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 300, background: surface, border: `1.5px solid ${border}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 170, overflow: 'hidden' }}>
+                    {[{ value: '', label: 'All Severities' }, { value: 'critical', label: 'Critical' }, { value: 'warning', label: 'Warning' }, { value: 'info', label: 'Info' }].map(opt => (
+                      <div key={opt.value} onClick={() => { setSeverity(opt.value); setPage(1); setShowSevDropdown(false); }} style={{
+                        padding: '9px 14px', cursor: 'pointer', fontSize: '0.85rem',
+                        background: severity === opt.value ? (dark ? '#0d2619' : '#f0fdf4') : 'transparent',
+                        color: severity === opt.value ? '#059669' : (dark ? '#7ab89a' : '#374151'),
+                        fontWeight: severity === opt.value ? 600 : 400,
+                        borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f7f7f7'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      }}
+                        onMouseEnter={e => { if (severity !== opt.value) e.currentTarget.style.background = dark ? '#132a1e' : '#f8faf9'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = severity === opt.value ? (dark ? '#0d2619' : '#f0fdf4') : 'transparent'; }}
+                      >
+                        {opt.label}
+                        {severity === opt.value && <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="2,6 5,9 10,3"/></svg>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               {/* Status filter */}
-              <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }} style={{ padding: '8px 12px', borderRadius: 9, border: `1px solid ${border}`, background: inputBg, color: textMain, fontSize: '0.82rem', outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="resolved">Resolved</option>
-              </select>
+              <div ref={statusDropdownRef} style={{ position: 'relative', flexShrink: 0 }}>
+                <div onClick={() => { setShowStatusDropdown(v => !v); setShowSevDropdown(false); }} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '7px 10px 7px 12px', borderRadius: 8,
+                  border: `1px solid ${border}`, background: inputBg,
+                  cursor: 'pointer', fontSize: '0.82rem',
+                  color: status ? '#059669' : textMuted,
+                  fontWeight: status ? 600 : 500,
+                  userSelect: 'none', whiteSpace: 'nowrap',
+                }}>
+                  <span>{status ? (status.charAt(0).toUpperCase() + status.slice(1)) : 'All Status'}</span>
+                  <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}><path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </div>
+                {showStatusDropdown && (
+                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 300, background: surface, border: `1.5px solid ${border}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 160, overflow: 'hidden' }}>
+                    {[{ value: '', label: 'All Status' }, { value: 'active', label: 'Active' }, { value: 'resolved', label: 'Resolved' }].map(opt => (
+                      <div key={opt.value} onClick={() => { setStatus(opt.value); setPage(1); setShowStatusDropdown(false); }} style={{
+                        padding: '9px 14px', cursor: 'pointer', fontSize: '0.85rem',
+                        background: status === opt.value ? (dark ? '#0d2619' : '#f0fdf4') : 'transparent',
+                        color: status === opt.value ? '#059669' : (dark ? '#7ab89a' : '#374151'),
+                        fontWeight: status === opt.value ? 600 : 400,
+                        borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f7f7f7'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      }}
+                        onMouseEnter={e => { if (status !== opt.value) e.currentTarget.style.background = dark ? '#132a1e' : '#f8faf9'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = status === opt.value ? (dark ? '#0d2619' : '#f0fdf4') : 'transparent'; }}
+                      >
+                        {opt.label}
+                        {status === opt.value && <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="2,6 5,9 10,3"/></svg>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               {hasFilters && (
                 <button onClick={handleClear} style={{ padding: '8px 14px', borderRadius: 9, border: `1px solid ${border}`, background: 'transparent', color: textMuted, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
                   Clear
