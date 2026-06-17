@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 let markerClusterReady = false;
@@ -652,7 +653,7 @@ function PhotoCarousel({ images = [], altText = '', onAddPhoto = null, uploading
         }}
         loading="lazy"
       />
-      {lightboxOpen && (
+      {lightboxOpen && createPortal(
         <div
           onClick={() => setLightboxOpen(false)}
           onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
@@ -724,7 +725,8 @@ function PhotoCarousel({ images = [], altText = '', onAddPhoto = null, uploading
           }}>
             {safeIdx + 1} / {valid.length}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       {/* Count badge */}
       <span style={{
