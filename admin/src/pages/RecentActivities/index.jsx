@@ -154,6 +154,13 @@ export default function RecentActivities() {
             @keyframes ra-enter { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
             .ra-row:hover { background: ${dark ? '#0d2619' : '#f8fffe'} !important; }
             .ra-tab-scroll::-webkit-scrollbar { display: none; }
+            @media (max-width: 768px) {
+              .ra-filter-bar { gap: 8px !important; }
+              .ra-filter-bar .ra-filter-search {
+                width: 100% !important; min-width: 0 !important; flex: unset !important;
+              }
+              .ra-filter-bar select { flex: 1; min-width: 0; }
+            }
             .ra-export-btn {
               display: inline-flex; align-items: center; gap: 7px;
               padding: 8px 16px; border-radius: 9px; border: none;
@@ -247,8 +254,8 @@ export default function RecentActivities() {
           <div style={{ background: surface, borderRadius: '0 12px 12px 12px', border: `1px solid ${border}`, overflow: 'hidden', boxShadow: dark ? '0 2px 12px rgba(0,0,0,0.25)' : '0 1px 4px rgba(0,0,0,0.06)', animation: 'ra-enter 0.2s ease' }}>
 
             {/* ── Filter bar ── */}
-            <div style={{ padding: '14px 20px', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
+            <div className="ra-filter-bar" style={{ padding: '14px 20px', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div className="ra-filter-search" style={{ position: 'relative', flex: 1, minWidth: 180 }}>
                 <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke={textMuted} strokeWidth="2" style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
                   <circle cx="9" cy="9" r="6"/><path d="M15 15l-3.5-3.5" strokeLinecap="round"/>
                 </svg>
