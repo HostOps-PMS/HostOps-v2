@@ -834,6 +834,7 @@ router.post('/change-password', requireAuth, async (req, res, next) => {
       );
       setRefreshCookie(res, rawRefresh, req);
       const staffSk = createSessionKey(accessJti, accessTokenExpiryMs());
+      deleteSessionKey(req._jti);
 
       return res.json({
         message:     'Password changed successfully.',
@@ -875,6 +876,7 @@ router.post('/change-password', requireAuth, async (req, res, next) => {
     );
     setRefreshCookie(res, rawRefresh, req);
     const userSk = createSessionKey(accessJti, accessTokenExpiryMs());
+    deleteSessionKey(req._jti);
 
     res.json({
       message:     'Password changed successfully.',
