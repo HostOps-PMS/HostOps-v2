@@ -32,7 +32,14 @@ export async function verifyLoginOtp({ email, otp, deviceId, rememberMe }) {
     body:        JSON.stringify({ email, otp, deviceId, rememberMe }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'OTP verification failed');
+  if (!res.ok) {
+    const err = new Error(data.error || 'OTP verification failed');
+    err.status = res.status;
+    if (res.status === 429) {
+      err.retryAfter = parseInt(res.headers.get('Retry-After'), 10) || 90;
+    }
+    throw err;
+  }
   return data;
 }
 
@@ -188,7 +195,14 @@ export async function verifyTotpLogin({ email, token }) {
     body:        JSON.stringify({ email, token }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Invalid authenticator code');
+  if (!res.ok) {
+    const err = new Error(data.error || 'Invalid authenticator code');
+    err.status = res.status;
+    if (res.status === 429) {
+      err.retryAfter = parseInt(res.headers.get('Retry-After'), 10) || 90;
+    }
+    throw err;
+  }
   return data;
 }
 

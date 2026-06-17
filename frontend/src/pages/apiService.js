@@ -41,10 +41,10 @@ export async function authFetch(path, options = {}, auth) {
   let res = await fetch(`${HP_API_BASE}${path}`, opts);
 
   if (res.status === 401) {
-    const refreshed = await tryRefresh(auth);
-    if (refreshed) {
+    const newToken = await auth.refreshToken();
+    if (newToken) {
       const newHint = await generateSessionHint(auth.getSessionKey?.()).catch(() => null);
-      opts.headers.Authorization = `Bearer ${auth.getToken()}`;
+      opts.headers.Authorization = `Bearer ${newToken}`;
       if (newHint) opts.headers['X-Session-Hint'] = newHint;
       res = await fetch(`${HP_API_BASE}${path}`, opts);
     } else {
@@ -54,42 +54,6 @@ export async function authFetch(path, options = {}, auth) {
   }
 
   return withDecryption(res, auth);
-}
-
-// Deduplicate concurrent refresh attempts. If multiple authFetch calls fire
-// simultaneously on a 401, only one POST /auth/refresh is made. All callers
-// share the same promise so the server never sees the same RT cookie twice,
-// which would otherwise trigger reuse-attack detection and revoke all sessions.
-let _refreshPromise = null;
-
-async function _doRefresh(auth) {
-  try {
-    const res = await fetch(`${HP_API_BASE}/auth/refresh`, {
-      method:      'POST',
-      credentials: 'include',
-      headers:     { 'x-api-key': import.meta.env.VITE_API_KEY },
-    });
-    if (!res.ok) return false;
-
-    const data = await res.json();
-    auth.setToken(data.accessToken);
-    if (data.sk)   auth.setSessionKey?.(data.sk);
-    if (data.user) auth.setUser(data.user);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Attempts a silent token refresh using the HttpOnly refresh cookie.
- * Concurrent calls share one in-flight request to avoid RT reuse detection.
- */
-export function tryRefresh(auth) {
-  if (!_refreshPromise) {
-    _refreshPromise = _doRefresh(auth).finally(() => { _refreshPromise = null; });
-  }
-  return _refreshPromise;
 }
 
 /**
@@ -116,13 +80,13 @@ export async function verifySession(auth) {
       return user;
     }
 
-    const refreshed = await tryRefresh(auth);
-    if (!refreshed) { auth.clear(); return null; }
+    const newToken = await auth.refreshToken();
+    if (!newToken) { auth.clear(); return null; }
 
     const res2 = await fetch(`${HP_API_BASE}/auth/me`, {
       credentials: 'include',
       headers: {
-        Authorization: `Bearer ${auth.getToken()}`,
+        Authorization: `Bearer ${newToken}`,
         'x-api-key':   import.meta.env.VITE_API_KEY,
       },
     });

@@ -75,7 +75,12 @@ export async function verifyOtp(otp) {
   const body = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new Error(body.error ?? body.message ?? 'Invalid or expired code.');
+    const err = new Error(body.error ?? body.message ?? 'Invalid or expired code.');
+    err.status = res.status;
+    if (res.status === 429) {
+      err.retryAfter = parseInt(res.headers.get('Retry-After'), 10) || 90;
+    }
+    throw err;
   }
 
   return body;
@@ -151,7 +156,14 @@ export async function verifyTotp(token) {
   });
 
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error ?? 'Invalid code. Please try again.');
+  if (!res.ok) {
+    const err = new Error(body.error ?? 'Invalid code. Please try again.');
+    err.status = res.status;
+    if (res.status === 429) {
+      err.retryAfter = parseInt(res.headers.get('Retry-After'), 10) || 90;
+    }
+    throw err;
+  }
   return body;
 }
 
