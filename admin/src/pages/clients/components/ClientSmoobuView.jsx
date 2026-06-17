@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getClientSmoobuData, getExchangeRate, getApartmentPhotosBulk } from '../services/clientsService';
+import { useTheme } from '../../../context/ThemeContext';
 
 // ── Date helpers (same logic as frontend DateFilterBar) ──────────
 function toYMD(date) {
@@ -517,7 +518,7 @@ function ExpandablePropertyList({ properties }) {
           <div key={p.id} style={{
             borderRadius: 10,
             border: `1px solid ${isOpen ? 'var(--color-primary, #26a676)' : 'var(--color-border, #e5e9ec)'}`,
-            background: isOpen ? '#f0faf5' : 'var(--color-surface-2, #f8faf9)',
+            background: isOpen ? 'var(--color-surface-2, #f0faf5)' : 'var(--color-surface-2, #f8faf9)',
             overflow: 'hidden',
             transition: 'border-color .15s',
           }}>
@@ -601,6 +602,8 @@ function ExpandablePropertyList({ properties }) {
 // ── Main component ───────────────────────────────────────────────
 export default function ClientSmoobuView({ client, property, onClose }) {
   if (!client || !property) return null;
+
+  const { dark } = useTheme();
 
   // Default preset is 'yearly'
   const [activePreset, setActivePreset] = useState('yearly');
@@ -699,10 +702,23 @@ export default function ClientSmoobuView({ client, property, onClose }) {
   const money = (n) => fmtMoney(n, currency, phpRate);
 
   return (
-    <div
+<div
       className="db-modal-overlay"
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{ zIndex: 1100 }}
+      style={{
+        zIndex: 1100,
+        ...(dark ? {
+          '--color-bg': '#0c1c14',
+          '--color-surface': '#132a1e',
+          '--color-surface-2': '#0d2619',
+          '--color-border': '#1e3a2a',
+          '--color-text': '#eaf5f0',
+          '--color-muted': '#7ab89a',
+          '--color-primary': '#26c47a',
+          '--color-primary-soft': '#0d2619',
+          '--color-brand': '#26c47a',
+        } : {}),
+      }}
     >
       <div
         className="db-modal"
@@ -743,7 +759,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
         <div className="smoobu-body" style={{ flex: 1, display: 'flex', flexDirection: 'row-reverse', minHeight: 0, overflow: 'auto', flexWrap: 'wrap-reverse' }}>
 
           {/* ── LEFT: main scrollable content ── */}
-          <div className="smoobu-main" style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16, background: 'var(--color-bg, #f6f8f7)' }}>
+          <div className="smoobu-main" style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16, background: dark ? '#0c1c14' : 'var(--color-bg, #f6f8f7)' }}>
 
           {/* Date filter + Currency — sticky top */}
           <div className="smoobu-datebar" style={{
@@ -939,8 +955,8 @@ export default function ClientSmoobuView({ client, property, onClose }) {
                               display: 'flex', alignItems: 'center', gap: 12,
                               padding: '10px 14px',
                               borderRadius: 10,
-                              background: idx === 0 ? 'linear-gradient(90deg, #fefce8, #fff)' : 'var(--color-surface-2, #f8faf9)',
-                              border: `1px solid ${idx === 0 ? '#fde68a' : 'var(--color-border, #e5e9ec)'}`,
+                              background: idx === 0 ? (dark ? 'linear-gradient(90deg, #2a1f00, #132a1e)' : 'linear-gradient(90deg, #fefce8, #fff)') : 'var(--color-surface-2, #f8faf9)',
+                              border: `1px solid ${idx === 0 ? (dark ? '#5c3a00' : '#fde68a') : 'var(--color-border, #e5e9ec)'}`,
                             }}>
                               <div style={{
                                 width: 24, height: 24, borderRadius: '50%',
@@ -1023,7 +1039,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
                               padding: '8px 12px', textAlign: 'left', fontWeight: 600,
                               color: 'var(--color-muted, #7a8c8e)', fontSize: '.75rem',
                               textTransform: 'uppercase', letterSpacing: '.04em',
-                              background: 'var(--color-bg, #f4f7f5)',
+                              background: dark ? '#0c1c14' : 'var(--color-bg, #f4f7f5)',
                               borderBottom: '1px solid var(--color-border, #e5e9ec)',
                               whiteSpace: 'nowrap',
                             }}>
@@ -1084,7 +1100,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
             borderLeft: '1px solid var(--color-border, #e5e9ec)',
             overflowY: 'auto',
             display: 'flex', flexDirection: 'column',
-            background: '#fafaf8',
+            background: dark ? '#0f2318' : '#fafaf8',
             padding: '16px 14px',
             gap: 12,
             minHeight: '100%',
@@ -1173,7 +1189,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
                 { label: 'Cancelled', value: cancellations, accent: '#e55b5b', sub: `${cancelledNights} nights`, emoji: '🚫' },
               ].map((s) => (
                 <div key={s.label} style={{
-                  background: '#fff',
+                  background: dark ? '#132a1e' : '#fff',
                   border: '1px solid var(--color-border, #e5e9ec)',
                   borderRadius: 14,
                   padding: '14px',
@@ -1208,7 +1224,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
             {/* ── Properties list ── */}
             {data && !data.smoobuNotConnected && properties.length > 0 && (
               <div style={{
-                background: '#fff',
+                background: dark ? '#132a1e' : '#fff',
                 border: '1px solid var(--color-border, #e5e9ec)',
                 borderRadius: 14,
                 padding: '12px 14px',
@@ -1233,7 +1249,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
 
             {/* ── Currency toggle ── */}
             <div style={{
-              background: '#fff',
+              background: dark ? '#132a1e' : '#fff',
               border: '1px solid var(--color-border, #e5e9ec)',
               borderRadius: 14,
               padding: '12px 14px',
@@ -1255,7 +1271,7 @@ export default function ClientSmoobuView({ client, property, onClose }) {
             </div>
 
             {/* spacer fills remaining space with same bg */}
-            <div style={{ flex: 1, minHeight: 0, background: '#fafaf8' }} />
+            <div style={{ flex: 1, minHeight: 0, background: dark ? '#0f2318' : '#fafaf8' }} />
 
           </div>{/* end RIGHT sidebar */}
         </div>{/* end body row */}
@@ -1263,6 +1279,12 @@ export default function ClientSmoobuView({ client, property, onClose }) {
 
         {/* ── Mobile responsive styles ── */}
         <style>{`
+          ${dark ? `
+          .db-skeleton {
+            background: linear-gradient(90deg, #1e3a2a 25%, #152e20 50%, #1e3a2a 75%) !important;
+            background-size: 200% 100% !important;
+          }
+          ` : ''}
           input[type="date"]::-webkit-date-and-time-value {
             text-align: left;
             min-height: 1.2em;
