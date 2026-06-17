@@ -80,6 +80,7 @@ export function useAuthorization(onAuthorized) {
       setLockoutTimer((prev) => {
         if (prev <= 1) {
           localStorage.removeItem('hp_otp_lockout');
+          setMessage(null);
           return 0;
         }
         return prev - 1;

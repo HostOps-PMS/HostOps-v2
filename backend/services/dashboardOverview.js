@@ -269,8 +269,6 @@ async function fetchPropertyData(propertyCtx, dateRange, clientId, clientName, p
       const lat = parseFloat(loc.latitude);
       const lng = parseFloat(loc.longitude);
 
-      console.log(`[overview] apt ${aptId} "${apt.name}" → images=${images.length}`);
-
       return {
         apartmentId:   aptId,
         apartmentName: apt.name || detail?.name || `Apartment ${aptId}`,
@@ -293,9 +291,6 @@ async function fetchPropertyData(propertyCtx, dateRange, clientId, clientName, p
       };
     })
   );
-
-  const withImgs = apartmentLocations.filter(a => a.images && a.images.length > 0).length;
-  console.log(`[overview] "${propertyName}" → ${apartmentLocations.length} apts, ${withImgs} with images`);
 
   // Filter bookings to the requested date range (arrival-based, matching Smoobu)
   const statsBookings = allBookings.filter((b) => {
@@ -915,9 +910,6 @@ export async function getDashboardOverview(opts = {}) {
   });
 
   const mapLocations = Array.from(mergedById.values());
-
-  const mappable = mapLocations.filter((l) => typeof l.latitude === 'number' && typeof l.longitude === 'number').length;
-  console.log(`[overview] mapLocations=${mapLocations.length} (withCoords=${mappable}) smoobuLocs=${smoobuLocs.length}`);
 
   // ── 13. Return assembled payload ─────────────────────────────────────────
   return {
