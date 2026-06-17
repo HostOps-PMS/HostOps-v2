@@ -102,6 +102,7 @@ export function signAccessToken(user, req = null) {
     sub:   user._id.toString(),
     email: user.email,
     role:  user.role,
+    tag:   user.tag || '',
   };
   if (req) payload.fp = generateFingerprint(req);
   return jwt.sign(payload, getSigningSecret(), { expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m' });

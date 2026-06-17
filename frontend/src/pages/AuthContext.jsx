@@ -184,7 +184,10 @@ export function AuthProvider({ children }) {
     // is a reload, not a true close. The timer checks this flag before beaconing.
     try { localStorage.removeItem('_hp_unload_pending'); } catch { /* ignore */ }
 
-    async function hydrate() {
+    // Retry up to 2 times for 5xx / network errors (Render cold-start can
+    // return 502/503 for ~30 s while the container wakes up). Never retry
+    // on 401/403 — those are genuine auth failures and must not be masked.
+    async function hydrate(attempt = 0) {
       try {
         const res = await fetch(`${HP_API_BASE}/auth/refresh`, {
           method:      'POST',
@@ -199,13 +202,28 @@ export function AuthProvider({ children }) {
           if (data.sk)   sessionKeyRef.current = data.sk;
           if (data.user) setUser(data.user);
           console.info('[Auth] hydrate OK — session restored');
+          return; // success path exits here; finally still runs
+        }
+
+        if (res.status >= 500 && attempt < 2) {
+          // Server error (cold start / 502) — back off and retry
+          console.warn('[Auth] hydrate — server error', res.status, '— retrying (attempt', attempt + 1, ')');
+          await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+          if (!controller.signal.aborted) { await hydrate(attempt + 1); return; }
         } else {
           accessTokenRef.current = null;
           sessionKeyRef.current  = null;
-          console.warn('[Auth] hydrate FAILED — status', res.status, '— session expired or revoked; please log in again');
+          const body = await res.json().catch(() => ({}));
+          console.warn('[Auth] hydrate FAILED — status', res.status, 'code', body.code ?? '—');
         }
       } catch (err) {
         if (err.name === 'AbortError') return;
+        // Network error (server unreachable / cold start) — retry
+        if (attempt < 2) {
+          console.warn('[Auth] hydrate — network error, retrying (attempt', attempt + 1, '):', err.message);
+          await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+          if (!controller.signal.aborted) { await hydrate(attempt + 1); return; }
+        }
         accessTokenRef.current = null;
         sessionKeyRef.current  = null;
         console.error('[Auth] hydrate ERROR —', err.message);

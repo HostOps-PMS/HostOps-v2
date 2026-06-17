@@ -571,22 +571,28 @@ router.post('/refresh', async (req, res, next) => {
 
     // Hash the decrypted token to look it up in DB
     const stored = await RefreshToken.findOne({ token: hashToken(rawToken) });
-    if (!stored) return res.status(401).json({ error: 'Unauthorized' });
+    if (!stored) return res.status(401).json({ error: 'Unauthorized', code: 'RT_NOT_FOUND' });
 
     // Reuse attack detection: token exists in DB but was already consumed.
     // A legitimately rotated token is always replaced — seeing a revoked one
     // presented again means the old token was leaked. Nuke all active sessions
     // for that identity so the attacker's copy is also invalidated.
     if (stored.revokedAt) {
+      console.warn('[auth/refresh] Reuse attack detected — wiping all sessions', {
+        userId:    stored.userId,
+        revokedAt: stored.revokedAt,
+        ip:        req.ip,
+        ua:        req.get('user-agent')?.slice(0, 80),
+      });
       if (stored.staffId) {
         await RefreshToken.updateMany({ staffId: stored.staffId, revokedAt: null }, { revokedAt: new Date() });
       } else {
         await RefreshToken.updateMany({ userId: stored.userId, staffId: null, revokedAt: null }, { revokedAt: new Date() });
       }
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({ error: 'Unauthorized', code: 'RT_REUSE' });
     }
 
-    if (!stored.isActive()) return res.status(401).json({ error: 'Unauthorized' });
+    if (!stored.isActive()) return res.status(401).json({ error: 'Unauthorized', code: 'RT_EXPIRED' });
 
     // ── Staff refresh ─────────────────────────────────────────────
     if (decoded.role === 'staff') {
@@ -668,9 +674,13 @@ router.post('/logout', async (req, res, next) => {
     const header     = req.headers.authorization || '';
     const accessBlob = header.startsWith('Bearer ') ? header.slice(7) : null;
     if (accessBlob) {
-      const jti = extractJti(accessBlob);
+      let decoded = null;
+      try { decoded = verifyAccessToken(accessBlob); } catch {}
+      const jti = decoded?.jti;
       if (jti) {
-        await revokeAccessJti(jti, req.user?._id || 'unknown', 'logout');
+        if (decoded?.tag !== 'Main Admin') {
+          await revokeAccessJti(jti, req.user?._id || 'unknown', 'logout');
+        }
         deleteSessionKey(jti);
       }
     }
@@ -702,8 +712,12 @@ router.post('/revoke-token', async (req, res, next) => {
     // The rt cookie must stay alive so the page can silently re-authenticate
     // after a refresh. It will expire naturally (7 days) or be revoked by
     // POST /auth/logout on intentional sign-out.
-    const jti = extractJti(token);
-    if (jti) await revokeAccessJti(jti, 'beacon', 'tab_close');
+    let decoded = null;
+    try { decoded = verifyAccessToken(token); } catch {}
+    const jti = decoded?.jti;
+    if (jti && decoded?.tag !== 'Main Admin') {
+      await revokeAccessJti(jti, 'beacon', 'tab_close');
+    }
 
     res.status(204).send();
   } catch (err) { next(err); }
