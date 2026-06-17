@@ -53,3 +53,17 @@
   --ease:              cubic-bezier(.4,0,.2,1);
   --transition:        150ms var(--ease);
 }
+
+/* ── Dark mode overrides (data-theme="dark" set by ThemeContext) ── */
+html[data-theme="dark"] {
+  --color-bg:          #0c1c14;
+  --color-surface:     #132a1e;
+  --color-surface-2:   #0d2619;
+  --color-border:      #1e3a2a;
+  --color-text:        #eaf5f0;
+  --color-muted:       #7ab89a;
+  --color-placeholder: #4d8a6a;
+  --color-brand-light: #0d2619;
+  --shadow-card:       0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+  --shadow-modal:      0 20px 60px rgba(0,0,0,.5);
+}

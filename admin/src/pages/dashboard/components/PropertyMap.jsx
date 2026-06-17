@@ -804,13 +804,17 @@ function PhotoCarousel({ images = [], altText = '', onAddPhoto = null, uploading
 }
 
 
-export default function PropertyMap({ mapLocations, loading }) {
+export default function PropertyMap({ mapLocations, loading, dark = false }) {
   const [selectedClient,    setSelectedClient]    = useState('all');
   const [selectedPropIndex, setSelectedPropIndex] = useState(null);
   // Third dropdown: selected room/apartment id (string)
   const [selectedAptId,     setSelectedAptId]     = useState('');
   const [isModalOpen,       setIsModalOpen]        = useState(false);
-  const [mapStyle,          setMapStyle]            = useState('standard');
+  const [prevDark, setPrevDark]       = useState(dark);
+  const [manualStyle, setManualStyle] = useState(null);
+  if (prevDark !== dark) { setPrevDark(dark); setManualStyle(null); }
+  const mapStyle = manualStyle ?? (dark ? 'satellite' : 'standard');
+
   const [selectedLegendApt, setSelectedLegendApt]   = useState(null);
   const [legendSearch,       setLegendSearch]        = useState('');
   const [activeTab,          setActiveTab]           = useState('properties'); // 'properties' | 'detail'
@@ -1212,7 +1216,7 @@ export default function PropertyMap({ mapLocations, loading }) {
               {Object.entries(MAP_STYLES).map(([key, val], i, arr) => (
                 <button
                   key={key}
-                  onClick={() => setMapStyle(key)}
+                  onClick={() => setManualStyle(key)}
                   style={{
                     padding: '4px 9px', fontSize: '11px', fontWeight: 600,
                     fontFamily: 'var(--font-body)', border: 'none',
@@ -1467,7 +1471,7 @@ export default function PropertyMap({ mapLocations, loading }) {
                   {Object.entries(MAP_STYLES).map(([key, val], i, arr) => (
                     <button
                       key={key}
-                      onClick={() => setMapStyle(key)}
+                      onClick={() => setManualStyle(key)}
                       style={{
                         padding: '5px 12px', fontSize: '12px', fontWeight: 600,
                         fontFamily: 'var(--font-body)', border: 'none',

@@ -298,6 +298,11 @@
   border-radius: var(--radius-sm);
 }
 
+html[data-theme="dark"] .db-skeleton {
+  background: linear-gradient(90deg, #1e3a2a 25%, #0d2619 50%, #1e3a2a 75%);
+  background-size: 600px 100%;
+}
+
 /* ─── Table / Content Card ────────────────────────────── */
 .db-table-card {
   background: var(--color-surface);
@@ -390,6 +395,11 @@
 .db-badge--warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
 .db-badge--danger  { background: #fff5f5; color: #991b1b; border: 1px solid #fecaca; }
 .db-badge--info    { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+
+html[data-theme="dark"] .db-badge--success { background: #052e16; color: #4ade80; border-color: #166534; }
+html[data-theme="dark"] .db-badge--warning { background: #2a1f0a; color: #fbbf24; border-color: #5c3a0a; }
+html[data-theme="dark"] .db-badge--danger  { background: #2a0d0d; color: #f87171; border-color: #5c1a1a; }
+html[data-theme="dark"] .db-badge--info    { background: #0d1a2a; color: #60a5fa; border-color: #1a3a5c; }
 
 /* ─── Modal ───────────────────────────────────────────── */
 .db-modal-overlay {

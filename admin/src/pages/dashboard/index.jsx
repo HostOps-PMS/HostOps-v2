@@ -1,5 +1,6 @@
 // src/pages/Dashboard/index.jsx
 import { useState } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import './dashboard.css';
 
 import { exportDashboardPdf } from './utils/exportDashboardPdf';
@@ -21,6 +22,7 @@ import { useAccounts } from './hooks/useAccounts';
 import FetchingOverlay from '../components/FetchingOverlay';
 
 export default function Dashboard() {
+  const { dark } = useTheme();
   const [modal, setModal] = useState({ open: false, type: null, data: null });
 
   const getPresetRange = (preset) => {
@@ -179,6 +181,7 @@ export default function Dashboard() {
             <PropertyMap
               mapLocations={overview?.mapLocations ?? null}
               loading={statsLoading}
+              dark={dark}
             />
             <OccupancyGauge
               occupancyBreakdown={overview?.occupancyBreakdown ?? null}

@@ -1,5 +1,6 @@
 // components/OccupancyGauge.jsx
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { useTheme } from '../../../context/ThemeContext';
 
 // ── Static fallback data ──────────────────────────────────────────
 const FALLBACK_PROPERTIES = [
@@ -22,6 +23,7 @@ const COLORS = ['#1a9e6e', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4'
  * @param {boolean}  [props.loading]
  */
 export default function OccupancyGauge({ occupancyBreakdown, overallOccupancy, loading }) {
+  const { dark } = useTheme();
   const isLive = !loading && occupancyBreakdown && occupancyBreakdown.length > 0;
 
   // Decide which property list to show
@@ -100,7 +102,7 @@ export default function OccupancyGauge({ occupancyBreakdown, overallOccupancy, l
                 strokeWidth={0}
               >
                 <Cell fill={overall >= 70 ? '#1a9e6e' : overall >= 50 ? '#f59e0b' : '#ef4444'} />
-                <Cell fill="#f0f0f0" />
+                <Cell fill={dark ? '#1e3a2a' : '#f0f0f0'} />
               </Pie>
             </PieChart>
           </ResponsiveContainer>
@@ -139,7 +141,7 @@ export default function OccupancyGauge({ occupancyBreakdown, overallOccupancy, l
                   </div>
                 )}
               </div>
-              <div style={{ width: 80, height: 5, background: '#f0f0f0', borderRadius: 99, overflow: 'hidden', flexShrink: 0 }}>
+              <div style={{ width: 80, height: 5, background: dark ? '#1e3a2a' : '#f0f0f0', borderRadius: 99, overflow: 'hidden', flexShrink: 0 }}>
                 <div style={{ width: `${p.occupancy}%`, height: '100%', background: COLORS[i % COLORS.length], borderRadius: 99 }} />
               </div>
               <div style={{ fontSize: '.72rem', fontWeight: 600, color: 'var(--color-muted)', width: 32, textAlign: 'right' }}>
