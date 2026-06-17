@@ -1,10 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import hostopsLogo from "../../../assets/HostOpsLOGO.png";
 import { useDashboard } from "../context/DashboardContext";
+import BugReportModal from "./BugReportModal";
 
 export default function Footer() {
   const year = new Date().getFullYear();
   const { dark } = useDashboard();
+  const [showBugReport, setShowBugReport] = useState(false);
 
   return (
     <footer style={{
@@ -25,7 +27,8 @@ export default function Footer() {
           gap: 12px;
           padding: 20px clamp(16px, 5vw, 80px);
         }
-        .footer-links a:hover {
+        .footer-links a:hover,
+        .footer-links button:hover {
           background: ${dark ? "#132a1e" : "#f0faf6"} !important;
           border-color: ${dark ? "#2a5c3c" : "#c8e6d8"} !important;
           color: ${dark ? "#56c299" : "#1e6b4a"} !important;
@@ -78,15 +81,27 @@ export default function Footer() {
               border: "1px solid transparent", transition: "all .15s",
             }}>{label}</a>
           ))}
-          <a href="#" style={{
-            fontSize: "12px", color: "#fff", textDecoration: "none",
-            fontWeight: 600, padding: "6px 14px", borderRadius: 8,
-            background: "linear-gradient(135deg, #26a676, #1e8760)",
-            boxShadow: "0 2px 8px rgba(38,166,118,0.3)",
-          }}>Support</a>
+          <button
+            onClick={() => setShowBugReport(true)}
+            style={{
+              fontSize: "12px", color: "#fff", textDecoration: "none",
+              fontWeight: 600, padding: "6px 14px", borderRadius: 8,
+              background: "linear-gradient(135deg, #26a676, #1e8760)",
+              boxShadow: "0 2px 8px rgba(38,166,118,0.3)",
+              border: "none", cursor: "pointer", fontFamily: "inherit",
+              display: "inline-flex", alignItems: "center", gap: "5px",
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+            </svg>
+            Bug Report
+          </button>
         </div>
 
       </div>
+
+      <BugReportModal show={showBugReport} onClose={() => setShowBugReport(false)} />
     </footer>
   );
 }
