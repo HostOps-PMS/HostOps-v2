@@ -182,6 +182,24 @@ function setRefreshCookie(res, rawRefreshToken, req) {
   });
 }
 
+// ── Helper: clear the rt cookie (must mirror setRefreshCookie attributes) ──
+// clearCookie() sends a Set-Cookie with Expires in the past. On HTTPS/cross-site
+// the browser only accepts it if SameSite=None; Secure are present — exactly as
+// when the cookie was first set. Omitting them leaves the old cookie in place,
+// so the next /auth/refresh sends a DB-revoked token → reuse-attack → 401.
+function clearRefreshCookie(res, req) {
+  const isHttps = req
+    ? (req.secure || req.get('x-forwarded-proto') === 'https')
+    : process.env.NODE_ENV === 'production';
+  const sameSite = isHttps ? (process.env.COOKIE_SAME_SITE || 'none') : 'lax';
+  res.clearCookie('rt', {
+    httpOnly: true,
+    secure:   isHttps,
+    sameSite,
+    path:     '/auth',
+  });
+}
+
 // ── Helper: read + decrypt the rt cookie ────────────────────────
 // Returns the raw (decrypted) refresh token string, or null.
 function getRefreshCookie(req) {
@@ -693,7 +711,7 @@ router.post('/logout', async (req, res, next) => {
       }
     }
 
-    res.clearCookie('rt', { path: '/auth' });
+    clearRefreshCookie(res, req);
     res.json({ message: 'Logged out' });
   } catch (err) { next(err); }
 });
