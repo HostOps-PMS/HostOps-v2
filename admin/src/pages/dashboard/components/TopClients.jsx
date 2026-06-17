@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTheme } from '../../../context/ThemeContext';
 
 /* ── Sample top clients data ─────────────────────────────────── */
 const TOP_CLIENTS = [
@@ -43,6 +44,7 @@ function OccupancyBar({ pct }) {
 }
 
 export default function TopClients() {
+  const { dark } = useTheme();
   const [sortBy, setSortBy] = useState('Revenue');
 
   const sorted = [...TOP_CLIENTS].sort((a, b) => {
@@ -96,11 +98,11 @@ export default function TopClients() {
                 gap: 12,
                 padding: '8px 8px',
                 borderRadius: 10,
-                background: idx === 0 ? '#f0faf6' : 'transparent',
+                background: idx === 0 ? (dark ? '#0d2619' : '#f0faf6') : 'transparent',
                 transition: 'background .12s',
                 cursor: 'default',
               }}
-              onMouseEnter={e => { if (idx > 0) e.currentTarget.style.background = 'var(--color-surface-2)'; }}
+              onMouseEnter={e => { if (idx > 0) e.currentTarget.style.background = dark ? '#0d2619' : '#f4faf7'; }}
               onMouseLeave={e => { if (idx > 0) e.currentTarget.style.background = 'transparent'; }}
             >
               {/* Rank */}

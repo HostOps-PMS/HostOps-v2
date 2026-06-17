@@ -1,5 +1,6 @@
 // components/RevenueChart.jsx
 import { useState } from 'react';
+import { useTheme } from '../../../context/ThemeContext';
 import {
   ResponsiveContainer, ComposedChart, Line, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -72,6 +73,7 @@ function buildSmoobuData(smoobuChartData) {
 }
 
 export default function RevenueChart({ smoobuChartData }) {
+  const { dark } = useTheme();
   const [period, setPeriod]       = useState('Monthly');
   const [activeSeries, setActive] = useState(['revenue','bookings','cancellations']);
 
@@ -169,15 +171,15 @@ export default function RevenueChart({ smoobuChartData }) {
       <div style={{ padding: '0 8px 12px', width: '100%', minWidth: 0 }}>
         <ResponsiveContainer width="100%" height={300}>
           <ComposedChart data={data} margin={{ top: 4, right: 36, bottom: 0, left: 48 }}>
-            <CartesianGrid stroke="rgba(0,0,0,0.06)" vertical={false} />
-            <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+            <CartesianGrid stroke={dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)'} vertical={false} />
+            <XAxis dataKey="name" tick={{ fontSize: 10, fill: dark ? '#7ab89a' : '#9ca3af' }} axisLine={false} tickLine={false} />
             <YAxis yAxisId="left" orientation="left"
               tickFormatter={formatRevenue}
-              tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={48} />
+              tick={{ fontSize: 10, fill: dark ? '#7ab89a' : '#9ca3af' }} axisLine={false} tickLine={false} width={48} />
             <YAxis yAxisId="right" orientation="right"
-              tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={32} />
+              tick={{ fontSize: 10, fill: dark ? '#7ab89a' : '#9ca3af' }} axisLine={false} tickLine={false} width={32} />
             <Tooltip
-              contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
+              contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`, background: dark ? '#132a1e' : '#fff', color: dark ? '#eaf5f0' : '#111827' }}
               formatter={(val, name) => name === 'revenue' ? formatRevenue(val) : val}
             />
             {activeSeries.includes('revenue') && (

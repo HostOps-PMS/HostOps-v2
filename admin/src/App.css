@@ -43,3 +43,26 @@ a {
 button {
   font-family: inherit;
 }
+
+/* ── Dark mode CSS variable overrides ──────────────────────
+   html[data-theme="dark"] has specificity (0,1,1) — higher
+   than :root (0,1,0) — so these always win regardless of
+   which CSS file loads last.
+   ─────────────────────────────────────────────────────── */
+html[data-theme="dark"] {
+  /* Backgrounds */
+  --color-bg:          #0c1c14;
+  --color-surface:     #132a1e;
+  --color-surface-2:   #0d2619;
+
+  /* Text */
+  --color-text:        #eaf5f0;
+  --color-muted:       #7ab89a;
+  --color-placeholder: #4d8a6a;
+
+  /* Borders & shadows */
+  --color-border:      #1e3a2a;
+  --color-brand-light: #0d2619;
+  --shadow-card:       0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+  --shadow-modal:      0 20px 60px rgba(0,0,0,.5);
+}

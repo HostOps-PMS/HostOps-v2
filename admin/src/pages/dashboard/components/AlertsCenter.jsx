@@ -121,11 +121,11 @@ export default function AlertsCenter({ alerts, loading }) {
 
               {/* Content */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '.85rem', fontWeight: 700, color: '#111827', lineHeight: 1.3 }}>
+                <div style={{ fontSize: '.85rem', fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.3 }}>
                   {alert.title}
                 </div>
                 <div style={{
-                  fontSize: '.78rem', color: '#6b7280', marginTop: 3, lineHeight: 1.4,
+                  fontSize: '.78rem', color: 'var(--color-muted)', marginTop: 3, lineHeight: 1.4,
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                 }}>
                   {alert.desc}
