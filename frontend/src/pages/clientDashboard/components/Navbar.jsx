@@ -9,7 +9,7 @@ import SwitchAccountModal from "./SwitchAccountModal";
 import FetchingOverlay from "./FetchingOverlay";
 import { useActivityLog } from "../hooks/useActivityLog";
 import safeStorage from "../../safeStorage";
-import { authFetch } from "../../apiService";
+
 import hostopsLogo from "../../../assets/HostOpsLOGO.png"; 
 
 function getUserData(auth) {
@@ -410,8 +410,14 @@ export default function Navbar() {
 
   useEffect(() => {
     if (!notifOpen || notifTab !== 'reports') return;
-    authFetch('/api/my-bug-reports', {}, auth)
-      .then(r => r?.json?.())
+    const userData = getUserData(auth);
+    const email = userData?.email;
+    if (!email) return;
+    const apiBase = (import.meta.env.VITE_API_URL || 'https://api.hostops.online').replace(/\/$/, '');
+    fetch(`${apiBase}/auth/my-reports?email=${encodeURIComponent(email)}`, {
+      headers: { 'x-api-key': import.meta.env.VITE_API_KEY || '' },
+    })
+      .then(r => r.json())
       .then(d => { if (Array.isArray(d)) setBugReports(d); })
       .catch(() => {});
   }, [notifOpen, notifTab]);

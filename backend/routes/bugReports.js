@@ -86,6 +86,20 @@ async function handleBugReport(req, res, next) {
   }
 }
 
+// Client checks their own reports by email (no auth needed — they only see status of their own submissions)
+publicBugReportRouter.get('/my-reports', async (req, res, next) => {
+  try {
+    const email = (req.query.email || '').toLowerCase().trim();
+    if (!email) return res.json([]);
+    const reports = await BugReport.find({ email })
+      .select('page severity description status createdAt')
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+    res.json(reports);
+  } catch (err) { next(err); }
+});
+
 // ═══════════════════════════════════════════════════════════════
 // ADMIN ROUTER — requires auth + admin role
 // ═══════════════════════════════════════════════════════════════
