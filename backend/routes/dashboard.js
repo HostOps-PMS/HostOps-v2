@@ -654,17 +654,25 @@ router.get('/messages/:reservationId', async (req, res, next) => {
         (p) => String(p._id) === String(propertyDbId)
       );
       if (!matchedProp) {
-        return res.status(403).json({ error: 'You do not own this property' });
-      }
-      if (req.isStaff && !req.staffPropertyDbIds?.includes(String(propertyDbId))) {
-        return res.status(403).json({ error: 'You do not have access to this property' });
-      }
-      const msgPropKey = matchedProp?.smoobuApiKey?.trim();
-      if (msgPropKey && !isEncrypted(msgPropKey)) {
-        const baseUser = typeof req.user.toObject === 'function'
-          ? req.user.toObject()
-          : { ...req.user };
-        req.user = { ...baseUser, smoobuApiKey: msgPropKey };
+        // Staff must only access their assigned properties — hard block.
+        // Non-staff (clients / admin): the propertyDbId may be stale (leftover
+        // from a previous session) or the user accesses via a shared API key
+        // (MODE B). Skip injection and let getApiKeyForUser fall through to
+        // MODE B / env key. assertReservationOwnership below is the real gate.
+        if (req.isStaff) {
+          return res.status(403).json({ error: 'You do not have access to this property' });
+        }
+      } else {
+        if (req.isStaff && !req.staffPropertyDbIds?.includes(String(propertyDbId))) {
+          return res.status(403).json({ error: 'You do not have access to this property' });
+        }
+        const msgPropKey = matchedProp?.smoobuApiKey?.trim();
+        if (msgPropKey && !isEncrypted(msgPropKey)) {
+          const baseUser = typeof req.user.toObject === 'function'
+            ? req.user.toObject()
+            : { ...req.user };
+          req.user = { ...baseUser, smoobuApiKey: msgPropKey };
+        }
       }
     }
 
