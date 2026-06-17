@@ -21,7 +21,7 @@ export default function ForgotPasswordForm({ showMsg, onBack }) {
   return (
     <>
       <h1 className="lp-h1">Reset your password</h1>
-      <p className="lp-sub">We'll email you a reset link.</p>
+      <p className="lp-sub">We'll email you a reset code.</p>
 
       <form onSubmit={handleSubmit}>
         <div className="lp-field">
@@ -36,7 +36,7 @@ export default function ForgotPasswordForm({ showMsg, onBack }) {
           />
         </div>
         <button className="lp-btn" type="submit" disabled={loading}>
-          {loading ? 'Sending...' : 'Send Reset Link'}
+          {loading ? 'Sending...' : 'Send Reset Code'}
         </button>
         <button type="button" className="lp-link" onClick={onBack}>
           ← Back to sign in
