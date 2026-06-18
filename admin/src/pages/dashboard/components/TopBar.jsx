@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../../context/NotificationsContext';
 import { useTheme } from '../../../context/ThemeContext';
+import { fetchWithAuth } from '../../../lib/authUtils';
 
 // ─────────────────────────────────────────────────────────────────
 // Helpers
@@ -155,16 +156,27 @@ const SunIcon = () => (
 function NotificationDropdown({ alerts = [], activities = [], loading, onClose }) {
   const [activeTab, setActiveTab] = useState('alerts');
   const [readIds,   setReadIds]   = useState(new Set());
+  const [bugReports, setBugReports] = useState([]);
   const { dark } = useTheme();
   const navigate = useNavigate();
 
+  const API_BASE = (import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+
+  useEffect(() => {
+    fetchWithAuth(`${API_BASE}/api/bug-reports`)
+      .then(r => r?.ok ? r.json() : [])
+      .then(d => { if (Array.isArray(d)) setBugReports(d); })
+      .catch(() => {});
+  }, []);
+
+  const openReports = bugReports.filter(r => r.status === 'open').length;
   const unreadAlerts = (alerts || []).filter(a => a.unread && !readIds.has(a.id)).length;
 
   const markAllRead = () => {
     setReadIds(prev => new Set([...prev, ...(alerts || []).map(a => a.id)]));
   };
 
-  const items = activeTab === 'alerts' ? (alerts || []) : (activities || []);
+  const items = activeTab === 'alerts' ? (alerts || []) : activeTab === 'activities' ? (activities || []) : bugReports;
 
   const surface   = dark ? '#132a1e' : '#fff';
   const border    = dark ? '#1e3a2a' : 'rgba(0,0,0,0.08)';
@@ -242,6 +254,7 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
           {[
             { key: 'alerts',     label: 'Alerts',   count: (alerts     || []).length },
             { key: 'activities', label: 'Activity', count: (activities || []).length },
+            { key: 'reports',    label: 'Reports',  count: bugReports.length },
           ].map(tab => (
             <button
               key={tab.key}
@@ -289,7 +302,7 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
               </svg>
             </div>
             <div style={{ fontSize: 12, color: textMuted }}>
-              {activeTab === 'alerts' ? 'No alerts right now' : 'No recent activity'}
+              {activeTab === 'alerts' ? 'No alerts right now' : activeTab === 'activities' ? 'No recent activity' : 'No bug reports yet'}
             </div>
           </div>
         ) : activeTab === 'alerts' ? (
@@ -355,7 +368,7 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
               </div>
             );
           })
-        ) : (
+        ) : activeTab === 'activities' ? (
           (activities || []).map((act, i) => (
             <div
               key={act.id ?? i}
@@ -388,6 +401,58 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
               </div>
             </div>
           ))
+        ) : (
+          bugReports.map((r, i) => {
+            const sevColors = { low: '#22c55e', medium: '#f59e0b', high: '#f97316', critical: '#ef4444' };
+            const stColors  = { open: '#f97316', in_progress: '#f59e0b', resolved: '#22c55e', dismissed: '#6b7280' };
+            const stLabels  = { open: 'Open', in_progress: 'In Progress', resolved: 'Approved', dismissed: 'Declined' };
+            return (
+              <div
+                key={r._id ?? i}
+                className="notif-item"
+                onClick={() => { onClose(); navigate('/bug-reports'); }}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10,
+                  padding: '11px 16px',
+                  borderBottom: `0.5px solid ${itemBorderB}`,
+                  cursor: 'pointer',
+                  background: r.status === 'open' ? unreadBg : readBg,
+                  transition: 'background 0.12s',
+                }}
+              >
+                <div style={{
+                  width: 34, height: 34, borderRadius: 10,
+                  background: dark ? '#2a0d0d' : '#fef2f2',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, fontSize: 16,
+                }}>🐛</div>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    <span style={{ padding: '1px 7px', borderRadius: 10, fontSize: 9, fontWeight: 700, color: '#fff', background: sevColors[r.severity] || '#f97316' }}>
+                      {(r.severity || 'high').charAt(0).toUpperCase() + (r.severity || 'high').slice(1)}
+                    </span>
+                    <span style={{ padding: '1px 7px', borderRadius: 10, fontSize: 9, fontWeight: 700, color: '#fff', background: stColors[r.status] || '#6b7280' }}>
+                      {stLabels[r.status] || r.status}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: textMain, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {r.page || 'General'}
+                  </div>
+                  <div style={{ fontSize: 11, color: textMuted, marginTop: 1 }}>
+                    {r.name || r.email || '—'}
+                  </div>
+                </div>
+
+                <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                  <div style={{ fontSize: 10, color: textDim, whiteSpace: 'nowrap' }}>{timeAgo(r.createdAt)}</div>
+                  {r.status === 'open' && (
+                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#f97316', marginLeft: 'auto', marginTop: 5 }} />
+                  )}
+                </div>
+              </div>
+            );
+          })
         )}
       </div>
 
@@ -397,7 +462,7 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
           <button
             onClick={() => {
               onClose();
-              navigate(activeTab === 'alerts' ? '/alerts' : '/recent-activities');
+              navigate(activeTab === 'alerts' ? '/alerts' : activeTab === 'activities' ? '/recent-activities' : '/bug-reports');
             }}
             style={{ fontSize: 11, color: '#1a9e6e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0 }}
           >
