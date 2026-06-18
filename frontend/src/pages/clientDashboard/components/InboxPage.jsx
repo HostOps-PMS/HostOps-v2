@@ -132,8 +132,8 @@ export default function InboxPage() {
   // Detect if the currently logged-in user is a staff member.
   // We check multiple signals because the login form may store the session
   // differently (data.staff vs data.user, isStaff flag, etc.):
-  //   1. hp_user has role:'staff' — set by backend on staff login responses
-  //   2. hp_user has isStaff:true — also injected by backend
+  //   1. hp_user (now secureUserStorage) has role:'staff' — set by backend on staff login responses
+  //   2. hp_user (now secureUserStorage) has isStaff:true — also injected by backend
   //   3. hp_is_staff sessionStorage key — set by some login form implementations
   // For staff: the reply box is always unlocked — they already authenticated
   // via JWT and the backend enforces property-level access in assertReservationOwnership.

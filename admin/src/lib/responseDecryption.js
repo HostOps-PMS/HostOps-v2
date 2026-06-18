@@ -22,30 +22,38 @@ function bytesToB64Url(bytes) {
 export async function decryptApiResponse(payload, sessionKeyB64) {
   if (!payload || payload.e !== 1 || !sessionKeyB64) return payload;
 
-  const keyBytes = b64ToBytes(sessionKeyB64);
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    keyBytes,
-    { name: 'AES-GCM' },
-    false,
-    ['decrypt'],
-  );
+  try {
+    const keyBytes = b64ToBytes(sessionKeyB64);
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      keyBytes,
+      { name: 'AES-GCM' },
+      false,
+      ['decrypt'],
+    );
 
-  const iv  = b64ToBytes(payload.i);
-  const enc = b64ToBytes(payload.d);
-  const tag = b64ToBytes(payload.t);
+    const iv  = b64ToBytes(payload.i);
+    const enc = b64ToBytes(payload.d);
+    const tag = b64ToBytes(payload.t);
 
-  const combined = new Uint8Array(enc.length + tag.length);
-  combined.set(enc);
-  combined.set(tag, enc.length);
+    const combined = new Uint8Array(enc.length + tag.length);
+    combined.set(enc);
+    combined.set(tag, enc.length);
 
-  const plain = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv, tagLength: 128 },
-    cryptoKey,
-    combined,
-  );
+    const plain = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv, tagLength: 128 },
+      cryptoKey,
+      combined,
+    );
 
-  return JSON.parse(new TextDecoder().decode(plain));
+    return JSON.parse(new TextDecoder().decode(plain));
+  } catch (err) {
+    // OperationError is thrown when the session key is stale or mismatched.
+    // Clear the bad key so the next refresh cycle can set a fresh one.
+    console.warn('[decryptApiResponse] Decryption failed (stale session key?), clearing key:', err.name);
+    sessionStorage.removeItem('hp_session_key');
+    return payload;
+  }
 }
 
 /**

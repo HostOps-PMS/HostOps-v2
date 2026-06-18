@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { getSecureUser } from '../../../lib/secureUserStorage';
 import { useNotifications } from '../../../context/NotificationsContext';
 import { useTheme } from '../../../context/ThemeContext';
 import { fetchWithAuth } from '../../../lib/authUtils';
@@ -491,7 +492,7 @@ export default function TopBar({ onAction, onExport, exportLoading = false, aler
   const resolvedLoading    = notifLoading ?? notifContext.loading;
 
   const currentUser = (() => {
-    try { return JSON.parse(sessionStorage.getItem('hp_user') || '{}'); } catch { return {}; }
+    try { return getSecureUser() || {}; } catch { return {}; }
   })();
 
   const fullName  = [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ') || 'User';

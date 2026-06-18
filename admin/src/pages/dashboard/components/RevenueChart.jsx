@@ -169,7 +169,7 @@ export default function RevenueChart({ smoobuChartData }) {
 
       {/* Chart */}
       <div style={{ padding: '0 8px 12px', width: '100%', minWidth: 0 }}>
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={300} minWidth={100} minHeight={100}>
           <ComposedChart data={data} margin={{ top: 4, right: 36, bottom: 0, left: 48 }}>
             <CartesianGrid stroke={dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)'} vertical={false} />
             <XAxis dataKey="name" tick={{ fontSize: 10, fill: dark ? '#7ab89a' : '#9ca3af' }} axisLine={false} tickLine={false} />

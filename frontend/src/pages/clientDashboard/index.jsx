@@ -13,6 +13,8 @@ import FirstLoginModal from "./components/FirstLoginModal";
 import FirstLoginPinModal from "./components/FirstLoginPinModal";
 import { useDashboard } from "./context/DashboardContext";
 import { useDashboardData } from "./hooks/useDashboardData";
+import AuthContext from '../AuthContext';
+import { setSecureUser } from '../../lib/secureUserStorage';
 import Footer from "./components/Footer";
 import ProfitabilityCalculator from "./components/ProfitabilityCalculator";
 import FetchingOverlay from "./components/FetchingOverlay";
@@ -36,7 +38,7 @@ export default function DashboardPage() {
   const handlePasswordChanged = (updatedUser) => {
     // Store the refreshed user object (now with isVerified: true)
     if (updatedUser) {
-      safeStorage.setItem('hp_user', JSON.stringify(updatedUser));
+      setSecureUser(updatedUser);
     }
     setShowFirstLoginModal(false);
   };
@@ -47,7 +49,7 @@ export default function DashboardPage() {
 
   const handlePinChanged = (updatedUser) => {
     if (updatedUser) {
-      safeStorage.setItem('hp_user', JSON.stringify(updatedUser));
+      setSecureUser(updatedUser);
     }
     setShowFirstLoginPinModal(false);
   };
@@ -61,7 +63,7 @@ export default function DashboardPage() {
   const [currentUser] = useState(() => {
     try {
       // Keys to check, in order of preference
-      const CANDIDATE_KEYS = ['hp_user', 'user', 'auth_user', 'currentUser', 'hostpilot_user'];
+      const CANDIDATE_KEYS = ['user', 'auth_user', 'currentUser', 'hostpilot_user'];
 
       for (const key of CANDIDATE_KEYS) {
         const raw = localStorage.getItem(key);

@@ -1,5 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { logoutUser } from '../../authorization/services/authService';
+import { FaUsers, FaChartLine, FaSignOutAlt, FaCog } from "react-icons/fa";
+import { removeSecureUser } from "../../../lib/secureUserStorage";
 
 const NAV_ITEMS = [
   {
@@ -89,7 +91,7 @@ export default function Sidebar() {
           onClick={async () => {
             await logoutUser();
             sessionStorage.removeItem("hp_access_token");
-            sessionStorage.removeItem("hp_user");
+            removeSecureUser();
             sessionStorage.removeItem("hp_authorized");
             // Redirect to frontend login
             window.location.href = "http://localhost:5173/login";

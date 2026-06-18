@@ -14,6 +14,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { verifyOtp, resendOtp, sendLoginOtp, verifyTotp } from '../services/authService';
+import { getSecureUser, setSecureUser } from '../../../lib/secureUserStorage';
 import { setToken, setSessionKey } from '../../../lib/authUtils';
 
 const RESEND_COOLDOWN_SEC = 60;
@@ -39,7 +40,11 @@ function bootstrapSessionFromUrlParams() {
     try {
       // Validate it's parseable before storing — avoids corrupt sessionStorage.
       JSON.parse(userRaw);
-      sessionStorage.setItem('hp_user', userRaw);
+      try {
+        setSecureUser(JSON.parse(userRaw));
+      } catch (e) {
+        setSecureUser(userRaw);
+      }
     } catch {
       console.error('[useAuthorization] Failed to parse _u URL param');
     }
@@ -91,7 +96,7 @@ export function useAuthorization(onAuthorized) {
 
   // 1. Bootstrap session from URL params (_t / _u) if present.
   //    Must run synchronously before sendLoginOtp so getAdminEmail()
-  //    can read hp_user from sessionStorage.
+  //    can read hp_user from secure storage.
   // 2. Auto-send OTP only for email-only users. TOTP users choose their
   //    method first; the OTP is sent when they explicitly pick Email OTP.
   useEffect(() => {
@@ -100,7 +105,7 @@ export function useAuthorization(onAuthorized) {
     // Read totpEnabled after bootstrapping — hp_user may have just been set from URL params.
     const hasTotpEnabled = (() => {
       try {
-        return JSON.parse(sessionStorage.getItem('hp_user') || '{}').totpEnabled ?? false;
+        return (getSecureUser() || {}).totpEnabled ?? false;
       } catch { return false; }
     })();
 
@@ -190,14 +195,14 @@ export function useAuthorization(onAuthorized) {
 
 const userEmail = (() => {
     try {
-      const u = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
+      const u = getSecureUser() || {};
       return u.email || u.businessEmail || '';
     } catch { return ''; }
   })();
 
   const totpEnabled = (() => {
     try {
-      const u = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
+      const u = getSecureUser() || {};
       return u.totpEnabled ?? false;
     } catch { return false; }
   })();

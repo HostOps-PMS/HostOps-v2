@@ -5,6 +5,8 @@ import { logoutUser } from './authorization/services/authService';
 import HostOpsLogo from '../assets/HostOpsLOGO.png';
 import { useNotifications } from '../context/NotificationsContext';
 import { useTheme } from '../context/ThemeContext';
+import { FaUsers, FaChartLine, FaChevronDown, FaBug, FaTractor, FaBoxOpen, FaShieldAlt } from 'react-icons/fa';
+import { getSecureUser, removeSecureUser } from '../lib/secureUserStorage';
 
 /* ─── Nav data ───────────────────────────────────────────────────── */
 
@@ -600,7 +602,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
     return jokeQueueRef.current.pop();
   };
   const [currentUser, setCurrentUser] = useState(() => {
-    try { return JSON.parse(sessionStorage.getItem('hp_user') || '{}'); } catch { return {}; }
+    try { return getSecureUser() || {}; } catch { return {}; }
   });
 
   const notifContext = useNotifications();
@@ -1204,7 +1206,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
           setLogoutOpen(false);
           await logoutUser();
           sessionStorage.removeItem('hp_access_token');
-          sessionStorage.removeItem('hp_user');
+          removeSecureUser();
           sessionStorage.removeItem('hp_authorized');
           window.location.href = 'https://go.hostops.online/';
         }}

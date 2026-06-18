@@ -3,6 +3,7 @@ import { useStaffs } from './hooks/useStaffs';
 import StaffModal from './components/StaffModal';
 import StaffTable from './components/StaffTable';
 import DeleteModal from '../../Staffs/components/DeleteModal';
+import { getSecureUser } from '../../../lib/secureUserStorage';
 
 export default function Staffs() {
   const [search, setSearch]             = useState('');
@@ -11,7 +12,7 @@ export default function Staffs() {
   // Get serverId from current user
   const user = useMemo(() => {
     try {
-      return JSON.parse(sessionStorage.getItem('hp_user') || '{}');
+      return getSecureUser() || {};
     } catch {
       return {};
     }

@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { FiLock, FiAlertCircle } from 'react-icons/fi';
+import { setSecureUser } from '../../../lib/secureUserStorage';
 import { changePassword } from '../../Login/services/authservice';
 import safeStorage from '../../safeStorage';
 import FetchingOverlay from './FetchingOverlay';
@@ -67,7 +69,7 @@ export default function FirstLoginModal({ onComplete }) {
 
       // Update stored user with the fresh user object returned by the backend
       if (data.user) {
-        safeStorage.setItem('hp_user', JSON.stringify(data.user));
+        setSecureUser(data.user);
       }
       sessionStorage.removeItem('hp_must_change_password');
 

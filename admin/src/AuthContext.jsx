@@ -1,19 +1,13 @@
 import { getToken, setSessionKey, fetchWithAuth as coreFetchWithAuth } from './lib/authUtils';
 
+import { getSecureUser, setSecureUser } from './lib/secureUserStorage';
+
 function getUser() {
-  try {
-    return JSON.parse(sessionStorage.getItem('hp_user') || 'null');
-  } catch {
-    return null;
-  }
+  return getSecureUser();
 }
 
 function setUser(user) {
-  if (user == null) {
-    sessionStorage.removeItem('hp_user');
-  } else {
-    sessionStorage.setItem('hp_user', JSON.stringify(user));
-  }
+  setSecureUser(user);
 }
 
 export function useAuth() {
