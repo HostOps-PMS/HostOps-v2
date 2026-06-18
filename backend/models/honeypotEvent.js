@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const honeypotEventSchema = new mongoose.Schema(
   {
-    timestamp: { type: Date, default: Date.now, index: true },
+    timestamp: { type: Date, default: Date.now },
     sessionId: { type: String, default: '' },
     ipAddress: { type: String, default: '' },
     deviceFingerprint: { type: String, default: '' },
