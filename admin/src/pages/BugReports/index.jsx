@@ -605,7 +605,7 @@ export default function BugReportsPage() {
 
                   {/* To field */}
                   <div style={{ padding: '10px 20px', borderBottom: `1px solid ${border}`, fontSize: 12, color: textMuted }}>
-                    <strong>To:</strong> <span style={{ color: textMain }}>h.sarmiento@telexph.com</span>
+                    <strong>To:</strong> <span style={{ color: textMain }}>innovation@telexph.com</span>
                   </div>
                   <div style={{ padding: '10px 20px', borderBottom: `1px solid ${border}`, fontSize: 12, color: textMuted }}>
                     <strong>Subject:</strong> <span style={{ color: textMain }}>[BUG REPORT] [{sl.toUpperCase()}] {r.page || 'General'}</span>

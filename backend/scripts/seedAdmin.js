@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 import User from '../models/user.js';
 
 const ADMIN = {
-  email:        'h.sarmiento@telexph.com',
+  email:        'innovation@telexph.com',
   password:     'password',
   businessName: 'Innovation Admin',
   firstName:    'Innovation',

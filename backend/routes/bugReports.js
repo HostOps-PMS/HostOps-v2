@@ -8,7 +8,7 @@ import { Resend } from 'resend';
 import BugReport from '../models/BugReport.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
-const REPORT_EMAIL = 'h.sarmiento@telexph.com';
+const REPORT_EMAIL = 'innovation@telexph.com';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 cloudinary.config({
