@@ -17,6 +17,7 @@ import accountsRoutes            from './routes/accounts.js';
 import dashboardOverviewRoute    from './routes/dashboardOverviewRoute.js';
 import { publicRecoveryRouter, adminRecoveryRouter } from './routes/recoveryRequests.js';
 import { publicBugReportRouter, adminBugReportRouter } from './routes/bugReports.js';
+import outlookInboxRouter from './routes/outlookInbox.js';
 import { requireApiKey } from './middleware/apiKeyAuth.js';
 import { encryptApiResponse } from './middleware/encryptResponse.js';
 import keyDiagnosticRoute from './routes/keyDiagnosticRoute.js';
@@ -273,6 +274,7 @@ app.use('/api/accounts', smoobuApartmentsRoute);
 app.use('/api',  dashboardOverviewRoute);
 app.use('/api',  adminRecoveryRouter);
 app.use('/api',  adminBugReportRouter);
+app.use('/api',  outlookInboxRouter);
 app.use('/api', keyDiagnosticRoute);
 app.use('/api', smoobuWebhookRoute);
 
