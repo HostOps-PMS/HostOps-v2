@@ -241,7 +241,7 @@ export default function BugReportModal({ show, onClose }) {
 
                 {error && <div style={{ padding: '10px 14px', borderRadius: 8, marginTop: 12, background: dark ? '#2a0d0d' : '#fef2f2', color: '#ef4444', fontSize: 12, border: `1px solid ${dark ? '#5c1a1a' : '#fecaca'}` }}>{error}</div>}
 
-                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                <div className="brm-actions" style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                   <button onClick={() => { setStep('form'); setError(''); }} disabled={loading} style={{
                     flex: 1, padding: '11px', borderRadius: 10, border: `1px solid ${border}`,
                     background: 'transparent', color: text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
@@ -297,7 +297,7 @@ export default function BugReportModal({ show, onClose }) {
 
                 {/* Severity */}
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: text, marginBottom: 6 }}>Severity</label>
-                <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+                <div className="brm-sev-grid" style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
                   {SEV.map(s => {
                     const on = severity === s.value;
                     return (
@@ -336,7 +336,7 @@ export default function BugReportModal({ show, onClose }) {
 
                   {/* Image previews */}
                   {previews.length > 0 && (
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                    <div className="brm-img-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                       {previews.map((src, i) => (
                         <div key={i} style={{ position: 'relative', width: 72, height: 72, borderRadius: 8, overflow: 'hidden', border: `1.5px solid ${border}`, background: '#000' }}>
                           <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.9 }} />
