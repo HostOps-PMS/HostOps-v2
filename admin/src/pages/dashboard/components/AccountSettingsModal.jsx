@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { sendLoginOtp, verifyOtp } from "../../authorization/services/authService";
-import { authHeaders } from "../../../lib/authUtils";
+import { authHeaders, fetchWithAuth } from "../../../lib/authUtils";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "https://api.hostops.online";
 const API_KEY  = import.meta.env.VITE_API_KEY ?? '';
@@ -218,6 +218,32 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
   const [totpMsg, setTotpMsg] = useState(null); // { text, type }
   const [allowAdminRememberMe, setAllowAdminRememberMe] = useState(user?.allowAdminRememberMe ?? true);
   const [togglingRm, setTogglingRm] = useState(false);
+
+  // -- Backup codes state --
+  const [bcCodes, setBcCodes] = useState(null);
+  const [bcCount, setBcCount] = useState(null);
+  const [bcLoading, setBcLoading] = useState(false);
+  const [bcCopyMsg, setBcCopyMsg] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !totpEnabled) return;
+    const base = (import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+    fetchWithAuth(`${base}/auth/backup-codes/count`)
+      .then(r => r?.ok ? r.json() : null)
+      .then(d => { if (d) setBcCount(d); })
+      .catch(() => {});
+  }, [isOpen, totpEnabled, bcCodes]);
+
+  async function generateBackupCodes() {
+    setBcLoading(true);
+    try {
+      const base = (import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+      const res = await fetchWithAuth(`${base}/auth/backup-codes/generate`, { method: 'POST' });
+      if (!res?.ok) throw new Error('Failed');
+      const data = await res.json();
+      if (data.codes) setBcCodes(data.codes);
+    } catch {} finally { setBcLoading(false); }
+  }
 
   const overlayRef = useRef(null);
 
@@ -991,82 +1017,64 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                 )}
 
                 {/* ── Backup Codes ── */}
-                {totpEnabled && totpStep === 'idle' && (() => {
-                  const [bcCodes, setBcCodes] = React.useState(null);
-                  const [bcCount, setBcCount] = React.useState(null);
-                  const [bcLoading, setBcLoading] = React.useState(false);
+                {totpEnabled && totpStep === 'idle' && (
+                  <div style={{ marginTop: 16 }}>
+                    <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: dark ? '#4d8a6a' : '#9ab8a9', textTransform: 'uppercase', marginBottom: 10 }}>
+                      Backup Codes
+                    </p>
 
-                  React.useEffect(() => {
-                    const base = (import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
-                    fetch(`${base}/auth/backup-codes/count`, {
-                      headers: { 'Authorization': `Bearer ${sessionStorage.getItem('hp_access_token')}`, 'x-api-key': import.meta.env.VITE_API_KEY || '' },
-                    }).then(r => r.json()).then(d => setBcCount(d)).catch(() => {});
-                  }, [bcCodes]);
-
-                  async function generateCodes() {
-                    setBcLoading(true);
-                    try {
-                      const base = (import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
-                      const res = await fetch(`${base}/auth/backup-codes/generate`, {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('hp_access_token')}`, 'x-api-key': import.meta.env.VITE_API_KEY || '', 'Content-Type': 'application/json' },
-                      });
-                      const data = await res.json();
-                      if (data.codes) setBcCodes(data.codes);
-                    } catch {} finally { setBcLoading(false); }
-                  }
-
-                  return (
-                    <div style={{ marginTop: 16 }}>
-                      <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: dark ? '#4d8a6a' : '#9ab8a9', textTransform: 'uppercase', marginBottom: 10 }}>
-                        Backup Codes
-                      </p>
-
-                      {bcCodes ? (
-                        <div style={{ background: dark ? '#0d2619' : '#f7faf8', borderRadius: 10, border: `1px solid ${dark ? '#1e3a2a' : '#eaf3ee'}`, padding: 14 }}>
-                          <p style={{ fontSize: 12, color: dark ? '#fbbf24' : '#d97706', fontWeight: 600, margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 3L2 17h16L10 3z" strokeLinejoin="round"/><path d="M10 9v3M10 14h.01" strokeLinecap="round"/></svg>
-                            Save these codes — they won't be shown again!
-                          </p>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
-                            {bcCodes.map((code, i) => (
-                              <div key={i} style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: 700, padding: '6px 10px', borderRadius: 6, background: dark ? '#132a1e' : '#fff', border: `1px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`, color: dark ? '#eaf5f0' : '#111827', textAlign: 'center' }}>
-                                {code}
-                              </div>
-                            ))}
-                          </div>
-                          <button onClick={() => {
-                            navigator.clipboard.writeText(bcCodes.join('\n'));
-                          }} style={{ marginTop: 10, width: '100%', padding: '8px 14px', borderRadius: 8, border: `1px solid ${dark ? '#1e3a2a' : '#d4e8dd'}`, background: dark ? '#132a1e' : '#fff', color: dark ? '#7ab89a' : '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                            Copy All Codes
-                          </button>
-                        </div>
-                      ) : (
-                        <div style={{ background: dark ? '#0d2619' : '#f7faf8', borderRadius: 10, border: `1px solid ${dark ? '#1e3a2a' : '#eaf3ee'}`, padding: 14 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke={dark ? '#7ab89a' : '#6b7280'} strokeWidth="1.8"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M7 7h6M7 10h6M7 13h4" strokeLinecap="round"/></svg>
-                              <div>
-                                <p style={{ fontSize: 13, fontWeight: 600, color: dark ? '#eaf5f0' : '#0c1c14', margin: 0 }}>
-                                  {bcCount ? `${bcCount.remaining} of ${bcCount.total} codes remaining` : 'No backup codes generated'}
-                                </p>
-                                <p style={{ fontSize: 11, color: dark ? '#4d8a6a' : '#9ab8a9', margin: 0 }}>Use these if you lose access to your authenticator</p>
-                              </div>
+                    {bcCodes ? (
+                      <div style={{ background: dark ? '#0d2619' : '#f7faf8', borderRadius: 10, border: `1px solid ${dark ? '#1e3a2a' : '#eaf3ee'}`, padding: 14 }}>
+                        <p style={{ fontSize: 12, color: dark ? '#fbbf24' : '#d97706', fontWeight: 600, margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 3L2 17h16L10 3z" strokeLinejoin="round"/><path d="M10 9v3M10 14h.01" strokeLinecap="round"/></svg>
+                          Save these codes — they won't be shown again!
+                        </p>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+                          {bcCodes.map((code, i) => (
+                            <div key={i} style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: 700, padding: '6px 10px', borderRadius: 6, background: dark ? '#132a1e' : '#fff', border: `1px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`, color: dark ? '#eaf5f0' : '#111827', textAlign: 'center' }}>
+                              {code}
                             </div>
-                          </div>
-                          <button onClick={generateCodes} disabled={bcLoading} style={{
-                            width: '100%', padding: '8px 14px', borderRadius: 8, border: 'none',
-                            background: bcCount?.remaining > 0 ? (dark ? '#1e3a2a' : '#f3f4f6') : '#1e8760',
-                            color: bcCount?.remaining > 0 ? (dark ? '#7ab89a' : '#374151') : '#fff',
-                            fontSize: 12, fontWeight: 600, cursor: bcLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
-                          }}>
-                            {bcLoading ? 'Generating…' : bcCount?.remaining > 0 ? 'Regenerate Codes' : 'Generate Backup Codes'}
-                          </button>
+                          ))}
                         </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                        <button onClick={() => {
+                          const text = bcCodes.join('\n');
+                          if (navigator.clipboard?.writeText) {
+                            navigator.clipboard.writeText(text).catch(() => {});
+                          } else {
+                            const ta = document.createElement('textarea');
+                            ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                            document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+                            document.body.removeChild(ta);
+                          }
+                          setBcCopyMsg(true);
+                          setTimeout(() => setBcCopyMsg(false), 2000);
+                        }} style={{ marginTop: 10, width: '100%', padding: '8px 14px', borderRadius: 8, border: `1px solid ${dark ? '#1e3a2a' : '#d4e8dd'}`, background: dark ? '#132a1e' : '#fff', color: dark ? '#7ab89a' : '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                          {bcCopyMsg ? '✓ Copied!' : 'Copy All Codes'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ background: dark ? '#0d2619' : '#f7faf8', borderRadius: 10, border: `1px solid ${dark ? '#1e3a2a' : '#eaf3ee'}`, padding: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke={dark ? '#7ab89a' : '#6b7280'} strokeWidth="1.8"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M7 7h6M7 10h6M7 13h4" strokeLinecap="round"/></svg>
+                          <div>
+                            <p style={{ fontSize: 13, fontWeight: 600, color: dark ? '#eaf5f0' : '#0c1c14', margin: 0 }}>
+                              {bcCount?.total > 0 ? `${bcCount.remaining ?? 0} of ${bcCount.total} codes remaining` : 'No backup codes generated'}
+                            </p>
+                            <p style={{ fontSize: 11, color: dark ? '#4d8a6a' : '#9ab8a9', margin: 0 }}>Use these if you lose access to your authenticator</p>
+                          </div>
+                        </div>
+                        <button onClick={generateBackupCodes} disabled={bcLoading} style={{
+                          width: '100%', padding: '8px 14px', borderRadius: 8, border: 'none',
+                          background: bcCount?.total > 0 ? (dark ? '#1e3a2a' : '#f3f4f6') : '#1e8760',
+                          color: bcCount?.total > 0 ? (dark ? '#7ab89a' : '#374151') : '#fff',
+                          fontSize: 12, fontWeight: 600, cursor: bcLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                        }}>
+                          {bcLoading ? 'Generating…' : bcCount?.total > 0 ? 'Regenerate Codes' : 'Generate Backup Codes'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

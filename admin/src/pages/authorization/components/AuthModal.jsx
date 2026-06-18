@@ -20,7 +20,9 @@ export default function AuthModal({ onAuthorized }) {
     ? auth.userEmail.replace(/(.{2})(.*)(@.*)/, (_, a, b, c) => a + '*'.repeat(b.length) + c)
     : '';
   const [currentSlide, setCurrentSlide] = useState(0);
-const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
+  const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
+  const [useBackupCode, setUseBackupCode] = useState(false);
+  const [backupCode, setBackupCode] = useState('');
   const [checkingTrusted, setCheckingTrusted] = useState(true);
   const trustedCheckedRef = useRef(false);
 
@@ -141,6 +143,21 @@ const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
               </svg>
             </button>
 
+            <button className="am-method-card" onClick={() => { setMethod('totp'); setUseBackupCode(true); }}>
+              <div className="am-method-icon" style={{ background: '#f3f4f6', color: '#6b7280' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 7h4M7 12h10M7 17h6"/>
+                </svg>
+              </div>
+              <div className="am-method-text">
+                <span className="am-method-title">Backup code</span>
+                <span className="am-method-desc">Use a one-time recovery code</span>
+              </div>
+              <svg className="am-method-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </button>
+
             <button type="button" className="am-back-btn" onClick={() => window.history.back()}>← Back to login</button>
             <div className="am-footer">© {new Date().getFullYear()} HostOps. All rights reserved.</div>
           </>
@@ -149,42 +166,84 @@ const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
         {/* ── TOTP SCREEN ── */}
         {method === 'totp' && (
           <>
-            <h1 className="am-title" id="am-title">Authenticator code</h1>
-            <p className="am-sub">Enter the <strong>6-digit code</strong> from your authenticator app.</p>
+            <h1 className="am-title" id="am-title">{useBackupCode ? 'Backup code' : 'Authenticator code'}</h1>
+            <p className="am-sub">
+              {useBackupCode
+                ? <>Enter one of your <strong>8-character backup codes</strong>.</>
+                : <>Enter the <strong>6-digit code</strong> from your authenticator app.</>
+              }
+            </p>
 
             {auth.message && (
               <div className={`am-msg am-msg--${auth.message.type}`}>{auth.message.text}</div>
             )}
 
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (!otp.isComplete || auth.loading) return;
-              const success = await auth.submitTotp(otp.otp);
-              if (!success) otp.reset();
-            }} autoComplete="off">
-              {auth.lockoutTimer <= 0 && (
-                <OtpInput
-                  digits={otp.digits}
-                  inputRefs={otp.inputRefs}
-                  onChange={otp.onChange}
-                  onKeyDown={otp.onKeyDown}
-                  onPaste={otp.onPaste}
-                  hasError={auth.message?.type === 'error'}
-                  disabled={auth.lockoutTimer > 0}
+            {useBackupCode ? (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (backupCode.replace(/-/g, '').length < 8 || auth.loading) return;
+                const success = await auth.submitTotp(backupCode.replace(/-/g, ''));
+                if (!success) setBackupCode('');
+              }} autoComplete="off">
+                <input
+                  type="text"
+                  value={backupCode}
+                  onChange={e => setBackupCode(e.target.value.toUpperCase())}
+                  placeholder="XXXX-XXXX"
+                  maxLength={9}
+                  style={{
+                    width: '100%', boxSizing: 'border-box', textAlign: 'center',
+                    padding: '14px 16px', borderRadius: 12, fontSize: 20, fontWeight: 700,
+                    fontFamily: 'monospace', letterSpacing: 4,
+                    border: '1.5px solid #e3ede8', background: '#f8fbf9',
+                    color: '#0c1c14', outline: 'none', marginBottom: 16,
+                  }}
+                  onFocus={e => { e.target.style.borderColor = '#26a676'; }}
+                  onBlur={e => { e.target.style.borderColor = '#e3ede8'; }}
+                  autoFocus
                 />
-              )}
-              <LockoutTimer lockoutTimer={auth.lockoutTimer} />
+                <LockoutTimer lockoutTimer={auth.lockoutTimer} />
+                <button
+                  className="am-btn am-btn--modern"
+                  type="submit"
+                  disabled={backupCode.replace(/-/g, '').length < 8 || auth.loading || auth.lockoutTimer > 0}
+                >
+                  {auth.loading ? <><span className="am-btn-spinner" />Verifying…</> : 'Continue →'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!otp.isComplete || auth.loading) return;
+                const success = await auth.submitTotp(otp.otp);
+                if (!success) otp.reset();
+              }} autoComplete="off">
+                {auth.lockoutTimer <= 0 && (
+                  <OtpInput
+                    digits={otp.digits}
+                    inputRefs={otp.inputRefs}
+                    onChange={otp.onChange}
+                    onKeyDown={otp.onKeyDown}
+                    onPaste={otp.onPaste}
+                    hasError={auth.message?.type === 'error'}
+                    disabled={auth.lockoutTimer > 0}
+                  />
+                )}
+                <LockoutTimer lockoutTimer={auth.lockoutTimer} />
+                <button
+                  className="am-btn am-btn--modern"
+                  type="submit"
+                  disabled={!otp.isComplete || auth.loading || auth.lockoutTimer > 0}
+                >
+                  {auth.loading ? <><span className="am-btn-spinner" />Verifying…</> : 'Continue →'}
+                </button>
+              </form>
+            )}
 
-              <button
-                className="am-btn am-btn--modern"
-                type="submit"
-                disabled={!otp.isComplete || auth.loading || auth.lockoutTimer > 0}
-              >
-                {auth.loading ? <><span className="am-btn-spinner" />Verifying…</> : 'Continue →'}
-              </button>
-            </form>
-
-            <button type="button" className="am-back-btn" onClick={() => { setMethod('choose'); otp.reset(); }}>
+            <button type="button" className="am-back-btn" onClick={() => { setUseBackupCode(!useBackupCode); setBackupCode(''); otp.reset(); }}>
+              {useBackupCode ? '← Use authenticator app' : '← Use a backup code'}
+            </button>
+            <button type="button" className="am-back-btn" onClick={() => { setMethod('choose'); otp.reset(); setUseBackupCode(false); setBackupCode(''); }}>
               ← Use a different method
             </button>
             <div className="am-footer">© {new Date().getFullYear()} HostOps. All rights reserved.</div>
