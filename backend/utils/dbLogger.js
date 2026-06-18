@@ -17,7 +17,7 @@ export function logEvent(fields) {
       severity: fields.severity || '',
       confidenceScore: Number(fields.confidenceScore) || 0,
       classification: fields.classification || '',
-      payload: fields.payload || {},
+      payload: typeof fields.payload === 'object' ? JSON.stringify(fields.payload) : (fields.payload || '{}'),
       tags: Array.isArray(fields.tags) ? fields.tags : (fields.tags ? [fields.tags] : []),
       userAgent: fields.userAgent || '',
       decoyResponse: fields.decoyResponse || ''

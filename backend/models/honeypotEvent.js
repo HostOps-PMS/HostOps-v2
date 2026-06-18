@@ -10,7 +10,7 @@ const honeypotEventSchema = new mongoose.Schema(
     severity: { type: String, default: '' },
     confidenceScore: { type: Number, default: 0 },
     classification: { type: String, default: '' },
-    payload: { type: mongoose.Schema.Types.Mixed, default: {} },
+    payload: { type: String, default: '{}' }, // Store as stringified JSON to prevent MongoDB key injection errors
     tags: { type: [String], default: [] },
     userAgent: { type: String, default: '' },
     decoyResponse: { type: String, default: '' }
