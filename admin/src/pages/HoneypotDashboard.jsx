@@ -216,7 +216,7 @@ export default function HoneypotDashboard() {
                           <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '0.78rem', color: textMuted, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.deviceFingerprint}>{log.deviceFingerprint || '—'}</td>
                           <td style={{ padding: '12px 16px' }}>
                             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                              {(log.tags || '').split('|').filter(Boolean).map(tag => (
+                              {(Array.isArray(log.tags) ? log.tags : (log.tags || '').split('|')).filter(Boolean).map(tag => (
                                 <span key={tag} style={{ padding: '2px 8px', borderRadius: 6, fontSize: '0.7rem', fontWeight: 600, background: dark ? '#1e3a2a' : '#f3f4f6', color: dark ? '#7ab89a' : '#4b5563', border: `1px solid ${border}` }}>{tag}</span>
                               ))}
                             </div>

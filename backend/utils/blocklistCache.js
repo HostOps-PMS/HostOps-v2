@@ -1,27 +1,16 @@
-import fs from 'fs';
-import { BLOCK_FILE } from './csvLogger.js';
+import HoneypotBlocklist from '../models/honeypotBlocklist.js';
 
 const banned = new Set();   // deviceFingerprint strings
+let loaded = false;
 
-function load() {
+async function load() {
+  if (loaded) return;
   try {
-    if (!fs.existsSync(BLOCK_FILE)) return;
-    const lines = fs.readFileSync(BLOCK_FILE, 'utf8').split('\n').slice(1); // skip header
-    for (const line of lines) {
-      const row = [];
-      let current = '';
-      let inQuotes = false;
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        if (char === '"' && line[i+1] === '"') { current += '"'; i++; }
-        else if (char === '"') inQuotes = !inQuotes;
-        else if (char === ',' && !inQuotes) { row.push(current); current = ''; }
-        else current += char;
-      }
-      row.push(current);
-      const fp = row[1];
-      if (fp) banned.add(fp);
+    const docs = await HoneypotBlocklist.find({}, { deviceFingerprint: 1 }).lean();
+    for (const doc of docs) {
+      if (doc.deviceFingerprint) banned.add(doc.deviceFingerprint);
     }
+    loaded = true;
   } catch (err) {
     process.stderr.write(`[blocklistCache] load error: ${err.message}\n`);
   }
@@ -30,4 +19,6 @@ function load() {
 export function add(fingerprint) { banned.add(fingerprint); }
 export function has(fingerprint) { return banned.has(fingerprint); }
 
-load();   // populate at module load time
+// Ensure cache is populated — called once DB is ready
+export { load };
+
