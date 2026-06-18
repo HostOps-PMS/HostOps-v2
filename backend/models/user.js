@@ -106,6 +106,7 @@ const userSchema = new mongoose.Schema({
 totpSecret:  { type: String, default: null, select: false },
 totpEnabled: { type: Boolean, default: false },
 totpDevices: [{ name: { type: String, default: 'Authenticator App' }, addedAt: { type: Date, default: Date.now } }],
+  backupCodes: { type: [{ hash: String, used: { type: Boolean, default: false } }], default: [], select: false },
 
   isArchive: { type: Boolean, default: false },
 

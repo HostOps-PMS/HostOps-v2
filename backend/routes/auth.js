@@ -1486,6 +1486,7 @@ router.post('/totp/disable', requireAuth, async (req, res, next) => {
     user.totpSecret  = null;
     user.totpEnabled = false;
     user.totpDevices = [];
+    user.backupCodes = [];
     await user.save();
 
     ActivityLog.create({
@@ -1503,6 +1504,54 @@ router.post('/totp/disable', requireAuth, async (req, res, next) => {
 });
 
 // ─────────────────────────────────────────────────────────────────
+// POST /auth/backup-codes/generate  — generate 10 backup codes
+// ─────────────────────────────────────────────────────────────────
+router.post('/backup-codes/generate', requireAuth, async (req, res, next) => {
+  try {
+    const crypto = await import('crypto');
+    const user = await User.findById(req.user._id).select('+backupCodes');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user.totpEnabled) return res.status(400).json({ error: '2FA must be enabled first' });
+
+    const codes = [];
+    const hashed = [];
+    for (let i = 0; i < 10; i++) {
+      const code = crypto.randomBytes(4).toString('hex').toUpperCase();
+      const formatted = code.slice(0, 4) + '-' + code.slice(4);
+      codes.push(formatted);
+      hashed.push({ hash: await bcrypt.hash(formatted, 10), used: false });
+    }
+
+    user.backupCodes = hashed;
+    await user.save();
+
+    ActivityLog.create({
+      userId: user._id,
+      performedBy: { userId: user._id, email: user.email, firstName: user.firstName || '', lastName: user.lastName || '', role: user.role || 'client' },
+      businessName: user.businessName || '',
+      action: 'backup_codes_generated',
+      ipAddress: (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || '',
+      userAgent: req.get('user-agent') || '',
+    }).catch(() => {});
+
+    res.json({ codes });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// GET /auth/backup-codes/count  — how many unused codes remain
+// ─────────────────────────────────────────────────────────────────
+router.get('/backup-codes/count', requireAuth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select('+backupCodes');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const remaining = (user.backupCodes || []).filter(c => !c.used).length;
+    const total = (user.backupCodes || []).length;
+    res.json({ remaining, total });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────
 // POST /auth/totp/verify  — verify TOTP code during login
 // ─────────────────────────────────────────────────────────────────
 router.post('/totp/verify', async (req, res, next) => {
@@ -1511,17 +1560,33 @@ router.post('/totp/verify', async (req, res, next) => {
     const { email, token } = req.body;
     if (!email || !token) return res.status(400).json({ error: 'Email and token required' });
 
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+totpSecret');
+    const user = await User.findOne({ email: email.toLowerCase() }).select('+totpSecret +backupCodes');
     if (!user || !user.totpEnabled || !user.totpSecret) {
       return res.status(400).json({ error: 'TOTP not enabled for this account' });
     }
 
-    const verified = speakeasy.default.totp.verify({
+    const cleanToken = token.replace(/\s/g, '');
+    let verified = speakeasy.default.totp.verify({
       secret:   user.totpSecret,
       encoding: 'base32',
-      token:    token.replace(/\s/g, ''),
+      token:    cleanToken,
       window:   1,
     });
+
+    // If TOTP failed, try backup codes
+    let usedBackupCode = false;
+    if (!verified && user.backupCodes?.length > 0) {
+      for (const bc of user.backupCodes) {
+        if (bc.used) continue;
+        const match = await bcrypt.compare(cleanToken.toUpperCase(), bc.hash);
+        if (match) {
+          bc.used = true;
+          verified = true;
+          usedBackupCode = true;
+          break;
+        }
+      }
+    }
 
     if (!verified) return res.status(401).json({ error: 'Invalid code. Please try again.' });
 
@@ -1530,13 +1595,15 @@ router.post('/totp/verify', async (req, res, next) => {
     );
 
     user.lastLoginAt = new Date();
+    if (usedBackupCode) user.markModified('backupCodes');
     await user.save();
 
     setRefreshCookie(res, rawRefresh, req);
     const totpSk = createSessionKey(totpJti, accessTokenExpiryMs());
 
     const isAdmin = (user.tag === 'Main Admin' && user.role === 'admin') || user.email === process.env.ADMIN_ROLE;
-    res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin, ...(totpSk ? { sk: totpSk } : {}) });
+    const remaining = usedBackupCode ? user.backupCodes.filter(c => !c.used).length : undefined;
+    res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin, ...(totpSk ? { sk: totpSk } : {}), ...(usedBackupCode ? { usedBackupCode: true, backupCodesRemaining: remaining } : {}) });
   } catch (err) { next(err); }
 });
 

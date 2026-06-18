@@ -3,7 +3,6 @@ import Sidebar from '../Sidebar';
 import TopBar from '../dashboard/components/TopBar';
 import { useTheme } from '../../context/ThemeContext';
 import { fetchAllActivityLogs } from '../ActivityLogs/services/activityLogApi';
-import { useIpLocations, formatLocation } from '../../hooks/useIpLocation';
 
 // ── Action → type mapping ─────────────────────────────────────────────────────
 const ACTION_LABELS = {
@@ -229,8 +228,6 @@ export default function RecentActivities() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showRoleDropdown]);
 
-  const ipList = useMemo(() => activities.map(a => a.ip), [activities]);
-  const ipLocations = useIpLocations(ipList);
 
   const surface   = dark ? '#132a1e' : '#fff';
   const border    = dark ? '#1e3a2a' : '#e5e7eb';
@@ -556,7 +553,6 @@ export default function RecentActivities() {
                             const ua = parseUA(act.userAgent);
                             const ip = formatIP(act.ip);
                             const env = getEnvTag(act.ip);
-                            const loc = formatLocation(act.ip, ipLocations);
                             return (
                               <div>
                                 <div style={{ fontSize: '0.78rem', fontWeight: 500, color: textMain }}>{ua.browser} · {ua.os}</div>
@@ -570,11 +566,6 @@ export default function RecentActivities() {
                                     }}>{env}</span>
                                   )}
                                 </div>
-                                {loc && (
-                                  <div style={{ fontSize: '0.7rem', color: dark ? '#26c47a' : '#059669', fontWeight: 500, marginTop: 2 }}>
-                                    📍 {loc}
-                                  </div>
-                                )}
                               </div>
                             );
                           })()}

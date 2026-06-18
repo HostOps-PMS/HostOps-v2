@@ -12,21 +12,28 @@ function isPublicIP(ip) {
   return true;
 }
 
+const APIS = [
+  { url: ip => `https://ipapi.co/${ip}/json/`, parse: d => d.error ? null : { city: d.city || '', country: d.country_code || '', region: d.region || '' } },
+  { url: ip => `https://freeipapi.com/api/json/${ip}`, parse: d => ({ city: d.cityName || '', country: d.countryCode || '', region: d.regionName || '' }) },
+];
+let apiIndex = 0;
+
 async function lookupIP(ip) {
   const clean = ip.replace(/^::ffff:/, '');
   if (cache[clean] !== undefined) return cache[clean];
   if (rateLimited) return null;
+  const api = APIS[apiIndex];
   try {
-    const res = await fetch(`https://ipwho.is/${clean}`);
+    const res = await fetch(api.url(clean));
     if (res.status === 403 || res.status === 429) {
+      apiIndex = (apiIndex + 1) % APIS.length;
       rateLimited = true;
-      setTimeout(() => { rateLimited = false; }, 60000);
+      setTimeout(() => { rateLimited = false; }, 30000);
       return null;
     }
     if (!res.ok) { cache[clean] = null; return null; }
     const data = await res.json();
-    if (data.success === false) { cache[clean] = null; return null; }
-    const loc = { city: data.city || '', country: data.country_code || '', region: data.region || '' };
+    const loc = api.parse(data);
     cache[clean] = loc;
     return loc;
   } catch {
