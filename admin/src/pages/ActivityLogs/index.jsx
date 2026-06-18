@@ -1,11 +1,9 @@
 // src/pages/ActivityLogs/index.jsx
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Sidebar from '../Sidebar';
 import TopBar from '../dashboard/components/TopBar';
 import { useActivityLogs } from './hooks/useActivityLogs';
 import ActivityLogTable from './components/ActivityLogTable';
-
-const PAGE_SIZE = 15;
 
 export default function ActivityLogs() {
   const [search,         setSearch]         = useState('');
@@ -14,16 +12,25 @@ export default function ActivityLogs() {
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo,   setFilterDateTo]   = useState('');
   const [page,           setPage]           = useState(1);
+  const [pageSize,       setPageSize]       = useState(50);
+  const [liveMode,       setLiveMode]       = useState(false);
+  const [liveTick,       setLiveTick]       = useState(0);
 
-  // Pass each filter as a separate primitive — never as an object literal.
-  // Object literals are recreated every render, causing infinite re-fetch loops.
-  const { logs, clients, pagination, loading, error } = useActivityLogs({
+  // Live mode polling
+  useEffect(() => {
+    if (!liveMode) return;
+    const id = setInterval(() => setLiveTick(t => t + 1), 5000);
+    return () => clearInterval(id);
+  }, [liveMode]);
+
+  const { logs, clients, pagination, loading, error, refetch } = useActivityLogs({
     page,
-    limit:  PAGE_SIZE,
+    limit:  pageSize,
     userId: filterClient,
     action: filterAction,
     from:   filterDateFrom,
     to:     filterDateTo ? filterDateTo + 'T23:59:59' : '',
+    _poll:  liveTick,
   });
 
   // Client-side text search layered on top of server-side results
@@ -82,12 +89,39 @@ export default function ActivityLogs() {
         <TopBar />
 
         <div className="cl-content">
+          <style>{`
+            .al-live-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 9px; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; border: 1.5px solid; white-space: nowrap; }
+            .al-live-label { display: inline; }
+            @keyframes al-header-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+            @media (max-width: 768px) {
+              .al-live-btn { width: 38px; height: 38px; padding: 0; justify-content: center; border-radius: 12px; }
+              .al-live-label { display: none; }
+            }
+          `}</style>
           {/* Page Header */}
           <header className="cl-content__header">
             <div>
               <h1 className="cl-content__title">Activity Logs</h1>
               <p className="cl-content__sub">Track all actions performed across businesses and staff accounts</p>
             </div>
+            <button
+              onClick={() => setLiveMode(v => !v)}
+              className="al-live-btn"
+              style={{
+                background: liveMode ? '#052e16' : 'transparent',
+                borderColor: liveMode ? '#22c55e' : '#dc2626',
+                color: liveMode ? '#22c55e' : '#dc2626',
+              }}
+              title={liveMode ? 'Live — auto-refreshing every 5s' : 'Stopped — click to enable live mode'}
+            >
+              <span style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: liveMode ? '#22c55e' : '#dc2626',
+                animation: liveMode ? 'al-header-pulse 1.5s infinite' : 'none',
+                flexShrink: 0,
+              }} />
+              <span className="al-live-label">{liveMode ? 'Live' : 'Stopped'}</span>
+            </button>
           </header>
 
           {error && (
@@ -120,6 +154,10 @@ export default function ActivityLogs() {
             totalCount={pagination?.total ?? 0}
             onPrev={() => setPage(p => Math.max(1, p - 1))}
             onNext={() => setPage(p => Math.min(pagination?.pages ?? 1, p + 1))}
+            pageSize={pageSize}
+            onPageSizeChange={v => { setPageSize(v); setPage(1); }}
+            liveMode={liveMode}
+            onLiveModeChange={setLiveMode}
           />
         </div>
       </div>
