@@ -1,13 +1,17 @@
 import express from 'express';
-import path from 'path';
-import * as counters from '../../utils/csvCounters.js';
-import { EVENTS_FILE, BLOCK_FILE } from '../../utils/csvLogger.js';
-import fs from 'fs';
+import HoneypotEvent from '../../models/honeypotEvent.js';
+import HoneypotBlocklist from '../../models/honeypotBlocklist.js';
+import * as counters from '../../utils/dbCounters.js';
 
 const router = express.Router();
 
-router.get('/stats', (req, res) => {
-  res.json(counters.get());
+router.get('/stats', async (req, res) => {
+  try {
+    const stats = await counters.get();
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.get('/logs', async (req, res) => {
@@ -16,87 +20,103 @@ router.get('/logs', async (req, res) => {
   const { severity, ip, fingerprint } = req.query;
 
   try {
-    if (!fs.existsSync(EVENTS_FILE)) return res.json({ logs: [], totalPages: 1 });
-    
-    const content = await fs.promises.readFile(EVENTS_FILE, 'utf8');
-    const lines = content.split('\n').filter(l => l.trim() !== '');
-    
-    // skip header
-    let logs = lines.slice(1).map(line => {
-      // Regex to properly split CSV respecting double quotes
-      const row = [];
-      let current = '';
-      let inQuotes = false;
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        if (char === '"' && line[i+1] === '"') {
-            current += '"';
-            i++;
-        } else if (char === '"') {
-            inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-            row.push(current);
-            current = '';
-        } else {
-            current += char;
-        }
-      }
-      row.push(current); // last column
-      
-      return {
-        timestamp: row[0] || '',
-        sessionId: row[1] || '',
-        ipAddress: row[2] || '',
-        deviceFingerprint: row[3] || '',
-        activityType: row[4] || '',
-        severity: row[5] || '',
-        confidenceScore: row[6] || '',
-        classification: row[7] || '',
-        payload: row[8] || '',
-        tags: row[9] || '',
-        userAgent: row[10] || '',
-        decoyResponse: row[11] || ''
-      };
-    });
+    const filter = {};
+    if (severity) filter.severity = severity;
+    if (ip) filter.ipAddress = { $regex: ip, $options: 'i' };
+    if (fingerprint) filter.deviceFingerprint = fingerprint;
 
-    if (severity) logs = logs.filter(l => l.severity === severity);
-    if (ip) logs = logs.filter(l => l.ipAddress.includes(ip));
-    if (fingerprint) logs = logs.filter(l => l.deviceFingerprint === fingerprint);
+    const totalCount = await HoneypotEvent.countDocuments(filter);
+    const totalPages = Math.ceil(totalCount / limit);
 
-    logs.reverse(); // newest first
-    const totalPages = Math.ceil(logs.length / limit);
-    const paginated = logs.slice((page - 1) * limit, page * limit);
+    const logs = await HoneypotEvent.find(filter)
+      .sort({ timestamp: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
 
-    res.json({ logs: paginated, totalPages: Math.max(1, totalPages) });
+    res.json({ logs, totalPages: Math.max(1, totalPages) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-const MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
+// Escape a single CSV cell value
+function esc(v) {
+  const s = String(v ?? '');
+  return s.includes(',') || s.includes('"') || s.includes('\n')
+    ? `"${s.replace(/"/g, '""')}"` : s;
+}
 
 router.get('/download/events', async (req, res) => {
   try {
-    const resolved = path.resolve(EVENTS_FILE);
-    if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'No events file found' });
-    const stat = await fs.promises.stat(resolved);
-    if (stat.size > MAX_DOWNLOAD_BYTES) {
-      return res.status(413).json({ error: `Events file too large (${(stat.size / 1024 / 1024).toFixed(1)} MB). Please contact an administrator.` });
+    const EVENTS_HEADER = 'timestamp,sessionId,ipAddress,deviceFingerprint,activityType,severity,confidenceScore,classification,payload,tags,userAgent,decoyResponse\n';
+    
+    // We stream the response to avoid keeping everything in memory
+    res.setHeader('Content-disposition', 'attachment; filename=honeypot-events.csv');
+    res.setHeader('Content-type', 'text/csv');
+    res.write(EVENTS_HEADER);
+
+    const cursor = HoneypotEvent.find().sort({ timestamp: -1 }).cursor();
+    
+    for await (const doc of cursor) {
+      const row = [
+        esc(doc.timestamp?.toISOString()),
+        esc(doc.sessionId),
+        esc(doc.ipAddress),
+        esc(doc.deviceFingerprint),
+        esc(doc.activityType),
+        esc(doc.severity),
+        esc(doc.confidenceScore),
+        esc(doc.classification),
+        esc(typeof doc.payload === 'object' ? JSON.stringify(doc.payload) : doc.payload),
+        esc(Array.isArray(doc.tags) ? doc.tags.join('|') : doc.tags),
+        esc(doc.userAgent),
+        esc(doc.decoyResponse),
+      ].join(',') + '\n';
+      res.write(row);
     }
-    res.download(resolved, 'honeypot-events.csv');
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    
+    res.end();
+  } catch (err) {
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.end();
+    }
+  }
 });
 
 router.get('/download/blocklist', async (req, res) => {
   try {
-    const resolved = path.resolve(BLOCK_FILE);
-    if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'No blocklist file found' });
-    const stat = await fs.promises.stat(resolved);
-    if (stat.size > MAX_DOWNLOAD_BYTES) {
-      return res.status(413).json({ error: `Blocklist file too large (${(stat.size / 1024 / 1024).toFixed(1)} MB). Please contact an administrator.` });
+    const BLOCK_HEADER = 'bannedAt,deviceFingerprint,ipAddresses,reason,confidenceScore,classification,expiresAt\n';
+    
+    res.setHeader('Content-disposition', 'attachment; filename=honeypot-blocklist.csv');
+    res.setHeader('Content-type', 'text/csv');
+    res.write(BLOCK_HEADER);
+
+    const cursor = HoneypotBlocklist.find().sort({ bannedAt: -1 }).cursor();
+    
+    for await (const doc of cursor) {
+      const row = [
+        esc(doc.bannedAt?.toISOString()),
+        esc(doc.deviceFingerprint),
+        esc(Array.isArray(doc.ipAddresses) ? doc.ipAddresses.join('|') : doc.ipAddresses),
+        esc(doc.reason),
+        esc(doc.confidenceScore),
+        esc(doc.classification),
+        esc(doc.expiresAt ? doc.expiresAt.toISOString() : 'permanent'),
+      ].join(',') + '\n';
+      res.write(row);
     }
-    res.download(resolved, 'honeypot-blocklist.csv');
-  } catch (err) { res.status(500).json({ error: err.message }); }
+
+    res.end();
+  } catch (err) {
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.end();
+    }
+  }
 });
 
 export default router;

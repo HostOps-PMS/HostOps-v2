@@ -1,6 +1,6 @@
 import { classify } from '../decoy/classify.js';
 import * as blocklistCache from '../utils/blocklistCache.js';
-import { logEvent, logBlock } from '../utils/csvLogger.js';
+import { logEvent, logBlock } from '../utils/dbLogger.js';
 import { sensor } from '../decoy/sensor.js';
 
 export default async function honeypotGateway(req, res, next) {

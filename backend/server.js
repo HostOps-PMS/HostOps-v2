@@ -17,6 +17,7 @@ import accountsRoutes            from './routes/accounts.js';
 import dashboardOverviewRoute    from './routes/dashboardOverviewRoute.js';
 import { publicRecoveryRouter, adminRecoveryRouter } from './routes/recoveryRequests.js';
 import { publicBugReportRouter, adminBugReportRouter } from './routes/bugReports.js';
+import outlookInboxRouter from './routes/outlookInbox.js';
 import { requireApiKey } from './middleware/apiKeyAuth.js';
 import { encryptApiResponse } from './middleware/encryptResponse.js';
 import keyDiagnosticRoute from './routes/keyDiagnosticRoute.js';
@@ -26,6 +27,7 @@ import imageProxyRoute         from './routes/imageProxy.js';
 import smoobuWebhookRoute      from './routes/smoobuWebhook.js';
 import opsRoutes               from './routes/internal/ops.js';
 import { requireAuth }         from './middleware/auth.js';
+import { load as loadBlocklistCache } from './utils/blocklistCache.js';
 
 function requireAdmin(req, res, next) {
   const isAdmin = (req.user?.tag === 'Main Admin' && req.user?.role === 'admin')
@@ -273,6 +275,7 @@ app.use('/api/accounts', smoobuApartmentsRoute);
 app.use('/api',  dashboardOverviewRoute);
 app.use('/api',  adminRecoveryRouter);
 app.use('/api',  adminBugReportRouter);
+app.use('/api',  outlookInboxRouter);
 app.use('/api', keyDiagnosticRoute);
 app.use('/api', smoobuWebhookRoute);
 
@@ -349,7 +352,8 @@ process.on('uncaughtException', (err) => {
 async function start() {
   try {
     await connectDB();
-
+    
+    await loadBlocklistCache();
     // Seed missing secret slots on first boot, then start hourly rotation.
     // Must run AFTER dotenv/config loads (import 'dotenv/config' at top)
     // so existing JWT_ACCESS_SECRET is available for the CURR promotion.
