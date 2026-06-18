@@ -3,13 +3,14 @@ import Sidebar from '../Sidebar';
 import TopBar from '../dashboard/components/TopBar';
 import { useTheme } from '../../context/ThemeContext';
 import { fetchAllActivityLogs } from '../ActivityLogs/services/activityLogApi';
+import { useIpLocations, formatLocation } from '../../hooks/useIpLocation';
 
 // ── Action → type mapping ─────────────────────────────────────────────────────
 const ACTION_LABELS = {
   login:                   'Logged in',
   logout:                  'Logged out',
-  password_changed:        'Password changed',
-  pin_changed:             'PIN changed',
+  password_changed:        'Changed password',
+  pin_changed:             'Changed PIN',
   opened_account_settings: 'Opened account settings',
   exported_pdf:            'Exported PDF report',
   changed_date_filter:     'Changed date filter',
@@ -17,9 +18,16 @@ const ACTION_LABELS = {
   switched_calendar_view:  'Switched calendar view',
   opened_message_thread:   'Opened message thread',
   switched_property:       'Switched property',
-  opened_messages_page:    'Opened messages page',
+  opened_messages_page:    'Opened Messages',
   sent_message:            'Sent a message',
   viewed_dashboard:        'Viewed dashboard',
+  viewed_settings_tab:     'Viewed settings',
+  changed_dashboard_period:'Changed dashboard period',
+  booking_created:         'New booking confirmed',
+  booking_modified:        'Booking modified',
+  booking_cancelled:       'Booking cancelled',
+  payment_received:        'Payment received',
+  payment_refunded:        'Payment refunded',
 };
 
 function mapActionToType(action) {
@@ -31,6 +39,35 @@ function mapActionToType(action) {
   return 'system';
 }
 
+function parseUA(ua) {
+  if (!ua) return { browser: '—', os: '—', device: 'Unknown' };
+  let browser = '—', os = '—', device = 'Desktop';
+  if (/Edg\//i.test(ua)) browser = 'Edge';
+  else if (/OPR|Opera/i.test(ua)) browser = 'Opera';
+  else if (/Chrome/i.test(ua)) browser = 'Chrome';
+  else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari';
+  else if (/Firefox/i.test(ua)) browser = 'Firefox';
+  if (/Windows/i.test(ua)) os = 'Windows';
+  else if (/Mac OS/i.test(ua)) os = 'macOS';
+  else if (/Android/i.test(ua)) { os = 'Android'; device = 'Mobile'; }
+  else if (/iPhone|iPad/i.test(ua)) { os = 'iOS'; device = /iPad/i.test(ua) ? 'Tablet' : 'Mobile'; }
+  else if (/Linux/i.test(ua)) os = 'Linux';
+  if (/Mobile/i.test(ua)) device = 'Mobile';
+  return { browser, os, device };
+}
+
+function formatIP(ip) {
+  if (!ip || ip === '::1' || ip === '127.0.0.1' || ip === '::ffff:127.0.0.1') return 'localhost';
+  return ip.replace(/^::ffff:/, '');
+}
+
+function getEnvTag(ip) {
+  if (!ip) return null;
+  if (ip === '::1' || ip === '127.0.0.1' || ip === '::ffff:127.0.0.1' || ip === 'localhost') return 'Dev';
+  if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(ip.replace(/^::ffff:/, ''))) return 'Internal';
+  return 'Production';
+}
+
 function mapLog(log) {
   const first = log.performedBy?.firstName || '';
   const last  = log.performedBy?.lastName  || '';
@@ -40,12 +77,13 @@ function mapLog(log) {
   return {
     id:          log._id,
     type:        mapActionToType(log.action),
-    description: ACTION_LABELS[log.action] || log.action,
+    description: ACTION_LABELS[log.action] || log.action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
     user:        name,
     email:       log.performedBy?.email || '',
     role,
     business:    log.businessName || '—',
     ip:          log.ipAddress    || '—',
+    userAgent:   log.userAgent    || '',
     time:        log.createdAt,
   };
 }
@@ -66,6 +104,53 @@ const ROLE_META = {
 };
 
 const PAGE_SIZE = 8;
+
+function computeSessionDurations(activities) {
+  const map = {};
+  const sorted = [...activities].sort((a, b) => new Date(a.time) - new Date(b.time));
+  for (const act of sorted) {
+    if (act.type !== 'login') continue;
+    const logout = sorted.find(a => a.type === 'login' && a.description?.toLowerCase().includes('out') && a.email === act.email && new Date(a.time) > new Date(act.time));
+    if (!logout) {
+      const nextLogout = sorted.find(a => a.email === act.email && (a.description?.toLowerCase().includes('logged out') || a.description?.toLowerCase().includes('logout')) && new Date(a.time) > new Date(act.time));
+      if (nextLogout) {
+        const mins = Math.round((new Date(nextLogout.time) - new Date(act.time)) / 60000);
+        if (mins > 0 && mins < 1440) map[act.id] = mins;
+      }
+    }
+  }
+  for (const act of sorted) {
+    if (!act.description?.toLowerCase().includes('logged out') && !act.description?.toLowerCase().includes('logout')) continue;
+    const login = [...sorted].reverse().find(a => a.email === act.email && (a.description?.toLowerCase().includes('logged in') || a.description?.toLowerCase().includes('login')) && a.type === 'login' && new Date(a.time) < new Date(act.time));
+    if (login && !map[login.id]) {
+      const mins = Math.round((new Date(act.time) - new Date(login.time)) / 60000);
+      if (mins > 0 && mins < 1440) map[login.id] = mins;
+    }
+  }
+  return map;
+}
+
+function fmtDuration(mins) {
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+function getDatePreset(preset) {
+  const today = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  if (preset === 'today') return { from: fmt(today), to: fmt(today) };
+  if (preset === 'week') {
+    const day = today.getDay();
+    const mon = new Date(today);
+    mon.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
+    return { from: fmt(mon), to: fmt(today) };
+  }
+  if (preset === 'month') return { from: fmt(new Date(today.getFullYear(), today.getMonth(), 1)), to: fmt(today) };
+  return { from: '', to: '' };
+}
 
 function timeAgo(iso) {
   const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
@@ -94,6 +179,9 @@ export default function RecentActivities() {
   const [role,   setRole]   = useState('');
   const [page,   setPage]   = useState(1);
   const [exportLoading, setExportLoading] = useState(false);
+  const [datePreset, setDatePreset] = useState(null);
+  const [dateFrom, setDateFrom]     = useState('');
+  const [dateTo, setDateTo]         = useState('');
 
   const [activities, setActivities] = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -141,6 +229,9 @@ export default function RecentActivities() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showRoleDropdown]);
 
+  const ipList = useMemo(() => activities.map(a => a.ip), [activities]);
+  const ipLocations = useIpLocations(ipList);
+
   const surface   = dark ? '#132a1e' : '#fff';
   const border    = dark ? '#1e3a2a' : '#e5e7eb';
   const textMain  = dark ? '#eaf5f0' : '#111827';
@@ -162,10 +253,14 @@ export default function RecentActivities() {
       icon: <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="16" height="11" rx="2"/><path d="M6 17h8M10 14v3" strokeLinecap="round"/></svg> },
   ];
 
+  const sessionDurations = useMemo(() => computeSessionDurations(activities), [activities]);
+
   const filtered = useMemo(() => {
     let list = activities;
     if (tab !== 'all') list = list.filter(a => a.type === tab);
     if (role)          list = list.filter(a => a.role === role);
+    if (dateFrom) list = list.filter(a => a.time >= dateFrom);
+    if (dateTo)   list = list.filter(a => a.time <= dateTo + 'T23:59:59');
     if (search)        list = list.filter(a =>
       a.description.toLowerCase().includes(search.toLowerCase()) ||
       a.user.toLowerCase().includes(search.toLowerCase())        ||
@@ -173,14 +268,17 @@ export default function RecentActivities() {
       a.ip.includes(search)
     );
     return list;
-  }, [activities, tab, search, role]);
+  }, [activities, tab, search, role, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const hasFilters = search || role || dateFrom || dateTo;
+
   function handleTabChange(id) { setTab(id); setPage(1); }
   function handleSearch(v)     { setSearch(v); setPage(1); }
-  function handleClear()       { setSearch(''); setRole(''); setPage(1); }
+  function handleClear()       { setSearch(''); setRole(''); setDateFrom(''); setDateTo(''); setDatePreset(null); setPage(1); }
+  function applyPreset(p)      { const r = getDatePreset(p); setDatePreset(p); setDateFrom(r.from); setDateTo(r.to); setPage(1); }
 
   function handleExport() {
     setExportLoading(true);
@@ -195,7 +293,6 @@ export default function RecentActivities() {
     setTimeout(() => setExportLoading(false), 600);
   }
 
-  const hasFilters = search || role;
 
   return (
     <div className="db-layout">
@@ -355,9 +452,21 @@ export default function RecentActivities() {
                   </div>
                 )}
               </div>
+              {/* Date presets */}
+              <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                {[{ key: 'today', label: 'Today' }, { key: 'week', label: 'This Week' }, { key: 'month', label: 'This Month' }].map(p => (
+                  <button key={p.key} onClick={() => applyPreset(p.key)} style={{
+                    padding: '5px 10px', borderRadius: 7, fontSize: '0.75rem', fontWeight: 600,
+                    border: `1px solid ${datePreset === p.key ? '#1a9e6e' : border}`,
+                    background: datePreset === p.key ? (dark ? '#0d2619' : '#eaf8f1') : 'transparent',
+                    color: datePreset === p.key ? '#1a9e6e' : textMuted,
+                    cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', transition: 'all 0.12s',
+                  }}>{p.label}</button>
+                ))}
+              </div>
               {hasFilters && (
-                <button onClick={handleClear} style={{ padding: '8px 14px', borderRadius: 9, border: `1px solid ${border}`, background: 'transparent', color: textMuted, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
-                  Clear
+                <button onClick={handleClear} style={{ padding: '6px 10px', borderRadius: 7, border: `1px solid ${dark ? '#5c1a1a' : '#fca5a5'}`, background: dark ? '#2a0d0d' : '#fff5f5', color: '#dc2626', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                  ✕ Clear
                 </button>
               )}
               <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: textMuted, whiteSpace: 'nowrap' }}>
@@ -384,7 +493,7 @@ export default function RecentActivities() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead>
                   <tr style={{ background: dark ? '#0f2417' : '#f9fafb', borderBottom: `1px solid ${border}` }}>
-                    {['Type','Activity','User','Business','IP Address','Time'].map(h => (
+                    {['Type','Activity','User','Business','Device / IP','Time'].map(h => (
                       <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 700, fontSize: '0.72rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: textMuted, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -415,6 +524,11 @@ export default function RecentActivities() {
                         </td>
                         <td style={{ padding: '13px 16px', maxWidth: 260 }}>
                           <span style={{ color: textMain, fontWeight: 500 }}>{act.description}</span>
+                          {sessionDurations[act.id] && (
+                            <span style={{ marginLeft: 6, padding: '1px 7px', borderRadius: 6, fontSize: '0.68rem', fontWeight: 700, background: dark ? '#0d1a2a' : '#eff6ff', color: dark ? '#60a5fa' : '#2563eb', border: `1px solid ${dark ? '#1a3a5c' : '#bfdbfe'}` }}>
+                              ⏱ {fmtDuration(sessionDurations[act.id])}
+                            </span>
+                          )}
                         </td>
                         <td style={{ padding: '13px 16px', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -439,9 +553,34 @@ export default function RecentActivities() {
                         <td style={{ padding: '13px 16px', color: textMuted, fontFamily: 'monospace', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
                           {act.business !== '—' ? act.business : <span style={{ color: dark ? '#2d5c3e' : '#d1d5db' }}>—</span>}
                         </td>
-                        <td style={{ padding: '13px 16px', color: textMuted, fontFamily: 'monospace', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
-                          <div style={{ fontFamily: 'monospace' }}>{act.ip}</div>
-                          <div style={{ fontSize: '0.7rem', color: dark ? '#4d8a6a' : '#9ca3af', marginTop: 2 }}>{timeAgo(act.time)}</div>
+                        <td style={{ padding: '13px 16px' }}>
+                          {(() => {
+                            const ua = parseUA(act.userAgent);
+                            const ip = formatIP(act.ip);
+                            const env = getEnvTag(act.ip);
+                            const loc = formatLocation(act.ip, ipLocations);
+                            return (
+                              <div>
+                                <div style={{ fontSize: '0.78rem', fontWeight: 500, color: textMain }}>{ua.browser} · {ua.os}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: '0.7rem', color: textMuted, fontFamily: 'monospace' }}>{ip}</span>
+                                  {env && (
+                                    <span style={{
+                                      padding: '0px 5px', borderRadius: 4, fontSize: '0.6rem', fontWeight: 700,
+                                      background: env === 'Dev' ? (dark ? '#2a1f0a' : '#fffbeb') : env === 'Internal' ? (dark ? '#0d1a2a' : '#eff6ff') : (dark ? '#052e16' : '#f0fdf4'),
+                                      color: env === 'Dev' ? (dark ? '#fbbf24' : '#d97706') : env === 'Internal' ? (dark ? '#60a5fa' : '#2563eb') : (dark ? '#4ade80' : '#16a34a'),
+                                    }}>{env}</span>
+                                  )}
+                                </div>
+                                {loc && (
+                                  <div style={{ fontSize: '0.7rem', color: dark ? '#26c47a' : '#059669', fontWeight: 500, marginTop: 2 }}>
+                                    📍 {loc}
+                                  </div>
+                                )}
+                                <div style={{ fontSize: '0.68rem', color: dark ? '#4d8a6a' : '#b0b7c3', marginTop: 1 }}>{timeAgo(act.time)}</div>
+                              </div>
+                            );
+                          })()}
                         </td>
                       </tr>
                     );

@@ -23,6 +23,7 @@ import keyDiagnosticRoute from './routes/keyDiagnosticRoute.js';
 import smoobuApartmentsRoute   from './routes/smoobuApartments.js';
 import activityLogRoute        from './routes/activityLog.js';
 import imageProxyRoute         from './routes/imageProxy.js';
+import smoobuWebhookRoute      from './routes/smoobuWebhook.js';
 import opsRoutes               from './routes/internal/ops.js';
 import { requireAuth }         from './middleware/auth.js';
 
@@ -249,9 +250,11 @@ app.use((req, res, next) => {
   // Authorization headers. Security is enforced inside the route itself
   // (valid MongoDB ObjectIds + DB ownership check + Cloudinary-only whitelist).
   const isImageProxy    = req.path.startsWith('/api/image/');
+  const isWebhook       = req.path === '/api/smoobu-webhook';
 
   if (isAuthRoute && !isSensitiveAuth) return next();
   if (isImageProxy) return next();
+  if (isWebhook) return next();
   requireApiKey(req, res, next);
 });
 
@@ -271,6 +274,7 @@ app.use('/api',  dashboardOverviewRoute);
 app.use('/api',  adminRecoveryRouter);
 app.use('/api',  adminBugReportRouter);
 app.use('/api', keyDiagnosticRoute);
+app.use('/api', smoobuWebhookRoute);
 
 app.use('/internal/ops', requireAuth, requireAdmin, opsRoutes);
 
