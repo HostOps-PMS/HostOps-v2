@@ -198,7 +198,7 @@ export default function BugReportsPage() {
   function handleExport() {
     setExportLoading(true);
     const rows = [['Severity','Reporter','Email','Page','Description','Status','Date'],
-      ...filtered.map(r => [r.severity, r.name, r.email, r.page, (r.description || '').replace(/<[^>]*>/g, ''), r.status, new Date(r.createdAt).toLocaleString()])];
+      ...filtered.map(r => [r.severity, r.name, r.email, r.page, (r.description || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"'), r.status, new Date(r.createdAt).toLocaleString()])];
     const csv = rows.map(r => r.map(c => `"${String(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -403,7 +403,7 @@ export default function BugReportsPage() {
                               </div>
                             </td>
                             <td style={{ padding: '12px 16px', color: textMain, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.page || '—'}</td>
-                            <td style={{ padding: '12px 16px', color: textMuted, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(r.description || '').replace(/<[^>]*>/g, '')}</td>
+                            <td style={{ padding: '12px 16px', color: textMuted, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(r.description || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')}</td>
                             <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
                               <span style={{
                                 display: 'inline-block', padding: '2px 10px', borderRadius: 20, fontSize: '0.7rem', fontWeight: 700,

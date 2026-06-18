@@ -123,7 +123,7 @@ export default function BugReportModal({ show, onClose }) {
         zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: 16, backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
       }}>
-        <div onClick={e => e.stopPropagation()} style={{
+        <div className="brm-modal" onClick={e => e.stopPropagation()} style={{
           background: surface, borderRadius: 16, width: '100%',
           maxWidth: step === 'preview' ? 500 : 440,
           border: `1px solid ${border}`,
@@ -134,7 +134,7 @@ export default function BugReportModal({ show, onClose }) {
         }}>
 
           {/* ── Header bar ── */}
-          <div style={{
+          <div className="brm-header" style={{
             padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             borderBottom: `1px solid ${border}`,
             background: dark ? '#0b1a12' : '#f6f9f7',
@@ -167,7 +167,7 @@ export default function BugReportModal({ show, onClose }) {
             </button>
           </div>
 
-          <div style={{ padding: '20px 20px 16px' }}>
+          <div className="brm-modal-pad" style={{ padding: '20px 20px 16px' }}>
 
             {/* ═══ SUBMITTED ═══ */}
             {step === 'submitted' && (
@@ -241,7 +241,7 @@ export default function BugReportModal({ show, onClose }) {
 
                 {error && <div style={{ padding: '10px 14px', borderRadius: 8, marginTop: 12, background: dark ? '#2a0d0d' : '#fef2f2', color: '#ef4444', fontSize: 12, border: `1px solid ${dark ? '#5c1a1a' : '#fecaca'}` }}>{error}</div>}
 
-                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                <div className="brm-actions" style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                   <button onClick={() => { setStep('form'); setError(''); }} disabled={loading} style={{
                     flex: 1, padding: '11px', borderRadius: 10, border: `1px solid ${border}`,
                     background: 'transparent', color: text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
@@ -297,7 +297,7 @@ export default function BugReportModal({ show, onClose }) {
 
                 {/* Severity */}
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: text, marginBottom: 6 }}>Severity</label>
-                <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+                <div className="brm-sev-grid" style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
                   {SEV.map(s => {
                     const on = severity === s.value;
                     return (
@@ -336,7 +336,7 @@ export default function BugReportModal({ show, onClose }) {
 
                   {/* Image previews */}
                   {previews.length > 0 && (
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                    <div className="brm-img-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                       {previews.map((src, i) => (
                         <div key={i} style={{ position: 'relative', width: 72, height: 72, borderRadius: 8, overflow: 'hidden', border: `1.5px solid ${border}`, background: '#000' }}>
                           <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.9 }} />
@@ -400,6 +400,21 @@ export default function BugReportModal({ show, onClose }) {
         @keyframes brm-in {
           from { opacity: 0; transform: translateY(10px) scale(0.98); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @media (max-width: 480px) {
+          .brm-modal {
+            border-radius: 14px !important;
+            max-height: 95vh !important;
+            margin: 8px !important;
+          }
+          .brm-modal-pad { padding: 16px 16px 14px !important; }
+          .brm-header { padding: 12px 16px !important; }
+          .brm-sev-grid { gap: 4px !important; }
+          .brm-sev-grid button { padding: 6px 2px !important; }
+          .brm-actions { flex-direction: column !important; }
+          .brm-actions button { flex: unset !important; width: 100% !important; }
+          .brm-img-row { gap: 4px !important; }
+          .brm-img-row > div, .brm-img-row > button { width: 60px !important; height: 60px !important; }
         }
       `}</style>
     </>
