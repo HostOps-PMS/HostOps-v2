@@ -9,6 +9,7 @@ export function useActivityLogs({
   action,
   from,
   to,
+  _poll = 0,
 }) {
   const [logs, setLogs]             = useState([]);
   const [clients, setClients]       = useState([]);
@@ -50,7 +51,7 @@ export function useActivityLogs({
     // Cleanup: if the component re-renders before the fetch resolves,
     // ignore the stale response to avoid flickering / race conditions.
     return () => { cancelled = true; };
-  }, [page, limit, userId, action, from, to]); // all primitives — stable references
+  }, [page, limit, userId, action, from, to, _poll]); // all primitives — stable references
 
   return { logs, clients, pagination, loading, error };
 }

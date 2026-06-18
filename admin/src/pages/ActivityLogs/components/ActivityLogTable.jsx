@@ -3,12 +3,129 @@ import React, { useState } from 'react';
 import { exportActivityLogs } from '../services/activityLogApi';
 import { useTheme } from '../../../context/ThemeContext';
 
+// ── Device / UA parser ───────────────────────────────────────────────────────
+function parseUA(ua) {
+  if (!ua) return { browser: '—', os: '—', device: 'Unknown' };
+  let browser = '—', os = '—', device = 'Desktop';
+  if (/Edg\//i.test(ua)) browser = 'Edge';
+  else if (/OPR|Opera/i.test(ua)) browser = 'Opera';
+  else if (/Chrome/i.test(ua)) browser = 'Chrome';
+  else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari';
+  else if (/Firefox/i.test(ua)) browser = 'Firefox';
+  if (/Windows/i.test(ua)) os = 'Windows';
+  else if (/Mac OS/i.test(ua)) os = 'macOS';
+  else if (/Android/i.test(ua)) { os = 'Android'; device = 'Mobile'; }
+  else if (/iPhone|iPad/i.test(ua)) { os = 'iOS'; device = /iPad/i.test(ua) ? 'Tablet' : 'Mobile'; }
+  else if (/Linux/i.test(ua)) os = 'Linux';
+  if (/Mobile/i.test(ua)) device = 'Mobile';
+  return { browser, os, device };
+}
+
+function formatIP(ip) {
+  if (!ip || ip === '::1' || ip === '127.0.0.1' || ip === '::ffff:127.0.0.1') return 'localhost';
+  return ip.replace(/^::ffff:/, '');
+}
+
+// ── Suspicious activity detection ────────────────────────────────────────────
+function detectSuspicious(entry, allLogs) {
+  const flags = [];
+  const pb = entry.performedBy || {};
+  const email = pb.email;
+  if (!email) return flags;
+
+  if (entry.action === 'login') {
+    const userLogs = allLogs.filter(l => l.performedBy?.email === email && l.action === 'login');
+    const entryTime = new Date(entry.createdAt).getTime();
+
+    // Multiple IPs in short window (30 min)
+    const recentLogins = userLogs.filter(l => {
+      const t = new Date(l.createdAt).getTime();
+      return Math.abs(t - entryTime) < 30 * 60 * 1000 && l._id !== entry._id;
+    });
+    const uniqueIPs = new Set(recentLogins.map(l => l.ipAddress).filter(Boolean));
+    if (entry.ipAddress) uniqueIPs.add(entry.ipAddress);
+    if (uniqueIPs.size > 1) flags.push('Multiple IPs');
+
+    // New device (different UA from previous logins)
+    const prevUAs = userLogs.filter(l => l._id !== entry._id && l.userAgent).map(l => l.userAgent);
+    if (entry.userAgent && prevUAs.length > 0 && !prevUAs.includes(entry.userAgent)) flags.push('New device');
+  }
+
+  return flags;
+}
+
+// ── Group consecutive duplicate events ────────────────────────────────────────
+function groupConsecutive(logs) {
+  if (!logs.length) return [];
+  const groups = [];
+  let current = { entry: logs[0], count: 1, ids: [logs[0]._id] };
+
+  for (let i = 1; i < logs.length; i++) {
+    const prev = current.entry;
+    const curr = logs[i];
+    if (
+      curr.action === prev.action &&
+      curr.performedBy?.email === prev.performedBy?.email &&
+      curr.ipAddress === prev.ipAddress
+    ) {
+      current.count++;
+      current.ids.push(curr._id);
+    } else {
+      groups.push(current);
+      current = { entry: curr, count: 1, ids: [curr._id] };
+    }
+  }
+  groups.push(current);
+  return groups;
+}
+
+// ── Smart meta description ───────────────────────────────────────────────────
+function getMetaDescription(action, meta) {
+  if (!meta || typeof meta !== 'object' || Object.keys(meta).length === 0) return null;
+
+  if (action === 'viewed_settings_tab') {
+    const tab = meta.tab || meta.value || '';
+    const tabNames = { activity: 'Activity tab', pin: 'PIN settings', password: 'Password settings', profile: 'Profile settings', security: 'Security settings', notifications: 'Notification settings' };
+    return tabNames[tab] || (tab ? `${tab.charAt(0).toUpperCase() + tab.slice(1)} tab` : null);
+  }
+  if (action === 'switched_property') {
+    const from = meta.fromPropertyName || meta.fromPropertyId || '';
+    const to = meta.toPropertyName || meta.toPropertyId || '';
+    if (from && to) return `${from} → ${to}`;
+    if (to) return `→ ${to}`;
+  }
+  if (action === 'login' || action === 'logout') {
+    return meta.propertyName || meta.property || null;
+  }
+  if (action === 'password_changed') return 'Password was updated successfully';
+  if (action === 'pin_changed') return 'PIN was updated successfully';
+  if (action === 'changed_dashboard_period') {
+    const period = meta.period || meta.value || '';
+    return period ? `Set to ${period.charAt(0).toUpperCase() + period.slice(1)}` : null;
+  }
+  if (action === 'changed_date_filter') {
+    const { from, to, preset } = meta;
+    if (preset) return `Set to ${preset}`;
+    if (from && to) return `${from} → ${to}`;
+  }
+  if (action === 'filtered_by_channel') return `Channel: ${meta.channel || meta.value || '—'}`;
+  if (action === 'switched_calendar_view') return `View: ${meta.view || meta.value || '—'}`;
+  if (action === 'opened_message_thread') return meta.threadName || meta.guest || null;
+  if (action === 'sent_message') return meta.to || meta.guest || meta.threadName || null;
+  if (action === 'exported_pdf') return meta.reportType || meta.type || null;
+  if (meta.propertyName) return meta.propertyName;
+  const keys = Object.keys(meta).filter(k => !['_id', 'id'].includes(k));
+  if (keys.length === 1) return `${keys[0]}: ${meta[keys[0]]}`;
+  if (keys.length > 1 && keys.length <= 3) return keys.map(k => `${k}: ${meta[k]}`).join(', ');
+  return null;
+}
+
 // ── Action helpers ────────────────────────────────────────────────────────────
 const ACTION_LABELS = {
   login:                   'Logged in',
   logout:                  'Logged out',
-  password_changed:        'Password changed',
-  pin_changed:             'PIN changed',
+  password_changed:        'Changed password',
+  pin_changed:             'Changed PIN',
   opened_account_settings: 'Opened account settings',
   exported_pdf:            'Exported PDF report',
   changed_date_filter:     'Changed date filter',
@@ -16,6 +133,11 @@ const ACTION_LABELS = {
   switched_calendar_view:  'Switched calendar view',
   opened_message_thread:   'Opened message thread',
   switched_property:       'Switched property',
+  opened_messages_page:    'Opened Messages',
+  sent_message:            'Sent a message',
+  viewed_dashboard:        'Viewed dashboard',
+  viewed_settings_tab:     'Viewed settings',
+  changed_dashboard_period:'Changed dashboard period',
 };
 
 const ACTION_OPTIONS = [
@@ -179,7 +301,7 @@ function ActivityLogDetailModal({ entry, onClose }) {
   if (!entry) return null;
 
   const meta  = getActionMeta(entry.action);
-  const label = ACTION_LABELS[entry.action] || entry.action;
+  const label = ACTION_LABELS[entry.action] || entry.action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   const pb    = entry.performedBy || {};
   const name  = [pb.firstName, pb.lastName].filter(Boolean).join(' ') || pb.email || '—';
   const role  = pb.staffRole || pb.role || 'client';
@@ -270,6 +392,24 @@ function ActivityLogDetailModal({ entry, onClose }) {
           <DmRow label="Email" last>
             <span style={{ color: email ? (dark ? '#eaf5f0' : '#374151') : (dark ? '#1e3a2a' : '#d1d5db') }}>{email || '—'}</span>
           </DmRow>
+
+          {/* Device & Security */}
+          <div style={{ height: 1, background: dark ? '#1e3a2a' : '#f0f2f5', margin: '10px 0 8px' }} />
+          <DmSectionLabel>Device & Security</DmSectionLabel>
+          {(() => {
+            const ua = parseUA(entry.userAgent);
+            const ip = formatIP(entry.ipAddress);
+            return (
+              <>
+                <DmRow label="Browser">{ua.browser}</DmRow>
+                <DmRow label="OS">{ua.os}</DmRow>
+                <DmRow label="Device Type">{ua.device}</DmRow>
+                <DmRow label="IP Address">
+                  <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{ip}</span>
+                </DmRow>
+              </>
+            );
+          })()}
 
           {/* Context */}
           {hasContext && (
@@ -465,12 +605,17 @@ export default function ActivityLogTable({
   totalCount = 0,
   onPrev,
   onNext,
+  pageSize = 50,
+  onPageSizeChange,
+  liveMode = false,
+  onLiveModeChange,
 }) {
   const { dark } = useTheme();
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [exporting,     setExporting]     = useState(false);
   const [exportError,   setExportError]   = useState('');
   const [activePreset,  setActivePreset]  = useState(null);
+  const [userTimeline,  setUserTimeline]  = useState(null); // { name, email, logs[] }
 
   function handlePresetClick(preset) {
     const { from, to } = getPresetRange(preset);
@@ -588,6 +733,7 @@ export default function ActivityLogTable({
         .al-badge { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 20px; font-size: 10px; font-weight: 700; border: 1px solid; white-space: nowrap; }
         .al-detail-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 11px; border-radius: 7px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.15s; border: 1px solid ${dark ? '#1e3a2a' : '#d4e8dd'}; background: ${dark ? '#0d2619' : '#fff'}; color: ${dark ? '#7ab89a' : '#4a6b5a'}; }
         .al-detail-btn:hover { background: ${dark ? '#132a1e' : '#f0f8f4'}; }
+        @keyframes al-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
         .al-detail-btn.open { border-color: rgba(30,135,96,0.4); background: ${dark ? '#0d2619' : '#eaf8f1'}; color: #1e8760; }
         .al-pagination { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-top: 1px solid ${dark ? '#1e3a2a' : '#eaf3ee'}; background: ${dark ? '#0d2619' : '#f7faf8'}; flex-wrap: wrap; gap: 8px; border-radius: 0 0 14px 14px; overflow: visible; }
         .al-page-info { font-size: 12px; color: ${dark ? '#4d8a6a' : '#9ab8a9'}; font-weight: 500; }
@@ -723,7 +869,7 @@ export default function ActivityLogTable({
         {/* ── Table body ── */}
         {loading ? (
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table className="al-table" style={{ minWidth: 580 }}>
+            <table className="al-table" style={{ minWidth: 720 }}>
               <thead className="al-thead">
                 <tr>
                   <th>Action</th>
@@ -779,20 +925,22 @@ export default function ActivityLogTable({
           </div>
         ) : (
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <table className="al-table" style={{ minWidth: 580 }}>
+          <table className="al-table" style={{ minWidth: 720 }}>
             <thead className="al-thead">
               <tr>
                 <th>Action</th>
                 <th>Business</th>
                 <th>Performed By</th>
+                <th>Device / IP</th>
                 <th>Date & Time</th>
                 <th style={{ textAlign: 'center' }}>Details</th>
               </tr>
             </thead>
             <tbody>
-              {logs.map((entry, i) => {
+              {groupConsecutive(logs).map((group, i) => {
+                const entry   = group.entry;
                 const meta    = getActionMeta(entry.action);
-                const label   = ACTION_LABELS[entry.action] || entry.action;
+                const label   = ACTION_LABELS[entry.action] || entry.action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                 const pb      = entry.performedBy || {};
                 const name    = [pb.firstName, pb.lastName].filter(Boolean).join(' ') || pb.email || '—';
                 const role    = pb.staffRole || pb.role || 'client';
@@ -815,7 +963,18 @@ export default function ActivityLogTable({
                           <i className={`ti ${meta.icon}`} style={{ fontSize: 14, color: meta.color }} />
                         </div>
                         <div>
-                          <div style={{ fontWeight: 600, fontSize: 13, color: dark ? '#eaf5f0' : '#0c1c14' }}>{label}</div>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: dark ? '#eaf5f0' : '#0c1c14', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {label}
+                            {group.count > 1 && (
+                              <span style={{ padding: '1px 7px', borderRadius: 10, fontSize: 10, fontWeight: 700, background: dark ? '#1e3a2a' : '#e5e7eb', color: dark ? '#7ab89a' : '#6b7280' }}>×{group.count}</span>
+                            )}
+                          </div>
+                          {(() => {
+                            const desc = getMetaDescription(entry.action, entry.meta);
+                            return desc ? (
+                              <div style={{ fontSize: 11, color: dark ? '#4d8a6a' : '#9ab8a9', marginTop: 1, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={desc}>{desc}</div>
+                            ) : null;
+                          })()}
                           <span
                             className="al-badge"
                             style={{
@@ -836,12 +995,49 @@ export default function ActivityLogTable({
                       {bizName}
                     </td>
 
-                    {/* Performed By */}
+                    {/* Performed By — clickable for user timeline */}
                     <td className="al-td">
-                      <div style={{ fontWeight: 500 }}>{name}</div>
+                      <div
+                        style={{ fontWeight: 500, cursor: 'pointer', color: dark ? '#26c47a' : '#0a6644', transition: 'color 0.12s' }}
+                        onClick={() => {
+                          const email = pb.email;
+                          if (!email) return;
+                          const userLogs = logs.filter(l => l.performedBy?.email === email);
+                          setUserTimeline({ name, email, logs: userLogs });
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline'; }}
+                        onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none'; }}
+                        title={`View all activity for ${name}`}
+                      >{name}</div>
                       <div style={{ fontSize: 11, color: dark ? '#4d8a6a' : '#9ab8a9', marginTop: 1, textTransform: 'capitalize' }}>
                         {role}
                       </div>
+                    </td>
+
+                    {/* Device / IP */}
+                    <td className="al-td">
+                      {(() => {
+                        const ua = parseUA(entry.userAgent);
+                        const ip = formatIP(entry.ipAddress);
+                        const flags = detectSuspicious(entry, logs);
+                        return (
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 500, color: dark ? '#eaf5f0' : '#0c1c14' }}>
+                              {ua.browser} · {ua.os}
+                            </div>
+                            <div style={{ fontSize: 11, color: dark ? '#4d8a6a' : '#9ab8a9', marginTop: 1, fontFamily: 'monospace' }}>
+                              {ip}
+                            </div>
+                            {flags.length > 0 && (
+                              <div style={{ display: 'flex', gap: 3, marginTop: 3, flexWrap: 'wrap' }}>
+                                {flags.map(f => (
+                                  <span key={f} style={{ padding: '1px 6px', borderRadius: 6, fontSize: 9, fontWeight: 700, background: dark ? '#2a0d0d' : '#fef2f2', color: dark ? '#f87171' : '#dc2626', border: `1px solid ${dark ? '#5c1a1a' : '#fecaca'}` }}>⚠ {f}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* Date */}
@@ -870,27 +1066,29 @@ export default function ActivityLogTable({
         {/* ── Pagination ── */}
         {!loading && logs.length > 0 && (
           <div className="al-pagination">
-            <span className="al-page-info">
-              {totalCount > 0
-                ? `Showing page ${page} of ${totalPages} · ${totalCount.toLocaleString()} total records`
-                : `Page ${page} of ${totalPages}`}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span className="al-page-info">
+                {totalCount > 0
+                  ? `Showing page ${page} of ${totalPages} · ${totalCount.toLocaleString()} total records`
+                  : `Page ${page} of ${totalPages}`}
+              </span>
+              {/* Rows per page */}
+              {onPageSizeChange && (
+                <select
+                  value={pageSize}
+                  onChange={e => onPageSizeChange(Number(e.target.value))}
+                  style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${dark ? '#1e3a2a' : '#d4e8dd'}`, background: dark ? '#0d2619' : '#fff', color: dark ? '#7ab89a' : '#374151', fontSize: 11, fontWeight: 600, cursor: 'pointer', outline: 'none', fontFamily: 'inherit' }}
+                >
+                  {[25, 50, 100].map(n => <option key={n} value={n}>{n} / page</option>)}
+                </select>
+              )}
+            </div>
             <div className="al-page-btns" style={{ display: 'flex', gap: 6 }}>
-              <button
-                className="al-page-btn"
-                onClick={onPrev}
-                disabled={page <= 1}
-              >
-                <i className="ti ti-chevron-left" style={{ fontSize: 13 }} />
-                Prev
+              <button className="al-page-btn" onClick={onPrev} disabled={page <= 1}>
+                <i className="ti ti-chevron-left" style={{ fontSize: 13 }} /> Prev
               </button>
-              <button
-                className="al-page-btn"
-                onClick={onNext}
-                disabled={page >= totalPages}
-              >
-                Next
-                <i className="ti ti-chevron-right" style={{ fontSize: 13 }} />
+              <button className="al-page-btn" onClick={onNext} disabled={page >= totalPages}>
+                Next <i className="ti ti-chevron-right" style={{ fontSize: 13 }} />
               </button>
             </div>
           </div>
@@ -902,6 +1100,78 @@ export default function ActivityLogTable({
         entry={selectedEntry}
         onClose={() => setSelectedEntry(null)}
       />
+
+      {/* ── User Timeline modal ── */}
+      {userTimeline && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: dark ? 'rgba(0,0,0,0.65)' : 'rgba(15,23,42,0.38)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(3px)', padding: 16 }}
+          onClick={e => { if (e.target === e.currentTarget) setUserTimeline(null); }}
+        >
+          <div style={{
+            background: dark ? '#132a1e' : '#fff', borderRadius: 16,
+            width: 520, maxWidth: '95vw', maxHeight: '85vh',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+            animation: 'aldm-in 0.2s cubic-bezier(0.4,0,0.2,1)',
+            overflow: 'hidden', display: 'flex', flexDirection: 'column',
+          }}>
+            {/* Header */}
+            <div style={{ padding: '18px 20px', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f0f2f5'}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #34d399, #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800, color: '#fff' }}>
+                  {userTimeline.name?.[0]?.toUpperCase() || '?'}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: dark ? '#eaf5f0' : '#111827' }}>{userTimeline.name}</div>
+                  <div style={{ fontSize: 12, color: dark ? '#4d8a6a' : '#9ab8a9' }}>{userTimeline.email} · {userTimeline.logs.length} events</div>
+                </div>
+              </div>
+              <button onClick={() => setUserTimeline(null)} style={{ border: 'none', background: dark ? '#1e3a2a' : '#eef0f3', cursor: 'pointer', color: dark ? '#4d8a6a' : '#6b7280', display: 'flex', padding: 7, borderRadius: 8 }}>
+                <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 4l12 12M16 4L4 16" strokeLinecap="round"/></svg>
+              </button>
+            </div>
+
+            {/* Timeline list */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
+              {userTimeline.logs.map((entry, i) => {
+                const meta  = getActionMeta(entry.action);
+                const label = ACTION_LABELS[entry.action] || entry.action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                const ua    = parseUA(entry.userAgent);
+                const ip    = formatIP(entry.ipAddress);
+                const time  = new Date(entry.createdAt || entry.timestamp).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+                const flags = detectSuspicious(entry, userTimeline.logs);
+                const isLast = i === userTimeline.logs.length - 1;
+
+                return (
+                  <div key={entry._id || i} style={{ display: 'flex', gap: 12, padding: '12px 20px', borderBottom: isLast ? 'none' : `1px solid ${dark ? '#1e3a2a' : '#f3f4f6'}` }}>
+                    {/* Timeline line + dot */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: 20 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: meta.color, border: `2px solid ${dark ? '#132a1e' : '#fff'}`, boxShadow: `0 0 0 2px ${meta.color}33`, flexShrink: 0 }} />
+                      {!isLast && <div style={{ width: 2, flex: 1, background: dark ? '#1e3a2a' : '#e5e7eb', marginTop: 4 }} />}
+                    </div>
+                    {/* Content */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: dark ? '#eaf5f0' : '#111827' }}>{label}</span>
+                        <span className="al-badge" style={{ background: meta.bg, color: meta.color, borderColor: `${meta.color}33` }}>{meta.badge}</span>
+                        {flags.map(f => (
+                          <span key={f} style={{ padding: '1px 6px', borderRadius: 6, fontSize: 9, fontWeight: 700, background: dark ? '#2a0d0d' : '#fef2f2', color: dark ? '#f87171' : '#dc2626', border: `1px solid ${dark ? '#5c1a1a' : '#fecaca'}` }}>⚠ {f}</span>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 11, color: dark ? '#4d8a6a' : '#9ab8a9', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <span>{time}</span>
+                        <span>·</span>
+                        <span>{ua.browser} · {ua.os}</span>
+                        <span>·</span>
+                        <span style={{ fontFamily: 'monospace' }}>{ip}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
