@@ -7,114 +7,67 @@ import { useNotifications } from '../context/NotificationsContext';
 import { useTheme } from '../context/ThemeContext';
 
 /* ─── Nav data ───────────────────────────────────────────────────── */
-const NAV_ITEMS = [
+
+// PINNED
+const PINNED_ITEMS = [
   {
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <rect x="2" y="2" width="7" height="7" rx="1.5" />
-        <rect x="11" y="2" width="7" height="7" rx="1.5" />
-        <rect x="2" y="11" width="7" height="7" rx="1.5" />
-        <rect x="11" y="11" width="7" height="7" rx="1.5" />
-      </svg>
-    ),
+    icon: <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg>,
     label: 'Dashboard',
     to: '/dashboard',
   },
   {
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="8" cy="7" r="4" />
-        <path d="M2 18c0-3.314 2.686-6 6-6h4c3.314 0 6 2.686 6 6" strokeLinecap="round" />
-      </svg>
-    ),
+    icon: <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="8" cy="7" r="4"/><path d="M2 18c0-3.314 2.686-6 6-6h4c3.314 0 6 2.686 6 6" strokeLinecap="round"/></svg>,
     label: 'Businesses',
     to: '/clients',
   },
+];
+
+// MANAGE
+const MANAGE_ITEMS = [
   {
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="6" cy="7" r="3" />
-        <circle cx="14" cy="7" r="3" />
-        <path d="M1 18c0-2.761 2.239-5 5-5h2" strokeLinecap="round" />
-        <path d="M10 13h4a5 5 0 015 5" strokeLinecap="round" />
-      </svg>
-    ),
-    label: 'Staffs',
+    icon: <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="6" cy="7" r="3"/><circle cx="14" cy="7" r="3"/><path d="M1 18c0-2.761 2.239-5 5-5h2" strokeLinecap="round"/><path d="M10 13h4a5 5 0 015 5" strokeLinecap="round"/></svg>,
+    label: 'Team',
     to: '/staffs',
+    children: [
+      { label: 'Staffs', to: '/staffs' },
+      { label: 'Team Leaders', to: '/team-leaders' },
+    ],
   },
   {
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="10" cy="7" r="4" />
-        <path d="M2 18a8 8 0 0116 0" strokeLinecap="round" />
-        <path d="M10 2l1 2.5 2.5.5-1.8 1.7.4 2.5L10 8l-2.1 1.2.4-2.5L6.5 5l2.5-.5L10 2z" strokeLinejoin="round" />
-      </svg>
-    ),
-    label: 'Team Leaders',
-    to: '/team-leaders',
-  },
-  {
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="6" cy="6" r="3" />
-        <circle cx="14" cy="6" r="3" />
-        <circle cx="6" cy="14" r="3" />
-        <circle cx="14" cy="14" r="3" />
-      </svg>
-    ),
+    icon: <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="6" cy="6" r="3"/><circle cx="14" cy="6" r="3"/><circle cx="6" cy="14" r="3"/><circle cx="14" cy="14" r="3"/></svg>,
     label: 'Accounts',
     to: '/accounts',
   },
 ];
 
+// MONITORING
 const MONITORING_ITEMS = [
   {
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M10 2a6 6 0 00-6 6c0 3-1.5 4.5-2 5h16c-.5-.5-2-2-2-5a6 6 0 00-6-6z" strokeLinejoin="round" />
-        <path d="M8.5 17.5a1.5 1.5 0 003 0" strokeLinecap="round" />
-      </svg>
-    ),
+    icon: <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M10 2a6 6 0 00-6 6c0 3-1.5 4.5-2 5h16c-.5-.5-2-2-2-5a6 6 0 00-6-6z" strokeLinejoin="round"/><path d="M8.5 17.5a1.5 1.5 0 003 0" strokeLinecap="round"/></svg>,
     label: 'Alerts Center',
     to: '/alerts',
   },
   {
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="10" cy="10" r="8" />
-        <path d="M10 6v4l3 3" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
+    icon: <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="10" cy="10" r="8"/><path d="M10 6v4l3 3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
     label: 'Recent Activities',
     to: '/recent-activities',
   },
   {
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M9 3H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4" strokeLinecap="round" />
-        <path d="M14 2l4 4-7 7H7v-4l7-7z" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
+    icon: <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M9 3H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4" strokeLinecap="round"/><path d="M14 2l4 4-7 7H7v-4l7-7z" strokeLinecap="round" strokeLinejoin="round"/></svg>,
     label: 'Activity Logs',
     to: '/activity-logs',
   },
+];
+
+// SECURITY & REPORTS
+const SECURITY_ITEMS = [
   {
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-    ),
+    icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round"/></svg>,
     label: 'Honeypot Security',
     to: '/honeypot',
   },
   {
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="10" cy="10" r="8" />
-        <path d="M10 6v5" strokeLinecap="round" />
-        <circle cx="10" cy="14" r="0.5" fill="currentColor" />
-      </svg>
-    ),
+    icon: <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="10" cy="10" r="8"/><path d="M10 6v5" strokeLinecap="round"/><circle cx="10" cy="14" r="0.5" fill="currentColor"/></svg>,
     label: 'Bug Reports',
     to: '/bug-reports',
   },
@@ -806,31 +759,29 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
           </button>
         )}
 
-        {/* ── MENU section ──────────────────────────────────────── */}
-        <SectionLabel label="Menu" collapsed={isCollapsed} />
+        {/* ── PINNED section ─────────────────────────────────── */}
+        <SectionLabel label="Pinned" collapsed={isCollapsed} />
         <nav style={{ display: 'flex', flexDirection: 'column' }}>
-          {NAV_ITEMS.map((item) => (
-            <SidebarNavLink
-              key={item.to}
-              to={item.to}
-              icon={item.icon}
-              label={item.label}
-              collapsed={isCollapsed}
-              children={item.children}
-            />
+          {PINNED_ITEMS.map((item) => (
+            <SidebarNavLink key={item.to} to={item.to} icon={item.icon} label={item.label} collapsed={isCollapsed} />
           ))}
 
-          {/* ── Monitoring section ──────────────────────────── */}
-          <SectionLabel label="Monitoring" collapsed={isCollapsed} />
+          {/* ── MANAGE section ──────────────────────────────── */}
+          <SectionLabel label="Manage" collapsed={isCollapsed} />
+          {MANAGE_ITEMS.map((item) => (
+            <SidebarNavLink key={item.to} to={item.to} icon={item.icon} label={item.label} collapsed={isCollapsed} children={item.children} />
+          ))}
 
+          {/* ── MONITORING section ──────────────────────────── */}
+          <SectionLabel label="Monitoring" collapsed={isCollapsed} />
           {MONITORING_ITEMS.map((item) => (
-            <SidebarNavLink
-              key={item.to}
-              to={item.to}
-              icon={item.icon}
-              label={item.label}
-              collapsed={isCollapsed}
-            />
+            <SidebarNavLink key={item.to} to={item.to} icon={item.icon} label={item.label} collapsed={isCollapsed} />
+          ))}
+
+          {/* ── SECURITY & REPORTS section ──────────────────── */}
+          <SectionLabel label="Security & Reports" collapsed={isCollapsed} />
+          {SECURITY_ITEMS.map((item) => (
+            <SidebarNavLink key={item.to} to={item.to} icon={item.icon} label={item.label} collapsed={isCollapsed} />
           ))}
         </nav>
 
