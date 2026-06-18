@@ -109,6 +109,8 @@ totpDevices: [{ name: { type: String, default: 'Authenticator App' }, addedAt: {
 
   isArchive: { type: Boolean, default: false },
 
+  allowAdminRememberMe: { type: Boolean, default: true },
+
   lastLoginAt: { type: Date },
 
   activityLog: [{

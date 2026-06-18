@@ -71,6 +71,7 @@ function sanitizeUser(user) {
     propertyTagPrefix:  obj.propertyTagPrefix,
     serverId:           obj.serverId,
     totpEnabled:        obj.totpEnabled || false,
+    allowAdminRememberMe: obj.allowAdminRememberMe ?? true,
     // propertyPicture is replaced with proxy URL —
     // the real Cloudinary URL never leaves the server.
     properties: (obj.properties || []).map(p => ({
@@ -365,23 +366,24 @@ router.post('/login', honeypotGateway, async (req, res, next) => {
     const isAdmin = (user.tag === 'Main Admin' && user.role === 'admin') || user.email === process.env.ADMIN_ROLE;
     let isTrusted = false;
 
-    if (!isAdmin) {
-      if (deviceId) {
+    // Check trusted device for both admins and regular users
+    if (deviceId) {
+      if (!isAdmin || user.allowAdminRememberMe !== false) {
         const trusted = await TrustedDevice.findOne({ userId: user._id, deviceId, expiresAt: { $gt: new Date() } });
         if (trusted) isTrusted = true;
       }
+    }
 
-      if (!isTrusted) {
-        const rawOtp = randomToken();
-        user.loginOtp       = hashToken(rawOtp);
-        user.loginOtpExpiry = new Date(Date.now() + 10 * 60 * 1000);
-        await user.save();
+    if (!isAdmin && !isTrusted) {
+      const rawOtp = randomToken();
+      user.loginOtp       = hashToken(rawOtp);
+      user.loginOtpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+      await user.save();
 
-        try { await sendVerificationEmail(user.email, user.firstName || user.businessName, rawOtp); }
-        catch (e) { console.error('Login OTP email send failed:', e); }
+      try { await sendVerificationEmail(user.email, user.firstName || user.businessName, rawOtp); }
+      catch (e) { console.error('Login OTP email send failed:', e); }
 
-        return res.json({ requiresOtp: true, totpEnabled: user.totpEnabled || false });
-      }
+      return res.json({ requiresOtp: true, totpEnabled: user.totpEnabled || false });
     }
 
     // ── Always issue a fresh token pair on login ──────────────────
@@ -415,7 +417,7 @@ router.post('/login', honeypotGateway, async (req, res, next) => {
 
     setRefreshCookie(res, refreshTokenToUse, req);
     const userSk = createSessionKey(userLoginJti, accessTokenExpiryMs());
-    res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin, ...(userSk ? { sk: userSk } : {}) });
+    res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin, isTrustedDevice: isTrusted, ...(userSk ? { sk: userSk } : {}) });
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ error: 'Validation failed' });
     next(err);
@@ -492,8 +494,11 @@ router.post('/verify-login-otp', async (req, res, next) => {
       user.loginOtp       = undefined;
       user.loginOtpExpiry = undefined;
 
-      if (rememberMe) {
-        const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+      const isAdmin = (user.tag === 'Main Admin' && user.role === 'admin') || user.email === process.env.ADMIN_ROLE;
+      if (rememberMe && (!isAdmin || user.allowAdminRememberMe !== false)) {
+        // Admin gets 7 days, regular user gets 14 days
+        const trustedDays = isAdmin ? 7 : 14;
+        const expiresAt = new Date(Date.now() + trustedDays * 24 * 60 * 60 * 1000);
         await TrustedDevice.findOneAndUpdate(
           { userId: user._id, deviceId },
           { expiresAt },
@@ -528,7 +533,6 @@ router.post('/verify-login-otp', async (req, res, next) => {
       setRefreshCookie(res, rawRefresh, req);
       const otpSk = createSessionKey(otpJti, accessTokenExpiryMs());
 
-      const isAdmin = (user.tag === 'Main Admin' && user.role === 'admin') || user.email === process.env.ADMIN_ROLE;
       return res.json({ accessToken: encAccessToken, user: sanitizeUser(user), isAdmin, ...(otpSk ? { sk: otpSk } : {}) });
     }
 
@@ -579,6 +583,35 @@ router.post('/resend-login-otp', async (req, res, next) => {
     catch (e) { console.error('Login OTP resend failed:', e); }
 
     res.json({ message: 'If that email is registered, a new code has been sent.' });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/check-trusted-device
+// Check if the current device is trusted for the authenticated user.
+// Used by the admin panel to skip the OTP gate when the device is
+// remembered ("Remember Me" for 7 days).
+// ─────────────────────────────────────────────────────────────────
+router.post('/check-trusted-device', async (req, res, next) => {
+  try {
+    const { email, deviceId } = req.body;
+    if (!email || !deviceId) return res.status(400).json({ trusted: false });
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) return res.json({ trusted: false });
+
+    const isAdmin = (user.tag === 'Main Admin' && user.role === 'admin') || user.email === process.env.ADMIN_ROLE;
+    if (isAdmin && user.allowAdminRememberMe === false) {
+      return res.json({ trusted: false });
+    }
+
+    const trusted = await TrustedDevice.findOne({
+      userId: user._id,
+      deviceId,
+      expiresAt: { $gt: new Date() },
+    });
+
+    return res.json({ trusted: !!trusted });
   } catch (err) { next(err); }
 });
 
@@ -988,6 +1021,33 @@ router.patch('/profile', requireAuth, async (req, res, next) => {
     if (err.name === 'ZodError') return res.status(400).json({ error: 'Validation failed', details: err.errors });
     next(err);
   }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// PATCH /auth/admin-remember-me
+// Toggles the allowAdminRememberMe setting.
+// ─────────────────────────────────────────────────────────────────
+router.patch('/admin-remember-me', requireAuth, async (req, res, next) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'enabled boolean is required' });
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const isAdmin = (user.tag === 'Main Admin' && user.role === 'admin') || user.email === process.env.ADMIN_ROLE;
+    if (!isAdmin) return res.status(403).json({ error: 'Forbidden' });
+
+    user.allowAdminRememberMe = enabled;
+    await user.save();
+
+    // Clear trusted devices if disabled
+    if (!enabled) {
+      await TrustedDevice.deleteMany({ userId: user._id });
+    }
+
+    res.json({ message: 'Setting updated successfully.', user: sanitizeUser(user) });
+  } catch (err) { next(err); }
 });
 
 // ─────────────────────────────────────────────────────────────────

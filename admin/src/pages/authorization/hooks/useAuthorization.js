@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { verifyOtp, resendOtp, sendLoginOtp, verifyTotp } from '../services/authService';
+import { verifyOtp, resendOtp, sendLoginOtp, verifyTotp, checkTrustedDevice } from '../services/authService';
 import { getSecureUser, setSecureUser } from '../../../lib/secureUserStorage';
 import { setToken, setSessionKey } from '../../../lib/authUtils';
 
@@ -74,6 +74,11 @@ export function useAuthorization(onAuthorized) {
     return 0;
   });
   const [message, setMessage]               = useState(null);
+  const [rememberMe] = useState(() => {
+    const val = sessionStorage.getItem('hp_remember_me') === 'true';
+    sessionStorage.removeItem('hp_remember_me');
+    return val;
+  });
   const otpSentRef                          = useRef(false);
 
   useEffect(() => {
@@ -101,20 +106,6 @@ export function useAuthorization(onAuthorized) {
   //    method first; the OTP is sent when they explicitly pick Email OTP.
   useEffect(() => {
     bootstrapSessionFromUrlParams();
-
-    // Read totpEnabled after bootstrapping — hp_user may have just been set from URL params.
-    const hasTotpEnabled = (() => {
-      try {
-        return (getSecureUser() || {}).totpEnabled ?? false;
-      } catch { return false; }
-    })();
-
-    if (!otpSentRef.current && !hasTotpEnabled) {
-      otpSentRef.current = true;
-      sendLoginOtp().catch((err) => {
-        console.error('Failed to send initial login OTP:', err);
-      });
-    }
   }, []);
 
   function showMessage(text, type = 'error') {
@@ -128,7 +119,7 @@ export function useAuthorization(onAuthorized) {
     setLoading(true);
     setMessage(null);
     try {
-      const data = await verifyOtp(otp);
+      const data = await verifyOtp(otp, rememberMe);
       // OTP verification issues a new token + session key — store both
       if (data?.accessToken) setToken(data.accessToken);
       if (data?.sk)          setSessionKey(data.sk);
@@ -232,5 +223,5 @@ const userEmail = (() => {
     }
   }
 
-  return { loading, resendLoading, resendCooldown, lockoutTimer, message, submit, resend, sendOtp, userEmail, totpEnabled, submitTotp };
+  return { loading, resendLoading, resendCooldown, lockoutTimer, message, submit, resend, sendOtp, userEmail, totpEnabled, submitTotp, checkTrusted: checkTrustedDevice };
 }

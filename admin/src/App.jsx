@@ -29,7 +29,9 @@ const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173
   const params = new URLSearchParams(window.location.search);
   const token   = params.get('_t');
   const userRaw = params.get('_u');
+  const rmRaw   = params.get('_rm');
   if (token)   sessionStorage.setItem('hp_access_token', token);
+  if (rmRaw === 'true') sessionStorage.setItem('hp_remember_me', 'true');
   if (userRaw) {
     try {
       setSecureUser(JSON.parse(userRaw));

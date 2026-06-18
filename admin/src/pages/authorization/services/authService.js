@@ -60,10 +60,11 @@ function getDeviceId() {
 /**
  * Verify a 6-digit OTP code for the admin's current session.
  * @param {string} otp
+ * @param {boolean} [rememberMe=false] - Whether to remember this device
  * @returns {Promise<object>} server response body
  * @throws {Error} with server message on failure
  */
-export async function verifyOtp(otp) {
+export async function verifyOtp(otp, rememberMe = false) {
   const email    = getAdminEmail();
   const deviceId = getDeviceId();
 
@@ -71,7 +72,7 @@ export async function verifyOtp(otp) {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
     credentials: 'include',
-    body: JSON.stringify({ email, otp, deviceId, rememberMe: false }),
+    body: JSON.stringify({ email, otp, deviceId, rememberMe }),
   });
 
   const body = await res.json().catch(() => ({}));
@@ -135,6 +136,29 @@ export async function sendLoginOtp() {
   }
 
   return body;
+}
+
+/**
+ * Check if the current device is trusted ("Remember Me" was set previously).
+ * @returns {Promise<boolean>} true if device is trusted
+ */
+export async function checkTrustedDevice() {
+  const email    = getAdminEmail();
+  const deviceId = getDeviceId();
+  if (!email || !deviceId) return false;
+
+  try {
+    const res = await fetch(authUrl('/auth/check-trusted-device'), {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+      credentials: 'include',
+      body: JSON.stringify({ email, deviceId }),
+    });
+    const body = await res.json().catch(() => ({}));
+    return body.trusted === true;
+  } catch {
+    return false;
+  }
 }
 
 export async function getTotpStatus() {
