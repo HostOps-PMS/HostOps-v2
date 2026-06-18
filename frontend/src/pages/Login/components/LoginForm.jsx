@@ -140,7 +140,7 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
         sessionStorage.removeItem('hp_must_change_pin');
       }
 
-      onAuthSuccess(data);
+      onAuthSuccess({ ...data, rememberMe });
     },
     onError: (msg) => {
       if (msg && msg.toLowerCase().includes('been disabled')) {

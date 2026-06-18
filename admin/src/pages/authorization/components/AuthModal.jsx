@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import OtpInput from './OtpInput';
 import { useOtp }           from '../hooks/useOtp';
 import { useAuthorization } from '../hooks/useAuthorization';
@@ -21,6 +21,28 @@ export default function AuthModal({ onAuthorized }) {
     : '';
   const [currentSlide, setCurrentSlide] = useState(0);
 const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
+  const [checkingTrusted, setCheckingTrusted] = useState(true);
+  const trustedCheckedRef = useRef(false);
+
+  // Check if device is trusted on mount — skip OTP if it is
+  useEffect(() => {
+    if (trustedCheckedRef.current) return;
+    trustedCheckedRef.current = true;
+    (async () => {
+      try {
+        const isTrusted = await auth.checkTrusted();
+        if (isTrusted) {
+          onAuthorized();
+          return;
+        }
+        // Not trusted: auto-send OTP if email method is selected
+        if (!auth.totpEnabled) {
+          auth.sendOtp().catch(() => {});
+        }
+      } catch {}
+      setCheckingTrusted(false);
+    })();
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -28,6 +50,8 @@ const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
     }, 4000);
     return () => clearInterval(timer);
   }, []);
+
+  if (checkingTrusted) return null;
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -150,6 +174,7 @@ const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
                 />
               )}
               <LockoutTimer lockoutTimer={auth.lockoutTimer} />
+
               <button
                 className="am-btn am-btn--modern"
                 type="submit"
@@ -192,6 +217,7 @@ const [method, setMethod] = useState(auth.totpEnabled ? 'choose' : 'email');
                 />
               )}
               <LockoutTimer lockoutTimer={auth.lockoutTimer} initialTimer={90} />
+
               <button
                 className="am-btn am-btn--modern"
                 type="submit"

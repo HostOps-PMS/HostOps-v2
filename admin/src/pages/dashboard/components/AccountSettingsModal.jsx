@@ -216,6 +216,8 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
   const [devices, setDevices] = useState([]);
   const [totpLoading, setTotpLoading] = useState(false);
   const [totpMsg, setTotpMsg] = useState(null); // { text, type }
+  const [allowAdminRememberMe, setAllowAdminRememberMe] = useState(user?.allowAdminRememberMe ?? true);
+  const [togglingRm, setTogglingRm] = useState(false);
 
   const overlayRef = useRef(null);
 
@@ -229,11 +231,13 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
       setShowOtpModal(false);
       setShowSuccessModal(false);
       verifiedTokenRef.current = null;
+      setAllowAdminRememberMe(user?.allowAdminRememberMe ?? true);
     }
     setTotpStep('idle');
     setTotpCode('');
     setTotpMsg(null);
     setDeviceName('');
+    setAllowAdminRememberMe(user?.allowAdminRememberMe ?? true);
   }, [isOpen]);
 
   useEffect(() => {
@@ -688,12 +692,14 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                 <div style={styles.section}>
                   <div style={styles.row2}>
                     <div style={styles.readOnlyRow}>
+                      <i className="ti ti-signature" style={styles.readOnlyIcon} aria-hidden="true" />
                       <div style={styles.readOnlyContent}>
                         <p style={styles.readOnlyKey}>First Name</p>
                         <p style={styles.readOnlyVal}>{user?.firstName || "-"}</p>
                       </div>
                     </div>
                     <div style={styles.readOnlyRow}>
+                      <i className="ti ti-signature" style={styles.readOnlyIcon} aria-hidden="true" />
                       <div style={styles.readOnlyContent}>
                         <p style={styles.readOnlyKey}>Last Name</p>
                         <p style={styles.readOnlyVal}>{user?.lastName || "-"}</p>
@@ -709,7 +715,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
               <div style={styles.section}>
                 <p style={styles.sectionLabel}>Authenticator App</p>
 
-                {/* Status row */}
+                {/* Status row for TOTP */}
                 <div style={{ ...styles.readOnlyRow, marginBottom: 16, justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <i className="ti ti-device-mobile" style={{ ...styles.readOnlyIcon, fontSize: 18 }} />
@@ -747,6 +753,61 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                       position: 'absolute', top: 3, width: 14, height: 14, borderRadius: '50%',
                       background: '#fff', transition: 'left 0.2s',
                       left: totpEnabled ? 19 : 3,
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
+                    }} />
+                  </div>
+                </div>
+
+                <div style={{ ...styles.divider, marginTop: 16, marginBottom: 16 }} />
+                
+                <p style={styles.sectionLabel}>Login Preferences</p>
+
+                {/* Status row for Admin Remember Me */}
+                <div style={{ ...styles.readOnlyRow, marginBottom: 16, justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <i className="ti ti-device-floppy" style={{ ...styles.readOnlyIcon, fontSize: 18 }} />
+                    <div>
+                      <p style={styles.readOnlyKey}>Allow "Remember Me" for 7 days</p>
+                      <p style={{ ...styles.readOnlyVal, color: allowAdminRememberMe ? '#1e8760' : (dark ? '#4d8a6a' : '#9ab8a9') }}>
+                        {allowAdminRememberMe ? 'Enabled' : 'Disabled'}
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{
+                    width: 36, height: 20, borderRadius: 10, cursor: togglingRm ? 'not-allowed' : 'pointer',
+                    background: togglingRm ? '#9ab8a9' : (allowAdminRememberMe ? '#1e8760' : (dark ? '#1e3a2a' : '#d4e8dd')),
+                    position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                    opacity: togglingRm ? 0.7 : 1,
+                  }} onClick={async () => {
+                    if (togglingRm) return;
+                    setTogglingRm(true);
+                    const newValue = !allowAdminRememberMe;
+                    try {
+                      const token = sessionStorage.getItem("hp_access_token");
+                      const res = await fetch(`${API_BASE}/auth/admin-remember-me`, {
+                        method: 'PATCH',
+                        headers: {
+                          "Content-Type": "application/json",
+                          "x-api-key": API_KEY,
+                          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                        },
+                        body: JSON.stringify({ enabled: newValue }),
+                        credentials: "include"
+                      });
+                      if (!res.ok) throw new Error();
+                      setAllowAdminRememberMe(newValue);
+                      const u = getSecureUser();
+                      if (u) setSecureUser({ ...u, allowAdminRememberMe: newValue });
+                    } catch {
+                      // Silently fail or show toast if we had one
+                    } finally {
+                      setTogglingRm(false);
+                    }
+                  }}>
+                    <div style={{
+                      position: 'absolute', top: 3, width: 14, height: 14, borderRadius: '50%',
+                      background: '#fff', transition: 'left 0.2s',
+                      left: allowAdminRememberMe ? 19 : 3,
                       boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
                     }} />
                   </div>
@@ -890,9 +951,9 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                 )}
 
                 {/* Idle info */}
-                {totpStep === 'idle' && !totpEnabled && (
-                  <p style={{ fontSize: 12, color: dark ? '#4d8a6a' : '#9ab8a9', lineHeight: 1.6, marginTop: 4 }}>
-                    Add an extra layer of security to your account. Toggle the switch above to get started.
+                {totpStep === 'idle' && (
+                  <p style={{ fontSize: 12, color: dark ? '#4d8a6a' : '#9ab8a9', lineHeight: 1.6, marginTop: 12, background: dark ? '#0d2619' : '#f7faf8', padding: '10px 14px', borderRadius: 8, border: `1px solid ${dark ? '#1e3a2a' : '#eaf3ee'}` }}>
+                    <strong>Note:</strong> Add an extra layer of security to your account. Toggle the switch above to get started.
                   </p>
                 )}
 
@@ -1029,7 +1090,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
           <div style={styles.footer}>
             <div style={styles.btnGroup}>
               <button style={styles.cancelBtn} className="acc-cancel-btn" onClick={onClose} disabled={pwSaving}>
-                Discard
+                Cancel
               </button>
               {activeTab === "password" && (
                 <button style={styles.saveBtn(pwSaving)} className="acc-save-btn" onClick={handleSave} disabled={pwSaving}>
