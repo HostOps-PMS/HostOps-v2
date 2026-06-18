@@ -368,11 +368,11 @@ export default function BugReportsPage() {
                                     padding: '4px 10px', borderRadius: 6, border: 'none', fontSize: '0.72rem', fontWeight: 600,
                                     background: dark ? '#2a0d0d' : '#fee2e2', color: dark ? '#f87171' : '#dc2626',
                                     cursor: updating ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
-                                  }}>Decline</button>
+                                  }}>Reject</button>
                                 </div>
                               )}
                               {r.status === 'resolved' && <span style={{ fontSize: '0.72rem', color: dark ? '#4ade80' : '#059669', fontWeight: 600 }}>Approved</span>}
-                              {r.status === 'dismissed' && <span style={{ fontSize: '0.72rem', color: dark ? '#f87171' : '#dc2626', fontWeight: 600 }}>Declined</span>}
+                              {r.status === 'dismissed' && <span style={{ fontSize: '0.72rem', color: dark ? '#f87171' : '#dc2626', fontWeight: 600 }}>Rejected</span>}
                             </td>
                           </tr>
                         );
@@ -473,44 +473,36 @@ export default function BugReportsPage() {
                     </div>
                   )}
 
-                  {/* Status actions */}
-                  <div style={{ fontSize: 11, fontWeight: 700, color: textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Update Status</div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {Object.entries(STATUS_META).map(([key, meta]) => {
-                      const active = selected.status === key;
-                      return (
-                        <button key={key} onClick={() => {
-                          if (active) return;
-                          if (key === 'dismissed') { setDeclineTarget(selected); setDeclineReason(''); }
-                          else updateStatus(selected._id, key);
-                        }} disabled={active || updating}
-                          style={{
-                            padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                            border: `1.5px solid ${active ? (dark ? meta.darkColor : meta.color) : border}`,
-                            background: active ? (dark ? meta.darkBg : meta.bg) : 'transparent',
-                            color: active ? (dark ? meta.darkColor : meta.color) : textMuted,
-                            cursor: active || updating ? 'default' : 'pointer', transition: 'all 0.15s',
-                            opacity: updating && !active ? 0.5 : 1,
-                          }}
-                        >{meta.label}</button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Send to Email */}
-                  <hr style={{ border: 'none', borderTop: `1px solid ${border}`, margin: '16px 0' }} />
-                  <button
-                    onClick={() => { setEmailPreview(selected); setSendSuccess(false); }}
-                    style={{
-                      width: '100%', padding: '10px 16px', borderRadius: 10, border: 'none',
-                      background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff',
-                      fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                      fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                    Send Report via Email
-                  </button>
+                  {(selected.status === 'open' || selected.status === 'in_progress') && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                      <button
+                        onClick={() => { setEmailPreview(selected); setSendSuccess(false); }}
+                        disabled={updating}
+                        style={{
+                          flex: 1, padding: '10px 16px', borderRadius: 10, border: 'none',
+                          background: dark ? '#052e16' : '#d1fae5', color: dark ? '#4ade80' : '#059669',
+                          fontSize: 13, fontWeight: 600, cursor: updating ? 'not-allowed' : 'pointer',
+                          fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => { setDeclineTarget(selected); setDeclineReason(''); }}
+                        disabled={updating}
+                        style={{
+                          flex: 1, padding: '10px 16px', borderRadius: 10, border: 'none',
+                          background: dark ? '#2a0d0d' : '#fee2e2', color: dark ? '#f87171' : '#dc2626',
+                          fontSize: 13, fontWeight: 600, cursor: updating ? 'not-allowed' : 'pointer',
+                          fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                        Reject
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -527,9 +519,9 @@ export default function BugReportsPage() {
                 width: '100%', maxWidth: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
                 animation: 'br-enter 0.2s ease', padding: '24px',
               }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: textMain, margin: '0 0 6px' }}>Decline Bug Report</h3>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: textMain, margin: '0 0 6px' }}>Reject Bug Report</h3>
                 <p style={{ fontSize: 12, color: textMuted, margin: '0 0 16px', lineHeight: 1.5 }}>
-                  Explain why this report is being declined. The client will see this reason.
+                  Explain why this report is being rejected. The client will see this reason.
                 </p>
 
                 <textarea
@@ -570,7 +562,7 @@ export default function BugReportsPage() {
                       fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
                       cursor: !declineReason.trim() || updating ? 'not-allowed' : 'pointer',
                     }}
-                  >{updating ? 'Declining…' : 'Decline Report'}</button>
+                  >{updating ? 'Rejecting…' : 'Reject Report'}</button>
                 </div>
               </div>
             </div>
@@ -674,7 +666,11 @@ export default function BugReportsPage() {
                         setSending(true); setSendSuccess(false);
                         try {
                           const res = await fetchWithAuth(`${API_BASE}/api/bug-reports/${r._id}/send-email`, { method: 'POST' });
-                          if (res.ok) { setSendSuccess(true); setTimeout(() => { setEmailPreview(null); setSendSuccess(false); }, 1500); }
+                          if (res.ok) {
+                            await updateStatus(r._id, 'resolved');
+                            setSendSuccess(true);
+                            setTimeout(() => { setEmailPreview(null); setSendSuccess(false); }, 1500);
+                          }
                         } catch {} finally { setSending(false); }
                       }}
                       disabled={sending || sendSuccess}
