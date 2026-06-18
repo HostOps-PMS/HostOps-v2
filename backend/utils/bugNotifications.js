@@ -100,24 +100,49 @@ export async function sendWebhookNotification(report) {
   const url = process.env.INTERNAL_WEBHOOK_URL;
   if (!url) return;
 
-  const sevLabel = (report.severity || 'high').toUpperCase();
+  const sevLabel = (report.severity || 'high').charAt(0).toUpperCase() + (report.severity || 'high').slice(1);
   const catLabel = CATEGORY_LABELS[report.category] || report.category || 'Other';
+  const images   = report.images || [];
 
   const payload = {
-    event:       'bug_report.created',
-    reportId:    report._id?.toString(),
-    severity:    report.severity,
-    category:    report.category || 'other',
-    status:      report.status,
-    reporter:    { name: report.name || '', email: report.email },
-    page:        report.page || '',
-    description: report.description,
+    // ── Event meta ──────────────────────────────────────────────
+    event:            'bug_report.created',
+    reportId:         report._id?.toString(),
+
+    // ── Reporter ────────────────────────────────────────────────
+    email:            report.email || '',
+    name:             report.name  || '',
+
+    // ── Bug details ─────────────────────────────────────────────
+    page:             report.page             || '',
+    severity:         report.severity         || 'medium',
+    severityLabel:    sevLabel,
+    category:         report.category         || 'other',
+    categoryLabel:    catLabel,
+    description:      report.description      || '',
     stepsToReproduce: report.stepsToReproduce || '',
-    environment: report.environment || {},
-    imageCount:  (report.images || []).length,
-    submittedAt: report.createdAt?.toISOString?.() || new Date().toISOString(),
-    // Slack/Teams-compatible plain text summary
-    text: `🐛 [BUG REPORT] ${sevLabel} | ${catLabel}\nPage: ${report.page || '—'}\nFrom: ${report.name || report.email} <${report.email}>\n\n${report.description.slice(0, 300)}${report.description.length > 300 ? '…' : ''}`,
+
+    // ── Environment ─────────────────────────────────────────────
+    environmentBrowser: report.environment?.browser || '',
+    environmentOs:      report.environment?.os      || '',
+
+    // ── Images ──────────────────────────────────────────────────
+    imageCount:   images.length,
+    imageUrls:    images.map(img => img.url),
+    imagePublicIds: images.map(img => img.publicId),
+
+    // ── Status ──────────────────────────────────────────────────
+    status:       report.status       || 'open',
+    resolvedNote: report.resolvedNote || '',
+    resolvedAt:   report.resolvedAt   ? new Date(report.resolvedAt).toISOString() : '',
+    resolvedBy:   report.resolvedBy   ? report.resolvedBy.toString() : '',
+
+    // ── Timestamps ──────────────────────────────────────────────
+    createdAt:    report.createdAt?.toISOString?.() || new Date().toISOString(),
+    updatedAt:    report.updatedAt?.toISOString?.() || '',
+
+    // ── Plain-text summary (GHL note / Slack / Teams) ───────────
+    text: `[BUG REPORT] ${sevLabel.toUpperCase()} | ${catLabel} | ${report.page || 'General'}\nFrom: ${report.name || '—'} <${report.email}>\n\n${report.description}${report.stepsToReproduce ? `\n\nSteps:\n${report.stepsToReproduce}` : ''}`,
   };
 
   const res = await fetch(url, {
