@@ -13,7 +13,7 @@ const gmailTransport = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: REPORT_EMAIL,
-    pass: process.env.GMAIL_APP_PASSWORD || 'lmyy fikh ukfs sxnn',
+    pass: process.env.GMAIL_APP_PASSWORD,
   },
 });
 

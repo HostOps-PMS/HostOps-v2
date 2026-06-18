@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 
@@ -20,9 +20,8 @@ import AlertsCenterPage from './pages/AlertsCenter';
 import HoneypotDashboard from './pages/HoneypotDashboard';
 import RecentActivitiesPage from './pages/RecentActivities/index';
 import BugReportsPage from './pages/BugReports/index';
-import ErrorPage404 from './pages/ErrorPage404';
 
-const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5174';
+const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
 
 // ── Consume _t / _u URL params injected by the frontend login app ──────────
 (function consumeLoginParams() {
@@ -53,8 +52,11 @@ const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5174
 
 function PrivateRoute({ children }) {
   const token = sessionStorage.getItem('hp_access_token');
-  if (!token) { return <ErrorPage404 />; }
-  
+  if (!token) {
+    window.location.href = FRONTEND_URL;
+    return null;
+  }
+
   try {
     const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
     if (user.role === 'team_leader') {
@@ -73,7 +75,10 @@ function PrivateRoute({ children }) {
 
 function TeamLeaderRoute({ children }) {
   const token = sessionStorage.getItem('hp_access_token');
-  if (!token) { return <ErrorPage404 />; }
+  if (!token) {
+    window.location.href = FRONTEND_URL;
+    return null;
+  }
 
   try {
     const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
@@ -81,7 +86,8 @@ function TeamLeaderRoute({ children }) {
       return <Navigate to="/dashboard" replace />;
     }
   } catch (e) {
-    return <ErrorPage404 />;
+    window.location.href = FRONTEND_URL;
+    return null;
   }
 
   return children;
@@ -94,13 +100,17 @@ function TeamLeaderRoute({ children }) {
 // until the user passes it — so no content is shown before verification.
 function AdminEntryRedirect() {
   const token = sessionStorage.getItem('hp_access_token');
-  if (!token) { return <ErrorPage404 />; }
+  if (!token) {
+    window.location.href = FRONTEND_URL;
+    return null;
+  }
   try {
     const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
     if (user.role === 'team_leader') return <Navigate to="/team-leader/staffs" replace />;
     return <Navigate to="/dashboard" replace />;
   } catch {
-    return <ErrorPage404 />;
+    window.location.href = FRONTEND_URL;
+    return null;
   }
 }
 
@@ -134,6 +144,19 @@ export default function App() {
 
     return false;
   });
+
+  // isReady prevents the wildcard <Route path="*"> from firing before React
+  // Router has resolved the current path. Without this, on a hard refresh the
+  // wildcard can match first and navigate away before the real route renders.
+  // Mirrors the fix in frontend/src/pages/ProtectedRoute.jsx.
+  const [isReady, setIsReady] = useState(false);
+  const readyRef = useRef(false);
+  useEffect(() => {
+    if (!readyRef.current) {
+      readyRef.current = true;
+      setIsReady(true);
+    }
+  }, []);
 
   function handleAuthorized() {
     sessionStorage.setItem('hp_authorized', '1');
@@ -273,7 +296,9 @@ export default function App() {
           }
         />
 
-        <Route path="*" element={<AdminEntryRedirect />} />
+        {/* Only render the wildcard after the initial route resolution settles,
+            so it doesn't fire before real routes have had a chance to match. */}
+        {isReady && <Route path="*" element={<AdminEntryRedirect />} />}
       </Routes>}
       </NotificationsProvider>
       </ThemeProvider>
