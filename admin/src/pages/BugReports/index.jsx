@@ -80,7 +80,7 @@ export default function BugReportsPage() {
       const res = await fetchWithAuth(`${API_BASE}/api/bug-reports`);
       if (!res.ok) throw new Error('Failed to load bug reports');
       const data = await res.json();
-      setReports(data);
+      setReports(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -96,7 +96,8 @@ export default function BugReportsPage() {
     try {
       const res = await fetchWithAuth(`${API_BASE}/api/inbox/threads`);
       if (!res.ok) throw new Error('Failed to load inbox');
-      setInbox(await res.json());
+      const data = await res.json();
+      setInbox(Array.isArray(data) ? data : []);
     } catch (err) {
       setInboxError(err.message);
     } finally {
@@ -110,7 +111,8 @@ export default function BugReportsPage() {
     try {
       const res = await fetchWithAuth(`${API_BASE}/api/inbox/threads/${conversationId}`);
       if (!res.ok) throw new Error('Failed to load thread');
-      setThreadMessages(await res.json());
+      const data = await res.json();
+      setThreadMessages(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
     } finally {
