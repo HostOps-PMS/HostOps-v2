@@ -52,13 +52,13 @@ const router = express.Router();
 //   connectedProperties:  number,          // how many properties had a Smoobu key
 // }
 // ─────────────────────────────────────────────────────────────────
-router.get(
+router.post(
   '/dashboard-overview',
   requireAuth,
   requireAdmin,
   async (req, res, next) => {
     try {
-      const { from, to } = req.query;
+      const { from, to } = req.body;
 
       // Basic date format validation (YYYY-MM-DD) if supplied
       const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;

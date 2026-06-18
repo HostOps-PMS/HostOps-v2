@@ -26,7 +26,8 @@ const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173
 
 // ── Consume _t / _u URL params injected by the frontend login app ──────────
 (function consumeLoginParams() {
-  const params = new URLSearchParams(window.location.search);
+  const rawParams = window.location.hash ? window.location.hash.substring(1) : window.location.search;
+  const params = new URLSearchParams(rawParams);
   const token   = params.get('_t');
   const userRaw = params.get('_u');
   const rmRaw   = params.get('_rm');
