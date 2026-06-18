@@ -110,7 +110,7 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
             _t: data.accessToken,
             _u: JSON.stringify({ ...data.clientAccount, role: 'clientAccount', isClientAccount: true }),
           });
-          window.location.href = `${dashboardBase}/admin?${params.toString()}`;
+          window.location.href = `${dashboardBase}/admin#${params.toString()}`;
         }, 800);
         return;
       }

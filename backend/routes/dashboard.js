@@ -284,14 +284,15 @@ function applyStaffPropertyFilter(data, staffPropertyIds, options = {}) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// GET /api/dashboard
 // ─────────────────────────────────────────────────────────────────
-router.get('/dashboard', async (req, res, next) => {
+// POST /api/dashboard
+// ─────────────────────────────────────────────────────────────────
+router.post('/dashboard', async (req, res, next) => {
   try {
     // ── propertyDbId — per-property Smoobu API key injection ─────────────────
     // When the user selects a specific property on the login screen, the frontend
     // stores its MongoDB _id in sessionStorage (hp_selected_property_id) and
-    // passes it here as ?propertyDbId=<ObjectId string>.
+    // passes it here in the request body as propertyDbId.
     //
     // Each embedded property in user.properties[] has its own smoobuApiKey.
     // We find the matching property by _id, then inject its smoobuApiKey onto
@@ -305,7 +306,7 @@ router.get('/dashboard', async (req, res, next) => {
     // If propertyDbId is not provided, the existing MODE A / B / C logic
     // applies unchanged (user.smoobuApiKey or env key fallback).
     let userForDashboard = req.user;
-    const propertyDbId = req.query.propertyDbId;
+    const propertyDbId = req.body.propertyDbId;
     let usingSelectedPropertyApiKey = false;
 
     if (propertyDbId) {
@@ -348,13 +349,13 @@ router.get('/dashboard', async (req, res, next) => {
     }
 
     const data = await getDashboard(userForDashboard, {
-      from: req.query.from,
-      to:   req.query.to,
+      from: req.body.from,
+      to:   req.body.to,
     });
 
     // MODE A: user has own API key → smoobu already scoped the data correctly
     if (hasOwnApiKey(userForDashboard)) {
-      applyPropertyFilter(data, req.query.apartmentId);
+      applyPropertyFilter(data, req.body.apartmentId);
       // MODE C: further narrow to staff's assigned properties if applicable
       if (req.isStaff) {
         applyStaffPropertyFilter(data, req.staffPropertyIds, {

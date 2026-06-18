@@ -77,7 +77,7 @@ export default function LoginPage() {
           _u: JSON.stringify(data.user),
         });
         if (data.rememberMe) params.append('_rm', 'true');
-        window.location.href = `${dashboardBase}/admin?${params.toString()}`;
+        window.location.href = `${dashboardBase}/admin#${params.toString()}`;
       }, 800);
       return;
     }

@@ -51,11 +51,10 @@ export async function getStats() {
  * @returns {Promise<DashboardOverviewPayload>}
  */
 export async function getDashboardOverview({ from, to } = {}) {
-  const params = new URLSearchParams();
-  if (from) params.set('from', from);
-  if (to)   params.set('to', to);
-  const qs = params.toString() ? '?' + params.toString() : '';
-  return request(`/api/dashboard-overview${qs}`);
+  return request(`/api/dashboard-overview`, {
+    method: 'POST',
+    body: JSON.stringify({ from, to }),
+  });
 }
 
 /* ── Orders ─────────────────────────────────────────────────────── */
