@@ -517,6 +517,7 @@ export default function TopBar({ onAction, onExport, exportLoading = false, aler
   }, [notifOpen]);
 
   return (
+    <>
     <header style={{
       display: 'flex',
       alignItems: 'center',
@@ -667,5 +668,6 @@ export default function TopBar({ onAction, onExport, exportLoading = false, aler
       isOpen={settingsOpen}
       onClose={() => setSettingsOpen(false)}
     />
+    </>
   );
 }
