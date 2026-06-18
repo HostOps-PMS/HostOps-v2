@@ -1,17 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useDashboard } from '../context/DashboardContext';
+import { useAuth } from '../../AuthContext';
 import RichTextInput from './RichTextInput';
 
 const API_BASE = (import.meta.env.VITE_API_URL || 'https://api.hostops.online').replace(/\/$/, '');
 const API_KEY  = import.meta.env.VITE_API_KEY || '';
 
-function getUser() {
-  try {
-    const { getSecureUser } = require('../../../lib/secureUserStorage');
-    const u = getSecureUser();
-    if (u) return u;
-  } catch {}
-  try { return JSON.parse(localStorage.getItem('hp_user') || sessionStorage.getItem('hp_user') || 'null'); } catch { return null; }
+function getUserData(auth) {
+  let u = auth?.getUser?.();
+  if (u && u.user && !u.email && typeof u.user === 'object') u = u.user;
+  if (u && (u.businessName || u.firstName || u.email)) return u;
+  try { return JSON.parse(sessionStorage.getItem('hp_user') || 'null'); } catch { return null; }
 }
 
 const SEV = [
@@ -27,7 +26,8 @@ function fmtDate() {
 
 export default function BugReportModal({ show, onClose }) {
   const { dark } = useDashboard();
-  const user = getUser();
+  const auth = useAuth();
+  const user = getUserData(auth);
   const [description, setDescription] = useState('');
   const [page, setPage]       = useState('');
   const [severity, setSeverity] = useState('high');
