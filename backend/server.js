@@ -57,10 +57,17 @@ app.use((req, res, next) => {
 // ── Security Headers (Helmet) ─────────────────────────────────────────────────
 const CLOUDINARY_HOSTNAME = 'https://res.cloudinary.com';
 
+// Strip control characters (e.g. \r from Windows line endings) that are
+// invisible but illegal inside HTTP headers such as Content-Security-Policy.
+const sanitizeOrigin = (o) =>
+  o.trim()
+   .replace(/[\x00-\x1F\x7F]/g, '')   // remove ASCII control chars
+   .replace(/\/$/, '');                 // remove trailing slash
+
 // The image proxy lives on this backend's own origin, so we must allow all
 // known frontend origins to load images from it via <img> tags.
 const IMAGE_PROXY_ORIGINS = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim().replace(/\/$/, ''))
+  ? process.env.ALLOWED_ORIGINS.split(',').map(sanitizeOrigin).filter(Boolean)
   : [
       'https://go.hostops.online',
       'https://hostops-frontend.onrender.com',
@@ -126,7 +133,7 @@ app.use((req, res, next) => {
 const isDev = process.env.NODE_ENV !== 'production';
 
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim().replace(/\/$/, ''))
+  ? process.env.ALLOWED_ORIGINS.split(',').map(sanitizeOrigin).filter(Boolean)
   : [
       'https://go.hostops.online',
       'https://hostops-frontend.onrender.com',
