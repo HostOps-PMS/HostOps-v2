@@ -1,8 +1,7 @@
 // src/pages/ActivityLogs/components/ActivityLogTable.jsx
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { exportActivityLogs } from '../services/activityLogApi';
 import { useTheme } from '../../../context/ThemeContext';
-import { useIpLocations, formatLocation } from '../../../hooks/useIpLocation';
 
 // ── Device / UA parser ───────────────────────────────────────────────────────
 function parseUA(ua) {
@@ -437,8 +436,6 @@ function ActivityLogDetailModal({ entry, onClose, ipLocations = {} }) {
                   <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{ip}</span>
                 </DmRow>
                 {(() => {
-                  const loc = formatLocation(entry.ipAddress, ipLocations);
-                  return loc ? <DmRow label="Location"><span style={{ color: '#059669', fontWeight: 500 }}>📍 {loc}</span></DmRow> : null;
                 })()}
               </>
             );
@@ -650,8 +647,7 @@ export default function ActivityLogTable({
   const [activePreset,  setActivePreset]  = useState(null);
   const [userTimeline,  setUserTimeline]  = useState(null); // { name, email, logs[] }
 
-  const ipList = useMemo(() => logs.map(l => l.ipAddress).filter(Boolean), [logs]);
-  const ipLocations = useIpLocations(ipList);
+  const ipLocations = {};
 
   function handlePresetClick(preset) {
     const { from, to } = getPresetRange(preset);
@@ -1056,7 +1052,6 @@ export default function ActivityLogTable({
                         const ua = parseUA(entry.userAgent);
                         const ip = formatIP(entry.ipAddress);
                         const flags = detectSuspicious(entry, logs);
-                        const loc = formatLocation(entry.ipAddress, ipLocations);
                         return (
                           <div>
                             <div style={{ fontSize: 12, fontWeight: 500, color: dark ? '#eaf5f0' : '#0c1c14' }}>
@@ -1065,10 +1060,8 @@ export default function ActivityLogTable({
                             <div style={{ fontSize: 11, color: dark ? '#4d8a6a' : '#9ab8a9', marginTop: 1, fontFamily: 'monospace' }}>
                               {ip}
                             </div>
-                            {loc && (
-                              <div style={{ fontSize: 11, color: dark ? '#26c47a' : '#059669', fontWeight: 500, marginTop: 1 }}>
-                                📍 {loc}
-                              </div>
+                            {false && (
+                              <div></div>
                             )}
                             {flags.length > 0 && (
                               <div style={{ display: 'flex', gap: 3, marginTop: 3, flexWrap: 'wrap' }}>
