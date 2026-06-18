@@ -37,6 +37,17 @@ function getInitials(name) {
   return parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : parts[0].slice(0, 2).toUpperCase();
 }
 
+function displayName(r) {
+  const n = r.name || '';
+  const e = r.email || '';
+  if (n && n !== e && !n.includes('@')) return n;
+  if (e) {
+    const local = e.split('@')[0];
+    return local.replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+  return '—';
+}
+
 const AV_COLORS = ['#1a9e6e','#2563eb','#7c3aed','#dc2626','#d97706','#0891b2'];
 function avatarColor(name) {
   let h = 0; for (const c of (name || '')) h = c.charCodeAt(0) + ((h << 5) - h);
@@ -398,11 +409,11 @@ export default function BugReportsPage() {
                             </td>
                             <td style={{ padding: '12px 16px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <div style={{ width: 28, height: 28, borderRadius: '50%', background: avatarColor(r.name || r.email), color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                  {getInitials(r.name || r.email)}
+                                <div style={{ width: 28, height: 28, borderRadius: '50%', background: avatarColor(displayName(r)), color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  {getInitials(displayName(r))}
                                 </div>
                                 <div style={{ minWidth: 0 }}>
-                                  <div style={{ fontWeight: 600, color: textMain, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }}>{r.name || '—'}</div>
+                                  <div style={{ fontWeight: 600, color: textMain, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }}>{displayName(r)}</div>
                                   <div style={{ fontSize: '0.72rem', color: textMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }}>{r.email}</div>
                                 </div>
                               </div>
