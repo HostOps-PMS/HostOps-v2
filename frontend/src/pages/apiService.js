@@ -109,14 +109,10 @@ export async function verifySession(auth) {
  * Fetches dashboard data for a given date range and optional property filter.
  */
 export async function fetchDashboard({ from, to, apartmentId, propertyDbId }, auth) {
-  const params = new URLSearchParams();
-  if (from)         params.set('from', from);
-  if (to)           params.set('to', to);
-  if (apartmentId)  params.set('apartmentId', String(apartmentId));
-  if (propertyDbId) params.set('propertyDbId', String(propertyDbId));
-
-  const query = params.toString() ? `?${params.toString()}` : '';
-  return authFetch(`/api/dashboard${query}`, {}, auth);
+  return authFetch(`/api/dashboard`, {
+    method: 'POST',
+    body: JSON.stringify({ from, to, apartmentId, propertyDbId }),
+  }, auth);
 }
 
 /**
