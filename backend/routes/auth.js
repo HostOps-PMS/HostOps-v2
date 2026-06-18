@@ -1519,7 +1519,7 @@ router.post('/backup-codes/generate', requireAuth, async (req, res, next) => {
       const code = crypto.randomBytes(4).toString('hex').toUpperCase();
       const formatted = code.slice(0, 4) + '-' + code.slice(4);
       codes.push(formatted);
-      hashed.push({ hash: await bcrypt.hash(formatted, 10), used: false });
+      hashed.push({ hash: await bcrypt.hash(code, 10), used: false });
     }
 
     user.backupCodes = hashed;
