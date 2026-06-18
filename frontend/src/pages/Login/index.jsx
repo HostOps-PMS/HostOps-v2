@@ -35,6 +35,7 @@ export default function LoginPage() {
   const [view,    setView]    = useState(VIEWS.LOGIN);
   const [message, setMessage] = useState({ text: '', type: '' });
   const [otpData, setOtpData] = useState({ email: '', rememberMe: false, totpEnabled: false });
+  const [backupMode, setBackupMode] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
 
   // Stores the full auth payload returned after successful OTP verification.
@@ -207,8 +208,9 @@ const [showLogin, setShowLogin] = useState(window.innerWidth > 768);
           {view === VIEWS.LOGIN_VERIFY_METHOD && (
             <LoginVerifyMethodForm
               email={otpData.email}
-              onChooseTotp={() => handleViewChange(VIEWS.LOGIN_TOTP)}
+              onChooseTotp={() => { setBackupMode(false); handleViewChange(VIEWS.LOGIN_TOTP); }}
               onChooseEmail={() => handleViewChange(VIEWS.LOGIN_OTP)}
+              onChooseBackup={() => { setBackupMode(true); handleViewChange(VIEWS.LOGIN_TOTP); }}
               onBack={() => handleViewChange(VIEWS.LOGIN)}
             />
           )}
@@ -231,6 +233,7 @@ const [showLogin, setShowLogin] = useState(window.innerWidth > 768);
               hideMsg={hideMsg}
               onBack={() => handleViewChange(VIEWS.LOGIN_VERIFY_METHOD)}
               onAuthSuccess={handleAuthSuccess}
+              backupMode={backupMode}
             />
           )}
 

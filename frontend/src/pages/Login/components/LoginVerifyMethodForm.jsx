@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function LoginVerifyMethodForm({ email, onChooseTotp, onChooseEmail, onBack }) {
+export default function LoginVerifyMethodForm({ email, onChooseTotp, onChooseEmail, onChooseBackup, onBack }) {
   return (
     <>
       <h1 className="lp-h1">Verify your identity</h1>
@@ -92,6 +92,43 @@ export default function LoginVerifyMethodForm({ email, onChooseTotp, onChooseEma
             <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
               We sent a code to <strong style={{ color: '#374151' }}>{email}</strong>
             </div>
+          </div>
+          <svg style={{ marginLeft: 'auto', flexShrink: 0 }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </button>
+
+        {/* Backup code option */}
+        <button
+          type="button"
+          onClick={onChooseBackup}
+          style={{
+            display:        'flex',
+            alignItems:     'center',
+            gap:            '16px',
+            padding:        '16px 18px',
+            border:         '1.5px solid #d1d5db',
+            borderRadius:   '12px',
+            background:     '#fff',
+            cursor:         'pointer',
+            textAlign:      'left',
+            transition:     'border-color 0.15s, box-shadow 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = '#10b981'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16,185,129,0.10)'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '10px',
+            background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 7h4M7 12h10M7 17h6"/>
+            </svg>
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>Backup Code</div>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>Use a one-time recovery code</div>
           </div>
           <svg style={{ marginLeft: 'auto', flexShrink: 0 }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 18 15 12 9 6"/>
