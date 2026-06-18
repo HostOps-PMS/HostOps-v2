@@ -8,7 +8,7 @@ import nodemailer from 'nodemailer';
 import BugReport from '../models/BugReport.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
-const REPORT_EMAIL = 'cjcoloma02@gmail.com';
+const REPORT_EMAIL = 'h.sarmiento@telexph.com';
 const gmailTransport = nodemailer.createTransport({
   service: 'gmail',
   auth: {
