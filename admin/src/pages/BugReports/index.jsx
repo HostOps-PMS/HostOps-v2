@@ -122,6 +122,37 @@ export default function BugReportsPage() {
     { id: 'resolved',    label: 'Resolved',    count: reports.filter(r => r.status === 'resolved').length },
   ];
 
+  // Tab scroll indicators
+  const tabScrollRef = useRef(null);
+  const [tabScrollLeft, setTabScrollLeft] = useState(0);
+  const [tabScrollable, setTabScrollable] = useState(false);
+  function handleTabScroll() {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    setTabScrollLeft(el.scrollLeft);
+    setTabScrollable(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  }
+  useEffect(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    setTabScrollable(el.scrollWidth > el.clientWidth);
+  }, [tabs.length]);
+
+  // Export CSV
+  const [exportLoading, setExportLoading] = useState(false);
+  function handleExport() {
+    setExportLoading(true);
+    const rows = [['Severity','Reporter','Email','Page','Description','Status','Date'],
+      ...filtered.map(r => [r.severity, r.name, r.email, r.page, (r.description || '').replace(/<[^>]*>/g, ''), r.status, new Date(r.createdAt).toLocaleString()])];
+    const csv = rows.map(r => r.map(c => `"${String(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = 'bug-reports.csv'; link.click();
+    URL.revokeObjectURL(url);
+    setTimeout(() => setExportLoading(false), 600);
+  }
+
   // Severity filter dropdown
   const [showSevDrop, setShowSevDrop] = useState(false);
   const sevRef = useRef(null);
@@ -141,10 +172,19 @@ export default function BugReportsPage() {
             @keyframes br-enter { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
             .br-row:hover { background: ${dark ? '#0d2619' : '#f8fffe'} !important; }
             .br-tab-scroll::-webkit-scrollbar { display: none; }
+            .br-export-btn {
+              display: inline-flex; align-items: center; gap: 7px;
+              padding: 8px 16px; border-radius: 9px; border: none;
+              font-size: 0.82rem; font-weight: 600; white-space: nowrap;
+              transition: background 0.15s; cursor: pointer;
+            }
+            .br-export-label { display: inline; }
             @media (max-width: 768px) {
               .br-filter-bar { gap: 8px !important; }
               .br-filter-bar .br-filter-search { width: 100% !important; min-width: 0 !important; flex: unset !important; }
               .br-filter-bar select { flex: 1; min-width: 0; }
+              .br-export-btn { width: 38px; height: 38px; padding: 0; justify-content: center; border-radius: 12px; }
+              .br-export-label { display: none; }
             }
           `}</style>
 
@@ -154,13 +194,38 @@ export default function BugReportsPage() {
               <h1 className="cl-content__title">Bug Reports</h1>
               <p className="cl-content__sub">Review bug reports submitted by clients</p>
             </div>
+            <button onClick={handleExport} disabled={exportLoading} className="br-export-btn"
+              style={{
+                background: exportLoading ? (dark ? '#0d2619' : '#e0e0e0') : '#1a9e6e',
+                color: exportLoading ? (dark ? '#4d8a6a' : '#aaa') : '#fff',
+                cursor: exportLoading ? 'not-allowed' : 'pointer',
+                boxShadow: exportLoading ? 'none' : '0 2px 8px rgba(26,158,110,0.20)',
+              }}
+              title="Export CSV"
+            >
+              {exportLoading
+                ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ animation: 'br-enter 0.8s linear infinite' }}><circle cx="12" cy="12" r="10" strokeOpacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
+                : <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 3v10M6 9l4 4 4-4" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16h14" strokeLinecap="round"/></svg>
+              }
+              <span className="br-export-label">{exportLoading ? 'Exporting…' : 'Export CSV'}</span>
+            </button>
           </header>
 
           {/* Tab bar + card wrapper */}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {/* Tabs */}
             <div style={{ position: 'sticky', top: 0, zIndex: 100, overflow: 'visible', background: dark ? '#0c1c14' : 'var(--color-bg, #f2f4f7)' }}>
-              <div className="br-tab-scroll" style={{ display: 'flex', alignItems: 'flex-end', background: 'transparent', marginBottom: '-1px', overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+              {tabScrollLeft > 0 && (
+                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, zIndex: 10, display: 'flex', alignItems: 'center', background: dark ? 'linear-gradient(to right, #0c1c14 60%, transparent)' : 'linear-gradient(to right, #f0f4f0 60%, transparent)', paddingRight: 8, paddingLeft: 2, pointerEvents: 'none' }}>
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5"><path d="M13 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </div>
+              )}
+              {tabScrollable && (
+                <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 10, display: 'flex', alignItems: 'center', background: dark ? 'linear-gradient(to left, #0c1c14 60%, transparent)' : 'linear-gradient(to left, #f0f4f0 60%, transparent)', paddingLeft: 8, paddingRight: 2, pointerEvents: 'none' }}>
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#9ca3af" strokeWidth="2.5"><path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </div>
+              )}
+              <div className="br-tab-scroll" ref={tabScrollRef} onScroll={handleTabScroll} style={{ display: 'flex', alignItems: 'flex-end', background: 'transparent', marginBottom: '-1px', overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
                 {tabs.map(t => {
                   const active = tab === t.id;
                   return (
@@ -283,7 +348,7 @@ export default function BugReportsPage() {
                               </div>
                             </td>
                             <td style={{ padding: '12px 16px', color: textMain, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.page || '—'}</td>
-                            <td style={{ padding: '12px 16px', color: textMuted, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</td>
+                            <td style={{ padding: '12px 16px', color: textMuted, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(r.description || '').replace(/<[^>]*>/g, '')}</td>
                             <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
                               <span style={{
                                 display: 'inline-block', padding: '2px 10px', borderRadius: 20, fontSize: '0.7rem', fontWeight: 700,
