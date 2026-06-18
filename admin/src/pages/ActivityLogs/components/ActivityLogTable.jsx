@@ -319,7 +319,7 @@ function DmRow({ label, children, last = false }) {
 }
 
 // ── Detail modal ──────────────────────────────────────────────────────────────
-function ActivityLogDetailModal({ entry, onClose }) {
+function ActivityLogDetailModal({ entry, onClose, ipLocations = {} }) {
   const { dark } = useTheme();
   React.useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose(); }
@@ -1141,6 +1141,7 @@ export default function ActivityLogTable({
       <ActivityLogDetailModal
         entry={selectedEntry}
         onClose={() => setSelectedEntry(null)}
+        ipLocations={ipLocations}
       />
 
       {/* ── User Timeline modal ── */}
