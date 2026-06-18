@@ -16,6 +16,7 @@ const SEV_META = {
 const STATUS_META = {
   open:        { label: 'Open',        color: '#ef4444', bg: '#fef2f2', darkBg: '#2a0d0d', darkColor: '#f87171' },
   in_progress: { label: 'In Progress', color: '#f59e0b', bg: '#fffbeb', darkBg: '#2a1f0a', darkColor: '#fbbf24' },
+  sent:        { label: 'Sent',        color: '#2563eb', bg: '#eff6ff', darkBg: '#1e3a5f', darkColor: '#60a5fa' },
   resolved:    { label: 'Resolved',    color: '#22c55e', bg: '#f0fdf4', darkBg: '#052e16', darkColor: '#4ade80' },
   dismissed:   { label: 'Dismissed',   color: '#6b7280', bg: '#f3f4f6', darkBg: '#1f2937', darkColor: '#9ca3af' },
 };
@@ -119,6 +120,7 @@ export default function BugReportsPage() {
     { id: 'all',         label: 'All',         count: reports.length },
     { id: 'open',        label: 'Open',        count: reports.filter(r => r.status === 'open').length },
     { id: 'in_progress', label: 'In Progress', count: reports.filter(r => r.status === 'in_progress').length },
+    { id: 'sent',        label: 'Sent',        count: reports.filter(r => r.status === 'sent').length },
     { id: 'resolved',    label: 'Resolved',    count: reports.filter(r => r.status === 'resolved').length },
   ];
 
@@ -357,9 +359,9 @@ export default function BugReportsPage() {
                             </td>
                             <td style={{ padding: '12px 16px', color: textMuted, whiteSpace: 'nowrap', fontSize: '0.78rem' }}>{timeAgo(r.createdAt)}</td>
                             <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
-                              {(r.status === 'open' || r.status === 'in_progress') && (
+                              {(r.status === 'open' || r.status === 'in_progress') && r.status !== 'sent' && (
                                 <div style={{ display: 'flex', gap: 5 }}>
-                                  <button onClick={() => updateStatus(r._id, 'resolved')} disabled={updating} style={{
+                                  <button onClick={() => updateStatus(r._id, 'in_progress')} disabled={updating} style={{
                                     padding: '4px 10px', borderRadius: 6, border: 'none', fontSize: '0.72rem', fontWeight: 600,
                                     background: dark ? '#052e16' : '#d1fae5', color: dark ? '#4ade80' : '#059669',
                                     cursor: updating ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
@@ -371,7 +373,8 @@ export default function BugReportsPage() {
                                   }}>Reject</button>
                                 </div>
                               )}
-                              {r.status === 'resolved' && <span style={{ fontSize: '0.72rem', color: dark ? '#4ade80' : '#059669', fontWeight: 600 }}>Approved</span>}
+                              {r.status === 'sent' && <span style={{ fontSize: '0.72rem', color: dark ? '#60a5fa' : '#2563eb', fontWeight: 600 }}>Sent</span>}
+                              {r.status === 'resolved' && <span style={{ fontSize: '0.72rem', color: dark ? '#4ade80' : '#059669', fontWeight: 600 }}>Resolved</span>}
                               {r.status === 'dismissed' && <span style={{ fontSize: '0.72rem', color: dark ? '#f87171' : '#dc2626', fontWeight: 600 }}>Rejected</span>}
                             </td>
                           </tr>
@@ -667,7 +670,7 @@ export default function BugReportsPage() {
                         try {
                           const res = await fetchWithAuth(`${API_BASE}/api/bug-reports/${r._id}/send-email`, { method: 'POST' });
                           if (res.ok) {
-                            await updateStatus(r._id, 'resolved');
+                            await updateStatus(r._id, 'sent');
                             setSendSuccess(true);
                             setTimeout(() => { setEmailPreview(null); setSendSuccess(false); }, 1500);
                           }

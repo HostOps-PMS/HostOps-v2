@@ -29,11 +29,30 @@ const bugReportSchema = new mongoose.Schema(
       index: true,
     },
 
+    category: {
+      type: String,
+      enum: ['ui_ux', 'api_backend', 'performance', 'security', 'data', 'other'],
+      default: 'other',
+      index: true,
+    },
+
     description: {
       type: String,
       required: true,
       trim: true,
       maxlength: 2000,
+    },
+
+    stepsToReproduce: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 2000,
+    },
+
+    environment: {
+      browser: { type: String, default: '' },
+      os:      { type: String, default: '' },
     },
 
     images: [{
@@ -43,7 +62,7 @@ const bugReportSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ['open', 'in_progress', 'resolved', 'dismissed'],
+      enum: ['open', 'in_progress', 'sent', 'resolved', 'dismissed'],
       default: 'open',
       index: true,
     },
