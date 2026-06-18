@@ -123,7 +123,7 @@ export default function BugReportModal({ show, onClose }) {
         zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: 16, backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
       }}>
-        <div onClick={e => e.stopPropagation()} style={{
+        <div className="brm-modal" onClick={e => e.stopPropagation()} style={{
           background: surface, borderRadius: 16, width: '100%',
           maxWidth: step === 'preview' ? 500 : 440,
           border: `1px solid ${border}`,
@@ -134,7 +134,7 @@ export default function BugReportModal({ show, onClose }) {
         }}>
 
           {/* ── Header bar ── */}
-          <div style={{
+          <div className="brm-header" style={{
             padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             borderBottom: `1px solid ${border}`,
             background: dark ? '#0b1a12' : '#f6f9f7',
@@ -400,6 +400,21 @@ export default function BugReportModal({ show, onClose }) {
         @keyframes brm-in {
           from { opacity: 0; transform: translateY(10px) scale(0.98); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @media (max-width: 480px) {
+          .brm-modal {
+            border-radius: 14px !important;
+            max-height: 95vh !important;
+            margin: 8px !important;
+          }
+          .brm-modal-pad { padding: 16px 16px 14px !important; }
+          .brm-header { padding: 12px 16px !important; }
+          .brm-sev-grid { gap: 4px !important; }
+          .brm-sev-grid button { padding: 6px 2px !important; }
+          .brm-actions { flex-direction: column !important; }
+          .brm-actions button { flex: unset !important; width: 100% !important; }
+          .brm-img-row { gap: 4px !important; }
+          .brm-img-row > div, .brm-img-row > button { width: 60px !important; height: 60px !important; }
         }
       `}</style>
     </>
