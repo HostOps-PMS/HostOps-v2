@@ -30,38 +30,54 @@ function setCache(key, data, ttlMs = 60_000) {
 // CORE FETCH
 // Cache key is scoped per user (_id) so users never share cached data.
 // ─────────────────────────────────────────────────────────────────
+const RETRYABLE_STATUSES = new Set([429, 502, 503]);
+const RETRY_COUNT = 3;
+const RETRY_BASE_MS = 500;
+
 async function smoobuRequest(path, apiKey, userId) {
   const cacheKey = `${userId}:${path}`;
   const cached = getCache(cacheKey);
   if (cached) return cached;
 
-  const res = await fetch(BASE + path, {
-    headers: {
-      'Api-Key': apiKey,
-      'Cache-Control': 'no-cache',
-    },
-  });
+  for (let attempt = 0; attempt <= RETRY_COUNT; attempt++) {
+    if (attempt > 0) {
+      const delay = RETRY_BASE_MS * Math.pow(2, attempt - 1);
+      await new Promise(r => setTimeout(r, delay));
+      console.warn(`[smoobu] retry ${attempt}/${RETRY_COUNT} for ${path} (after ${delay}ms)`);
+    }
 
-  const text = await res.text();
+    const res = await fetch(BASE + path, {
+      headers: {
+        'Api-Key': apiKey,
+        'Cache-Control': 'no-cache',
+      },
+    });
 
-  if (!res.ok) {
-    const err = new Error(`Smoobu ${res.status}: ${text}`);
-    err.status = res.status;
-    throw err;
+    const text = await res.text();
+
+    if (!res.ok) {
+      const err = new Error(`Smoobu ${res.status}: ${text}`);
+      err.status = res.status;
+      if (RETRYABLE_STATUSES.has(res.status) && attempt < RETRY_COUNT) {
+        console.warn(`[smoobu] transient ${res.status} on ${path}, will retry`);
+        continue;
+      }
+      throw err;
+    }
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.warn(`[smoobu] non-JSON response for ${path} (status ${res.status}):`, text.slice(0, 200));
+      const err = new Error(`Smoobu returned non-JSON for ${path}`);
+      err.status = 502;
+      throw err;
+    }
+
+    setCache(cacheKey, data);
+    return data;
   }
-
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    console.warn(`[smoobu] non-JSON response for ${path} (status ${res.status}):`, text.slice(0, 200));
-    const err = new Error(`Smoobu returned non-JSON for ${path}`);
-    err.status = 502;
-    throw err;
-  }
-
-  setCache(cacheKey, data);
-  return data;
 }
 
 // ─────────────────────────────────────────────────────────────────
