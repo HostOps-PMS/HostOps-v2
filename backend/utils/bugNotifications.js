@@ -88,10 +88,11 @@ function buildEmailHtml(report) {
 export async function sendBugReportEmail(report) {
   const sevLabel = (report.severity || 'high').charAt(0).toUpperCase() + (report.severity || 'high').slice(1);
   const { error } = await resend.emails.send({
-    from:    'HostOps Bug Report <onboarding@resend.dev>',
-    to:      REPORT_EMAIL,
-    subject: `[BUG REPORT] [${sevLabel.toUpperCase()}] [HostOps] — ${report.page || 'General'}`,
-    html:    buildEmailHtml(report),
+    from:     'HostOps Bug Report <onboarding@resend.dev>',
+    to:       REPORT_EMAIL,
+    reply_to: report.email,
+    subject:  `[BUG REPORT] [${sevLabel.toUpperCase()}] [HostOps] — ${report.page || 'General'}`,
+    html:     buildEmailHtml(report),
   });
   if (error) throw new Error(error.message);
 }
