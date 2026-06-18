@@ -32,16 +32,82 @@ async function getToken() {
   return _token;
 }
 
-async function graph(path, token) {
-  const res = await fetch(`${GRAPH_BASE}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+async function graph(path, token, { search = false } = {}) {
+  const headers = { Authorization: `Bearer ${token}` };
+  if (search) {
+    headers['ConsistencyLevel'] = 'eventual';
+  }
+  const res = await fetch(`${GRAPH_BASE}${path}`, { headers });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Graph API error: ${res.status}`);
+    const body = await res.json().catch(() => ({}));
+    const code = body.error?.code || 'unknown';
+    const msg  = body.error?.message || `HTTP ${res.status}`;
+    console.error('[Graph] Error:', { status: res.status, code, message: msg, path });
+    throw new Error(`[${code}] ${msg}`);
   }
   return res.json();
 }
+
+// GET /api/inbox/debug — step-by-step permission diagnostic
+router.get('/inbox/debug', requireAuth, requireAdmin, async (req, res) => {
+  const steps = [];
+  try {
+    // Step 1: Get token
+    const token = await getToken();
+    steps.push({ step: 'auth', ok: true, note: 'Token obtained successfully' });
+
+    // Step 2: List the app's permissions via /me (will fail for app-only, expected)
+    // Try reading the mailbox user profile
+    try {
+      const userRes = await fetch(`${GRAPH_BASE}/users/${MAILBOX}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const userData = await userRes.json();
+      if (userRes.ok) {
+        steps.push({ step: 'read_user', ok: true, note: `User found: ${userData.displayName} (${userData.mail})` });
+      } else {
+        steps.push({ step: 'read_user', ok: false, code: userData.error?.code, message: userData.error?.message });
+      }
+    } catch (e) {
+      steps.push({ step: 'read_user', ok: false, message: e.message });
+    }
+
+    // Step 3: Try to list mailFolders (requires Mail.Read Application)
+    try {
+      const foldersRes = await fetch(`${GRAPH_BASE}/users/${MAILBOX}/mailFolders?$top=5`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const foldersData = await foldersRes.json();
+      if (foldersRes.ok) {
+        steps.push({ step: 'list_folders', ok: true, note: `Found ${foldersData.value?.length ?? 0} folders` });
+      } else {
+        steps.push({ step: 'list_folders', ok: false, code: foldersData.error?.code, message: foldersData.error?.message });
+      }
+    } catch (e) {
+      steps.push({ step: 'list_folders', ok: false, message: e.message });
+    }
+
+    // Step 4: Try to read messages (top 3, no search)
+    try {
+      const msgRes = await fetch(`${GRAPH_BASE}/users/${MAILBOX}/messages?$top=3&$select=id,subject,from,receivedDateTime`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const msgData = await msgRes.json();
+      if (msgRes.ok) {
+        steps.push({ step: 'list_messages', ok: true, note: `Found ${msgData.value?.length ?? 0} messages`, subjects: msgData.value?.map(m => m.subject) });
+      } else {
+        steps.push({ step: 'list_messages', ok: false, code: msgData.error?.code, message: msgData.error?.message });
+      }
+    } catch (e) {
+      steps.push({ step: 'list_messages', ok: false, message: e.message });
+    }
+
+    res.json({ mailbox: MAILBOX, steps });
+  } catch (err) {
+    steps.push({ step: 'auth', ok: false, message: err.message });
+    res.status(500).json({ mailbox: MAILBOX, steps, error: err.message });
+  }
+});
 
 // GET /api/inbox/threads — list bug report email threads
 router.get('/inbox/threads', requireAuth, requireAdmin, async (req, res, next) => {
@@ -52,7 +118,8 @@ router.get('/inbox/threads', requireAuth, requireAdmin, async (req, res, next) =
 
     const data = await graph(
       `/users/${MAILBOX}/messages?$search=${search}&$select=${select}&$top=100`,
-      token
+      token,
+      { search: true }
     );
 
     // Filter to only messages whose subject contains both keywords

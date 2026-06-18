@@ -60,16 +60,19 @@ export default function BugReportsPage() {
   const [sendSuccess, setSendSuccess] = useState(false);
   const [emailPreview, setEmailPreview] = useState(null);
 
+  const [inbox, setInbox]               = useState([]);
+  const [inboxLoading, setInboxLoading] = useState(false);
+  const [inboxError, setInboxError]     = useState('');
+  const [selectedThread, setSelectedThread] = useState(null);
+  const [threadMessages, setThreadMessages] = useState([]);
+  const [threadLoading, setThreadLoading]   = useState(false);
+  const [debugResult, setDebugResult]       = useState(null);
+  const [debugLoading, setDebugLoading]     = useState(false);
+
   const [replyText, setReplyText]       = useState('');
   const [sendingReply, setSendingReply] = useState(false);
   const [replySent, setReplySent]       = useState(false);
 
-  const [inbox, setInbox]               = useState([]);
-  const [inboxLoading, setInboxLoading] = useState(false);
-  const [inboxError, setInboxError]     = useState('');
-  const [selectedThread, setSelectedThread]   = useState(null);
-  const [threadMessages, setThreadMessages]   = useState([]);
-  const [threadLoading, setThreadLoading]     = useState(false);
 
   const surface  = dark ? '#132a1e' : '#fff';
   const border   = dark ? '#1e3a2a' : '#e5e7eb';
@@ -121,6 +124,20 @@ export default function BugReportsPage() {
       console.error(err);
     } finally {
       setThreadLoading(false);
+    }
+  }
+
+  async function runDebug() {
+    setDebugLoading(true);
+    setDebugResult(null);
+    try {
+      const res  = await fetchWithAuth(`${API_BASE}/api/inbox/debug`);
+      const data = await res.json();
+      setDebugResult(data);
+    } catch (err) {
+      setDebugResult({ error: err.message });
+    } finally {
+      setDebugLoading(false);
     }
   }
 
@@ -825,23 +842,55 @@ export default function BugReportsPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={textMain} strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                 <h2 style={{ fontSize: 14, fontWeight: 700, color: textMain, margin: 0 }}>Email Inbox</h2>
-                <span style={{ fontSize: 11, color: textMuted, fontWeight: 500 }}>Bug report threads from {MAILBOX_LABEL}</span>
+                <span style={{ fontSize: 11, color: textMuted, fontWeight: 500 }}>innovation@telexph.com</span>
               </div>
-              <button onClick={loadInbox} disabled={inboxLoading} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '6px 12px', borderRadius: 8, border: `1px solid ${border}`,
-                background: 'transparent', color: textMuted, fontSize: 12, fontWeight: 600,
-                cursor: inboxLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
-              }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-                  style={{ animation: inboxLoading ? 'br-spin 0.8s linear infinite' : 'none' }}>
-                  <path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" strokeLinecap="round"/>
-                </svg>
-                {inboxLoading ? 'Loading…' : 'Refresh'}
-              </button>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={runDebug} disabled={debugLoading} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '6px 12px', borderRadius: 8, border: `1px solid ${border}`,
+                  background: 'transparent', color: textMuted, fontSize: 12, fontWeight: 600,
+                  cursor: debugLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                }}>
+                  {debugLoading ? 'Testing…' : 'Test Connection'}
+                </button>
+                <button onClick={loadInbox} disabled={inboxLoading} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '6px 12px', borderRadius: 8, border: `1px solid ${border}`,
+                  background: 'transparent', color: textMuted, fontSize: 12, fontWeight: 600,
+                  cursor: inboxLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                    style={{ animation: inboxLoading ? 'br-spin 0.8s linear infinite' : 'none' }}>
+                    <path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" strokeLinecap="round"/>
+                  </svg>
+                  {inboxLoading ? 'Loading…' : 'Refresh'}
+                </button>
+              </div>
             </div>
 
             <style>{`@keyframes br-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+
+            {debugResult && (
+              <div style={{ marginBottom: 12, padding: '12px 16px', borderRadius: 10, border: `1px solid ${border}`, background: dark ? '#0d2619' : '#f8fafc', fontSize: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <span style={{ fontWeight: 700, color: textMain }}>Connection Diagnostic — {debugResult.mailbox}</span>
+                  <button onClick={() => setDebugResult(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: textMuted, fontSize: 14, lineHeight: 1 }}>✕</button>
+                </div>
+                {debugResult.error && <div style={{ color: '#ef4444' }}>Fatal: {debugResult.error}</div>}
+                {(debugResult.steps || []).map((s, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 14 }}>{s.ok ? '✅' : '❌'}</span>
+                    <div>
+                      <span style={{ fontWeight: 700, color: textMain }}>{s.step}</span>
+                      {s.note    && <span style={{ color: textMuted, marginLeft: 6 }}>{s.note}</span>}
+                      {s.message && <span style={{ color: '#ef4444', marginLeft: 6 }}>{s.message}</span>}
+                      {s.code    && <span style={{ color: '#f97316', marginLeft: 6 }}>code: {s.code}</span>}
+                      {s.subjects && <div style={{ color: textMuted, marginTop: 2 }}>subjects: {s.subjects.join(', ')}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div style={{ background: surface, borderRadius: 12, border: `1px solid ${border}`, overflow: 'hidden', boxShadow: dark ? '0 2px 12px rgba(0,0,0,0.25)' : '0 1px 4px rgba(0,0,0,0.06)' }}>
               {inboxLoading ? (
@@ -855,7 +904,8 @@ export default function BugReportsPage() {
                   const date = new Date(thread.latestDate).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
                   const subjectClean = thread.subject.replace(/\[BUG REPORT\]\s*/, '').trim();
                   return (
-                    <div key={thread.conversationId} className="br-row" onClick={() => { setSelectedThread(thread); loadThread(thread.conversationId); }}
+                    <div key={thread.conversationId} className="br-row"
+                      onClick={() => { setSelectedThread(thread); loadThread(thread.conversationId); }}
                       style={{ padding: '14px 20px', borderBottom: i < inbox.length - 1 ? `1px solid ${border}` : 'none', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                       <div style={{ marginTop: 4, flexShrink: 0 }}>
                         {thread.hasUnread
@@ -865,9 +915,7 @@ export default function BugReportsPage() {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
-                          <div style={{ fontWeight: thread.hasUnread ? 700 : 600, color: textMain, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {subjectClean}
-                          </div>
+                          <div style={{ fontWeight: thread.hasUnread ? 700 : 600, color: textMain, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subjectClean}</div>
                           <div style={{ fontSize: 11, color: textMuted, whiteSpace: 'nowrap', flexShrink: 0 }}>{date}</div>
                         </div>
                         <div style={{ fontSize: 12, color: textMuted, marginBottom: 3 }}>
@@ -894,7 +942,6 @@ export default function BugReportsPage() {
                 width: '100%', maxWidth: 680, maxHeight: '90vh', overflowY: 'auto',
                 boxShadow: '0 20px 60px rgba(0,0,0,0.25)', animation: 'br-enter 0.2s ease',
               }}>
-                {/* Header */}
                 <div style={{ padding: '18px 24px', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: textMain, marginBottom: 4 }}>{selectedThread.subject}</div>
@@ -904,19 +951,17 @@ export default function BugReportsPage() {
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
                   </button>
                 </div>
-
-                {/* Messages */}
                 <div style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {threadLoading ? (
                     <div style={{ padding: 32, textAlign: 'center', color: textMuted, fontSize: 13 }}>Loading messages…</div>
                   ) : threadMessages.length === 0 ? (
                     <div style={{ padding: 32, textAlign: 'center', color: textMuted, fontSize: 13 }}>No messages found.</div>
                   ) : (
-                    threadMessages.map((msg, i) => {
-                      const from = msg.from?.emailAddress?.name || msg.from?.emailAddress?.address || '—';
-                      const addr = msg.from?.emailAddress?.address || '';
-                      const dt   = new Date(msg.receivedDateTime).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
-                      const isAdmin = addr.toLowerCase().includes('innovation@telexph.com');
+                    threadMessages.map((msg) => {
+                      const from     = msg.from?.emailAddress?.name || msg.from?.emailAddress?.address || '—';
+                      const addr     = msg.from?.emailAddress?.address || '';
+                      const dt       = new Date(msg.receivedDateTime).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+                      const isAdmin  = addr.toLowerCase() === 'innovation@telexph.com';
                       return (
                         <div key={msg.id} style={{ borderRadius: 12, border: `1px solid ${border}`, overflow: 'hidden' }}>
                           <div style={{ padding: '10px 16px', background: dark ? '#0f2417' : '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -947,5 +992,3 @@ export default function BugReportsPage() {
     </div>
   );
 }
-
-const MAILBOX_LABEL = 'innovation@telexph.com';
