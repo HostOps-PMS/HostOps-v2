@@ -919,7 +919,7 @@ if (bookings.length > 0) {
     // Setting `margin.top = CONTENT_TOP` (≈ 27mm) ensures autoTable starts
     // the continuation-page table header below our branding header on every
     // additional page.
-    doc.autoTable({
+    autoTable(doc, {
       startY: y,
       head: [['Guest', 'Room', 'Channel', 'Check-in', 'Check-out', 'Amount', 'Balance / Notes']],
       body: bookingRows,

@@ -1,5 +1,6 @@
 // frontend/src/pages/Login/services/authservice.js
 import safeStorage from '../../safeStorage';
+import { removeSecureUser } from '../../../lib/secureUserStorage';
 import fpPromise from '@fingerprintjs/fingerprintjs';
 
 let fpCache = null;
@@ -173,11 +174,7 @@ export async function logoutUser(currentToken) {
     console.warn('Logout request failed:', err);
   } finally {
     // Wipe all client-side auth state regardless of server response
-    safeStorage.removeItem('hp_user');
-
-    // Belt-and-suspenders: clean up any legacy keys
-    try { localStorage.removeItem('hp_access_token'); } catch { /* ignore */ }
-    try { localStorage.removeItem('hp_user'); } catch { /* ignore */ }
+    removeSecureUser();
     try { localStorage.removeItem('user'); } catch { /* ignore */ }
     try { localStorage.removeItem('auth_user'); } catch { /* ignore */ }
     try { localStorage.removeItem('currentUser'); } catch { /* ignore */ }

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
 import safeStorage from '../../safeStorage';
+import { setSecureUser } from '../../../lib/secureUserStorage';
 import RecoveryModal from './RecoveryModal';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://api.hostops.online';
@@ -309,7 +310,7 @@ export default function PinModal({
         // FIX: Use safeStorage instead of localStorage directly — localStorage
         // throws a SecurityError on go.hostops.online, safeStorage catches it
         // and falls back to an in-memory Map so the write always succeeds.
-        safeStorage.setItem('hp_user', JSON.stringify(verifiedUser));
+        setSecureUser(verifiedUser);
         
         if (verifiedUser.mustChangePin) {
           sessionStorage.setItem('hp_must_change_pin', 'true');

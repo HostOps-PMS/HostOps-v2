@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { updateClient, getClientSmoobuData, createClientProperty, updateClientProperty, deleteClientProperty, getClientPropertyApiKey, uploadPropertyPicture, getClientProperties } from '../services/clientsService';
 import ClientSmoobuView from './ClientSmoobuView';
+import { getSecureUser } from '../../../lib/secureUserStorage';
 import ImageCropModal from './ImageCropModal';
 import OTPModal from '../../../components/OTPModal';
 import ConfirmModal from './ConfirmModal';
@@ -788,7 +789,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
 
       {otpAction && (
         <OTPModal 
-          email={JSON.parse(sessionStorage.getItem('hp_user') || '{}')?.email}
+          email={(getSecureUser() || {})?.email}
           onVerified={handleOtpVerified} 
           onCancel={() => setOtpAction(null)} 
         />

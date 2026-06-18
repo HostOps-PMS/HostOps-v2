@@ -1,4 +1,5 @@
 import { decryptApiResponse, generateSessionHint } from './responseDecryption';
+import { removeSecureUser } from './secureUserStorage';
 
 const API_KEY  = import.meta.env.VITE_API_KEY  ?? '';
 const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? '';
@@ -72,7 +73,7 @@ async function tryRefresh() {
 function handleSessionExpired() {
   setToken(null);
   setSessionKey(null);
-  sessionStorage.removeItem('hp_user');
+  removeSecureUser();
   sessionStorage.removeItem('hp_authorized');
   // Redirect to the admin login entry point or main frontend login
   const loginUrl = import.meta.env.VITE_LOGIN_URL || import.meta.env.VITE_FRONTEND_URL || '/';

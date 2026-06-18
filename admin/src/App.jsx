@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
+import { getSecureUser, setSecureUser } from './lib/secureUserStorage';
 
 import { NotificationsProvider } from './context/NotificationsContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -29,7 +30,14 @@ const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173
   const token   = params.get('_t');
   const userRaw = params.get('_u');
   if (token)   sessionStorage.setItem('hp_access_token', token);
-  if (userRaw) sessionStorage.setItem('hp_user', userRaw);
+  if (userRaw) {
+    try {
+      setSecureUser(JSON.parse(userRaw));
+    } catch (e) {
+      // Just store securely even if parse fails (though login passes valid JSON)
+      setSecureUser(userRaw);
+    }
+  }
   if (token || userRaw) {
     window.history.replaceState({}, '', window.location.pathname);
     // ── Clear any previous authorization so the OTP gate always fires
@@ -58,7 +66,7 @@ function PrivateRoute({ children }) {
   }
 
   try {
-    const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
+    const user = getSecureUser() || {};
     if (user.role === 'team_leader') {
       return <Navigate to="/team-leader/staffs" replace />;
     }
@@ -81,7 +89,7 @@ function TeamLeaderRoute({ children }) {
   }
 
   try {
-    const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
+    const user = getSecureUser() || {};
     if (user.role !== 'team_leader') {
       return <Navigate to="/dashboard" replace />;
     }
@@ -105,7 +113,7 @@ function AdminEntryRedirect() {
     return null;
   }
   try {
-    const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
+    const user = getSecureUser() || {};
     if (user.role === 'team_leader') return <Navigate to="/team-leader/staffs" replace />;
     return <Navigate to="/dashboard" replace />;
   } catch {
@@ -121,9 +129,9 @@ const ROLES_REQUIRING_AUTH = new Set(['admin', 'team_leader']);
 
 function getRoleFromSession() {
   try {
-    const raw = sessionStorage.getItem('hp_user');
+    const raw = getSecureUser();
     if (!raw) return null;
-    return JSON.parse(raw)?.role ?? null;
+    return raw?.role ?? null;
   } catch {
     return null;
   }

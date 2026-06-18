@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login, DASHBOARD_URL } from '../services/authService';
+import { getSecureUser, setSecureUser } from '../../../lib/secureUserStorage';
 import { setSessionKey } from '../../../lib/authUtils';
 
 const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5174';
@@ -20,7 +21,7 @@ export function useAutoRedirect() {
     const token = sessionStorage.getItem('hp_access_token');
     if (token) {
       try {
-        const user = JSON.parse(sessionStorage.getItem('hp_user') || '{}');
+        const user = getSecureUser() || {};
         if (user.role === 'team_leader') {
           navigate('/team-leader/staffs', { replace: true });
           return;
@@ -71,7 +72,7 @@ export function useAuthSubmit(type, showMessage) {
         }
 
         sessionStorage.setItem('hp_access_token', data.accessToken);
-        sessionStorage.setItem('hp_user', JSON.stringify(data.user));
+        setSecureUser(data.user);
         if (data.sk) setSessionKey(data.sk);
 
         showMessage(`Welcome back, ${getDisplayName(data.user)}! Redirecting...`, 'success');
