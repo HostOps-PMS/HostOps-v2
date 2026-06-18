@@ -167,7 +167,7 @@ export default function BugReportModal({ show, onClose }) {
             </button>
           </div>
 
-          <div style={{ padding: '20px 20px 16px' }}>
+          <div className="brm-modal-pad" style={{ padding: '20px 20px 16px' }}>
 
             {/* ═══ SUBMITTED ═══ */}
             {step === 'submitted' && (
