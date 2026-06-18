@@ -6,7 +6,7 @@ import fs from 'fs';
 import os from 'os';
 import BugReport from '../models/BugReport.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
-import { sendBugReportEmail, sendWebhookNotification } from '../utils/bugNotifications.js';
+import { sendBugReportEmail, sendWebhookNotification, sendReplyEmail } from '../utils/bugNotifications.js';
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -162,6 +162,36 @@ adminBugReportRouter.patch('/bug-reports/:id', requireAuth, requireAdmin, async 
     }
     const report = await BugReport.findByIdAndUpdate(req.params.id, update, { new: true });
     if (!report) return res.status(404).json({ error: 'Bug report not found' });
+    res.json(report);
+  } catch (err) { next(err); }
+});
+
+// Admin reply to client
+adminBugReportRouter.post('/bug-reports/:id/reply', requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const { message } = req.body;
+    if (!message?.trim()) return res.status(400).json({ error: 'Message is required' });
+
+    const report = await BugReport.findById(req.params.id);
+    if (!report) return res.status(404).json({ error: 'Bug report not found' });
+
+    const reply = {
+      message:    message.trim(),
+      sentAt:     new Date(),
+      sentByName: req.user?.name || req.user?.email || 'Admin',
+      emailedToClient: false,
+    };
+
+    try {
+      await sendReplyEmail(report, reply.message, reply.sentByName);
+      reply.emailedToClient = true;
+    } catch (err) {
+      console.error('[BugReport] Reply email failed:', err.message);
+    }
+
+    report.adminReplies.push(reply);
+    await report.save();
+
     res.json(report);
   } catch (err) { next(err); }
 });

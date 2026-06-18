@@ -60,6 +60,10 @@ export default function BugReportsPage() {
   const [sendSuccess, setSendSuccess] = useState(false);
   const [emailPreview, setEmailPreview] = useState(null);
 
+  const [replyText, setReplyText]       = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+  const [replySent, setReplySent]       = useState(false);
+
   const [inbox, setInbox]               = useState([]);
   const [inboxLoading, setInboxLoading] = useState(false);
   const [inboxError, setInboxError]     = useState('');
@@ -80,7 +84,7 @@ export default function BugReportsPage() {
       const res = await fetchWithAuth(`${API_BASE}/api/bug-reports`);
       if (!res.ok) throw new Error('Failed to load bug reports');
       const data = await res.json();
-      setReports(data);
+      setReports(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -96,7 +100,8 @@ export default function BugReportsPage() {
     try {
       const res = await fetchWithAuth(`${API_BASE}/api/inbox/threads`);
       if (!res.ok) throw new Error('Failed to load inbox');
-      setInbox(await res.json());
+      const data = await res.json();
+      setInbox(Array.isArray(data) ? data : []);
     } catch (err) {
       setInboxError(err.message);
     } finally {
@@ -110,7 +115,8 @@ export default function BugReportsPage() {
     try {
       const res = await fetchWithAuth(`${API_BASE}/api/inbox/threads/${conversationId}`);
       if (!res.ok) throw new Error('Failed to load thread');
-      setThreadMessages(await res.json());
+      const data = await res.json();
+      setThreadMessages(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -444,7 +450,7 @@ export default function BugReportsPage() {
 
           {/* ── Detail Modal ── */}
           {selected && (
-            <div onClick={() => setSelected(null)} style={{
+            <div onClick={() => { setSelected(null); setReplyText(''); setReplySent(false); }} style={{
               position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 10000,
               display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
             }}>
@@ -459,7 +465,7 @@ export default function BugReportsPage() {
                     <span style={{ fontSize: 18 }}>🐛</span>
                     <h2 style={{ fontSize: 16, fontWeight: 700, color: textMain, margin: 0 }}>Bug Report Detail</h2>
                   </div>
-                  <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: textMuted, fontSize: 18, padding: 4 }}>
+                  <button onClick={() => { setSelected(null); setReplyText(''); setReplySent(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: textMuted, fontSize: 18, padding: 4 }}>
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
                   </button>
                 </div>
@@ -541,6 +547,90 @@ export default function BugReportsPage() {
                       </button>
                     </div>
                   )}
+
+                  {/* ── Admin Replies ── */}
+                  <hr style={{ border: 'none', borderTop: `1px solid ${border}`, margin: '20px 0 14px' }} />
+
+                  {selected.adminReplies?.length > 0 && (
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>Admin Replies</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {selected.adminReplies.map((reply, i) => (
+                          <div key={i} style={{ padding: '10px 14px', borderRadius: 10, background: inputBg, border: `1px solid ${border}` }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: dark ? '#4ade80' : '#059669' }}>{reply.sentByName}</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                {reply.emailedToClient && (
+                                  <span style={{ fontSize: 10, color: dark ? '#60a5fa' : '#2563eb', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}>
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                    Emailed
+                                  </span>
+                                )}
+                                <span style={{ fontSize: 11, color: textMuted }}>
+                                  {new Date(reply.sentAt).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
+                                </span>
+                              </div>
+                            </div>
+                            <div style={{ fontSize: 13, color: textMain, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{reply.message}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Reply form */}
+                  <div style={{ fontSize: 11, fontWeight: 700, color: textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Reply to Client</div>
+                  <textarea
+                    value={replyText}
+                    onChange={e => setReplyText(e.target.value)}
+                    placeholder="Type your response to the client…"
+                    rows={3}
+                    maxLength={2000}
+                    style={{
+                      width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: 10,
+                      border: `1.5px solid ${border}`, fontSize: 13, color: textMain,
+                      background: inputBg, outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5,
+                    }}
+                    onFocus={e => { e.target.style.borderColor = '#1a9e6e'; }}
+                    onBlur={e => { e.target.style.borderColor = border; }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                    <span style={{ fontSize: 11, color: textMuted }}>{replyText.length}/2000</span>
+                    <button
+                      onClick={async () => {
+                        if (!replyText.trim()) return;
+                        setSendingReply(true);
+                        try {
+                          const res = await fetchWithAuth(`${API_BASE}/api/bug-reports/${selected._id}/reply`, {
+                            method: 'POST',
+                            body: JSON.stringify({ message: replyText.trim() }),
+                          });
+                          if (res.ok) {
+                            const updated = await res.json();
+                            setReports(prev => prev.map(r => r._id === updated._id ? updated : r));
+                            setSelected(updated);
+                            setReplyText('');
+                            setReplySent(true);
+                            setTimeout(() => setReplySent(false), 2000);
+                          }
+                        } catch (err) { console.error(err); } finally { setSendingReply(false); }
+                      }}
+                      disabled={sendingReply || !replyText.trim()}
+                      style={{
+                        padding: '8px 18px', borderRadius: 9, border: 'none', fontSize: 13, fontWeight: 600,
+                        background: replySent ? '#059669' : (!replyText.trim() ? (dark ? '#1e3a2a' : '#e5e7eb') : 'linear-gradient(135deg, #1a9e6e, #059669)'),
+                        color: !replyText.trim() ? (dark ? '#4d8a6a' : '#9ca3af') : '#fff',
+                        cursor: sendingReply || !replyText.trim() ? 'not-allowed' : 'pointer',
+                        fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6, transition: 'background 0.15s',
+                      }}
+                    >
+                      {replySent
+                        ? <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg> Sent!</>
+                        : sendingReply ? 'Sending…'
+                        : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> Send Reply</>
+                      }
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

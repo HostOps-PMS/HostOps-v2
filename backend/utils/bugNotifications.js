@@ -97,6 +97,33 @@ export async function sendBugReportEmail(report) {
   if (error) throw new Error(error.message);
 }
 
+export async function sendReplyEmail(report, message, adminName) {
+  const { error } = await resend.emails.send({
+    from:     'HostOps Bug Report <onboarding@resend.dev>',
+    to:       report.email,
+    reply_to: REPORT_EMAIL,
+    subject:  `Re: [BUG REPORT] [HostOps] — ${report.page || 'General'}`,
+    html: `
+      <div style="font-family:'DM Sans',Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
+        <div style="background:#0c1c14;padding:20px 24px">
+          <div style="color:#26a676;font-size:16px;font-weight:700">HostOps — Admin Response</div>
+        </div>
+        <div style="padding:24px">
+          <p style="margin:0 0 16px;color:#374151;font-size:14px">Hi ${report.name || 'there'},</p>
+          <p style="margin:0 0 16px;color:#374151;font-size:14px">The HostOps team has responded to your bug report.</p>
+          <hr style="border:none;border-top:1.5px solid #e5e7eb;margin:0 0 16px"/>
+          <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Response from ${adminName}:</p>
+          <div style="font-size:14px;color:#111827;line-height:1.7;background:#f9fafb;border-radius:8px;padding:14px 16px;border:1px solid #e5e7eb">${message.replace(/\n/g, '<br/>')}</div>
+          <hr style="border:none;border-top:1.5px solid #e5e7eb;margin:16px 0 10px"/>
+          <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Your Original Report:</p>
+          <p style="margin:0;font-size:13px;color:#6b7280">Page: ${report.page || '—'} · Report ID: ${report._id}</p>
+        </div>
+      </div>
+    `,
+  });
+  if (error) throw new Error(error.message);
+}
+
 export async function sendWebhookNotification(report) {
   const url = process.env.INTERNAL_WEBHOOK_URL;
   if (!url) return;

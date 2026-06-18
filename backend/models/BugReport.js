@@ -70,6 +70,13 @@ const bugReportSchema = new mongoose.Schema(
     resolvedAt: { type: Date, default: null },
     resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'user', default: null },
     resolvedNote: { type: String, default: '', trim: true },
+
+    adminReplies: [{
+      message:         { type: String, required: true, trim: true, maxlength: 2000 },
+      sentAt:          { type: Date, default: Date.now },
+      sentByName:      { type: String, default: '' },
+      emailedToClient: { type: Boolean, default: false },
+    }],
   },
   { timestamps: true }
 );
