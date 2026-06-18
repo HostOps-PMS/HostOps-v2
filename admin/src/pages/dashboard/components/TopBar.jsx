@@ -250,11 +250,11 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
           {[
             { key: 'alerts',     label: 'Alerts',   count: (alerts     || []).length },
             { key: 'activities', label: 'Activity', count: (activities || []).length },
-            { key: 'reports',    label: 'Reports',  count: bugReports.length },
+            { key: 'reports',    label: 'Reports',  count: bugReports.length, highlight: bugReports.some(r => r.status === 'open') },
           ].map(tab => (
             <button
               key={tab.key}
@@ -281,6 +281,9 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
                 <span style={{ fontSize: 10, color: activeTab === tab.key ? '#1a9e6e' : textDim, fontWeight: 500 }}>
                   {tab.count}
                 </span>
+              )}
+              {tab.highlight && activeTab !== tab.key && (
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f97316', flexShrink: 0 }} />
               )}
             </button>
           ))}
