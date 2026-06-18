@@ -13,7 +13,8 @@
  *   POST /auth/send-login-otp    { email }
  */
 
-import { authHeaders } from '../../../lib/authUtils';
+import { fetchWithAuth } from '../../../lib/authUtils';
+import { getSecureUser } from '../../../lib/secureUserStorage';
 
 const API_KEY  = import.meta.env.VITE_API_KEY ?? '';
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
@@ -33,7 +34,8 @@ function authUrl(path) {
  */
 function getAdminEmail() {
   try {
-    const raw = sessionStorage.getItem('hp_user');
+    const userObj = getSecureUser();
+    const raw = userObj ? JSON.stringify(userObj) : null;
     if (!raw) return '';
     return JSON.parse(raw)?.email ?? '';
   } catch {
@@ -137,7 +139,8 @@ export async function sendLoginOtp() {
 
 export async function getTotpStatus() {
   try {
-    const raw  = sessionStorage.getItem('hp_user');
+    const userObj = getSecureUser();
+    const raw = userObj ? JSON.stringify(userObj) : null;
     const user = raw ? JSON.parse(raw) : {};
     return { totpEnabled: user?.totpEnabled ?? false };
   } catch {

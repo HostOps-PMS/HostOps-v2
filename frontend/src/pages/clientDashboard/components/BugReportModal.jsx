@@ -1,4 +1,6 @@
 import { useState, useRef } from 'react';
+import { FiX } from 'react-icons/fi';
+import { getSecureUser } from '../../../lib/secureUserStorage';
 import { useDashboard } from '../context/DashboardContext';
 import safeStorage from '../../safeStorage';
 import RichTextInput from './RichTextInput';
@@ -7,7 +9,7 @@ const API_BASE = (import.meta.env.VITE_API_URL || 'https://api.hostops.online').
 const API_KEY  = import.meta.env.VITE_API_KEY || '';
 
 function getUser() {
-  try { return JSON.parse(safeStorage.getItem('hp_user') || 'null'); } catch { return null; }
+  try { return getSecureUser(); } catch { return null; }
 }
 
 const SEVERITY_OPTIONS = [

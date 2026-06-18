@@ -8,6 +8,7 @@ import React, {
   useState,
 } from 'react';
 import safeStorage from './safeStorage';
+import { getSecureUser, setSecureUser, removeSecureUser } from '../lib/secureUserStorage';
 import { decryptApiResponse, generateSessionHint } from './utils/responseDecryption';
 
 const HP_API_BASE = import.meta.env.VITE_API_URL || 'https://api.hostops.online';
@@ -68,7 +69,7 @@ export function AuthProvider({ children }) {
   // ── User accessors (display data only — not a secret) ────────────
   const getUser = useCallback(() => {
     try {
-      return JSON.parse(safeStorage.getItem('hp_user') || 'null');
+      return getSecureUser();
     } catch {
       return null;
     }
@@ -76,9 +77,9 @@ export function AuthProvider({ children }) {
 
   const setUser = useCallback((u) => {
     if (u) {
-      safeStorage.setItem('hp_user', JSON.stringify(u));
+      setSecureUser(u);
     } else {
-      safeStorage.removeItem('hp_user');
+      removeSecureUser();
     }
   }, []);
 
@@ -174,9 +175,7 @@ export function AuthProvider({ children }) {
   const clear = useCallback(() => {
     accessTokenRef.current = null;
     sessionKeyRef.current  = null;
-    safeStorage.removeItem('hp_user');
-    try { localStorage.removeItem('hp_access_token'); } catch { /* ignore */ }
-    try { localStorage.removeItem('hp_user'); } catch { /* ignore */ }
+    removeSecureUser();
     try { localStorage.removeItem('user'); } catch { /* ignore */ }
     try { localStorage.removeItem('auth_user'); } catch { /* ignore */ }
     try { localStorage.removeItem('currentUser'); } catch { /* ignore */ }
@@ -341,3 +340,5 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
   return ctx;
 }
+
+export default AuthContext;

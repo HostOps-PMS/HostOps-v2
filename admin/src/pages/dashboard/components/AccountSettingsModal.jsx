@@ -88,6 +88,7 @@ async function changeAdminPassword({ currentPassword, newPassword }) {
 }
 
 import OTPModal from '../../../components/OTPModal';
+import { getSecureUser, setSecureUser } from "../../../lib/secureUserStorage";
 import { useTheme } from '../../../context/ThemeContext';
 
 // -----------------------------------------------------------------
@@ -189,7 +190,7 @@ function SuccessModal({ onClose }) {
 
 export default function AccountSettingsModal({ isOpen, onClose }) {
   const getUser = () => {
-    try { return JSON.parse(sessionStorage.getItem("hp_user") || "{}"); } catch { return {}; }
+    try { return getSecureUser() || {}; } catch { return {}; }
   };
   const user = getUser();
 
@@ -316,7 +317,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
     try {
       const body = await changeAdminPassword({ currentPassword, newPassword });
       if (body.user) {
-        sessionStorage.setItem("hp_user", JSON.stringify(body.user));
+        setSecureUser(body.user);
       }
 
       setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
@@ -811,7 +812,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                         try {
                           await verifyTotpSetup(totpCode, deviceName);
                           const u = { ...user, totpEnabled: true };
-                          sessionStorage.setItem('hp_user', JSON.stringify(u));
+                          setSecureUser(u);
                           setTotpEnabled(true);
                           setTotpStep('idle');
                           setTotpMsg({ text: 'Authenticator enabled successfully!', type: 'success' });
@@ -862,7 +863,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                           try {
                             await disableTotp();
                             const u = { ...user, totpEnabled: false };
-                            sessionStorage.setItem('hp_user', JSON.stringify(u));
+                            setSecureUser(u);
                             setTotpEnabled(false);
                             setTotpStep('idle');
                             setDevices([]);

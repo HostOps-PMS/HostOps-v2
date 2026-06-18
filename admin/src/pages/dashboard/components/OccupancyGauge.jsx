@@ -88,7 +88,7 @@ export default function OccupancyGauge({ occupancyBreakdown, overallOccupancy, l
       <div style={{ padding: '0 20px 20px' }}>
         {/* Donut gauge */}
         <div style={{ position: 'relative', height: 160 }}>
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={100}>
             <PieChart>
               <Pie
                 data={gaugeData}

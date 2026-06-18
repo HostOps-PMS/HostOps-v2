@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../AuthContext';
-import safeStorage from '../../safeStorage';
+import { setSecureUser } from '../../../lib/secureUserStorage';
 import FetchingOverlay from './FetchingOverlay';
 import { useDashboard } from '../context/DashboardContext';
 
@@ -70,7 +70,7 @@ export default function FirstLoginPinModal({ onComplete }) {
 
       // Update stored user with the fresh user object returned by the backend
       if (updatedUser) {
-        safeStorage.setItem('hp_user', JSON.stringify(updatedUser));
+        setSecureUser(updatedUser);
       }
       sessionStorage.removeItem('hp_must_change_pin');
 
