@@ -53,7 +53,7 @@ router.post('/activity-log', requireAuth, async (req, res, next) => {
 
       action:    action.trim(),
       meta,
-      ipAddress: req.ip || '',
+      ipAddress: (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || '',
       userAgent: req.get('user-agent') || '',
     });
 

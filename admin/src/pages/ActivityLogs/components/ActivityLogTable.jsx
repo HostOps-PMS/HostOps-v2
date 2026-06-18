@@ -1,7 +1,8 @@
 // src/pages/ActivityLogs/components/ActivityLogTable.jsx
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { exportActivityLogs } from '../services/activityLogApi';
 import { useTheme } from '../../../context/ThemeContext';
+import { useIpLocations, formatLocation } from '../../../hooks/useIpLocation';
 
 // ── Device / UA parser ───────────────────────────────────────────────────────
 function parseUA(ua) {
@@ -97,6 +98,19 @@ function getMetaDescription(action, meta) {
   if (action === 'login' || action === 'logout') {
     return meta.propertyName || meta.property || null;
   }
+  if (action === 'booking_created') {
+    const parts = [meta.guestName, meta.propertyName, meta.nights ? `${meta.nights} nights` : null, meta.price ? `₱${Number(meta.price).toLocaleString()}` : null].filter(Boolean);
+    return parts.join(' · ') || null;
+  }
+  if (action === 'booking_cancelled') {
+    return [meta.guestName, meta.propertyName, meta.price ? `₱${Number(meta.price).toLocaleString()}` : null].filter(Boolean).join(' · ') || null;
+  }
+  if (action === 'booking_modified') {
+    return [meta.guestName, meta.propertyName].filter(Boolean).join(' · ') || null;
+  }
+  if (action === 'payment_received' || action === 'payment_refunded') {
+    return [meta.guestName, meta.price ? `₱${Number(meta.price).toLocaleString()}` : null, meta.channel].filter(Boolean).join(' · ') || null;
+  }
   if (action === 'password_changed') return 'Password was updated successfully';
   if (action === 'pin_changed') return 'PIN was updated successfully';
   if (action === 'changed_dashboard_period') {
@@ -138,6 +152,11 @@ const ACTION_LABELS = {
   viewed_dashboard:        'Viewed dashboard',
   viewed_settings_tab:     'Viewed settings',
   changed_dashboard_period:'Changed dashboard period',
+  booking_created:         'New booking confirmed',
+  booking_modified:        'Booking modified',
+  booking_cancelled:       'Booking cancelled',
+  payment_received:        'Payment received',
+  payment_refunded:        'Payment refunded',
 };
 
 const ACTION_OPTIONS = [
@@ -167,6 +186,16 @@ function getActionMeta(action) {
       return { icon: 'ti-file-export',     color: '#0891b2', bg: '#ecfeff', badge: 'Export' };
     case 'opened_account_settings':
       return { icon: 'ti-settings',        color: '#6b7280', bg: '#f3f4f6', badge: 'Settings' };
+    case 'booking_created':
+      return { icon: 'ti-calendar-plus',   color: '#059669', bg: '#ecfdf5', badge: 'Booking' };
+    case 'booking_modified':
+      return { icon: 'ti-calendar-event',  color: '#2563eb', bg: '#eff6ff', badge: 'Booking' };
+    case 'booking_cancelled':
+      return { icon: 'ti-calendar-x',      color: '#dc2626', bg: '#fef2f2', badge: 'Cancelled' };
+    case 'payment_received':
+      return { icon: 'ti-credit-card',     color: '#059669', bg: '#ecfdf5', badge: 'Payment' };
+    case 'payment_refunded':
+      return { icon: 'ti-receipt-refund',  color: '#d97706', bg: '#fffbeb', badge: 'Refund' };
     default:
       return { icon: 'ti-info-circle',     color: '#9ab8a9', bg: '#f7faf8', badge: 'Event' };
   }
@@ -407,6 +436,10 @@ function ActivityLogDetailModal({ entry, onClose }) {
                 <DmRow label="IP Address">
                   <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{ip}</span>
                 </DmRow>
+                {(() => {
+                  const loc = formatLocation(entry.ipAddress, ipLocations);
+                  return loc ? <DmRow label="Location"><span style={{ color: '#059669', fontWeight: 500 }}>📍 {loc}</span></DmRow> : null;
+                })()}
               </>
             );
           })()}
@@ -616,6 +649,9 @@ export default function ActivityLogTable({
   const [exportError,   setExportError]   = useState('');
   const [activePreset,  setActivePreset]  = useState(null);
   const [userTimeline,  setUserTimeline]  = useState(null); // { name, email, logs[] }
+
+  const ipList = useMemo(() => logs.map(l => l.ipAddress).filter(Boolean), [logs]);
+  const ipLocations = useIpLocations(ipList);
 
   function handlePresetClick(preset) {
     const { from, to } = getPresetRange(preset);
@@ -1020,6 +1056,7 @@ export default function ActivityLogTable({
                         const ua = parseUA(entry.userAgent);
                         const ip = formatIP(entry.ipAddress);
                         const flags = detectSuspicious(entry, logs);
+                        const loc = formatLocation(entry.ipAddress, ipLocations);
                         return (
                           <div>
                             <div style={{ fontSize: 12, fontWeight: 500, color: dark ? '#eaf5f0' : '#0c1c14' }}>
@@ -1028,6 +1065,11 @@ export default function ActivityLogTable({
                             <div style={{ fontSize: 11, color: dark ? '#4d8a6a' : '#9ab8a9', marginTop: 1, fontFamily: 'monospace' }}>
                               {ip}
                             </div>
+                            {loc && (
+                              <div style={{ fontSize: 11, color: dark ? '#26c47a' : '#059669', fontWeight: 500, marginTop: 1 }}>
+                                📍 {loc}
+                              </div>
+                            )}
                             {flags.length > 0 && (
                               <div style={{ display: 'flex', gap: 3, marginTop: 3, flexWrap: 'wrap' }}>
                                 {flags.map(f => (
