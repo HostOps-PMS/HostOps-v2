@@ -1,153 +1,79 @@
 import express from 'express';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import InboxEmail from '../models/InboxEmail.js';
 
 const router = express.Router();
-const MAILBOX    = 'innovation@telexph.com';
-const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 
-let _token       = null;
-let _tokenExpiry = 0;
-
-async function getToken() {
-  if (_token && Date.now() < _tokenExpiry) return _token;
-
-  const res = await fetch(
-    `https://login.microsoftonline.com/${process.env.MICROSOFT_TENANT_ID}/oauth2/v2.0/token`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type:    'client_credentials',
-        client_id:     process.env.MICROSOFT_CLIENT_ID,
-        client_secret: process.env.MICROSOFT_CLIENT_SECRET,
-        scope:         'https://graph.microsoft.com/.default',
-      }),
-    }
-  );
-
-  if (!res.ok) throw new Error(`Microsoft auth failed: ${res.statusText}`);
-  const data   = await res.json();
-  _token       = data.access_token;
-  _tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
-  return _token;
-}
-
-async function graph(path, token, { search = false } = {}) {
-  const headers = { Authorization: `Bearer ${token}` };
-  if (search) {
-    headers['ConsistencyLevel'] = 'eventual';
-  }
-  const res = await fetch(`${GRAPH_BASE}${path}`, { headers });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    const code = body.error?.code || 'unknown';
-    const msg  = body.error?.message || `HTTP ${res.status}`;
-    console.error('[Graph] Error:', { status: res.status, code, message: msg, path });
-    throw new Error(`[${code}] ${msg}`);
-  }
-  return res.json();
-}
-
-// GET /api/inbox/debug — step-by-step permission diagnostic
-router.get('/inbox/debug', requireAuth, requireAdmin, async (req, res) => {
-  const steps = [];
+// POST /api/inbox/webhook — called by Power Automate when a [BUG REPORT] email arrives
+// Protected by a shared secret (set INBOX_WEBHOOK_SECRET in .env)
+router.post('/inbox/webhook', async (req, res) => {
   try {
-    // Step 1: Get token
-    const token = await getToken();
-    steps.push({ step: 'auth', ok: true, note: 'Token obtained successfully' });
-
-    // Step 2: List the app's permissions via /me (will fail for app-only, expected)
-    // Try reading the mailbox user profile
-    try {
-      const userRes = await fetch(`${GRAPH_BASE}/users/${MAILBOX}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const userData = await userRes.json();
-      if (userRes.ok) {
-        steps.push({ step: 'read_user', ok: true, note: `User found: ${userData.displayName} (${userData.mail})` });
-      } else {
-        steps.push({ step: 'read_user', ok: false, code: userData.error?.code, message: userData.error?.message });
-      }
-    } catch (e) {
-      steps.push({ step: 'read_user', ok: false, message: e.message });
+    const secret = req.headers['x-webhook-secret'] || req.body?.secret;
+    if (!process.env.INBOX_WEBHOOK_SECRET || secret !== process.env.INBOX_WEBHOOK_SECRET) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Step 3: Try to list mailFolders (requires Mail.Read Application)
-    try {
-      const foldersRes = await fetch(`${GRAPH_BASE}/users/${MAILBOX}/mailFolders?$top=5`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const foldersData = await foldersRes.json();
-      if (foldersRes.ok) {
-        steps.push({ step: 'list_folders', ok: true, note: `Found ${foldersData.value?.length ?? 0} folders` });
-      } else {
-        steps.push({ step: 'list_folders', ok: false, code: foldersData.error?.code, message: foldersData.error?.message });
-      }
-    } catch (e) {
-      steps.push({ step: 'list_folders', ok: false, message: e.message });
-    }
+    const { messageId, conversationId, subject, from, fromName, body, bodyPreview, receivedAt } = req.body;
 
-    // Step 4: Try to read messages (top 3, no search)
-    try {
-      const msgRes = await fetch(`${GRAPH_BASE}/users/${MAILBOX}/messages?$top=3&$select=id,subject,from,receivedDateTime`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const msgData = await msgRes.json();
-      if (msgRes.ok) {
-        steps.push({ step: 'list_messages', ok: true, note: `Found ${msgData.value?.length ?? 0} messages`, subjects: msgData.value?.map(m => m.subject) });
-      } else {
-        steps.push({ step: 'list_messages', ok: false, code: msgData.error?.code, message: msgData.error?.message });
-      }
-    } catch (e) {
-      steps.push({ step: 'list_messages', ok: false, message: e.message });
-    }
+    if (!subject) return res.status(400).json({ error: 'subject is required' });
 
-    res.json({ mailbox: MAILBOX, steps });
+    // Deduplicate by messageId
+    const existing = messageId ? await InboxEmail.findOne({ messageId }) : null;
+    if (existing) return res.json({ ok: true, duplicate: true });
+
+    // Build a conversationId from subject if Power Automate doesn't provide one
+    const cid = conversationId || subject.replace(/\s+/g, '-').toLowerCase().slice(0, 80);
+
+    const preview = bodyPreview || (body ? body.replace(/<[^>]+>/g, '').slice(0, 200) : '');
+
+    await InboxEmail.create({
+      messageId:      messageId || null,
+      conversationId: cid,
+      subject:        subject.trim(),
+      from:           from || '',
+      fromName:       fromName || from || '',
+      body:           body || '',
+      bodyPreview:    preview,
+      receivedAt:     receivedAt ? new Date(receivedAt) : new Date(),
+      isRead:         false,
+    });
+
+    console.log('[Inbox] Webhook received:', subject, 'from', from);
+    res.json({ ok: true });
   } catch (err) {
-    steps.push({ step: 'auth', ok: false, message: err.message });
-    res.status(500).json({ mailbox: MAILBOX, steps, error: err.message });
+    console.error('[Inbox] Webhook error:', err.message);
+    res.status(500).json({ error: 'Internal error' });
   }
 });
 
-// GET /api/inbox/threads — list bug report email threads
+// GET /api/inbox/threads — list bug report email threads grouped by conversationId
 router.get('/inbox/threads', requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const token  = await getToken();
-    const search = encodeURIComponent('"[BUG REPORT]" "[HostOps]"');
-    const select = 'id,subject,from,receivedDateTime,conversationId,bodyPreview,isRead';
+    const emails = await InboxEmail.find()
+      .sort({ receivedAt: -1 })
+      .limit(200)
+      .lean();
 
-    const data = await graph(
-      `/users/${MAILBOX}/messages?$search=${search}&$select=${select}&$top=100`,
-      token,
-      { search: true }
-    );
-
-    // Filter to only messages whose subject contains both keywords
-    const messages = (data.value || []).filter(m =>
-      m.subject?.includes('[BUG REPORT]') && m.subject?.includes('[HostOps]')
-    );
-
-    // Group by conversationId, keep latest message metadata per thread
     const threadMap = {};
-    for (const msg of messages) {
-      const cid = msg.conversationId;
+    for (const email of emails) {
+      const cid = email.conversationId || email._id.toString();
       if (!threadMap[cid]) {
         threadMap[cid] = {
           conversationId: cid,
-          subject:        msg.subject,
-          latestDate:     msg.receivedDateTime,
+          subject:        email.subject,
+          latestDate:     email.receivedAt,
           messageCount:   0,
           hasUnread:      false,
-          preview:        msg.bodyPreview,
-          from:           msg.from?.emailAddress?.name || msg.from?.emailAddress?.address || '—',
+          preview:        email.bodyPreview,
+          from:           email.fromName || email.from || '—',
         };
       }
       threadMap[cid].messageCount++;
-      if (!msg.isRead) threadMap[cid].hasUnread = true;
-      if (new Date(msg.receivedDateTime) > new Date(threadMap[cid].latestDate)) {
-        threadMap[cid].latestDate = msg.receivedDateTime;
-        threadMap[cid].preview    = msg.bodyPreview;
-        threadMap[cid].from       = msg.from?.emailAddress?.name || msg.from?.emailAddress?.address || '—';
+      if (!email.isRead) threadMap[cid].hasUnread = true;
+      if (new Date(email.receivedAt) > new Date(threadMap[cid].latestDate)) {
+        threadMap[cid].latestDate = email.receivedAt;
+        threadMap[cid].preview    = email.bodyPreview;
+        threadMap[cid].from       = email.fromName || email.from || '—';
       }
     }
 
@@ -156,27 +82,41 @@ router.get('/inbox/threads', requireAuth, requireAdmin, async (req, res, next) =
 
     res.json(threads);
   } catch (err) {
-    console.error('[Inbox] threads error:', err.message);
     next(err);
   }
 });
 
-// GET /api/inbox/threads/:conversationId — full thread messages with body
+// GET /api/inbox/threads/:conversationId — full thread with HTML bodies
 router.get('/inbox/threads/:conversationId', requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const token  = await getToken();
-    const cid    = req.params.conversationId;
-    const filter = encodeURIComponent(`conversationId eq '${cid}'`);
-    const select = 'id,subject,from,toRecipients,receivedDateTime,body,isRead';
+    const emails = await InboxEmail.find({ conversationId: req.params.conversationId })
+      .sort({ receivedAt: 1 })
+      .lean();
 
-    const data = await graph(
-      `/users/${MAILBOX}/messages?$filter=${filter}&$select=${select}&$orderby=receivedDateTime asc`,
-      token
-    );
+    // Shape to match what the frontend expects (Graph API message format)
+    const shaped = emails.map(e => ({
+      id:               e._id.toString(),
+      subject:          e.subject,
+      receivedDateTime: e.receivedAt,
+      isRead:           e.isRead,
+      from: {
+        emailAddress: { name: e.fromName || e.from, address: e.from },
+      },
+      body: { content: e.body, contentType: 'html' },
+    }));
 
-    res.json(data.value || []);
+    res.json(shaped);
   } catch (err) {
-    console.error('[Inbox] thread detail error:', err.message);
+    next(err);
+  }
+});
+
+// PATCH /api/inbox/threads/:conversationId/read — mark thread as read
+router.patch('/inbox/threads/:conversationId/read', requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    await InboxEmail.updateMany({ conversationId: req.params.conversationId }, { isRead: true });
+    res.json({ ok: true });
+  } catch (err) {
     next(err);
   }
 });
