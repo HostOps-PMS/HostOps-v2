@@ -60,6 +60,13 @@ export default function BugReportsPage() {
   const [sendSuccess, setSendSuccess] = useState(false);
   const [emailPreview, setEmailPreview] = useState(null);
 
+  const [inbox, setInbox]               = useState([]);
+  const [inboxLoading, setInboxLoading] = useState(false);
+  const [inboxError, setInboxError]     = useState('');
+  const [selectedThread, setSelectedThread] = useState(null);
+  const [threadMessages, setThreadMessages] = useState([]);
+  const [threadLoading, setThreadLoading]   = useState(false);
+
   const [replyText, setReplyText]       = useState('');
   const [sendingReply, setSendingReply] = useState(false);
   const [replySent, setReplySent]       = useState(false);
@@ -86,7 +93,37 @@ export default function BugReportsPage() {
     }
   }
 
-  useEffect(() => { loadReports(); }, []);
+  useEffect(() => { loadReports(); loadInbox(); }, []);
+
+  async function loadInbox() {
+    setInboxLoading(true);
+    setInboxError('');
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/api/inbox/threads`);
+      if (!res.ok) throw new Error('Failed to load inbox');
+      const data = await res.json();
+      setInbox(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setInboxError(err.message);
+    } finally {
+      setInboxLoading(false);
+    }
+  }
+
+  async function loadThread(conversationId) {
+    setThreadLoading(true);
+    setThreadMessages([]);
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/api/inbox/threads/${conversationId}`);
+      if (!res.ok) throw new Error('Failed to load thread');
+      const data = await res.json();
+      setThreadMessages(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setThreadLoading(false);
+    }
+  }
 
   async function updateStatus(id, status, note = '') {
     setUpdating(true);
@@ -783,6 +820,125 @@ export default function BugReportsPage() {
             );
           })()}
 
+          {/* ── Email Inbox Section ── */}
+          <div style={{ marginTop: 28 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={textMain} strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                <h2 style={{ fontSize: 14, fontWeight: 700, color: textMain, margin: 0 }}>Email Inbox</h2>
+                <span style={{ fontSize: 11, color: textMuted, fontWeight: 500 }}>innovation@telexph.com</span>
+              </div>
+              <button onClick={loadInbox} disabled={inboxLoading} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '6px 12px', borderRadius: 8, border: `1px solid ${border}`,
+                background: 'transparent', color: textMuted, fontSize: 12, fontWeight: 600,
+                cursor: inboxLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+              }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                  style={{ animation: inboxLoading ? 'br-spin 0.8s linear infinite' : 'none' }}>
+                  <path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" strokeLinecap="round"/>
+                </svg>
+                {inboxLoading ? 'Loading…' : 'Refresh'}
+              </button>
+            </div>
+
+            <style>{`@keyframes br-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+
+            <div style={{ background: surface, borderRadius: 12, border: `1px solid ${border}`, overflow: 'hidden', boxShadow: dark ? '0 2px 12px rgba(0,0,0,0.25)' : '0 1px 4px rgba(0,0,0,0.06)' }}>
+              {inboxLoading ? (
+                <div style={{ padding: 40, textAlign: 'center', color: textMuted, fontSize: 13 }}>Loading threads…</div>
+              ) : inboxError ? (
+                <div style={{ padding: 40, textAlign: 'center', color: '#ef4444', fontSize: 13 }}>{inboxError}</div>
+              ) : inbox.length === 0 ? (
+                <div style={{ padding: 40, textAlign: 'center', color: textMuted, fontSize: 13 }}>No bug report emails found.</div>
+              ) : (
+                inbox.map((thread, i) => {
+                  const date = new Date(thread.latestDate).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+                  const subjectClean = thread.subject.replace(/\[BUG REPORT\]\s*/, '').trim();
+                  return (
+                    <div key={thread.conversationId} className="br-row"
+                      onClick={() => { setSelectedThread(thread); loadThread(thread.conversationId); }}
+                      style={{ padding: '14px 20px', borderBottom: i < inbox.length - 1 ? `1px solid ${border}` : 'none', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <div style={{ marginTop: 4, flexShrink: 0 }}>
+                        {thread.hasUnread
+                          ? <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#2563eb' }} />
+                          : <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'transparent', border: `1.5px solid ${border}` }} />
+                        }
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
+                          <div style={{ fontWeight: thread.hasUnread ? 700 : 600, color: textMain, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subjectClean}</div>
+                          <div style={{ fontSize: 11, color: textMuted, whiteSpace: 'nowrap', flexShrink: 0 }}>{date}</div>
+                        </div>
+                        <div style={{ fontSize: 12, color: textMuted, marginBottom: 3 }}>
+                          <span style={{ fontWeight: 600, color: dark ? '#7ab89a' : '#374151' }}>{thread.from}</span>
+                          {thread.messageCount > 1 && <span style={{ marginLeft: 6, padding: '1px 7px', borderRadius: 20, background: dark ? '#0d2619' : '#f0fdf4', color: dark ? '#4ade80' : '#059669', fontSize: 10, fontWeight: 700 }}>{thread.messageCount}</span>}
+                        </div>
+                        <div style={{ fontSize: 12, color: textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{thread.preview}</div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* ── Thread Detail Modal ── */}
+          {selectedThread && (
+            <div onClick={() => { setSelectedThread(null); setThreadMessages([]); }} style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 10003,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+            }}>
+              <div onClick={e => e.stopPropagation()} style={{
+                background: surface, borderRadius: 16, border: `1px solid ${border}`,
+                width: '100%', maxWidth: 680, maxHeight: '90vh', overflowY: 'auto',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.25)', animation: 'br-enter 0.2s ease',
+              }}>
+                <div style={{ padding: '18px 24px', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: textMain, marginBottom: 4 }}>{selectedThread.subject}</div>
+                    <div style={{ fontSize: 11, color: textMuted }}>{selectedThread.messageCount} message{selectedThread.messageCount !== 1 ? 's' : ''}</div>
+                  </div>
+                  <button onClick={() => { setSelectedThread(null); setThreadMessages([]); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: textMuted, padding: 4, flexShrink: 0 }}>
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                  </button>
+                </div>
+                <div style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {threadLoading ? (
+                    <div style={{ padding: 32, textAlign: 'center', color: textMuted, fontSize: 13 }}>Loading messages…</div>
+                  ) : threadMessages.length === 0 ? (
+                    <div style={{ padding: 32, textAlign: 'center', color: textMuted, fontSize: 13 }}>No messages found.</div>
+                  ) : (
+                    threadMessages.map((msg) => {
+                      const from     = msg.from?.emailAddress?.name || msg.from?.emailAddress?.address || '—';
+                      const addr     = msg.from?.emailAddress?.address || '';
+                      const dt       = new Date(msg.receivedDateTime).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+                      const isAdmin  = addr.toLowerCase() === 'innovation@telexph.com';
+                      return (
+                        <div key={msg.id} style={{ borderRadius: 12, border: `1px solid ${border}`, overflow: 'hidden' }}>
+                          <div style={{ padding: '10px 16px', background: dark ? '#0f2417' : '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <div style={{ width: 28, height: 28, borderRadius: '50%', background: isAdmin ? '#1a9e6e' : '#2563eb', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                {from.slice(0, 2).toUpperCase()}
+                              </div>
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: textMain }}>{from}</div>
+                                <div style={{ fontSize: 11, color: textMuted }}>{addr}</div>
+                              </div>
+                            </div>
+                            <div style={{ fontSize: 11, color: textMuted, whiteSpace: 'nowrap' }}>{dt}</div>
+                          </div>
+                          <div style={{ padding: '14px 16px', background: surface, fontSize: 13, color: textMain, lineHeight: 1.65, maxHeight: 320, overflowY: 'auto' }}
+                            dangerouslySetInnerHTML={{ __html: msg.body?.content || '' }}
+                          />
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
