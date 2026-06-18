@@ -66,6 +66,8 @@ export default function BugReportsPage() {
   const [selectedThread, setSelectedThread] = useState(null);
   const [threadMessages, setThreadMessages] = useState([]);
   const [threadLoading, setThreadLoading]   = useState(false);
+  const [debugResult, setDebugResult]       = useState(null);
+  const [debugLoading, setDebugLoading]     = useState(false);
 
   const [replyText, setReplyText]       = useState('');
   const [sendingReply, setSendingReply] = useState(false);
@@ -122,6 +124,20 @@ export default function BugReportsPage() {
       console.error(err);
     } finally {
       setThreadLoading(false);
+    }
+  }
+
+  async function runDebug() {
+    setDebugLoading(true);
+    setDebugResult(null);
+    try {
+      const res  = await fetchWithAuth(`${API_BASE}/api/inbox/debug`);
+      const data = await res.json();
+      setDebugResult(data);
+    } catch (err) {
+      setDebugResult({ error: err.message });
+    } finally {
+      setDebugLoading(false);
     }
   }
 
@@ -828,21 +844,53 @@ export default function BugReportsPage() {
                 <h2 style={{ fontSize: 14, fontWeight: 700, color: textMain, margin: 0 }}>Email Inbox</h2>
                 <span style={{ fontSize: 11, color: textMuted, fontWeight: 500 }}>innovation@telexph.com</span>
               </div>
-              <button onClick={loadInbox} disabled={inboxLoading} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '6px 12px', borderRadius: 8, border: `1px solid ${border}`,
-                background: 'transparent', color: textMuted, fontSize: 12, fontWeight: 600,
-                cursor: inboxLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
-              }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-                  style={{ animation: inboxLoading ? 'br-spin 0.8s linear infinite' : 'none' }}>
-                  <path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" strokeLinecap="round"/>
-                </svg>
-                {inboxLoading ? 'Loading…' : 'Refresh'}
-              </button>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={runDebug} disabled={debugLoading} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '6px 12px', borderRadius: 8, border: `1px solid ${border}`,
+                  background: 'transparent', color: textMuted, fontSize: 12, fontWeight: 600,
+                  cursor: debugLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                }}>
+                  {debugLoading ? 'Testing…' : 'Test Connection'}
+                </button>
+                <button onClick={loadInbox} disabled={inboxLoading} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '6px 12px', borderRadius: 8, border: `1px solid ${border}`,
+                  background: 'transparent', color: textMuted, fontSize: 12, fontWeight: 600,
+                  cursor: inboxLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                    style={{ animation: inboxLoading ? 'br-spin 0.8s linear infinite' : 'none' }}>
+                    <path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" strokeLinecap="round"/>
+                  </svg>
+                  {inboxLoading ? 'Loading…' : 'Refresh'}
+                </button>
+              </div>
             </div>
 
             <style>{`@keyframes br-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+
+            {debugResult && (
+              <div style={{ marginBottom: 12, padding: '12px 16px', borderRadius: 10, border: `1px solid ${border}`, background: dark ? '#0d2619' : '#f8fafc', fontSize: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <span style={{ fontWeight: 700, color: textMain }}>Connection Diagnostic — {debugResult.mailbox}</span>
+                  <button onClick={() => setDebugResult(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: textMuted, fontSize: 14, lineHeight: 1 }}>✕</button>
+                </div>
+                {debugResult.error && <div style={{ color: '#ef4444' }}>Fatal: {debugResult.error}</div>}
+                {(debugResult.steps || []).map((s, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 14 }}>{s.ok ? '✅' : '❌'}</span>
+                    <div>
+                      <span style={{ fontWeight: 700, color: textMain }}>{s.step}</span>
+                      {s.note    && <span style={{ color: textMuted, marginLeft: 6 }}>{s.note}</span>}
+                      {s.message && <span style={{ color: '#ef4444', marginLeft: 6 }}>{s.message}</span>}
+                      {s.code    && <span style={{ color: '#f97316', marginLeft: 6 }}>code: {s.code}</span>}
+                      {s.subjects && <div style={{ color: textMuted, marginTop: 2 }}>subjects: {s.subjects.join(', ')}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div style={{ background: surface, borderRadius: 12, border: `1px solid ${border}`, overflow: 'hidden', boxShadow: dark ? '0 2px 12px rgba(0,0,0,0.25)' : '0 1px 4px rgba(0,0,0,0.06)' }}>
               {inboxLoading ? (
