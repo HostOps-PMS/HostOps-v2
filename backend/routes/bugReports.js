@@ -161,7 +161,7 @@ adminBugReportRouter.post('/bug-reports/:id/send-email', requireAuth, requireAdm
     const { data, error } = await resend.emails.send({
       from:    process.env.EMAIL_FROM || 'HostOps Bug Report <onboarding@resend.dev>',
       to:      REPORT_EMAIL,
-      subject: `[BUG REPORT] [${sevLabel.toUpperCase()}] ${report.page || 'General'} — ${(report.description || '').replace(/<[^>]*>/g, '').slice(0, 60)}`,
+      subject: `[BUG REPORT] [${sevLabel.toUpperCase()}] [HostOps]`,
       html: `
         <div style="font-family:'DM Sans',Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
           <div style="background:#0c1c14;padding:20px 24px">

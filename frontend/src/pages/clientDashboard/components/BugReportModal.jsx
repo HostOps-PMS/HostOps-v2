@@ -179,7 +179,7 @@ export default function BugReportModal({ show, onClose }) {
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: text }}>
-                    [BUG REPORT] [{sevLabel(severity).toUpperCase()}]
+                    [BUG REPORT] [{sevLabel(severity).toUpperCase()}] [HostOps]
                   </span>
                   <span style={{
                     display: 'inline-block', padding: '2px 10px', borderRadius: 20,
