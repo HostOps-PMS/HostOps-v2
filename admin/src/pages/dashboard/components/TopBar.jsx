@@ -4,6 +4,7 @@ import { getSecureUser } from '../../../lib/secureUserStorage';
 import { useNotifications } from '../../../context/NotificationsContext';
 import { useTheme } from '../../../context/ThemeContext';
 import { fetchWithAuth } from '../../../lib/authUtils';
+import AccountSettingsModal from './AccountSettingsModal';
 
 // ─────────────────────────────────────────────────────────────────
 // Helpers
@@ -483,6 +484,7 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
 // ─────────────────────────────────────────────────────────────────
 export default function TopBar({ onAction, onExport, exportLoading = false, alerts, activities, notifLoading, showExport = false }) {
   const [notifOpen, setNotifOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const notifRef = useRef(null);
   const { dark, toggleDark } = useTheme();
 
@@ -654,11 +656,16 @@ export default function TopBar({ onAction, onExport, exportLoading = false, aler
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 12, fontWeight: 700, color: '#fff',
           cursor: 'pointer', flexShrink: 0,
-        }} title={fullName}>
+        }} title={fullName} onClick={() => setSettingsOpen(true)}>
           {initials}
         </div>
 
       </div>
     </header>
+
+    <AccountSettingsModal
+      isOpen={settingsOpen}
+      onClose={() => setSettingsOpen(false)}
+    />
   );
 }
