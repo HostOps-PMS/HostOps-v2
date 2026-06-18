@@ -541,17 +541,15 @@ export default function RecentActivities() {
                             </div>
                           </div>
                         </td>
-                        <td style={{ padding: '13px 16px', color: textMuted, whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span style={{
-                              display: 'inline-block', padding: '2px 8px', borderRadius: 999, fontSize: '0.68rem', fontWeight: 700,
-                              background: dark ? roleMeta.darkBg : roleMeta.bg,
-                              color: dark ? roleMeta.darkColor : roleMeta.color,
-                            }}>{act.role}</span>
+                        <td style={{ padding: '13px 16px', whiteSpace: 'nowrap' }}>
+                          <div style={{ fontWeight: 500, color: textMain, fontSize: '0.8rem' }}>
+                            {act.business !== '—' ? act.business : <span style={{ color: dark ? '#2d5c3e' : '#d1d5db' }}>—</span>}
                           </div>
-                        </td>
-                        <td style={{ padding: '13px 16px', color: textMuted, fontFamily: 'monospace', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
-                          {act.business !== '—' ? act.business : <span style={{ color: dark ? '#2d5c3e' : '#d1d5db' }}>—</span>}
+                          <span style={{
+                            display: 'inline-block', padding: '2px 8px', borderRadius: 999, fontSize: '0.68rem', fontWeight: 700, marginTop: 2,
+                            background: dark ? roleMeta.darkBg : roleMeta.bg,
+                            color: dark ? roleMeta.darkColor : roleMeta.color,
+                          }}>{act.role}</span>
                         </td>
                         <td style={{ padding: '13px 16px' }}>
                           {(() => {
@@ -577,10 +575,12 @@ export default function RecentActivities() {
                                     📍 {loc}
                                   </div>
                                 )}
-                                <div style={{ fontSize: '0.68rem', color: dark ? '#4d8a6a' : '#b0b7c3', marginTop: 1 }}>{timeAgo(act.time)}</div>
                               </div>
                             );
                           })()}
+                        </td>
+                        <td style={{ padding: '13px 16px', whiteSpace: 'nowrap', color: textMuted, fontSize: '0.78rem' }}>
+                          {timeAgo(act.time)}
                         </td>
                       </tr>
                     );
