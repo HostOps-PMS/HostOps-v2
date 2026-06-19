@@ -549,7 +549,7 @@ html[data-theme="dark"] .db-badge--info    { background: #0d1a2a; color: #60a5fa
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
   min-width: 0;
 }
 

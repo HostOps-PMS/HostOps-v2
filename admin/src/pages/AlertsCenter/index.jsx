@@ -374,14 +374,14 @@ export default function AlertsCenter() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead>
                   <tr style={{ background: dark ? '#0f2417' : '#f9fafb', borderBottom: `1px solid ${border}` }}>
-                    {['Severity','Title','Source','Time','Status',''].map(h => (
+                    {['Severity','Title','Source','Time'].map(h => (
                       <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 700, fontSize: '0.72rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: textMuted, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {paginated.length === 0 ? (
-                    <tr><td colSpan={6} style={{ padding: '48px 20px', textAlign: 'center', color: textMuted, fontSize: '0.88rem' }}>
+                    <tr><td colSpan={4} style={{ padding: '48px 20px', textAlign: 'center', color: textMuted, fontSize: '0.88rem' }}>
                       No alerts found{hasFilters ? ' — try adjusting your filters' : ''}.
                     </td></tr>
                   ) : paginated.map((alert, i) => {
@@ -414,18 +414,6 @@ export default function AlertsCenter() {
                         </td>
                         <td style={{ padding: '13px 16px', color: textMuted, whiteSpace: 'nowrap', fontSize: '0.79rem' }}>
                           <span title={new Date(alert.time).toLocaleString()}>{timeAgo(alert.time)}</span>
-                        </td>
-                        <td style={{ padding: '13px 16px' }}>
-                          <span style={{ fontWeight: 600, fontSize: '0.78rem', color: dark ? stMeta.darkColor : stMeta.color }}>
-                            {alert.status === 'active' ? '● Active' : '✓ Resolved'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '13px 16px', textAlign: 'right' }}>
-                          {alert.status === 'active' && (
-                            <button style={{ padding: '5px 12px', borderRadius: 7, border: `1px solid ${border}`, background: 'transparent', color: textMuted, fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>
-                              Resolve
-                            </button>
-                          )}
                         </td>
                       </tr>
                     );
