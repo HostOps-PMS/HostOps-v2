@@ -12,7 +12,7 @@ export async function requireAuth(req, res, next) {
     // ── 1. Extract token ─────────────────────────────────────────
     const header = req.headers.authorization || '';
     const token  = header.startsWith('Bearer ') ? header.slice(7) : null;
-    if (!token) return res.status(401).json({ error: 'Missing token' });
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
     // ── 2 & 3. Decrypt → verify JWT ──────────────────────────────
     // verifyAccessToken() does: decrypt(blob) → jwt.verify(raw)
@@ -20,7 +20,7 @@ export async function requireAuth(req, res, next) {
 
     // ── 4. Require jti — reject tokens that don't carry one ─────
     if (!decoded.jti) {
-      return res.status(401).json({ error: 'Invalid token: missing jti' });
+      return res.status(401).json({ error: 'Unauthorized' });
     }
     req._jti = decoded.jti; // expose for response-encryption middleware
 
