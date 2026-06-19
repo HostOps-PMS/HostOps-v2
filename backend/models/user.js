@@ -108,6 +108,8 @@ totpEnabled: { type: Boolean, default: false },
 totpDevices: [{ name: { type: String, default: 'Authenticator App' }, addedAt: { type: Date, default: Date.now } }],
   backupCodes: { type: [{ hash: String, used: { type: Boolean, default: false } }], default: [], select: false },
 
+  profileImage: { type: String, default: '' },
+
   isArchive: { type: Boolean, default: false },
 
   allowAdminRememberMe: { type: Boolean, default: true },
