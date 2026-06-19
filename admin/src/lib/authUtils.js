@@ -121,7 +121,7 @@ export async function fetchWithAuth(url, options = {}) {
         },
         credentials: 'include',
       });
-    } else {
+    } else if (!window.location.hostname.includes('localhost')) {
       handleSessionExpired();
     }
   }
