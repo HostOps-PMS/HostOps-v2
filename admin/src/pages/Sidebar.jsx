@@ -7,6 +7,7 @@ import { useNotifications } from '../context/NotificationsContext';
 import { useTheme } from '../context/ThemeContext';
 import { FaUsers, FaChartLine, FaChevronDown, FaBug, FaTractor, FaBoxOpen, FaShieldAlt } from 'react-icons/fa';
 import { getSecureUser, removeSecureUser } from '../lib/secureUserStorage';
+import { fetchWithAuth } from '../lib/authUtils';
 
 /* ─── Nav data ───────────────────────────────────────────────────── */
 
@@ -614,7 +615,9 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
   const [mobileNotifOpen,  setMobileNotifOpen]  = useState(false);
   const [mobileActiveTab,  setMobileActiveTab]  = useState('alerts');
   const [mobileReadIds,    setMobileReadIds]    = useState(new Set());
+  const mobileBugReports = notifContext.bugReports || [];
   const location = useLocation();
+
 
   useEffect(() => {
     if (mobileNotifOpen && resolvedAlerts.length === 0 && !resolvedLoading) {
@@ -1002,10 +1005,11 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                 </div>
 
                 {/* Tabs */}
-                <div style={{ display: 'flex', gap: 4 }}>
+                <div style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
                   {[
                     { key: 'alerts',     label: 'Alerts',   count: (resolvedAlerts     || []).length },
                     { key: 'activities', label: 'Activity', count: (resolvedActivities || []).length },
+                    { key: 'reports',    label: 'Reports',  count: mobileBugReports.length },
                   ].map(tab => (
                     <button
                       key={tab.key}
@@ -1016,10 +1020,11 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                         color: mobileActiveTab === tab.key ? '#1a9e6e' : notifMuted,
                         background: 'none', border: 'none',
                         borderBottom: mobileActiveTab === tab.key ? '2px solid #1a9e6e' : '2px solid transparent',
-                        padding: '4px 10px 8px',
+                        padding: '4px 8px 8px',
                         cursor: 'pointer',
                         borderRadius: '4px 4px 0 0',
-                        display: 'flex', alignItems: 'center', gap: 5,
+                        display: 'flex', alignItems: 'center', gap: 4,
+                        whiteSpace: 'nowrap', flexShrink: 0,
                       }}
                     >
                       {tab.label}
@@ -1075,7 +1080,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                       );
                     })
                   )
-                ) : (
+                ) : mobileActiveTab === 'activities' ? (
                   (resolvedActivities || []).length === 0 ? (
                     <div style={{ padding: '36px 0', textAlign: 'center', fontSize: 12, color: notifMuted }}>No recent activity</div>
                   ) : (
@@ -1105,17 +1110,63 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                               {' '}<span style={{ color: notifMuted }}>{act.action}</span>
                               {act.target && <span style={{ color: '#1a9e6e', fontWeight: 600 }}> {act.target}</span>}
                             </div>
-                            {act.time && (
+                            {(act.time || act.createdAt || act.timestamp) && (
                               <div style={{ fontSize: 10, color: notifDim, marginTop: 2 }}>
                                 {(() => {
-                                  const diff = Math.floor((Date.now() - new Date(act.time)) / 1000);
-                                  if (diff < 60) return 'just now';
+                                  const t = act.time || act.createdAt || act.timestamp;
+                                  if (!t) return '';
+                                  const d = new Date(t);
+                                  if (isNaN(d.getTime())) return '';
+                                  const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+                                  if (diff < 0 || diff < 60) return 'just now';
                                   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
                                   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
                                   return `${Math.floor(diff / 86400)}d ago`;
                                 })()}
                               </div>
                             )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )
+                ) : (
+                  mobileBugReports.length === 0 ? (
+                    <div style={{ padding: '36px 0', textAlign: 'center', fontSize: 12, color: notifMuted }}>No bug reports yet</div>
+                  ) : (
+                    mobileBugReports.map((r, i) => {
+                      const sevColors = { low: '#22c55e', medium: '#f59e0b', high: '#f97316', critical: '#ef4444' };
+                      const stColors  = { open: '#f97316', in_progress: '#f59e0b', sent: '#2563eb', resolved: '#22c55e', dismissed: '#6b7280' };
+                      const stLabels  = { open: 'Open', in_progress: 'In Progress', sent: 'Sent', resolved: 'Resolved', dismissed: 'Dismissed' };
+                      return (
+                        <div key={r._id ?? i} className="mob-notif-item" style={{
+                          display: 'flex', alignItems: 'flex-start', gap: 10,
+                          padding: '11px 16px',
+                          borderBottom: `0.5px solid ${notifDiv}`,
+                          background: r.status === 'open' ? notifUnreadBg : notifReadBg,
+                        }}>
+                          <div style={{ width: 34, height: 34, borderRadius: 10, background: dark ? '#2a0d0d' : '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>🐛</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', gap: 4, marginBottom: 3 }}>
+                              <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 700, color: '#fff', background: sevColors[r.severity] || '#f97316' }}>{(r.severity || 'high').charAt(0).toUpperCase() + (r.severity || 'high').slice(1)}</span>
+                              <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 700, color: '#fff', background: stColors[r.status] || '#6b7280' }}>{stLabels[r.status] || r.status}</span>
+                            </div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: notifText, lineHeight: 1.3 }}>{r.page || 'General'}</div>
+                            <div style={{ fontSize: 11, color: notifMuted, marginTop: 1 }}>{r.name || r.email || '—'}</div>
+                          </div>
+                          <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                            <div style={{ fontSize: 10, color: notifDim }}>
+                              {(() => {
+                                const d = new Date(r.createdAt);
+                                if (isNaN(d.getTime())) return '';
+                                const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+                                if (diff < 60) return 'just now';
+                                if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+                                if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+                                return `${Math.floor(diff / 86400)}d ago`;
+                              })()}
+                            </div>
+                            {r.status === 'open' && <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#f97316', marginLeft: 'auto', marginTop: 5 }} />}
                           </div>
                         </div>
                       );

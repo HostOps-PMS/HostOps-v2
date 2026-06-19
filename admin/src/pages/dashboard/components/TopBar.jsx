@@ -12,8 +12,9 @@ import AccountSettingsModal from './AccountSettingsModal';
 function timeAgo(timeStr) {
   if (!timeStr) return '';
   const date = new Date(timeStr);
-  if (isNaN(date)) return timeStr;
-  const diff = Math.floor((Date.now() - date) / 1000);
+  if (isNaN(date.getTime())) return '';
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 0)     return 'just now';
   if (diff < 60)    return 'just now';
   if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
@@ -158,18 +159,10 @@ const SunIcon = () => (
 function NotificationDropdown({ alerts = [], activities = [], loading, onClose }) {
   const [activeTab, setActiveTab] = useState('alerts');
   const [readIds,   setReadIds]   = useState(new Set());
-  const [bugReports, setBugReports] = useState([]);
+  const { bugReports: ctxBugReports } = useNotifications();
+  const bugReports = ctxBugReports || [];
   const { dark } = useTheme();
   const navigate = useNavigate();
-
-  const API_BASE = (import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
-
-  useEffect(() => {
-    fetchWithAuth(`${API_BASE}/api/bug-reports`)
-      .then(r => r?.ok ? r.json() : [])
-      .then(d => { if (Array.isArray(d)) setBugReports(d); })
-      .catch(() => {});
-  }, []);
 
   const openReports = bugReports.filter(r => r.status === 'open').length;
   const unreadAlerts = (alerts || []).filter(a => a.unread && !readIds.has(a.id)).length;
@@ -221,6 +214,7 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
         }
         .notif-item:hover { background: ${hoverBg} !important; }
         .notif-tab-btn:hover { background: rgba(${dark ? '255,255,255' : '0,0,0'},0.04) !important; }
+        .notif-tabs-scroll::-webkit-scrollbar { display: none; }
         .notif-mark-all:hover { color: #26c47a !important; }
         .notif-scrollable::-webkit-scrollbar { width: 4px; }
         .notif-scrollable::-webkit-scrollbar-track { background: transparent; }
@@ -252,7 +246,7 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
+        <div className="notif-tabs-scroll" style={{ display: 'flex', gap: 0, overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', msOverflowStyle: 'none' }}>
           {[
             { key: 'alerts',     label: 'Alerts',   count: (alerts     || []).length },
             { key: 'activities', label: 'Activity', count: (activities || []).length },
@@ -269,9 +263,10 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
                 background: 'none',
                 border: 'none',
                 borderBottom: activeTab === tab.key ? '2px solid #1a9e6e' : '2px solid transparent',
-                padding: '4px 10px 8px',
+                padding: '4px 8px 8px',
                 cursor: 'pointer',
                 borderRadius: '4px 4px 0 0',
+                whiteSpace: 'nowrap', flexShrink: 0,
                 transition: 'all 0.15s',
                 display: 'flex',
                 alignItems: 'center',
@@ -398,9 +393,9 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
                     <span style={{ color: '#1a9e6e', fontWeight: 600 }}> {act.target}</span>
                   )}
                 </div>
-                {act.time && (
+                {(act.time || act.createdAt || act.timestamp) && (
                   <div style={{ fontSize: 10, color: textDim, marginTop: 2 }}>
-                    {timeAgo(act.time)}
+                    {timeAgo(act.time || act.createdAt || act.timestamp)}
                   </div>
                 )}
               </div>
