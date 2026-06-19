@@ -71,6 +71,7 @@ function sanitizeUser(user) {
     propertyTagPrefix:  obj.propertyTagPrefix,
     serverId:           obj.serverId,
     totpEnabled:        obj.totpEnabled || false,
+    profileImage:       obj.profileImage || '',
     allowAdminRememberMe: obj.allowAdminRememberMe ?? true,
     // propertyPicture is replaced with proxy URL —
     // the real Cloudinary URL never leaves the server.
@@ -1633,6 +1634,72 @@ router.delete('/totp/devices/:deviceId', requireAuth, async (req, res, next) => 
       userAgent:   req.get('user-agent') || '',
     }).catch(() => {});
 
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /auth/profile-image  — upload/update profile image
+// ─────────────────────────────────────────────────────────────────
+import { v2 as cloudinary } from 'cloudinary';
+import multer from 'multer';
+import fs from 'fs';
+import os from 'os';
+
+const profileUpload = multer({
+  dest: os.tmpdir(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files are allowed'), false);
+  },
+});
+
+router.post('/profile-image', requireAuth, profileUpload.single('image'), async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No image provided' });
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (user.profileImage) {
+      const parts = user.profileImage.split('/');
+      const filename = parts[parts.length - 1].split('.')[0];
+      const folder = parts[parts.length - 2];
+      try { await cloudinary.uploader.destroy(`${folder}/${filename}`); } catch {}
+    }
+
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: 'hostops/profile-images',
+      transformation: [{ width: 256, height: 256, crop: 'fill', gravity: 'face' }],
+    });
+
+    if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+
+    user.profileImage = result.secure_url;
+    await user.save();
+
+    res.json({ profileImage: result.secure_url });
+  } catch (err) {
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    next(err);
+  }
+});
+
+router.delete('/profile-image', requireAuth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (user.profileImage) {
+      const parts = user.profileImage.split('/');
+      const filename = parts[parts.length - 1].split('.')[0];
+      const folder = parts[parts.length - 2];
+      try { await cloudinary.uploader.destroy(`${folder}/${filename}`); } catch {}
+    }
+
+    user.profileImage = '';
+    await user.save();
     res.json({ ok: true });
   } catch (err) { next(err); }
 });

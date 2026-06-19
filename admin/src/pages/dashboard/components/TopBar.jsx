@@ -646,15 +646,22 @@ export default function TopBar({ onAction, onExport, exportLoading = false, aler
         </div>
 
         {/* Avatar */}
-        <div style={{
-          width: 34, height: 34, borderRadius: '50%',
-          background: '#1a9e6e',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 12, fontWeight: 700, color: '#fff',
-          cursor: 'pointer', flexShrink: 0,
-        }} title={fullName} onClick={() => setSettingsOpen(true)}>
-          {initials}
-        </div>
+        {currentUser.profileImage ? (
+          <img src={currentUser.profileImage} alt={fullName} title={fullName} onClick={() => setSettingsOpen(true)} style={{
+            width: 34, height: 34, borderRadius: '50%', objectFit: 'cover',
+            cursor: 'pointer', flexShrink: 0, border: `2px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`,
+          }} />
+        ) : (
+          <div style={{
+            width: 34, height: 34, borderRadius: '50%',
+            background: '#1a9e6e',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 12, fontWeight: 700, color: '#fff',
+            cursor: 'pointer', flexShrink: 0,
+          }} title={fullName} onClick={() => setSettingsOpen(true)}>
+            {initials}
+          </div>
+        )}
 
       </div>
     </header>
