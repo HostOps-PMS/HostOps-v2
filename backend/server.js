@@ -25,6 +25,7 @@ import smoobuApartmentsRoute   from './routes/smoobuApartments.js';
 import activityLogRoute        from './routes/activityLog.js';
 import imageProxyRoute         from './routes/imageProxy.js';
 import smoobuWebhookRoute      from './routes/smoobuWebhook.js';
+import ghlProxyRoute           from './routes/ghlProxy.js';
 import opsRoutes               from './routes/internal/ops.js';
 import { requireAuth }         from './middleware/auth.js';
 import { load as loadBlocklistCache } from './utils/blocklistCache.js';
@@ -260,10 +261,14 @@ app.use((req, res, next) => {
   // (valid MongoDB ObjectIds + DB ownership check + Cloudinary-only whitelist).
   const isImageProxy    = req.path.startsWith('/api/image/');
   const isWebhook       = req.path === '/api/smoobu-webhook';
+  // GHL proxy endpoints are public (used by the landing page, no API key)
+  const isGhlProxy      = req.path.startsWith('/api/ghl');
 
   if (isAuthRoute && !isSensitiveAuth) return next();
   if (isImageProxy) return next();
   if (isWebhook) return next();
+  if (isGhlProxy) return next();
+  console.log('[requireApiKey] fallback for:', req.path);
   requireApiKey(req, res, next);
 });
 
@@ -272,6 +277,7 @@ app.use('/auth', authRoutes);
 app.use('/auth', publicRecoveryRouter);
 app.use('/auth', publicBugReportRouter);
 app.use('/api',  imageProxyRoute);       // No API-key required — see middleware above
+app.use('/api/ghl', ghlProxyRoute);      // Public landing page → GHL proxy (rate-limited)
 app.use('/api',  dashboardRoutes);
 app.use('/api',  clientsRoutes);
 app.use('/api',  activityLogRoute);
