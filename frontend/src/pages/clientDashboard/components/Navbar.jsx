@@ -238,6 +238,7 @@ export default function Navbar() {
   const { getUser, clear } = useAuth();
   const { dashState, dark, setDark, selectProperty } = useDashboard();
   const auth = useAuth();         
+  const [, forceUserRefresh] = useState(0);
   const user = getUserData(auth);
   const [dropOpen, setDropOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -275,6 +276,14 @@ export default function Navbar() {
     }
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    function handleUserUpdated() {
+      forceUserRefresh((n) => n + 1);
+    }
+    window.addEventListener('hostops:client-user-updated', handleUserUpdated);
+    return () => window.removeEventListener('hostops:client-user-updated', handleUserUpdated);
   }, []);
 
   useEffect(() => {

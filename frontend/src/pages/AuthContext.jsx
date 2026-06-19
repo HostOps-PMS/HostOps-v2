@@ -75,12 +75,13 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const setUser = useCallback((u) => {
+const setUser = useCallback((u) => {
     if (u) {
       setSecureUser(u);
     } else {
       removeSecureUser();
     }
+    window.dispatchEvent(new CustomEvent('hostops:client-user-updated', { detail: u }));
   }, []);
 
   // ── Silent token refresh ──────────────────────────────────────────
