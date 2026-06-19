@@ -1042,7 +1042,10 @@ export default function Navbar() {
                   style={t.avatar}
                   onClick={() => setDropOpen((prev) => !prev)}
                 >
-                  {avatarInitial || "U"}
+                  {user?.profileImage
+                    ? <img src={user.profileImage} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                    : (avatarInitial || "U")
+                  }
                 </div>
                 <div style={t.dropdown}>
                   <div style={t.dropHeader}>
@@ -1271,7 +1274,10 @@ export default function Navbar() {
                 onClick={() => setDropOpen((prev) => !prev)}
               >
                 <div style={t.avatar}>
-                  {avatarInitial || "U"}
+                  {user?.profileImage
+                    ? <img src={user.profileImage} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                    : (avatarInitial || "U")
+                  }
                 </div>
                 <span style={t.userName}>{displayName}</span>
                 <i

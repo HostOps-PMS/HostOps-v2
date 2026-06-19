@@ -188,7 +188,7 @@ function SuccessModal({ onClose }) {
   );
 }
 
-export default function AccountSettingsModal({ isOpen, onClose }) {
+export default function AccountSettingsModal({ isOpen, onClose, onSaved }) {
   const getUser = () => {
     try { return getSecureUser() || {}; } catch { return {}; }
   };
@@ -704,10 +704,20 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                       const fd = new FormData();
                       fd.append('image', file);
                       const base = (import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
-                      const res = await fetchWithAuth(`${base}/auth/profile-image`, { method: 'POST', body: fd, headers: {} });
-                      if (res?.ok) {
+                      const token = sessionStorage.getItem('hp_access_token');
+                      const res = await fetch(`${base}/auth/profile-image`, {
+                        method: 'POST', body: fd,
+                        headers: { 'Authorization': `Bearer ${token}`, 'x-api-key': import.meta.env.VITE_API_KEY || '' },
+                      });
+                      if (res.ok) {
                         const data = await res.json();
-                        if (data.profileImage) setProfileImg(data.profileImage);
+                        if (data.profileImage) {
+                          setProfileImg(data.profileImage);
+                          const updatedUser = { ...getSecureUser(), profileImage: data.profileImage };
+                          setSecureUser(updatedUser);
+                          window.dispatchEvent(new CustomEvent('hostops:user-updated', { detail: updatedUser }));
+                          if (typeof onSaved === 'function') onSaved(updatedUser);
+                        }
                       }
                     } catch {} finally { setImgUploading(false); e.target.value = ''; }
                   }} />
@@ -741,8 +751,18 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                           setImgUploading(true);
                           try {
                             const base = (import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
-                            const res = await fetchWithAuth(`${base}/auth/profile-image`, { method: 'DELETE' });
-                            if (res?.ok) setProfileImg('');
+                            const token = sessionStorage.getItem('hp_access_token');
+                            const res = await fetch(`${base}/auth/profile-image`, {
+                              method: 'DELETE',
+                              headers: { 'Authorization': `Bearer ${token}`, 'x-api-key': import.meta.env.VITE_API_KEY || '' },
+                            });
+                            if (res.ok) {
+                            setProfileImg('');
+                            const updatedUser = { ...getSecureUser(), profileImage: '' };
+                            setSecureUser(updatedUser);
+                            window.dispatchEvent(new CustomEvent('hostops:user-updated', { detail: updatedUser }));
+                            if (typeof onSaved === 'function') onSaved(updatedUser);
+                          }
                           } catch {} finally { setImgUploading(false); }
                         }} disabled={imgUploading} style={{
                           padding: '5px 12px', borderRadius: 7, border: `1px solid ${dark ? '#5c1a1a' : '#fecaca'}`,

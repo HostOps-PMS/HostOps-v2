@@ -578,6 +578,9 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
 
   // ── Password form ────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("profile");
+  const [profileImg, setProfileImg] = useState(user?.profileImage || '');
+  const [imgUploading, setImgUploading] = useState(false);
+  const imgInputRef = useRef(null);
   const [pwForm, setPwForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -1320,6 +1323,81 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
             {/* ── PROFILE TAB ── */}
             {activeTab === "profile" && (
               <>
+                {/* Profile Image */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '4px 0 14px', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f0f2f5'}`, marginBottom: 14 }}>
+                  <input ref={imgInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setImgUploading(true);
+                    try {
+                      const fd = new FormData();
+                      fd.append('image', file);
+                      const token = auth.getToken();
+                      const res = await fetch(`${API_BASE}/auth/profile-image`, {
+                        method: 'POST', body: fd,
+                        headers: { 'Authorization': `Bearer ${token}`, 'x-api-key': import.meta.env.VITE_API_KEY || '' },
+                      });
+                      if (res.ok) {
+                        const data = await res.json();
+                        if (data.profileImage) {
+                          setProfileImg(data.profileImage);
+                          const u = auth.getUser();
+                          if (u) auth.setUser({ ...u, profileImage: data.profileImage });
+                        }
+                      }
+                    } catch {} finally { setImgUploading(false); e.target.value = ''; }
+                  }} />
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    {profileImg ? (
+                      <img src={profileImg} alt="" style={{ width: 56, height: 56, borderRadius: 14, objectFit: 'cover', border: `2px solid ${dark ? '#1e3a2a' : '#e5e7eb'}` }} />
+                    ) : (
+                      <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #1a9e6e, #157a55)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 20, fontWeight: 700 }}>
+                        {(user?.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase()}
+                      </div>
+                    )}
+                    {imgUploading && (
+                      <div style={{ position: 'absolute', inset: 0, borderRadius: 14, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: 18, height: 18, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'acm-spin 0.6s linear infinite' }} />
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: dark ? '#eaf5f0' : '#0c1c14' }}>
+                      {user?.firstName || ''} {user?.lastName || ''}
+                    </div>
+                    <div style={{ fontSize: 11, color: dark ? '#4d8a6a' : '#9ab8a9', marginTop: 1 }}>{user?.email || ''}</div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                      <button onClick={() => imgInputRef.current?.click()} disabled={imgUploading} style={{
+                        padding: '4px 10px', borderRadius: 6, border: `1px solid ${dark ? '#1e3a2a' : '#d4e8dd'}`,
+                        background: dark ? '#0d2619' : '#fff', color: dark ? '#7ab89a' : '#374151',
+                        fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                      }}>{profileImg ? 'Change' : 'Upload Photo'}</button>
+                      {profileImg && (
+                        <button onClick={async () => {
+                          setImgUploading(true);
+                          try {
+                            const token = auth.getToken();
+                            const res = await fetch(`${API_BASE}/auth/profile-image`, {
+                              method: 'DELETE',
+                              headers: { 'Authorization': `Bearer ${token}`, 'x-api-key': import.meta.env.VITE_API_KEY || '' },
+                            });
+                            if (res.ok) {
+                              setProfileImg('');
+                              const u = auth.getUser();
+                              if (u) auth.setUser({ ...u, profileImage: '' });
+                            }
+                          } catch {} finally { setImgUploading(false); }
+                        }} disabled={imgUploading} style={{
+                          padding: '4px 10px', borderRadius: 6, border: `1px solid ${dark ? '#5c1a1a' : '#fecaca'}`,
+                          background: 'transparent', color: dark ? '#f87171' : '#dc2626',
+                          fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                        }}>Remove</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <style>{`@keyframes acm-spin { to { transform: rotate(360deg); } }`}</style>
+
                 <div style={styles.section}>
                   <p style={styles.sectionLabel}>Account Info</p>
                   <div style={styles.readOnlyRow}>

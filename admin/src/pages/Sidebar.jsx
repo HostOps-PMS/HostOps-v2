@@ -606,6 +606,14 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
     try { return getSecureUser() || {}; } catch { return {}; }
   });
 
+  useEffect(() => {
+    function handleUserUpdated(e) {
+      setCurrentUser(e.detail);
+    }
+    window.addEventListener('hostops:user-updated', handleUserUpdated);
+    return () => window.removeEventListener('hostops:user-updated', handleUserUpdated);
+  }, []);
+
   const notifContext = useNotifications();
   const resolvedAlerts     = alerts ?? notifContext.alerts;
   const resolvedActivities = notifContext.activities;
