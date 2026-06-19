@@ -488,9 +488,17 @@ export default function TopBar({ onAction, onExport, exportLoading = false, aler
   const resolvedActivities = activities ?? notifContext.activities;
   const resolvedLoading    = notifLoading ?? notifContext.loading;
 
-  const currentUser = (() => {
+const [currentUser, setCurrentUser] = useState(() => {
     try { return getSecureUser() || {}; } catch { return {}; }
-  })();
+  });
+
+  useEffect(() => {
+    function handleUserUpdated(e) {
+      setCurrentUser(e.detail);
+    }
+    window.addEventListener('hostops:user-updated', handleUserUpdated);
+    return () => window.removeEventListener('hostops:user-updated', handleUserUpdated);
+  }, []);
 
   const fullName  = [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ') || 'User';
   const initials  = [currentUser.firstName, currentUser.lastName]
@@ -669,6 +677,7 @@ export default function TopBar({ onAction, onExport, exportLoading = false, aler
     <AccountSettingsModal
       isOpen={settingsOpen}
       onClose={() => setSettingsOpen(false)}
+      onSaved={(updated) => setCurrentUser(updated)}
     />
     </>
   );
