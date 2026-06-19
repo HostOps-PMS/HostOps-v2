@@ -287,7 +287,7 @@ export default function BugReportsPage() {
                     <button key={t.id} onClick={() => handleTabChange(t.id)} style={{
                       display: 'inline-flex', alignItems: 'center', gap: 7,
                       padding: '9px 18px 10px', border: '1px solid',
-                      borderColor: active ? (dark ? '#1e3a2a' : '#e8ecf0') : 'transparent',
+                      borderColor: active ? border : 'transparent',
                       borderBottom: active ? `1px solid ${surface}` : 'none',
                       borderRadius: '10px 10px 0 0',
                       background: active ? surface : 'transparent',
@@ -309,7 +309,7 @@ export default function BugReportsPage() {
             </div>
 
             {/* Card */}
-            <div style={{ background: surface, borderRadius: '0 12px 12px 12px', border: `1px solid ${border}`, overflow: 'hidden', boxShadow: dark ? '0 2px 12px rgba(0,0,0,0.25)' : '0 1px 4px rgba(0,0,0,0.06)' }}>
+            <div style={{ background: surface, borderRadius: tab === 'all' ? '0 12px 12px 12px' : '12px 12px 12px 12px', border: `1px solid ${border}`, overflow: 'hidden', boxShadow: dark ? '0 2px 12px rgba(0,0,0,0.25)' : '0 1px 4px rgba(0,0,0,0.06)' }}>
 
               {/* Filter bar */}
               <div className="br-filter-bar" style={{ padding: '14px 20px', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
