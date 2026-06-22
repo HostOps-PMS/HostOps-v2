@@ -652,11 +652,11 @@ const [currentUser, setCurrentUser] = useState(() => {
           )}
         </div>
 
-        {/* Avatar */}
+        {/* Avatar — display only, no click */}
         {currentUser.profileImage ? (
-          <img src={currentUser.profileImage} alt={fullName} title={fullName} onClick={() => setSettingsOpen(true)} style={{
+          <img src={currentUser.profileImage} alt={fullName} title={fullName} style={{
             width: 34, height: 34, borderRadius: '50%', objectFit: 'cover',
-            cursor: 'pointer', flexShrink: 0, border: `2px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`,
+            flexShrink: 0, border: `2px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`,
           }} />
         ) : (
           <div style={{
@@ -664,8 +664,8 @@ const [currentUser, setCurrentUser] = useState(() => {
             background: '#1a9e6e',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 12, fontWeight: 700, color: '#fff',
-            cursor: 'pointer', flexShrink: 0,
-          }} title={fullName} onClick={() => setSettingsOpen(true)}>
+            flexShrink: 0,
+          }} title={fullName}>
             {initials}
           </div>
         )}
