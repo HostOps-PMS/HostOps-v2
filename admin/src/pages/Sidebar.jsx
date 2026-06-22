@@ -1281,6 +1281,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
         @media (max-width: 768px) {
           .db-sidebar-desktop { display: none !important; }
           .db-sidebar-mobile-bar { display: flex !important; }
+          .db-main { padding-top: 52px !important; }
         }
         @media (min-width: 769px) {
           .db-sidebar-mobile-bar { display: none !important; }
