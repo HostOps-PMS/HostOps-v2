@@ -21,6 +21,7 @@ export default function HoneypotDashboard() {
   const [logs, setLogs] = useState([]);
   const [filters, setFilters] = useState({ severity: '', ip: '', fingerprint: '' });
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -40,7 +41,7 @@ export default function HoneypotDashboard() {
   useEffect(() => {
     if (!adminToken) return;
     setLoading(true);
-    const params = new URLSearchParams({ page, limit: 25 });
+    const params = new URLSearchParams({ page, limit: pageSize });
     if (filters.severity) params.set('severity', filters.severity);
     if (filters.ip) params.set('ip', filters.ip);
     if (filters.fingerprint) params.set('fingerprint', filters.fingerprint);
@@ -49,7 +50,7 @@ export default function HoneypotDashboard() {
       .then(data => { setLogs(data.logs || []); setTotalPages(data.totalPages || 1); setError(''); })
       .catch(() => setError('Failed to load logs'))
       .finally(() => setLoading(false));
-  }, [page, filters, adminToken]);
+  }, [page, pageSize, filters, adminToken]);
 
   async function downloadFile(endpoint, filename) {
     setExportLoading(true);
@@ -82,14 +83,21 @@ export default function HoneypotDashboard() {
           <style>{`
             .hp-row:hover { background: ${dark ? '#0d2619' : '#f8fffe'} !important; }
             @media (max-width: 768px) {
-              .hp-filter-bar { gap: 8px !important; }
+              .hp-filter-bar { gap: 8px !important; flex-direction: column !important; align-items: stretch !important; }
               .hp-filter-bar .hp-filter-search { width: 100% !important; min-width: 0 !important; flex: unset !important; }
+              .hp-filter-bar .hp-stats-row { width: 100% !important; margin-right: 0 !important; }
+              .hp-filter-bar .hp-stats-row > span { flex: 1 !important; justify-content: center !important; }
+              .hp-stat-label { display: none !important; }
+              .hp-filter-bar .hp-sev-wrap { width: 100% !important; }
+              .hp-filter-bar .hp-sev-wrap > div:first-child { width: 100% !important; justify-content: space-between !important; }
             }
             .hp-export-btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 9px; border: none; font-size: 0.82rem; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background 0.15s; }
             .hp-export-label { display: inline; }
             @media (max-width: 768px) {
               .hp-export-btn { width: 38px; height: 38px; padding: 0; justify-content: center; border-radius: 12px; }
               .hp-export-label { display: none; }
+              .hp-pagination { flex-direction: column; align-items: center; }
+              .hp-pagination > div { justify-content: center; }
             }
           `}</style>
 
@@ -114,25 +122,27 @@ export default function HoneypotDashboard() {
           </header>
 
           {/* Card */}
-          <div style={{ background: surface, borderRadius: 12, border: `1px solid ${border}`, overflow: 'hidden', boxShadow: dark ? '0 2px 12px rgba(0,0,0,0.25)' : '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <div style={{ background: surface, borderRadius: 12, border: `1px solid ${border}`, overflow: 'visible', boxShadow: dark ? '0 2px 12px rgba(0,0,0,0.25)' : '0 1px 4px rgba(0,0,0,0.06)' }}>
 
             {/* Filter bar */}
             <div className="hp-filter-bar" style={{ padding: '14px 20px', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               {/* Stats as filter pills */}
               {stats && (
-                <div style={{ display: 'flex', gap: 6, marginRight: 'auto', flexWrap: 'wrap' }}>
+                <div className="hp-stats-row" style={{ display: 'flex', gap: 6, marginRight: 'auto', flexWrap: 'wrap' }}>
                   {[
-                    { label: 'Events 24h', value: stats.last24h, color: '#2563eb' },
-                    { label: 'Critical 24h', value: stats.criticalLast24h, color: '#ef4444' },
-                    { label: 'Banned', value: stats.bannedTotal, color: '#8b5cf6' },
+                    { label: 'Events 24h', value: stats.last24h, color: '#2563eb', icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
+                    { label: 'Critical 24h', value: stats.criticalLast24h, color: '#ef4444', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z' },
+                    { label: 'Banned', value: stats.bannedTotal, color: '#8b5cf6', icon: 'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636' },
                   ].map(s => (
-                    <span key={s.label} style={{
+                    <span key={s.label} title={`${s.label}: ${s.value ?? 0}`} style={{
                       display: 'inline-flex', alignItems: 'center', gap: 6,
                       padding: '5px 12px', borderRadius: 8, fontSize: '0.78rem', fontWeight: 600,
                       background: dark ? `${s.color}15` : `${s.color}10`, color: s.color,
-                      border: `1px solid ${s.color}30`,
+                      border: `1px solid ${s.color}30`, cursor: 'default',
                     }}>
-                      {s.label}: <strong>{s.value ?? 0}</strong>
+                      <svg className="hp-stat-icon" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d={s.icon}/></svg>
+                      <span className="hp-stat-label">{s.label}: </span>
+                      <strong>{s.value ?? 0}</strong>
                     </span>
                   ))}
                 </div>
@@ -150,7 +160,7 @@ export default function HoneypotDashboard() {
               </div>
 
               {/* Severity dropdown */}
-              <div ref={sevRef} style={{ position: 'relative', flexShrink: 0 }}>
+              <div ref={sevRef} className="hp-sev-wrap" style={{ position: 'relative', flexShrink: 0 }}>
                 <div onClick={() => setShowSevDrop(v => !v)} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 10px 7px 12px', borderRadius: 8,
                   border: `1px solid ${border}`, background: inputBg, cursor: 'pointer', fontSize: '0.82rem',
@@ -230,15 +240,23 @@ export default function HoneypotDashboard() {
             )}
 
             {/* Pagination */}
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderTop: `1px solid ${border}` }}>
-                <span style={{ fontSize: '0.75rem', color: dark ? '#4d8a6a' : '#9ca3af' }}>Page {page} of {totalPages}</span>
+            {totalPages > 0 && (
+              <div className="hp-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderTop: `1px solid ${border}`, flexWrap: 'wrap', gap: 8, background: dark ? '#0d2619' : '#f7faf8', borderRadius: '0 0 12px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.75rem', color: dark ? '#4d8a6a' : '#9ca3af', fontWeight: 500 }}>
+                    Showing page {page} of {totalPages}
+                  </span>
+                  <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+                    style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${dark ? '#1e3a2a' : '#d4e8dd'}`, background: dark ? '#0d2619' : '#fff', color: dark ? '#7ab89a' : '#374151', fontSize: 11, fontWeight: 600, cursor: 'pointer', outline: 'none', fontFamily: 'inherit' }}>
+                    {[25, 50, 100].map(n => <option key={n} value={n}>{n} / page</option>)}
+                  </select>
+                </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  {[['prev', page === 1, () => setPage(p => Math.max(1, p - 1))], ['next', page === totalPages, () => setPage(p => Math.min(totalPages, p + 1))]].map(([dir, disabled, onClick]) => (
+                  {[['prev', page <= 1, () => setPage(p => Math.max(1, p - 1))], ['next', page >= totalPages, () => setPage(p => Math.min(totalPages, p + 1))]].map(([dir, disabled, onClick]) => (
                     <button key={dir} onClick={onClick} disabled={disabled}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, border: `1px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`, background: disabled ? (dark ? '#0a1a10' : '#f9fafb') : (dark ? '#0d2619' : '#fff'), color: disabled ? (dark ? '#2a4a35' : '#d1d5db') : (dark ? '#7ab89a' : '#374151'), fontSize: '0.78rem', fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer', transition: 'background 0.15s', fontFamily: 'inherit' }}
-                      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = dark ? '#132a1e' : '#f3f4f6'; }}
-                      onMouseLeave={e => { if (!disabled) e.currentTarget.style.background = disabled ? (dark ? '#0a1a10' : '#f9fafb') : (dark ? '#0d2619' : '#fff'); }}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 8, border: `1.5px solid ${dark ? '#1e3a2a' : '#d4e8dd'}`, background: disabled ? (dark ? '#0a1a10' : '#f9fafb') : (dark ? '#0d2619' : '#fff'), color: disabled ? (dark ? '#2a4a35' : '#d1d5db') : (dark ? '#7ab89a' : '#374151'), fontSize: '0.78rem', fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer', transition: 'all 0.15s', fontFamily: 'inherit' }}
+                      onMouseEnter={e => { if (!disabled) { e.currentTarget.style.background = dark ? '#132a1e' : '#eaf8f1'; e.currentTarget.style.borderColor = '#1e8760'; e.currentTarget.style.color = '#1e8760'; }}}
+                      onMouseLeave={e => { if (!disabled) { e.currentTarget.style.background = dark ? '#0d2619' : '#fff'; e.currentTarget.style.borderColor = dark ? '#1e3a2a' : '#d4e8dd'; e.currentTarget.style.color = dark ? '#7ab89a' : '#374151'; }}}
                     >
                       {dir === 'prev' && <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M13 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                       {dir === 'prev' ? 'Prev' : 'Next'}
