@@ -25,6 +25,7 @@ import {
 import { sendVerificationEmail, sendResetEmail } from '../services/email.js';
 import { requireAuth } from '../middleware/auth.js';
 import ActivityLog from '../models/activityLog.js';
+import { validateObjectId } from '../middleware/ownershipGuard.js';
 
 const router = express.Router();
 
@@ -1631,7 +1632,7 @@ router.get('/totp/devices', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/totp/devices/:deviceId', requireAuth, async (req, res, next) => {
+router.delete('/totp/devices/:deviceId', requireAuth, validateObjectId('deviceId'), async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });

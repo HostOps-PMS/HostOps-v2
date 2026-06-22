@@ -11,6 +11,7 @@ import express from 'express';
 import { z } from 'zod';
 import User from '../models/user.js';
 import { requireAuth, requireAdmin, requireAdminOrTeamLeader } from '../middleware/auth.js';
+import { validateObjectId, logSuspiciousAccess } from '../middleware/ownershipGuard.js';
 import { getDashboard } from '../services/smoobu.js';
 import { v2 as cloudinary } from 'cloudinary';
 import { invalidateImageCache } from './imageProxy.js';
@@ -72,7 +73,7 @@ router.get('/clients', requireAdminOrTeamLeader, async (req, res, next) => {
 // GET /api/clients/:id
 // Returns a single client by MongoDB ObjectId.
 // ─────────────────────────────────────────────────────────────────
-router.get('/clients/:id', requireAdmin, async (req, res, next) => {
+router.get('/clients/:id', requireAdmin, validateObjectId('id'), logSuspiciousAccess, async (req, res, next) => {
   try {
     const client = await User.findById(req.params.id)
       .select('-password -verifyToken -verifyTokenExpiry -resetToken -resetTokenExpiry -__v')
