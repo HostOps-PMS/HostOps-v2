@@ -27,18 +27,18 @@ const FORBIDDEN_FIELDS = new Set([
   '_id',
 ]);
 
-// Routes that are ALLOWED to set restricted fields (admin-only endpoints)
-const ADMIN_EXEMPT_PATHS = new Set([
-  '/api/clients',       // admin edits client (has its own role-check)
+// Routes exempt from field stripping (they have their own validation)
+const EXEMPT_PREFIXES = [
+  '/auth/',             // login, register, change-password, change-pin all need password/pin
+  '/api/clients',       // admin edits client (has its own Zod + role-check)
   '/api/staffs',        // admin edits staff
-]);
+];
 
 export function sanitizeRequestBody(req, res, next) {
   if (!req.body || typeof req.body !== 'object') return next();
 
-  // Skip for admin-exempt paths (they have their own Zod + role checks)
-  const isExempt = ADMIN_EXEMPT_PATHS.has(req.path) ||
-    [...ADMIN_EXEMPT_PATHS].some(p => req.path.startsWith(p + '/'));
+  // Skip for exempt paths (they have their own Zod + role checks)
+  const isExempt = EXEMPT_PREFIXES.some(p => req.path.startsWith(p));
 
   if (!isExempt) {
     for (const field of FORBIDDEN_FIELDS) {
