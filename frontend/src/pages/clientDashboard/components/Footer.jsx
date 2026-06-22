@@ -81,6 +81,8 @@ export default function Footer() {
               border: "1px solid transparent", transition: "all .15s",
             }}>{label}</a>
           ))}
+          {/* Bug Report button — temporarily disabled */}
+          {/*
           <button
             onClick={() => setShowBugReport(true)}
             style={{
@@ -97,6 +99,7 @@ export default function Footer() {
             </svg>
             Bug Report
           </button>
+          */}
         </div>
 
       </div>
