@@ -629,7 +629,8 @@ router.post('/refresh', async (req, res, next) => {
     try { decoded = verifyRefreshToken(rawToken); }
     catch { return res.status(401).json({ error: 'Invalid refresh token' }); }
 
-    // Hash the decrypted token to look it up in DB
+    // Atomic lookup — prevents race condition where two parallel refresh
+    // requests both read the same un-revoked token before either revokes it
     const stored = await RefreshToken.findOne({ token: hashToken(rawToken) });
     if (!stored) return res.status(401).json({ error: 'Unauthorized', code: 'RT_NOT_FOUND' });
 
@@ -664,9 +665,12 @@ router.post('/refresh', async (req, res, next) => {
       const newRefreshToken = signStaffRefreshToken(staff);
       const { jti: newAccessJti } = verifyAccessToken(encryptToken(rawNewAccess));
 
-      stored.revokedAt  = new Date();
-      stored.replacedBy = hashToken(newRefreshToken);
-      await stored.save();
+      // Atomic revocation — prevents parallel refresh race condition
+      const revoked = await RefreshToken.findOneAndUpdate(
+        { _id: stored._id, revokedAt: null },
+        { $set: { revokedAt: new Date(), replacedBy: hashToken(newRefreshToken) } }
+      );
+      if (!revoked) return res.status(401).json({ error: 'Unauthorized', code: 'RT_ALREADY_USED' });
 
       await RefreshToken.create({
         userId:    staff.clientId, 
@@ -697,9 +701,12 @@ router.post('/refresh', async (req, res, next) => {
     const newRefreshToken = signRefreshToken(user);
     const { jti: newAccessJti } = verifyAccessToken(encryptToken(rawNewAccess));
 
-    stored.revokedAt  = new Date();
-    stored.replacedBy = hashToken(newRefreshToken);
-    await stored.save();
+    // Atomic revocation — prevents parallel refresh race condition
+    const revoked = await RefreshToken.findOneAndUpdate(
+      { _id: stored._id, revokedAt: null },
+      { $set: { revokedAt: new Date(), replacedBy: hashToken(newRefreshToken) } }
+    );
+    if (!revoked) return res.status(401).json({ error: 'Unauthorized', code: 'RT_ALREADY_USED' });
 
     await RefreshToken.create({
       userId:    user._id,
@@ -1573,16 +1580,26 @@ router.post('/totp/verify', async (req, res, next) => {
       window:   1,
     });
 
-    // If TOTP failed, try backup codes
+    // If TOTP failed, try backup codes with ATOMIC update
     let usedBackupCode = false;
     if (!verified && user.backupCodes?.length > 0) {
-      for (const bc of user.backupCodes) {
+      for (let i = 0; i < user.backupCodes.length; i++) {
+        const bc = user.backupCodes[i];
         if (bc.used) continue;
         const match = await bcrypt.compare(cleanToken.toUpperCase(), bc.hash);
         if (match) {
-          bc.used = true;
-          verified = true;
-          usedBackupCode = true;
+          // Atomic update — marks the specific backup code as used in a single DB operation
+          // Prevents race condition where two parallel requests use the same code
+          const atomicResult = await User.findOneAndUpdate(
+            { _id: user._id, [`backupCodes.${i}.used`]: false },
+            { $set: { [`backupCodes.${i}.used`]: true } },
+            { new: true }
+          ).select('+backupCodes');
+          if (atomicResult) {
+            verified = true;
+            usedBackupCode = true;
+            user = atomicResult;
+          }
           break;
         }
       }
@@ -1594,9 +1611,8 @@ router.post('/totp/verify', async (req, res, next) => {
       signAccessToken, signRefreshToken, user, req
     );
 
-    user.lastLoginAt = new Date();
-    if (usedBackupCode) user.markModified('backupCodes');
-    await user.save();
+    // Atomic lastLoginAt update
+    await User.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } });
 
     setRefreshCookie(res, rawRefresh, req);
     const totpSk = createSessionKey(totpJti, accessTokenExpiryMs());
