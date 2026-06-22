@@ -43,11 +43,22 @@ function OccupancyBar({ pct }) {
   );
 }
 
-export default function TopClients() {
+export default function TopClients({ topClients, loading, onClientClick }) {
   const { dark } = useTheme();
   const [sortBy, setSortBy] = useState('Revenue');
 
-  const sorted = [...TOP_CLIENTS].sort((a, b) => {
+  const data = (topClients && topClients.length > 0)
+    ? topClients.map(c => ({
+        ...c,
+        name: c.clientName || c.businessName || c.name || 'Unknown',
+        avatar: (c.clientName || c.businessName || c.name || '??').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase(),
+        revenue: c.revenue || 0,
+        occupancy: c.occupancy || 0,
+        bookings: c.bookings || 0,
+      }))
+    : TOP_CLIENTS;
+
+  const sorted = [...data].sort((a, b) => {
     if (sortBy === 'Revenue')          return b.revenue   - a.revenue;
     if (sortBy === 'Occupancy %')      return b.occupancy - a.occupancy;
     if (sortBy === 'Active Bookings')  return b.bookings  - a.bookings;
@@ -55,9 +66,9 @@ export default function TopClients() {
   });
 
   return (
-    <div className="db-table-card" style={{ flexShrink: 0, height: '100%' }}>
+    <div className="db-table-card" style={{ flexShrink: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <div className="db-table-card__head" style={{ flexWrap: 'wrap', gap: 8 }}>
+      <div className="db-table-card__head" style={{ flexWrap: 'wrap', gap: 8, flexShrink: 0 }}>
         <h2 className="db-table-card__title">Top Clients</h2>
         <div style={{ display: 'flex', gap: 6 }}>
           {SORT_OPTS.map(opt => (
@@ -83,8 +94,8 @@ export default function TopClients() {
         </div>
       </div>
 
-      {/* List */}
-      <div style={{ padding: '0 10px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {/* List — scrollable */}
+      <div style={{ padding: '0 10px 4px', display: 'flex', flexDirection: 'column', gap: 2, flex: 1, overflowY: 'auto', minHeight: 0 }}>
         {sorted.map((client, idx) => {
           const badge = RANK_BADGES[idx + 1];
           return (
@@ -100,8 +111,9 @@ export default function TopClients() {
                 borderRadius: 10,
                 background: idx === 0 ? (dark ? '#0d2619' : '#f0faf6') : 'transparent',
                 transition: 'background .12s',
-                cursor: 'default',
+                cursor: onClientClick ? 'pointer' : 'default',
               }}
+              onClick={() => onClientClick?.(client)}
               onMouseEnter={e => { if (idx > 0) e.currentTarget.style.background = dark ? '#0d2619' : '#f4faf7'; }}
               onMouseLeave={e => { if (idx > 0) e.currentTarget.style.background = 'transparent'; }}
             >
@@ -162,6 +174,24 @@ export default function TopClients() {
             </div>
           );
         })}
+      </div>
+
+      {/* View More — fixed at bottom */}
+      <div style={{ padding: '8px 20px 14px', textAlign: 'center', marginTop: 'auto', flexShrink: 0 }}>
+        <button
+          onClick={() => { if (typeof window !== 'undefined') window.location.href = '/clients'; }}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '8px 24px',
+            borderRadius: 'var(--radius-pill)',
+            background: 'var(--color-brand-light)',
+            color: 'var(--color-brand)',
+            fontWeight: 600, fontSize: '.8rem',
+            border: '1px solid #c6ead9',
+            cursor: 'pointer', fontFamily: 'var(--font-body)',
+          }}>
+          View all clients ↗
+        </button>
       </div>
     </div>
   );
