@@ -65,9 +65,9 @@ export default function RecentActivities({ activities, loading }) {
   }
 
   return (
-    <div className="db-table-card" style={{ flexShrink: 0, minHeight: 450 }}>
+    <div className="db-table-card" style={{ flexShrink: 0, minHeight: 450, display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <div className="db-table-card__head">
+      <div className="db-table-card__head" style={{ flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <h2 className="db-table-card__title">Recent Activities</h2>
           {isLive && (
@@ -149,7 +149,7 @@ export default function RecentActivities({ activities, loading }) {
       </div>
 
       {/* View all button — bottom */}
-      <div style={{ padding: '20px 20px 24px', textAlign: 'center' }}>
+      <div style={{ padding: '20px 20px 24px', textAlign: 'center', marginTop: 'auto', flexShrink: 0 }}>
         <button
           onClick={() => navigate('/recent-activities')}
           style={{

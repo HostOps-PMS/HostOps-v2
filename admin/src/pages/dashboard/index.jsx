@@ -172,6 +172,9 @@ export default function Dashboard() {
               <TopClients
                 topClients={overview?.topClients ?? null}
                 loading={statsLoading}
+                onClientClick={(client) => {
+                  window.location.href = '/clients';
+                }}
               />
             </div>
           </div>

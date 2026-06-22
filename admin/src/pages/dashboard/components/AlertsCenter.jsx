@@ -51,9 +51,9 @@ export default function AlertsCenter({ alerts, loading }) {
   }
 
   return (
-    <div className="db-table-card" style={{ flexShrink: 0 }}>
+    <div className="db-table-card" style={{ flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <div className="db-table-card__head">
+      <div className="db-table-card__head" style={{ flexShrink: 0 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h2 className="db-table-card__title">Alerts Center</h2>
@@ -169,7 +169,7 @@ export default function AlertsCenter({ alerts, loading }) {
       )}
 
       {/* View all button */}
-      <div style={{ padding: '8px 20px 16px', textAlign: 'center' }}>
+      <div style={{ padding: '8px 20px 16px', textAlign: 'center', marginTop: 'auto', flexShrink: 0 }}>
         <button
           onClick={() => navigate('/alerts')}
           style={{
