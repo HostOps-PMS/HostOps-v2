@@ -44,7 +44,7 @@ function ViewToggle({ view, onViewChange }) {
             <span style={{ color: active ? (v.id === 'archives' ? '#f59e0b' : '#10b981') : '#b0b7c3', display: 'flex', transition: 'color 0.16s' }}>
               {v.icon}
             </span>
-            {v.label}
+            <span className="ac-view-label">{v.label}</span>
           </button>
         );
       })}
