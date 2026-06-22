@@ -169,6 +169,10 @@ app.use(cookieParser());
 // ── MongoDB Injection Sanitization ────────────────────────────────────────────
 app.use(mongoSanitize());
 
+// ── Mass Assignment Protection ───────────────────────────────────────────────
+import { sanitizeRequestBody } from './middleware/sanitizeBody.js';
+app.use(sanitizeRequestBody);
+
 // ── Response Encryption ───────────────────────────────────────────────────────
 app.use(encryptApiResponse);
 

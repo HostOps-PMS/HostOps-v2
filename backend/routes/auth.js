@@ -1030,8 +1030,7 @@ router.patch('/profile', requireAuth, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.patch('/admin-remember-me', requireAuth, async (req, res, next) => {
   try {
-    const { enabled } = req.body;
-    if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'enabled boolean is required' });
+    const { enabled } = z.object({ enabled: z.boolean() }).parse(req.body);
 
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
