@@ -519,7 +519,8 @@ const [currentUser, setCurrentUser] = useState(() => {
 
   return (
     <>
-    <header style={{
+    <style>{`@media (max-width: 768px) { .db-topbar-header { display: none !important; } }`}</style>
+    <header className="db-topbar-header" style={{
       display: 'flex',
       alignItems: 'center',
       gap: 10,
