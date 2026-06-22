@@ -733,7 +733,8 @@ export default function ActivityLogTable({
           .al-date-sep { flex-shrink: 0; }
           .al-clear-btn { flex-shrink: 0; padding: 7px 10px; margin-left: auto; }
           .al-export-btn { margin-left: 0 !important; width: 100%; justify-content: center; }
-          .al-pagination { flex-direction: column; align-items: flex-start; gap: 10px; }
+          .al-pagination { flex-direction: column; align-items: center; gap: 10px; }
+          .al-pagination > div { justify-content: center; }
           .al-page-btns { justify-content: flex-end; }
           .al-table-wrap { border-radius: 12px; overflow: visible !important; }
           .al-page-info { width: 100%; text-align: center; }

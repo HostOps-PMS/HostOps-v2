@@ -1143,9 +1143,14 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                     <div style={{ padding: '36px 0', textAlign: 'center', fontSize: 12, color: notifMuted }}>No bug reports yet</div>
                   ) : (
                     mobileBugReports.map((r, i) => {
-                      const sevColors = { low: '#22c55e', medium: '#f59e0b', high: '#f97316', critical: '#ef4444' };
-                      const stColors  = { open: '#f97316', in_progress: '#f59e0b', sent: '#2563eb', resolved: '#22c55e', dismissed: '#6b7280' };
-                      const stLabels  = { open: 'Open', in_progress: 'In Progress', sent: 'Sent', resolved: 'Resolved', dismissed: 'Dismissed' };
+                      const sevMeta = { low: { label: 'Low', bg: dark ? '#052e16' : '#f0fdf4', color: dark ? '#4ade80' : '#16a34a', border: dark ? '#166534' : '#bbf7d0' }, medium: { label: 'Medium', bg: dark ? '#2a1f0a' : '#fffbeb', color: dark ? '#fbbf24' : '#d97706', border: dark ? '#5c3a0a' : '#fde68a' }, high: { label: 'High', bg: dark ? '#2a1a0a' : '#fff7ed', color: dark ? '#fb923c' : '#ea580c', border: dark ? '#5c2a0a' : '#fed7aa' }, critical: { label: 'Critical', bg: dark ? '#2a0d0d' : '#fef2f2', color: dark ? '#f87171' : '#dc2626', border: dark ? '#5c1a1a' : '#fecaca' } };
+                      const stMeta = { open: { label: 'Open', bg: dark ? '#2a1a0a' : '#fff7ed', color: dark ? '#fb923c' : '#ea580c', border: dark ? '#5c2a0a' : '#fed7aa' }, in_progress: { label: 'In Progress', bg: dark ? '#2a1f0a' : '#fffbeb', color: dark ? '#fbbf24' : '#d97706', border: dark ? '#5c3a0a' : '#fde68a' }, sent: { label: 'Sent', bg: dark ? '#0d1a2a' : '#eff6ff', color: dark ? '#60a5fa' : '#2563eb', border: dark ? '#1a3a5c' : '#bfdbfe' }, resolved: { label: 'Resolved', bg: dark ? '#052e16' : '#f0fdf4', color: dark ? '#4ade80' : '#16a34a', border: dark ? '#166534' : '#bbf7d0' }, dismissed: { label: 'Dismissed', bg: dark ? '#1f2937' : '#f3f4f6', color: dark ? '#9ca3af' : '#6b7280', border: dark ? '#374151' : '#e5e7eb' } };
+                      const sev = sevMeta[r.severity] || sevMeta.high;
+                      const st = stMeta[r.status] || stMeta.open;
+                      const rName = (r.name && r.name !== r.email && !r.name.includes('@')) ? r.name : (r.email ? r.email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '?');
+                      const COLORS = ['#1a9e6e','#2196f3','#9c27b0','#f44336','#ff9800','#00bcd4'];
+                      let hash = 0; for (let c = 0; c < rName.length; c++) hash = rName.charCodeAt(c) + ((hash << 5) - hash);
+                      const avBg = COLORS[Math.abs(hash) % COLORS.length];
                       return (
                         <div key={r._id ?? i} className="mob-notif-item" style={{
                           display: 'flex', alignItems: 'flex-start', gap: 10,
@@ -1153,14 +1158,14 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                           borderBottom: `0.5px solid ${notifDiv}`,
                           background: r.status === 'open' ? notifUnreadBg : notifReadBg,
                         }}>
-                          <div style={{ width: 34, height: 34, borderRadius: 10, background: dark ? '#2a0d0d' : '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>🐛</div>
+                          <div style={{ width: 34, height: 34, borderRadius: 10, background: avBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{(rName[0] || '?').toUpperCase()}</div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', gap: 4, marginBottom: 3 }}>
-                              <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 700, color: '#fff', background: sevColors[r.severity] || '#f97316' }}>{(r.severity || 'high').charAt(0).toUpperCase() + (r.severity || 'high').slice(1)}</span>
-                              <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 700, color: '#fff', background: stColors[r.status] || '#6b7280' }}>{stLabels[r.status] || r.status}</span>
+                            <div style={{ display: 'flex', gap: 4, marginBottom: 3, flexWrap: 'wrap' }}>
+                              <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: sev.color, background: sev.bg, border: `1px solid ${sev.border}`, letterSpacing: 0.3 }}>{sev.label}</span>
+                              <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: st.color, background: st.bg, border: `1px solid ${st.border}`, letterSpacing: 0.3 }}>{st.label}</span>
                             </div>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: notifText, lineHeight: 1.3 }}>{r.page || 'General'}</div>
-                            <div style={{ fontSize: 11, color: notifMuted, marginTop: 1 }}>{r.name || r.email || '—'}</div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: notifText, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.page || 'General'}</div>
+                            <div style={{ fontSize: 11, color: notifMuted, marginTop: 1 }}>{rName}</div>
                           </div>
                           <div style={{ flexShrink: 0, textAlign: 'right' }}>
                             <div style={{ fontSize: 10, color: notifDim }}>
@@ -1168,7 +1173,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                                 const d = new Date(r.createdAt);
                                 if (isNaN(d.getTime())) return '';
                                 const diff = Math.floor((Date.now() - d.getTime()) / 1000);
-                                if (diff < 60) return 'just now';
+                                if (diff < 0 || diff < 60) return 'just now';
                                 if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
                                 if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
                                 return `${Math.floor(diff / 86400)}d ago`;

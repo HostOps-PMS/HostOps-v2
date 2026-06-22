@@ -102,7 +102,7 @@ export default function AccountsPage() {
           <style>{`
             @keyframes ac-pdf-spin   { to { transform: rotate(360deg); } }
             @keyframes ac-view-enter { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
-            @media (max-width: 768px) { .ac-export-label { display: none; } }
+            @media (max-width: 768px) { .ac-export-label { display: none; } .ac-view-label { display: none; } }
           `}</style>
 
           {/* ── Page header ── */}
