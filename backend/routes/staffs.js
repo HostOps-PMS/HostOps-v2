@@ -11,6 +11,7 @@ import { z } from 'zod';
 import Staff from '../models/staff.js';
 import User  from '../models/user.js';
 import { requireAuth, requireAdminOrTeamLeader } from '../middleware/auth.js';
+import { validateObjectId, logSuspiciousAccess } from '../middleware/ownershipGuard.js';
 
 const router = express.Router();
 
@@ -71,11 +72,11 @@ router.get('/staffs', requireAdminOrTeamLeader, async (req, res, next) => {
 // GET /api/staffs/:id
 // Returns a single staff member by MongoDB ObjectId.
 // ─────────────────────────────────────────────────────────────────
-router.get('/staffs/:id', requireAdminOrTeamLeader, async (req, res, next) => {
+router.get('/staffs/:id', requireAdminOrTeamLeader, validateObjectId('id'), logSuspiciousAccess, async (req, res, next) => {
   try {
     const staff = await Staff.findById(req.params.id).lean();
     if (!staff) return res.status(404).json({ error: 'Staff not found' });
-    
+
     if (req.user.role === 'team_leader' && String(staff.clientId) !== String(req.user.serverId)) {
       return res.status(403).json({ error: 'Unauthorized to view this staff member' });
     }

@@ -6,6 +6,7 @@ import fs from 'fs';
 import os from 'os';
 import BugReport from '../models/BugReport.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { validateObjectId } from '../middleware/ownershipGuard.js';
 import { sendBugReportEmail, sendWebhookNotification, sendReplyEmail } from '../utils/bugNotifications.js';
 
 cloudinary.config({
@@ -151,7 +152,7 @@ adminBugReportRouter.get('/bug-reports', requireAuth, requireAdmin, async (req, 
   } catch (err) { next(err); }
 });
 
-adminBugReportRouter.patch('/bug-reports/:id', requireAuth, requireAdmin, async (req, res, next) => {
+adminBugReportRouter.patch('/bug-reports/:id', requireAuth, requireAdmin, validateObjectId('id'), async (req, res, next) => {
   try {
     const { status, resolvedNote } = req.body;
     const update = { status };

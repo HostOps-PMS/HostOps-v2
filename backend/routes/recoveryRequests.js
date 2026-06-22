@@ -13,6 +13,7 @@ import { z }   from 'zod';
 import RecoveryRequest from '../models/RecoveryRequest.js';
 import User            from '../models/user.js';
 import Staff           from '../models/staff.js';
+import { validateObjectId } from '../middleware/ownershipGuard.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 // ═════════════════════════════════════════════════════════════════
@@ -117,7 +118,7 @@ adminRecoveryRouter.get('/recovery-requests', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 // GET /api/recovery-requests/:id
 // ─────────────────────────────────────────────────────────────────
-adminRecoveryRouter.get('/recovery-requests/:id', async (req, res, next) => {
+adminRecoveryRouter.get('/recovery-requests/:id', validateObjectId('id'), async (req, res, next) => {
   try {
     const request = await RecoveryRequest.findById(req.params.id).lean();
     if (!request) return res.status(404).json({ error: 'Recovery request not found' });
@@ -142,7 +143,7 @@ const resolveSchema = z.object({
   enableAccount: z.boolean().optional().default(false),
 });
 
-adminRecoveryRouter.patch('/recovery-requests/:id', async (req, res, next) => {
+adminRecoveryRouter.patch('/recovery-requests/:id', validateObjectId('id'), async (req, res, next) => {
   try {
     const data = resolveSchema.parse(req.body);
 

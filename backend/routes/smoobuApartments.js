@@ -31,6 +31,7 @@ import os          from 'os';
 import User        from '../models/user.js';
 import { decrypt } from '../utils/encryption.js';
 import { requireAuth } from '../middleware/auth.js';
+import { validateObjectId } from '../middleware/ownershipGuard.js';
 import ApartmentPhoto from '../models/apartmentPhoto.js';
 import { getStoredApartmentImages, getStoredApartmentImagesBulk } from '../services/apartmentPhotos.js';
 
@@ -393,7 +394,7 @@ router.post('/apartment-photos/bulk', requireAuth, async (req, res) => {
 
 // GET /:clientId/smoobu-apartments/:apartmentId/photos
 // Returns the stored photos for one apartment.
-router.get('/:clientId/smoobu-apartments/:apartmentId/photos', requireAuth, async (req, res) => {
+router.get('/:clientId/smoobu-apartments/:apartmentId/photos', requireAuth, validateObjectId('clientId'), async (req, res) => {
   try {
     if (!isAdminOrTeamLeader(req)) return res.status(403).json({ error: 'Forbidden' });
     const images = await getStoredApartmentImages(req.params.apartmentId);
@@ -485,7 +486,7 @@ router.post(
 // DELETE /:clientId/smoobu-apartments/:apartmentId/photos?publicId=<urlencoded>
 // Removes a single photo (from Cloudinary + DB). publicId comes from the
 // image objects returned by GET/POST (the `id` field).
-router.delete('/:clientId/smoobu-apartments/:apartmentId/photos', requireAuth, async (req, res) => {
+router.delete('/:clientId/smoobu-apartments/:apartmentId/photos', requireAuth, validateObjectId('clientId'), async (req, res) => {
   try {
     if (!isAdminOrTeamLeader(req)) return res.status(403).json({ error: 'Forbidden' });
 
