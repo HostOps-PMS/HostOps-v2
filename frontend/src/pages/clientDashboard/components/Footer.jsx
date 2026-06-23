@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import hostopsLogo from "../../../assets/HostOpsLOGO.png";
 import { useDashboard } from "../context/DashboardContext";
 import BugReportModal from "./BugReportModal";
+import AnnouncementHouse from "./AnnouncementHouse";
 
 export default function Footer() {
   const year = new Date().getFullYear();
@@ -18,6 +19,22 @@ export default function Footer() {
       borderTop: dark ? "1px solid #1e3a2a" : "1px solid #c8e6d8",
       transition: "background 0.2s, border-color 0.2s",
     }}>
+
+      {/* ── Announcements: illustrated house tab ── */}
+      <div className="hp-announce-anchor" style={{
+        position: "relative",
+        padding: "0 clamp(16px, 5vw, 80px)",
+      }}>
+        <div className="hp-announce-float" style={{
+          position: "absolute",
+          top: 0,
+          left: "clamp(16px, 5vw, 80px)",
+          transform: "translateY(-100%)",
+        }}>
+          <AnnouncementHouse dark={dark} />
+        </div>
+      </div>
+
       <style>{`
         .footer-inner {
           display: flex;
@@ -32,6 +49,18 @@ export default function Footer() {
           background: ${dark ? "#132a1e" : "#f0faf6"} !important;
           border-color: ${dark ? "#2a5c3c" : "#c8e6d8"} !important;
           color: ${dark ? "#56c299" : "#1e6b4a"} !important;
+        }
+        @media (max-width: 1024px) {
+          .hp-announce-anchor {
+            padding: 12px 16px 0 !important;
+            display: flex !important;
+            justify-content: center !important;
+            overflow: hidden !important;
+          }
+          .hp-announce-float {
+            position: static !important;
+            transform: none !important;
+          }
         }
         @media (max-width: 768px) {
           .footer-inner {
