@@ -20,21 +20,6 @@ export default function Footer() {
       transition: "background 0.2s, border-color 0.2s",
     }}>
 
-      {/* ── Announcements: illustrated house tab ── */}
-      <div className="hp-announce-anchor" style={{
-        position: "relative",
-        padding: "0 clamp(16px, 5vw, 80px)",
-      }}>
-        <div className="hp-announce-float" style={{
-          position: "absolute",
-          top: 0,
-          left: "clamp(16px, 5vw, 80px)",
-          transform: "translateY(-100%)",
-        }}>
-          <AnnouncementHouse dark={dark} />
-        </div>
-      </div>
-
       <style>{`
         .footer-inner {
           display: flex;
@@ -51,15 +36,9 @@ export default function Footer() {
           color: ${dark ? "#56c299" : "#1e6b4a"} !important;
         }
         @media (max-width: 1024px) {
-          .hp-announce-anchor {
-            padding: 12px 16px 0 !important;
-            display: flex !important;
-            justify-content: center !important;
-            overflow: hidden !important;
-          }
-          .hp-announce-float {
-            position: static !important;
-            transform: none !important;
+          .footer-brand-row {
+            flex-direction: column !important;
+            align-items: center !important;
           }
         }
         @media (max-width: 768px) {
@@ -79,14 +58,19 @@ export default function Footer() {
 
       <div className="footer-inner">
 
-        {/* Logo + Brand */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
-            <img src={hostopsLogo} alt="HostOps" style={{ width: 32, height: 32, objectFit: "contain" }} />
-          </div>
-          <div>
-            <div style={{ fontSize: "13px", fontWeight: 700, color: dark ? "#56c299" : "#1e6b4a" }}>HostOps</div>
-            <div style={{ fontSize: "11px", color: "#8ab8a0", marginTop: 1 }}>{year} — All rights reserved</div>
+        {/* Announcements house + Logo + Brand — same row, same flex item,
+            kaya zero extra vertical space ang naidadagdag */}
+        <div className="footer-brand-row" style={{ display: "flex", alignItems: "center", gap: "16px", flexShrink: 0 }}>
+          <AnnouncementHouse dark={dark} />
+
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
+              <img src={hostopsLogo} alt="HostOps" style={{ width: 32, height: 32, objectFit: "contain" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: dark ? "#56c299" : "#1e6b4a" }}>HostOps</div>
+              <div style={{ fontSize: "11px", color: "#8ab8a0", marginTop: 1 }}>{year} — All rights reserved</div>
+            </div>
           </div>
         </div>
 
