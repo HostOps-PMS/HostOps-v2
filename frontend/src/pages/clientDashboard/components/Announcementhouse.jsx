@@ -5,7 +5,6 @@ const DUMMY_ANNOUNCEMENTS = [
     id: 1,
     label: "Maintenance notice",
     message: "Pool area closed June 25 for cleaning.",
-    image: "https://images.unsplash.com/photo-1572331165267-854da2b021b1?w=400&h=200&fit=crop",
   },
   {
     id: 2,
@@ -45,16 +44,7 @@ function SmokeLabel({ labelColor, smokeColor }) {
       <div className="hp-puff" style={{ left: 0, bottom: 0, width: 6, height: 6, background: smokeColor, animationDelay: "0s" }} />
       <div className="hp-puff" style={{ left: 3, bottom: -3, width: 8, height: 8, background: smokeColor, animationDelay: "0.3s" }} />
       <div className="hp-puff" style={{ left: -1, bottom: -6, width: 10, height: 10, background: smokeColor, animationDelay: "0.6s" }} />
-      <span style={{
-        position: "absolute",
-        left: 14,
-        bottom: -2,
-        fontSize: 13,
-        fontWeight: 800,
-        color: labelColor,
-        letterSpacing: "0.02em",
-        whiteSpace: "nowrap",
-      }}>Announcements</span>
+      <span className="hp-text" style={{ color: labelColor }}>Announcements</span>
       <style>{`
         .hp-puff {
           position: absolute;
@@ -62,11 +52,29 @@ function SmokeLabel({ labelColor, smokeColor }) {
           opacity: 0;
           animation: hpPuffRise 4s ease-in-out infinite;
         }
+        .hp-text {
+          position: absolute;
+          left: 12px;
+          bottom: 0;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.03em;
+          white-space: nowrap;
+          opacity: 0;
+          filter: blur(4px);
+          animation: hpTextForm 4s ease-in-out infinite;
+        }
         @keyframes hpPuffRise {
           0% { opacity: 0; transform: translateY(0) scale(0.6); }
           15% { opacity: 0.55; transform: translateY(-5px) scale(0.9); }
           45% { opacity: 0.35; transform: translateY(-18px) scale(1.3); }
           70%, 100% { opacity: 0; transform: translateY(-30px) scale(1.6); }
+        }
+        @keyframes hpTextForm {
+          0%, 10% { opacity: 0; filter: blur(6px); letter-spacing: 0.3em; }
+          45% { opacity: 1; filter: blur(0px); letter-spacing: 0.03em; }
+          75% { opacity: 1; filter: blur(0px); letter-spacing: 0.03em; }
+          95%, 100% { opacity: 0; filter: blur(4px); letter-spacing: 0.08em; }
         }
       `}</style>
     </div>
@@ -498,35 +506,13 @@ export default function AnnouncementHouse({ dark, announcements = DUMMY_ANNOUNCE
                           {/* Accent bar */}
                           <div style={{
                             width: 4,
-                            alignSelf: "stretch",
+                            minHeight: "100%",
                             borderRadius: 2,
                             background: accent,
                             flexShrink: 0,
                             opacity: 0.8,
                           }} />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            {/* Optional image */}
-                            {item.image && (
-                              <div style={{
-                                width: "100%",
-                                height: 120,
-                                borderRadius: 6,
-                                overflow: "hidden",
-                                marginBottom: 8,
-                                background: dark ? "#0a1812" : "#f0f0ee",
-                              }}>
-                                <img
-                                  src={item.image}
-                                  alt={item.label}
-                                  style={{
-                                    width: "100%",
-                                    height: "100%",
-                                    objectFit: "cover",
-                                    display: "block",
-                                  }}
-                                />
-                              </div>
-                            )}
                             <p style={{
                               fontSize: 13,
                               fontWeight: 700,

@@ -41,6 +41,11 @@ const MANAGE_ITEMS = [
     label: 'Accounts',
     to: '/accounts',
   },
+  {
+    icon: <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 5h14M3 5v12a1 1 0 001 1h12a1 1 0 001-1V5" strokeLinecap="round" strokeLinejoin="round"/><path d="M8 2h4a1 1 0 011 1v2H7V3a1 1 0 011-1z" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 10h6M7 13h4" strokeLinecap="round"/></svg>,
+    label: 'Announcements',
+    to: '/announcements',
+  },
 ];
 
 // MONITORING
