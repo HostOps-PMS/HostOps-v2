@@ -21,6 +21,7 @@ import AlertsCenterPage from './pages/AlertsCenter';
 import HoneypotDashboard from './pages/HoneypotDashboard';
 import RecentActivitiesPage from './pages/RecentActivities/index';
 import BugReportsPage from './pages/BugReports/index';
+import AnnouncementsPage from './pages/Announcements/index';
 
 const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
 
@@ -280,6 +281,16 @@ export default function App() {
           element={
             <PrivateRoute>
               <BugReportsPage />
+            </PrivateRoute>
+          }
+        />
+
+        {/* ── Announcements ─────────────────────────────────── */}
+        <Route
+          path="/announcements"
+          element={
+            <PrivateRoute>
+              <AnnouncementsPage />
             </PrivateRoute>
           }
         />

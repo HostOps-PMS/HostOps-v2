@@ -27,6 +27,7 @@ import imageProxyRoute         from './routes/imageProxy.js';
 import smoobuWebhookRoute      from './routes/smoobuWebhook.js';
 import ghlProxyRoute           from './routes/ghlProxy.js';
 import opsRoutes               from './routes/internal/ops.js';
+import announcementsRoute      from './routes/announcements.js';
 import { requireAuth }         from './middleware/auth.js';
 import { load as loadBlocklistCache } from './utils/blocklistCache.js';
 
@@ -295,6 +296,7 @@ app.use('/api',  adminBugReportRouter);
 app.use('/api',  outlookInboxRouter);
 app.use('/api', keyDiagnosticRoute);
 app.use('/api', smoobuWebhookRoute);
+app.use('/api', announcementsRoute);
 
 app.use('/internal/ops', requireAuth, requireAdmin, opsRoutes);
 
