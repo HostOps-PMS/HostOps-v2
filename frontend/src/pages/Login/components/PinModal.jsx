@@ -5,7 +5,7 @@ import safeStorage from '../../safeStorage';
 import { setSecureUser } from '../../../lib/secureUserStorage';
 import RecoveryModal from './RecoveryModal';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://api.hostops.online';
+const API_BASE = import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_URL || 'https://api.hostops.online';
 const PIN_LENGTH = 6;
 
 const PIN_TIPS = [
