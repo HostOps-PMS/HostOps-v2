@@ -233,15 +233,15 @@ const authLimiterByAccount = rateLimit({
 });
 
 const otpLimiter = rateLimit({
-  windowMs:        90 * 1000, // 90 seconds
-  max:             3,
+  windowMs:        30 * 60 * 1000, // 30 minutes — matches verify attempt lockout window
+  max:             5,
   standardHeaders: true,
   legacyHeaders:   false,
   keyGenerator: (req) => req.body?.email?.toLowerCase() || req.ip,
   skipSuccessfulRequests: true,
   handler: (req, res) => logHit(req, res, {
     name: 'otp-verification',
-    message: { error: 'Too many OTP attempts, please wait 90 seconds.' },
+    message: { error: 'Too many OTP attempts, please wait 30 minutes.' },
   }),
 });
 
@@ -253,9 +253,10 @@ app.use('/auth/forgot-password',  authLimiterByIp, authLimiterByAccount);
 app.use('/auth/reset-password',   authLimiterByIp, authLimiterByAccount);
 app.use('/auth/send-login-otp',   authLimiterByIp, authLimiterByAccount);
 app.use('/auth/resend-login-otp', authLimiterByIp, authLimiterByAccount);
-app.use('/auth/verify-login-otp', otpLimiter);
-app.use('/auth/verify',           otpLimiter);
-app.use('/auth/totp/verify',      otpLimiter);
+app.use('/auth/verify-login-otp',   otpLimiter);
+app.use('/auth/verify',             otpLimiter);
+app.use('/auth/totp/verify',        otpLimiter);
+app.use('/auth/resend-verification', authLimiterByIp, authLimiterByAccount);
 
 // ── Global API Key Protection ─────────────────────────────────────────────────
 app.use((req, res, next) => {
