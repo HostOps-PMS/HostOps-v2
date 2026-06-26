@@ -657,3 +657,36 @@
   bottom: 0;
   background: var(--color-surface);
 }
+
+/* ── Mobile responsiveness ────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .cl-search {
+    max-width: 100%;
+  }
+
+  .db-topbar__search {
+    max-width: 100%;
+  }
+
+  .cl-content {
+    padding: 16px 16px;
+  }
+
+  .cl-content__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .cl-filterbar {
+    flex-wrap: wrap;
+  }
+
+  .db-modal__row {
+    grid-template-columns: 1fr;
+  }
+
+  .cl-modal-grid {
+    grid-template-columns: 1fr;
+  }
+}

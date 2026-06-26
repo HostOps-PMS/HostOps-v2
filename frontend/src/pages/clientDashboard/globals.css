@@ -290,3 +290,21 @@ body, #root {
   height: fit-content !important;
   min-height: unset !important;
 }
+
+/* ── Mobile responsiveness ───────────────────────────────────────── */
+@media (max-width: 768px) {
+  .db-grid-2-chart,
+  .db-grid-2-bottom {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .db-nav {
+    padding: 0 14px;
+  }
+
+  .db-container {
+    padding: 20px 14px;
+  }
+}
