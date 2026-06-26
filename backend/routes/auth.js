@@ -300,22 +300,23 @@ router.post('/verify', async (req, res, next) => {
     const normalizedEmail = email.toLowerCase();
     const now             = new Date();
 
-    // Check lockout before touching the token — read-only probe, no race risk
-    const probe = await User.findOne({ email: normalizedEmail })
-      .select('+verifyLockedUntil +verifyAttempts');
-    if (probe?.verifyLockedUntil && probe.verifyLockedUntil > now) {
-      const retryAfterMs = probe.verifyLockedUntil - now;
-      const minutes      = Math.ceil(retryAfterMs / 60000);
+    // Always fetch the user first to check lockout and token in one read
+    const user = await User.findOne({ email: normalizedEmail, isVerified: false });
+    if (!user) return res.status(400).json({ error: 'Invalid or expired token' });
+
+    // Check lockout
+    if (user.verifyLockedUntil && user.verifyLockedUntil > now) {
+      const minutes = Math.ceil((user.verifyLockedUntil - now) / 60000);
       return res.status(429).json({
         error: `Maximum attempts reached the limit, Please try again after ${minutes} minute${minutes !== 1 ? 's' : ''}`,
       });
     }
 
-    // Atomic: only succeed if token matches AND is not expired AND account is not already verified
+    // Check token match atomically — consume it in the same operation
     const hashed  = hashToken(token);
     const updated = await User.findOneAndUpdate(
       {
-        email:             normalizedEmail,
+        _id:               user._id,
         isVerified:        false,
         verifyToken:       hashed,
         verifyTokenExpiry: { $gt: now },
@@ -329,16 +330,11 @@ router.post('/verify', async (req, res, next) => {
 
     if (updated) return res.json({ message: 'Email verified. You can now log in.' });
 
-    // Token was wrong — increment attempt counter atomically
-    const afterFail = await User.findOneAndUpdate(
-      { email: normalizedEmail, isVerified: false },
-      { $inc: { verifyAttempts: 1 } },
-      { new: true, select: '+verifyAttempts' }
-    );
-
-    if (afterFail && afterFail.verifyAttempts >= VERIFY_MAX_ATTEMPTS) {
+    // Wrong token — increment attempt counter atomically and check if lockout threshold reached
+    const newAttempts = (user.verifyAttempts || 0) + 1;
+    if (newAttempts >= VERIFY_MAX_ATTEMPTS) {
       await User.updateOne(
-        { email: normalizedEmail, isVerified: false },
+        { _id: user._id },
         { $set: { verifyLockedUntil: new Date(Date.now() + VERIFY_LOCKOUT_MS), verifyAttempts: 0 } }
       );
       return res.status(429).json({
@@ -346,6 +342,7 @@ router.post('/verify', async (req, res, next) => {
       });
     }
 
+    await User.updateOne({ _id: user._id }, { $inc: { verifyAttempts: 1 } });
     return res.status(400).json({ error: 'Invalid or expired token' });
   } catch (err) { next(err); }
 });
@@ -1216,10 +1213,22 @@ router.post('/resend-verification', async (req, res, next) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
 
+    const now = new Date();
+
+    // Read first to check lockout before issuing a new token
+    const existing = await User.findOne({ email: email.toLowerCase(), isVerified: false });
+    if (existing?.verifyLockedUntil && existing.verifyLockedUntil > now) {
+      const minutes = Math.ceil((existing.verifyLockedUntil - now) / 60000);
+      return res.status(429).json({
+        error: `Maximum attempts reached the limit, Please try again after ${minutes} minute${minutes !== 1 ? 's' : ''}`,
+      });
+    }
+    if (!existing) return res.json({ message: 'If registered, a new code has been sent.' });
+
     const rawToken = randomToken();
     const user = await User.findOneAndUpdate(
-      { email: email.toLowerCase(), isVerified: false },
-      { $set: { verifyToken: hashToken(rawToken), verifyTokenExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000), verifyAttempts: 0, verifyLockedUntil: null } },
+      { _id: existing._id, isVerified: false },
+      { $set: { verifyToken: hashToken(rawToken), verifyTokenExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000) } },
       { new: true }
     );
     if (!user) return res.json({ message: 'If registered, a new code has been sent.' });
