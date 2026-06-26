@@ -289,26 +289,64 @@ router.post('/register', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/verify
 // ─────────────────────────────────────────────────────────────────
+const VERIFY_MAX_ATTEMPTS  = 5;
+const VERIFY_LOCKOUT_MS    = 30 * 60 * 1000; // 30 minutes
+
 router.post('/verify', async (req, res, next) => {
   try {
     const { email, token } = req.body;
     if (!email || !token) return res.status(400).json({ error: 'Email and token required' });
 
-    const hashed = hashToken(token);
-    const user   = await User.findOne({
-      email:             email.toLowerCase(),
-      verifyToken:       hashed,
-      verifyTokenExpiry: { $gt: new Date() },
-    }).select('+verifyToken +verifyTokenExpiry');
+    const normalizedEmail = email.toLowerCase();
+    const now             = new Date();
 
-    if (!user) return res.status(400).json({ error: 'Invalid or expired token' });
+    // Check lockout before touching the token — read-only probe, no race risk
+    const probe = await User.findOne({ email: normalizedEmail })
+      .select('+verifyLockedUntil +verifyAttempts');
+    if (probe?.verifyLockedUntil && probe.verifyLockedUntil > now) {
+      const retryAfterMs = probe.verifyLockedUntil - now;
+      const minutes      = Math.ceil(retryAfterMs / 60000);
+      return res.status(429).json({
+        error: `Maximum attempts reached the limit, Please try again after ${minutes} minute${minutes !== 1 ? 's' : ''}`,
+      });
+    }
 
-    user.isVerified        = true;
-    user.verifyToken       = undefined;
-    user.verifyTokenExpiry = undefined;
-    await user.save();
+    // Atomic: only succeed if token matches AND is not expired AND account is not already verified
+    const hashed  = hashToken(token);
+    const updated = await User.findOneAndUpdate(
+      {
+        email:             normalizedEmail,
+        isVerified:        false,
+        verifyToken:       hashed,
+        verifyTokenExpiry: { $gt: now },
+      },
+      {
+        $set:   { isVerified: true },
+        $unset: { verifyToken: '', verifyTokenExpiry: '', verifyAttempts: '', verifyLockedUntil: '' },
+      },
+      { new: true }
+    );
 
-    res.json({ message: 'Email verified. You can now log in.' });
+    if (updated) return res.json({ message: 'Email verified. You can now log in.' });
+
+    // Token was wrong — increment attempt counter atomically
+    const afterFail = await User.findOneAndUpdate(
+      { email: normalizedEmail, isVerified: false },
+      { $inc: { verifyAttempts: 1 } },
+      { new: true, select: '+verifyAttempts' }
+    );
+
+    if (afterFail && afterFail.verifyAttempts >= VERIFY_MAX_ATTEMPTS) {
+      await User.updateOne(
+        { email: normalizedEmail, isVerified: false },
+        { $set: { verifyLockedUntil: new Date(Date.now() + VERIFY_LOCKOUT_MS), verifyAttempts: 0 } }
+      );
+      return res.status(429).json({
+        error: 'Maximum attempts reached the limit, Please try again after 30 minutes',
+      });
+    }
+
+    return res.status(400).json({ error: 'Invalid or expired token' });
   } catch (err) { next(err); }
 });
 
@@ -482,19 +520,21 @@ router.post('/verify-login-otp', async (req, res, next) => {
     const hashedOtp       = hashToken(otp);
     const now             = new Date();
 
-    const user = await User.findOne({
-      email:          normalizedEmail,
-      loginOtp:       hashedOtp,
-      loginOtpExpiry: { $gt: now },
-    }).select('+loginOtp +loginOtpExpiry');
+    // Atomic OTP consumption: only one concurrent request can match and clear the OTP
+    const user = await User.findOneAndUpdate(
+      {
+        email:          normalizedEmail,
+        loginOtp:       hashedOtp,
+        loginOtpExpiry: { $gt: now },
+      },
+      { $unset: { loginOtp: '', loginOtpExpiry: '' } },
+      { new: true }
+    );
 
     if (user) {
       if (user.isArchive) {
         return res.status(403).json({ error: 'This account has been disabled. Please contact your administrator.', accountDisabled: true });
       }
-
-      user.loginOtp       = undefined;
-      user.loginOtpExpiry = undefined;
 
       const isAdmin = (user.tag === 'Main Admin' && user.role === 'admin') || user.email === process.env.ADMIN_ROLE;
       if (rememberMe && (!isAdmin || user.allowAdminRememberMe !== false)) {
@@ -550,13 +590,13 @@ router.post('/send-login-otp', async (req, res, next) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
 
-    const account = await User.findOne({ email: email.toLowerCase() });
+    const rawOtp  = randomToken();
+    const account = await User.findOneAndUpdate(
+      { email: email.toLowerCase() },
+      { $set: { loginOtp: hashToken(rawOtp), loginOtpExpiry: new Date(Date.now() + 10 * 60 * 1000) } },
+      { new: true }
+    );
     if (!account) return res.json({ message: 'If that email is registered, an OTP has been sent.' });
-
-    const rawOtp = randomToken();
-    account.loginOtp       = hashToken(rawOtp);
-    account.loginOtpExpiry = new Date(Date.now() + 10 * 60 * 1000);
-    await account.save();
 
     try { await sendVerificationEmail(account.email, account.firstName, rawOtp); }
     catch (e) { console.error('Login OTP email send failed:', e); }
@@ -573,13 +613,13 @@ router.post('/resend-login-otp', async (req, res, next) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
 
-    const account = await User.findOne({ email: email.toLowerCase() });
+    const rawOtp  = randomToken();
+    const account = await User.findOneAndUpdate(
+      { email: email.toLowerCase() },
+      { $set: { loginOtp: hashToken(rawOtp), loginOtpExpiry: new Date(Date.now() + 10 * 60 * 1000) } },
+      { new: true }
+    );
     if (!account) return res.json({ message: 'If that email is registered, a new code has been sent.' });
-
-    const rawOtp = randomToken();
-    account.loginOtp       = hashToken(rawOtp);
-    account.loginOtpExpiry = new Date(Date.now() + 10 * 60 * 1000);
-    await account.save();
 
     try { await sendVerificationEmail(account.email, account.firstName, rawOtp); }
     catch (e) { console.error('Login OTP resend failed:', e); }
@@ -1086,21 +1126,23 @@ router.post('/forgot-password', async (req, res, next) => {
     const normalizedEmail = email.toLowerCase();
     const rawToken = randomToken();
 
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOneAndUpdate(
+      { email: normalizedEmail },
+      { $set: { resetToken: hashToken(rawToken), resetTokenExpiry: new Date(Date.now() + 60 * 60 * 1000) } },
+      { new: true }
+    );
     if (user) {
-      user.resetToken       = hashToken(rawToken);
-      user.resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
-      await user.save();
       try { await sendResetEmail(user.email, user.firstName || user.businessName, rawToken); }
       catch (e) { console.error('Reset email send failed:', e); }
       return res.json({ message: 'If that email is registered, a reset code has been sent.' });
     }
 
-    const staff = await Staff.findOne({ email: normalizedEmail });
+    const staff = await Staff.findOneAndUpdate(
+      { email: normalizedEmail },
+      { $set: { loginOtp: hashToken(rawToken), loginOtpExpiry: new Date(Date.now() + 60 * 60 * 1000) } },
+      { new: true }
+    );
     if (staff) {
-      staff.loginOtp       = hashToken(rawToken);
-      staff.loginOtpExpiry = new Date(Date.now() + 60 * 60 * 1000);
-      await staff.save();
       try { await sendVerificationEmail(staff.email, staff.firstName, rawToken); }
       catch (e) { console.error('Staff reset OTP email send failed:', e); }
     }
@@ -1118,17 +1160,21 @@ router.post('/reset-password', async (req, res, next) => {
     if (!email || !token || !newPassword) return res.status(400).json({ error: 'All fields required' });
     if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
 
-    const user = await User.findOne({
-      email:            email.toLowerCase(),
-      resetToken:       hashToken(token),
-      resetTokenExpiry: { $gt: new Date() },
-    }).select('+resetToken +resetTokenExpiry');
+    // Atomic token consumption: atomically find-and-clear the reset token so
+    // concurrent requests cannot both succeed with the same token.
+    const user = await User.findOneAndUpdate(
+      {
+        email:            email.toLowerCase(),
+        resetToken:       hashToken(token),
+        resetTokenExpiry: { $gt: new Date() },
+      },
+      { $unset: { resetToken: '', resetTokenExpiry: '' } },
+      { new: true }
+    );
 
     if (!user) return res.status(400).json({ error: 'Invalid or expired token' });
 
-    user.password         = newPassword;
-    user.resetToken       = undefined;
-    user.resetTokenExpiry = undefined;
+    user.password = newPassword;
     await user.save();
 
     await RefreshToken.updateMany({ userId: user._id, revokedAt: null }, { revokedAt: new Date() });
@@ -1170,14 +1216,13 @@ router.post('/resend-verification', async (req, res, next) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
 
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) return res.json({ message: 'If registered, a new code has been sent.' });
-    if (user.isVerified) return res.status(400).json({ error: 'Already verified' });
-
     const rawToken = randomToken();
-    user.verifyToken       = hashToken(rawToken);
-    user.verifyTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    await user.save();
+    const user = await User.findOneAndUpdate(
+      { email: email.toLowerCase(), isVerified: false },
+      { $set: { verifyToken: hashToken(rawToken), verifyTokenExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000), verifyAttempts: 0, verifyLockedUntil: null } },
+      { new: true }
+    );
+    if (!user) return res.json({ message: 'If registered, a new code has been sent.' });
 
     try { await sendVerificationEmail(user.email, user.firstName || user.businessName, rawToken); }
     catch (e) { console.error('Email send failed:', e); }
@@ -1197,21 +1242,23 @@ router.post('/resend-reset', async (req, res, next) => {
     const normalizedEmail = email.toLowerCase();
     const rawToken = randomToken();
 
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOneAndUpdate(
+      { email: normalizedEmail },
+      { $set: { resetToken: hashToken(rawToken), resetTokenExpiry: new Date(Date.now() + 60 * 60 * 1000) } },
+      { new: true }
+    );
     if (user) {
-      user.resetToken       = hashToken(rawToken);
-      user.resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
-      await user.save();
       try { await sendResetEmail(user.email, user.firstName || user.businessName, rawToken); }
       catch (e) { console.error('Reset email send failed:', e); }
       return res.json({ message: 'If registered, a new code has been sent.' });
     }
 
-    const staff = await Staff.findOne({ email: normalizedEmail });
+    const staff = await Staff.findOneAndUpdate(
+      { email: normalizedEmail },
+      { $set: { loginOtp: hashToken(rawToken), loginOtpExpiry: new Date(Date.now() + 60 * 60 * 1000) } },
+      { new: true }
+    );
     if (staff) {
-      staff.loginOtp       = hashToken(rawToken);
-      staff.loginOtpExpiry = new Date(Date.now() + 60 * 60 * 1000);
-      await staff.save();
       try { await sendVerificationEmail(staff.email, staff.firstName, rawToken); }
       catch (e) { console.error('Staff reset OTP resend failed:', e); }
     }
@@ -1230,21 +1277,23 @@ router.post('/send-change-password-otp', requireAuth, async (req, res, next) => 
     const expiry   = new Date(Date.now() + 10 * 60 * 1000);
 
     if (req.isStaff) {
-      const staff = await Staff.findById(req.staff._id);
+      const staff = await Staff.findByIdAndUpdate(
+        req.staff._id,
+        { $set: { loginOtp: hashed, loginOtpExpiry: expiry } },
+        { new: true }
+      );
       if (!staff) return res.status(404).json({ error: 'Staff account not found.' });
-      staff.loginOtp       = hashed;
-      staff.loginOtpExpiry = expiry;
-      await staff.save();
       try { await sendVerificationEmail(staff.email, staff.firstName, rawToken); }
       catch (e) { console.error('Staff change-password OTP send failed:', e); }
       return res.json({ message: 'A verification code has been sent to your email.' });
     }
 
-    const user = await User.findById(req.user._id);
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: { resetToken: hashed, resetTokenExpiry: expiry } },
+      { new: true }
+    );
     if (!user) return res.status(404).json({ error: 'User not found.' });
-    user.resetToken       = hashed;
-    user.resetTokenExpiry = expiry;
-    await user.save();
     try { await sendVerificationEmail(user.email, user.firstName || user.businessName, rawToken); }
     catch (e) { console.error('User change-password OTP send failed:', e); }
 
