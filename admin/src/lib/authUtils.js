@@ -53,12 +53,19 @@ export async function tryRefresh() {
         credentials: 'include',
         headers:     { 'x-api-key': API_KEY },
       });
-      if (!res.ok) return false;
+      console.debug(`[tryRefresh] → ${res.status}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        console.warn('[tryRefresh] failed:', res.status, body);
+        return false;
+      }
       const data = await res.json();
       if (data.accessToken) setToken(data.accessToken);
       if (data.sk)          setSessionKey(data.sk);
+      console.debug('[tryRefresh] success, new token set');
       return !!data.accessToken;
-    } catch {
+    } catch (err) {
+      console.warn('[tryRefresh] network error:', err.message);
       return false;
     } finally {
       _refreshPromise = null;
@@ -109,7 +116,9 @@ export async function fetchWithAuth(url, options = {}) {
 
   let res = await fetch(url, { ...options, headers: buildHeaders(), credentials: 'include' });
 
-  if (res.status === 401 || res.status === 403) {
+  console.debug(`[fetchWithAuth] ${options.method || 'GET'} ${url} → ${res.status}`);
+
+  if (res.status === 401) {
     const refreshed = await tryRefresh();
     if (refreshed) {
       const newSk   = getSessionKey();

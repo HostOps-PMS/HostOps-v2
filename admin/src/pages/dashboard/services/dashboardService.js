@@ -19,8 +19,9 @@ async function request(path, options = {}) {
   const res = await fetchWithAuth(`${BASE}${path}`, options);
 
   if (!res.ok) {
-    const msg = await res.text().catch(() => res.statusText);
-    throw new Error(`API ${res.status}: ${msg}`);
+    const body = await res.json().catch(() => ({}));
+    console.error(`[dashboardService] ${options.method || 'GET'} ${path} → ${res.status}`, body);
+    throw new Error(body.error ?? `API ${res.status}`);
   }
 
   return res.json();
