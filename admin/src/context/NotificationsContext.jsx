@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { getDashboardOverview } from '../pages/dashboard/services/dashboardService';
 import { getToken, fetchWithAuth } from '../lib/authUtils';
 
 const API_BASE = (import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
@@ -10,36 +9,28 @@ const NotificationsContext = createContext({
   bugReports: [],
   loading: false,
   refetch: () => {},
+  setOverviewData: () => {},
 });
 
 export function NotificationsProvider({ children }) {
   const [alerts,      setAlerts]      = useState([]);
   const [activities,  setActivities]  = useState([]);
   const [bugReports,  setBugReports]  = useState([]);
-  const [loading,     setLoading]     = useState(true);
+  const [loading,     setLoading]     = useState(false);
 
-  const fetchNotifications = useCallback(async () => {
-    if (!getToken()) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const data = await getDashboardOverview({});
-      setAlerts(data?.alerts ?? []);
-      setActivities(data?.recentActivities ?? []);
-    } catch (err) {
-      console.error('[NotificationsContext] fetch failed:', err);
-    } finally {
-      setLoading(false);
-    }
+  // alerts and activities are populated externally via setOverviewData
+  // called by the dashboard's useStats hook after it fetches the overview
+  const setOverviewData = useCallback((data) => {
+    if (!data) return;
+    setAlerts(data.alerts ?? []);
+    setActivities(data.recentActivities ?? []);
   }, []);
 
   const bugFetchedRef = useRef(false);
 
   const fetchBugReports = useCallback(async () => {
     const token = getToken();
-    if (!token) return;
+    if (!token || bugFetchedRef.current) return;
     try {
       const res = await fetchWithAuth(`${API_BASE}/api/bug-reports`);
       if (res && res.ok) {
@@ -54,31 +45,20 @@ export function NotificationsProvider({ children }) {
     }
   }, []);
 
-  useEffect(() => {
-    fetchNotifications();
+  // fetchNotifications kept for manual refetch compatibility but no longer
+  // calls getDashboardOverview — the dashboard overview is fetched once by
+  // useStats and shared here via setOverviewData to avoid duplicate calls.
+  const fetchNotifications = useCallback(() => {
+    bugFetchedRef.current = false;
     fetchBugReports();
+  }, [fetchBugReports]);
 
-    const interval = setInterval(() => {
-      fetchNotifications();
-      fetchBugReports();
-    }, 60000);
-
-    function onVisible() {
-      if (document.visibilityState === 'visible') {
-        fetchNotifications();
-        fetchBugReports();
-      }
-    }
-    document.addEventListener('visibilitychange', onVisible);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisible);
-    };
-  }, [fetchNotifications, fetchBugReports]);
+  useEffect(() => {
+    fetchBugReports();
+  }, [fetchBugReports]);
 
   return (
-    <NotificationsContext.Provider value={{ alerts, activities, bugReports, loading, refetch: fetchNotifications, refetchBugReports: fetchBugReports }}>
+    <NotificationsContext.Provider value={{ alerts, activities, bugReports, loading, refetch: fetchNotifications, refetchBugReports: fetchBugReports, setOverviewData }}>
       {children}
     </NotificationsContext.Provider>
   );

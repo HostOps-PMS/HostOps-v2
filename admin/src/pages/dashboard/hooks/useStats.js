@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from 'react';
 import { getDashboardOverview } from '../services/dashboardService';
+import { useNotifications } from '../../../context/NotificationsContext';
 
 function formatRevenue(value) {
   if (value >= 1_000_000) return '₱' + (value / 1_000_000).toFixed(1) + 'M';
@@ -50,27 +51,26 @@ export function useStats({ from, to } = {}) {
   const [overview, setOverview] = useState(null);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(null);
+  const { setOverviewData } = useNotifications();
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // ── Use the shared service so auth headers + base URL are consistent ──
-      // getDashboardOverview() reads VITE_API_BASE_URL and hp_access_token from
-      // the same place every other service call does — no more "works on
-      // localhost but not in prod" from a stale inline fetch().
       const data = await getDashboardOverview({ from, to });
-
       setOverview(data);
       setStats(buildStatsCards(data));
+      // share the fetched data with NotificationsContext so it
+      // doesn't need to make its own duplicate dashboard-overview call
+      setOverviewData(data);
     } catch (err) {
       console.error('[useStats] fetch failed:', err);
       setError(err.message || 'Failed to fetch dashboard stats');
     } finally {
       setLoading(false);
     }
-  }, [from, to]);
+  }, [from, to, setOverviewData]);
 
   useEffect(() => {
     fetchStats();
