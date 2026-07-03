@@ -33,6 +33,44 @@ function parseTargetClients(raw) {
 
 const router = Router();
 
+// ── Client-facing: only published announcements visible to this user ──────────
+router.get('/announcements/client', requireAuth, async (req, res, next) => {
+  try {
+    const now    = new Date();
+    const userId = req.user._id;
+
+    console.log('[announcements/client] userId:', userId, 'role:', req.user.role);
+
+    // endDate is informational only — admin archives to end visibility.
+    // startDate controls "not yet visible" (hide until start date arrives).
+    const announcements = await Announcement.find({
+      status: 'published',
+      $and: [
+        {
+          $or: [
+            { audience: 'all' },
+            { audience: 'selected', targetClients: userId },
+          ],
+        },
+        {
+          $or: [
+            { startDate: null },
+            { startDate: { $exists: false } },
+            { startDate: { $lte: now } },
+          ],
+        },
+      ],
+    })
+      .select('title content image priority publishedAt')
+      .sort({ publishedAt: -1, createdAt: -1 })
+      .limit(50)
+      .lean();
+
+    console.log('[announcements/client] found:', announcements.length);
+    res.json(announcements);
+  } catch (err) { next(err); }
+});
+
 router.get('/announcements', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const announcements = await Announcement.find()

@@ -1,23 +1,5 @@
 import { useState, useEffect } from "react";
 
-const DUMMY_ANNOUNCEMENTS = [
-  {
-    id: 1,
-    label: "Maintenance notice",
-    message: "Pool area closed June 25 for cleaning.",
-  },
-  {
-    id: 2,
-    label: "New policy",
-    message: "Check-in time updated to 2:00 PM starting July.",
-  },
-  {
-    id: 3,
-    label: "Reminder",
-    message: "Please review house rules before your stay.",
-  },
-];
-
 function HouseIllustration({ accent, size = 32 }) {
   const wallFill = "#2dc97f";
   const cutoutFill = "#0a1812";
@@ -87,7 +69,13 @@ const STAGE_ENVELOPE_RISE = 2;
 const STAGE_ENVELOPE_OPEN = 3;
 const STAGE_CONTENT = 4;
 
-export default function AnnouncementHouse({ dark, announcements = DUMMY_ANNOUNCEMENTS }) {
+export default function AnnouncementHouse({ dark, announcements: rawAnnouncements = [], loading = false }) {
+  // Normalize API shape { title, content } → display shape { id, label, message }
+  const announcements = rawAnnouncements.map(a => ({
+    id:      a._id,
+    label:   a.title,
+    message: a.content,
+  }));
   const [stage, setStage] = useState(STAGE_CLOSED);
 
   const accent = dark ? "#56c299" : "#1e8760";
@@ -191,6 +179,29 @@ export default function AnnouncementHouse({ dark, announcements = DUMMY_ANNOUNCE
         >
           <HouseIllustration accent={accent} size={72} />
           <SmokeLabel labelColor={labelColor} smokeColor={smokeColor} />
+          {/* Count badge */}
+          {!loading && announcements.length > 0 && (
+            <div style={{
+              position: "absolute",
+              top: 0,
+              right: -6,
+              minWidth: 18,
+              height: 18,
+              borderRadius: 9,
+              background: "#e74c3c",
+              color: "#fff",
+              fontSize: 10,
+              fontWeight: 800,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0 4px",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+              lineHeight: 1,
+            }}>
+              {announcements.length > 9 ? "9+" : announcements.length}
+            </div>
+          )}
         </button>
       </div>
 
@@ -485,12 +496,17 @@ export default function AnnouncementHouse({ dark, announcements = DUMMY_ANNOUNCE
                       maxHeight: "min(280px, 42vh)",
                       overflowY: "auto",
                     }}>
-                      {announcements.length === 0 && (
+                      {loading && (
+                        <p style={{ fontSize: 13, color: mutedColor, margin: 0, textAlign: "center", padding: "24px 0" }}>
+                          Loading…
+                        </p>
+                      )}
+                      {!loading && announcements.length === 0 && (
                         <p style={{ fontSize: 13, color: mutedColor, margin: 0, textAlign: "center", padding: "24px 0" }}>
                           No announcements yet.
                         </p>
                       )}
-                      {announcements.map((item, idx) => (
+                      {!loading && announcements.map((item, idx) => (
                         <div
                           key={item.id}
                           style={{
