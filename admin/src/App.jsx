@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 import { getSecureUser, setSecureUser } from './lib/secureUserStorage';
+import { tryRefresh, getToken } from './lib/authUtils';
 
 import { NotificationsProvider } from './context/NotificationsContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -166,7 +167,14 @@ export default function App() {
   useEffect(() => {
     if (!readyRef.current) {
       readyRef.current = true;
-      setIsReady(true);
+      // Proactively refresh the access token on mount so that a page reload
+      // or a returning session doesn't immediately hit 401 on the first API call.
+      // Skip if there's no existing token (fresh visit, not a reload).
+      if (getToken()) {
+        tryRefresh().finally(() => setIsReady(true));
+      } else {
+        setIsReady(true);
+      }
     }
   }, []);
 

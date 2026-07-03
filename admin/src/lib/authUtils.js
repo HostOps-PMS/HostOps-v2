@@ -43,7 +43,7 @@ export const uploadHeaders = (extra = {}) => ({
 // all sessions nuked → everyone logged out.
 let _refreshPromise = null;
 
-async function tryRefresh() {
+export async function tryRefresh() {
   if (_refreshPromise) return _refreshPromise;
 
   _refreshPromise = (async () => {
@@ -101,14 +101,15 @@ export async function fetchWithAuth(url, options = {}) {
   const sk   = getSessionKey();
   const hint = sk ? await generateSessionHint(sk).catch(() => null) : null;
 
+  const isFormData = options.body instanceof FormData;
   const buildHeaders = () => ({
-    ...authHeaders(options.headers),
+    ...(isFormData ? uploadHeaders(options.headers) : authHeaders(options.headers)),
     ...(hint ? { 'X-Session-Hint': hint } : {}),
   });
 
   let res = await fetch(url, { ...options, headers: buildHeaders(), credentials: 'include' });
 
-  if (res.status === 401) {
+  if (res.status === 401 || res.status === 403) {
     const refreshed = await tryRefresh();
     if (refreshed) {
       const newSk   = getSessionKey();
@@ -116,12 +117,12 @@ export async function fetchWithAuth(url, options = {}) {
       res = await fetch(url, {
         ...options,
         headers: {
-          ...authHeaders(options.headers),
+          ...(isFormData ? uploadHeaders(options.headers) : authHeaders(options.headers)),
           ...(newHint ? { 'X-Session-Hint': newHint } : {}),
         },
         credentials: 'include',
       });
-    } else if (!window.location.hostname.includes('localhost')) {
+    } else {
       handleSessionExpired();
     }
   }

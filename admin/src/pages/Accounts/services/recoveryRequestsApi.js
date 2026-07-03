@@ -1,12 +1,9 @@
-import { authHeaders } from '../../../lib/authUtils';
+import { fetchWithAuth } from '../../../lib/authUtils';
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'https://api.hostops.online';
 
 async function request(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { ...authHeaders(), ...options.headers },
-    ...options,
-  });
+  const res = await fetchWithAuth(`${BASE}${path}`, options);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     const err  = new Error(body.error ?? `API ${res.status}`);
