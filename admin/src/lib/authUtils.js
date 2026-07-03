@@ -19,9 +19,15 @@ export const setSessionKey = (sk) => {
 };
 
 // ── Request headers ────────────────────────────────────────────────
+// X-App-Client tells the backend which SPA is calling so it can scope
+// the 'rt' refresh cookie per app (see backend/routes/auth.js
+// refreshCookieName) — otherwise the admin and frontend apps collide
+// on the same cookie name and logging into one overwrites the other's
+// session on the next silent refresh.
 export const authHeaders = (extra = {}) => ({
   'Content-Type': 'application/json',
   'x-api-key': API_KEY,
+  'X-App-Client': 'admin',
   Authorization: `Bearer ${getToken()}`,
   ...extra,
 });
@@ -29,6 +35,7 @@ export const authHeaders = (extra = {}) => ({
 // For multipart/FormData — omits Content-Type so the browser sets the boundary
 export const uploadHeaders = (extra = {}) => ({
   'x-api-key': API_KEY,
+  'X-App-Client': 'admin',
   Authorization: `Bearer ${getToken()}`,
   ...extra,
 });
@@ -51,7 +58,7 @@ export async function tryRefresh() {
       const res = await fetch(`${API_BASE}/auth/refresh`, {
         method:      'POST',
         credentials: 'include',
-        headers:     { 'x-api-key': API_KEY },
+        headers:     { 'x-api-key': API_KEY, 'X-App-Client': 'admin' },
       });
       console.debug(`[tryRefresh] → ${res.status}`);
       if (!res.ok) {

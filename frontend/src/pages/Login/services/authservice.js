@@ -28,10 +28,11 @@ export async function loginUser({ email, password, deviceId }) {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method:      'POST',
     credentials: 'include',
-    headers:     { 
-      'Content-Type': 'application/json', 
+    headers:     {
+      'Content-Type': 'application/json',
       'x-api-key': import.meta.env.VITE_API_KEY,
-      'x-device-fp': fpHash
+      'x-device-fp': fpHash,
+      'X-App-Client': 'frontend'
     },
     body:        JSON.stringify({ email, password, deviceId }),
   });
@@ -48,7 +49,7 @@ export async function verifyLoginOtp({ email, otp, deviceId, rememberMe }) {
   const res = await fetch(`${API_BASE}/auth/verify-login-otp`, {
     method:      'POST',
     credentials: 'include',
-    headers:     { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
+    headers:     { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY, 'X-App-Client': 'frontend' },
     body:        JSON.stringify({ email, otp, deviceId, rememberMe }),
   });
   const data = await res.json();
@@ -71,7 +72,7 @@ export async function staffLogin({ email, password }) {
   const res = await fetch(`${API_BASE}/auth/staff-login`, {
     method:      'POST',
     credentials: 'include',
-    headers:     { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
+    headers:     { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY, 'X-App-Client': 'frontend' },
     body:        JSON.stringify({ email, password }),
   });
   const data = await res.json();
@@ -121,6 +122,7 @@ export async function checkSession(currentToken) {
       headers: {
         Authorization: `Bearer ${currentToken}`,
         'x-api-key':   import.meta.env.VITE_API_KEY,
+        'X-App-Client': 'frontend',
       },
     });
     if (res.ok) return true;
@@ -134,7 +136,7 @@ export async function checkSession(currentToken) {
       const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
         method:      'POST',
         credentials: 'include',
-        headers:     { 'x-api-key': import.meta.env.VITE_API_KEY },
+        headers:     { 'x-api-key': import.meta.env.VITE_API_KEY, 'X-App-Client': 'frontend' },
       });
       if (refreshRes.ok) {
         const data = await refreshRes.json();
@@ -167,6 +169,7 @@ export async function logoutUser(currentToken) {
       headers: {
         'Content-Type': 'application/json',
         'x-api-key':    import.meta.env.VITE_API_KEY,
+        'X-App-Client': 'frontend',
         ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
       },
     });
@@ -196,6 +199,7 @@ export async function changePassword({ currentPassword, newPassword }, currentTo
     headers: {
       'Content-Type': 'application/json',
       'x-api-key':    import.meta.env.VITE_API_KEY,
+      'X-App-Client': 'frontend',
       ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
     },
     body: JSON.stringify({ currentPassword, newPassword }),
@@ -214,7 +218,7 @@ export async function verifyTotpLogin({ email, token }) {
   const res = await fetch(`${API_BASE}/auth/totp/verify`, {
     method:      'POST',
     credentials: 'include',
-    headers:     { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
+    headers:     { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY, 'X-App-Client': 'frontend' },
     body:        JSON.stringify({ email, token }),
   });
   const data = await res.json();
@@ -239,6 +243,7 @@ export async function changePin({ currentPin, newPin }, currentToken) {
     headers: {
       'Content-Type': 'application/json',
       'x-api-key':    import.meta.env.VITE_API_KEY,
+      'X-App-Client': 'frontend',
       ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
     },
     body: JSON.stringify({ currentPin, newPin }),
