@@ -7,7 +7,7 @@ const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL || '/dashboard';
 export async function login({ email, password }) {
   const res = await fetch('/auth/login', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-App-Client': 'admin' },
     credentials: 'include', // needed for the refresh token cookie
     body: JSON.stringify({ email, password }),
   });
@@ -34,7 +34,7 @@ export async function checkSession(token) {
 
   try {
     const res = await fetch('/auth/me', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, 'X-App-Client': 'admin' },
       credentials: 'include',
     });
     return res.ok;

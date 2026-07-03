@@ -104,7 +104,7 @@ const setUser = useCallback((u) => {
         const res = await fetch(`${HP_API_BASE}/auth/refresh`, {
           method:      'POST',
           credentials: 'include',
-          headers:     { 'x-api-key': import.meta.env.VITE_API_KEY },
+          headers:     { 'x-api-key': import.meta.env.VITE_API_KEY, 'X-App-Client': 'frontend' },
         });
         if (!res.ok) {
           accessTokenRef.current = null;
@@ -145,6 +145,7 @@ const setUser = useCallback((u) => {
     const makeHeaders = (token) => ({
       'Content-Type': 'application/json',
       'x-api-key':    import.meta.env.VITE_API_KEY,
+      'X-App-Client': 'frontend',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(hint   ? { 'X-Session-Hint': hint } : {}),
       ...(options.headers || {}),
@@ -210,7 +211,7 @@ const setUser = useCallback((u) => {
             const res = await fetch(`${HP_API_BASE}/auth/refresh`, {
               method:      'POST',
               credentials: 'include',
-              headers:     { 'x-api-key': import.meta.env.VITE_API_KEY },
+              headers:     { 'x-api-key': import.meta.env.VITE_API_KEY, 'X-App-Client': 'frontend' },
               signal:      controller.signal,
             });
 

@@ -157,6 +157,23 @@ async function issueTokenPair(signFnAccess, signFnRefresh, entity, req, extra = 
   return { encAccessToken: encryptToken(rawAccess), rawRefresh, accessJti };
 }
 
+// ── Helper: pick the rt cookie name for the calling app ──────────
+// Admin panel and client frontend are separate SPAs but both call this
+// same backend origin. If they shared one 'rt' cookie name, logging into
+// one app would silently overwrite the other's refresh token in the
+// browser's cookie jar (same origin = same cookie storage), so the next
+// silent refresh from the OTHER app would come back authenticated as
+// whichever identity logged in last. Each app sends 'X-App-Client:
+// admin|frontend' and gets its own cookie name so the two never collide.
+// Unrecognized/missing header falls back to the original 'rt' name so
+// any caller that hasn't been updated yet keeps working exactly as before.
+function refreshCookieName(req) {
+  const appClient = req?.get('x-app-client');
+  if (appClient === 'admin') return 'rt_admin';
+  if (appClient === 'frontend') return 'rt_frontend';
+  return 'rt';
+}
+
 // ── Helper: set the encrypted rt cookie ─────────────────────────
 // Single place that controls cookie options so they stay consistent.
 // Detects HTTPS from the actual connection or reverse-proxy header (x-forwarded-proto),
@@ -176,7 +193,7 @@ function setRefreshCookie(res, rawRefreshToken, req) {
   // subdomains) can send the cookie. SameSite=none requires Secure=true, which is
   // automatically true whenever the connection is HTTPS.
   const sameSite = isHttps ? (process.env.COOKIE_SAME_SITE || 'none') : 'lax';
-  res.cookie('rt', encryptToken(rawRefreshToken), {
+  res.cookie(refreshCookieName(req), encryptToken(rawRefreshToken), {
     httpOnly: true,
     secure:   isHttps,
     sameSite,
@@ -195,7 +212,7 @@ function clearRefreshCookie(res, req) {
     ? (req.secure || req.get('x-forwarded-proto') === 'https')
     : process.env.NODE_ENV === 'production';
   const sameSite = isHttps ? (process.env.COOKIE_SAME_SITE || 'none') : 'lax';
-  res.clearCookie('rt', {
+  res.clearCookie(refreshCookieName(req), {
     httpOnly: true,
     secure:   isHttps,
     sameSite,
@@ -205,8 +222,10 @@ function clearRefreshCookie(res, req) {
 
 // ── Helper: read + decrypt the rt cookie ────────────────────────
 // Returns the raw (decrypted) refresh token string, or null.
+// Falls back to the legacy 'rt' cookie so already-logged-in sessions
+// (issued before this app-scoped split) aren't force-logged-out.
 function getRefreshCookie(req) {
-  const blob = req.cookies?.rt;
+  const blob = req.cookies?.[refreshCookieName(req)] ?? req.cookies?.rt;
   if (!blob) return null;
   return decryptToken(blob); // no-op if somehow already plain
 }

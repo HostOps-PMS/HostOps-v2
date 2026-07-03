@@ -70,7 +70,7 @@ export async function verifyOtp(otp, rememberMe = false) {
 
   const res = await fetch(authUrl('/auth/verify-login-otp'), {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'X-App-Client': 'admin' },
     credentials: 'include',
     body: JSON.stringify({ email, otp, deviceId, rememberMe }),
   });
@@ -99,7 +99,7 @@ export async function resendOtp() {
 
   const res = await fetch(authUrl('/auth/resend-login-otp'), {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'X-App-Client': 'admin' },
     credentials: 'include',
     body: JSON.stringify({ email }),
   });
@@ -124,7 +124,7 @@ export async function sendLoginOtp() {
 
   const res = await fetch(authUrl('/auth/send-login-otp'), {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'X-App-Client': 'admin' },
     credentials: 'include',
     body: JSON.stringify({ email }),
   });
@@ -150,7 +150,7 @@ export async function checkTrustedDevice() {
   try {
     const res = await fetch(authUrl('/auth/check-trusted-device'), {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+      headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'X-App-Client': 'admin' },
       credentials: 'include',
       body: JSON.stringify({ email, deviceId }),
     });
@@ -177,7 +177,7 @@ export async function verifyTotp(token) {
 
   const res = await fetch(authUrl('/auth/totp/verify'), {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'X-App-Client': 'admin' },
     credentials: 'include',
     body: JSON.stringify({ email, token }),
   });

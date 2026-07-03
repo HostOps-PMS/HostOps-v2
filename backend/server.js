@@ -155,7 +155,7 @@ app.use(
     },
     credentials: true,
     methods:     ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'x-api-key', 'X-Session-Hint', 'x-device-fp'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'x-api-key', 'X-Session-Hint', 'x-device-fp', 'X-App-Client'],
   })
 );
 
