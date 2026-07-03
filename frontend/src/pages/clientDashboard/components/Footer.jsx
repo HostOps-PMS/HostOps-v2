@@ -3,11 +3,13 @@ import hostopsLogo from "../../../assets/HostOpsLOGO.png";
 import { useDashboard } from "../context/DashboardContext";
 import BugReportModal from "./BugReportModal";
 import AnnouncementHouse from "./AnnouncementHouse";
+import { useClientAnnouncements } from "../hooks/useClientAnnouncements";
 
 export default function Footer() {
   const year = new Date().getFullYear();
   const { dark } = useDashboard();
   const [showBugReport, setShowBugReport] = useState(false);
+  const { announcements, loading } = useClientAnnouncements();
 
   return (
     <footer style={{
@@ -61,7 +63,7 @@ export default function Footer() {
         {/* Announcements house + Logo + Brand — same row, same flex item,
             kaya zero extra vertical space ang naidadagdag */}
         <div className="footer-brand-row" style={{ display: "flex", alignItems: "center", gap: "16px", flexShrink: 0 }}>
-          <AnnouncementHouse dark={dark} />
+          <AnnouncementHouse dark={dark} announcements={announcements} loading={loading} />
 
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <div style={{ width: 32, height: 32, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>

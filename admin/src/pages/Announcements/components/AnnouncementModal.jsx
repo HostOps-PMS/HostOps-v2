@@ -13,6 +13,30 @@ export default function AnnouncementModal({ announcement, onClose, onSave, loadi
   const fileRef = useRef(null);
   const dropdownRef = useRef(null);
 
+  const inputStyle = {
+    width: '100%',
+    padding: '10px 14px',
+    borderRadius: 10,
+    border: `1.5px solid ${dark ? '#1e3a2a' : '#e8edf2'}`,
+    fontSize: '0.875rem',
+    outline: 'none',
+    boxSizing: 'border-box',
+    background: dark ? '#0d2619' : '#f8fafc',
+    color: dark ? '#eaf5f0' : '#0f172a',
+    transition: 'border-color 0.15s, box-shadow 0.15s',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+  };
+
+  const labelStyle = {
+    display: 'block',
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: dark ? '#7ab89a' : '#64748b',
+    marginBottom: 6,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  };
+
   const [title, setTitle]         = useState(announcement?.title || '');
   const [content, setContent]     = useState(announcement?.content || '');
   const [audience, setAudience]   = useState(announcement?.audience || 'all');
@@ -29,10 +53,10 @@ export default function AnnouncementModal({ announcement, onClose, onSave, loadi
     if (!announcement?.targetClients?.length) return [];
     return announcement.targetClients.map(c => typeof c === 'string' ? c : c._id);
   });
-  const [clientList, setClientList]       = useState([]);
+  const [clientList, setClientList]         = useState([]);
   const [clientsLoading, setClientsLoading] = useState(false);
-  const [showDropdown, setShowDropdown]   = useState(false);
-  const [clientSearch, setClientSearch]   = useState('');
+  const [showDropdown, setShowDropdown]     = useState(false);
+  const [clientSearch, setClientSearch]     = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -116,12 +140,6 @@ export default function AnnouncementModal({ announcement, onClose, onSave, loadi
 
   const busy = saving || externalLoading;
 
-  const inputStyle = {
-    background: dark ? '#0d2619' : undefined,
-    color: dark ? '#eaf5f0' : undefined,
-    borderColor: dark ? '#1e3a2a' : undefined,
-  };
-
   const filteredClients = clientList.filter(c =>
     !clientSearch || c.businessName?.toLowerCase().includes(clientSearch.toLowerCase()) ||
     c.email?.toLowerCase().includes(clientSearch.toLowerCase())
@@ -133,31 +151,72 @@ export default function AnnouncementModal({ announcement, onClose, onSave, loadi
   }
 
   return (
-    <div
-      className="db-modal-overlay"
-      onClick={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}
-      style={{ background: 'rgba(0,0,0,0.45)' }}
-    >
-      <div className="db-modal" style={{ width: 600, maxHeight: 'calc(100vh - 48px)', background: dark ? '#132a1e' : undefined }}>
-        {/* Header */}
-        <div className="db-modal__head" style={{ background: dark ? '#132a1e' : undefined, borderColor: dark ? '#1e3a2a' : undefined }}>
-          <div className="db-modal__title" style={{ color: dark ? '#eaf5f0' : undefined }}>
-            {isEdit ? 'Edit Announcement' : 'New Announcement'}
+    <>
+      <style>{`
+        @keyframes ann-modal-overlay { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes ann-modal-card { from { opacity: 0; transform: translateY(20px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+      `}</style>
+      <div
+        style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: dark ? 'rgba(0,0,0,0.65)' : 'rgba(12,28,20,0.45)',
+          backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16, animation: 'ann-modal-overlay 0.2s ease',
+        }}
+        onClick={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}
+      >
+        <div
+          style={{
+            background: dark ? '#132a1e' : '#fff',
+            borderRadius: 20, width: '100%', maxWidth: 560,
+            maxHeight: '90vh', overflowY: 'auto',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+            border: 'none', display: 'flex', flexDirection: 'column',
+            animation: 'ann-modal-card 0.28s cubic-bezier(0.16,1,0.3,1)',
+          }}
+        >
+          {/* Header */}
+          <div style={{
+            padding: '28px 32px 0 32px',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+            flexShrink: 0,
+          }}>
+            <div>
+              <h2 style={{
+                fontSize: '1.6rem', fontWeight: 800,
+                color: dark ? '#eaf5f0' : '#0d1117',
+                lineHeight: 1.15, margin: 0, letterSpacing: '-0.02em',
+              }}>
+                {isEdit
+                  ? <>Edit <span style={{ color: '#26a676' }}>Announcement</span></>
+                  : <>New <span style={{ color: '#26a676' }}>Announcement</span></>}
+              </h2>
+              <p style={{ margin: '6px 0 0', fontSize: '.8125rem', color: dark ? '#4d8a6a' : '#9ca3af', fontWeight: 400 }}>
+                {isEdit ? 'Update the announcement details below.' : 'Fill in the details to create an announcement.'}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              disabled={busy}
+              style={{
+                background: dark ? '#0d2619' : '#f3f4f6',
+                border: `1px solid ${dark ? '#1e3a2a' : 'transparent'}`,
+                borderRadius: 10, width: 32, height: 32,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: busy ? 'not-allowed' : 'pointer',
+                color: dark ? '#4d8a6a' : '#6b7280',
+                fontSize: '1rem', flexShrink: 0, marginTop: 2,
+              }}
+            >✕</button>
           </div>
-          <button
-            className="db-modal__close"
-            onClick={onClose}
-            disabled={busy}
-            style={{ background: dark ? '#0d2619' : undefined, color: dark ? '#7ab89a' : undefined }}
-          >&times;</button>
-        </div>
 
-        {/* Body */}
-        <form onSubmit={handleSubmit}>
-          <div className="db-modal__body">
+          {/* Body */}
+          <form id="ann-form" onSubmit={handleSubmit} style={{ padding: '20px 32px 0', overflowY: 'auto', flex: 1 }}>
+
             {/* Title */}
-            <div className="db-field">
-              <label style={{ color: dark ? '#4d8a6a' : undefined }}>Title</label>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Title *</label>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -169,8 +228,8 @@ export default function AnnouncementModal({ announcement, onClose, onSave, loadi
             </div>
 
             {/* Content */}
-            <div className="db-field">
-              <label style={{ color: dark ? '#4d8a6a' : undefined }}>Content</label>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Content *</label>
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
@@ -179,38 +238,63 @@ export default function AnnouncementModal({ announcement, onClose, onSave, loadi
                 required
                 rows={5}
                 style={{
-                  width: '100%', boxSizing: 'border-box',
-                  padding: '10px 12px',
-                  border: `1px solid ${dark ? '#1e3a2a' : 'var(--color-border, #e5e7eb)'}`,
-                  borderRadius: 'var(--radius-sm, 8px)',
-                  fontSize: '.875rem', fontFamily: 'var(--font-body, inherit)',
-                  color: dark ? '#eaf5f0' : 'var(--color-text, #1a202c)',
-                  background: dark ? '#0d2619' : 'var(--color-surface, #fff)',
-                  outline: 'none', resize: 'vertical',
+                  ...inputStyle,
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
                 }}
               />
             </div>
 
-            {/* Image upload */}
-            <div className="db-field">
-              <label style={{ color: dark ? '#4d8a6a' : undefined }}>Image</label>
+            {/* Image */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Image</label>
               {imagePreview ? (
-                <div style={{ position: 'relative', display: 'inline-block' }}>
-                  <img src={imagePreview} alt="Preview" style={{
-                    maxWidth: '100%', maxHeight: 180, borderRadius: 10, objectFit: 'cover',
-                    border: `1px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`,
-                  }} />
-                  <button
-                    type="button"
-                    onClick={handleRemoveImage}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 14px', borderRadius: 10,
+                  border: `1.5px solid ${dark ? '#1e3a2a' : '#e8edf2'}`,
+                  background: dark ? '#0d2619' : '#f8fafc',
+                }}>
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
                     style={{
-                      position: 'absolute', top: 6, right: 6,
-                      width: 24, height: 24, borderRadius: '50%',
-                      background: 'rgba(0,0,0,0.6)', color: '#fff',
-                      border: 'none', cursor: 'pointer', fontSize: 14,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: 48, height: 48, borderRadius: 8, objectFit: 'cover',
+                      flexShrink: 0, border: `1px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`,
                     }}
-                  >&times;</button>
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.83rem', fontWeight: 600, color: dark ? '#eaf5f0' : '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {imageFile ? imageFile.name : 'Current image'}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: dark ? '#4d8a6a' : '#9ca3af', marginTop: 2 }}>
+                      {imageFile ? `${(imageFile.size / 1024).toFixed(0)} KB` : 'Click change to replace'}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      style={{
+                        padding: '5px 12px', borderRadius: 7,
+                        border: `1.5px solid ${dark ? '#1e3a2a' : '#e8edf2'}`,
+                        background: dark ? '#132a1e' : '#fff',
+                        fontSize: '0.75rem', fontWeight: 600,
+                        color: dark ? '#7ab89a' : '#374151', cursor: 'pointer',
+                      }}
+                    >Change</button>
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      style={{
+                        padding: '5px 12px', borderRadius: 7,
+                        border: '1.5px solid #fca5a5',
+                        background: dark ? '#2d0a0a' : '#fff5f5',
+                        fontSize: '0.75rem', fontWeight: 600,
+                        color: dark ? '#f87171' : '#dc2626', cursor: 'pointer',
+                      }}
+                    >Remove</button>
+                  </div>
                 </div>
               ) : (
                 <button
@@ -220,10 +304,10 @@ export default function AnnouncementModal({ announcement, onClose, onSave, loadi
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     padding: '20px 16px', borderRadius: 10,
                     border: `2px dashed ${dark ? '#1e3a2a' : '#d1d5db'}`,
-                    background: dark ? '#0d2619' : '#fafafa',
+                    background: dark ? '#0d2619' : '#f8fafc',
                     color: dark ? '#4d8a6a' : '#9ca3af',
                     cursor: 'pointer', fontSize: '0.83rem', fontWeight: 500,
-                    width: '100%',
+                    width: '100%', boxSizing: 'border-box',
                   }}
                 >
                   <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -238,20 +322,19 @@ export default function AnnouncementModal({ announcement, onClose, onSave, loadi
             </div>
 
             {/* Audience */}
-            <div className="db-field">
-              <label style={{ color: dark ? '#4d8a6a' : undefined }}>Audience</label>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Audience</label>
               <select value={audience} onChange={(e) => setAudience(e.target.value)} style={inputStyle}>
                 <option value="all">All Clients</option>
                 <option value="selected">Selected Clients</option>
               </select>
             </div>
 
-            {/* Client multi-select — only visible when audience = selected */}
+            {/* Client multi-select */}
             {audience === 'selected' && (
-              <div className="db-field" style={{ position: 'relative' }} ref={dropdownRef}>
-                <label style={{ color: dark ? '#4d8a6a' : undefined }}>Select Clients</label>
+              <div style={{ marginBottom: 14, position: 'relative' }} ref={dropdownRef}>
+                <label style={labelStyle}>Select Clients</label>
 
-                {/* Selected pills */}
                 {selectedClients.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                     {selectedClients.map(id => (
@@ -266,31 +349,27 @@ export default function AnnouncementModal({ announcement, onClose, onSave, loadi
                         <button type="button" onClick={() => toggleClient(id)} style={{
                           background: 'none', border: 'none', padding: 0, cursor: 'pointer',
                           color: 'inherit', fontSize: 14, lineHeight: 1, display: 'flex',
-                        }}>&times;</button>
+                        }}>✕</button>
                       </span>
                     ))}
                   </div>
                 )}
 
-                {/* Dropdown trigger */}
                 <div
                   onClick={() => setShowDropdown(v => !v)}
                   style={{
+                    ...inputStyle,
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '7px 12px', borderRadius: 8,
-                    border: `1px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`,
-                    background: dark ? '#0d2619' : '#fafafa',
-                    cursor: 'pointer', fontSize: '0.83rem',
-                    color: dark ? '#7ab89a' : '#6b7280',
+                    cursor: 'pointer', userSelect: 'none',
+                    color: selectedClients.length ? (dark ? '#eaf5f0' : '#0f172a') : (dark ? '#4d8a6a' : '#94a3b8'),
                   }}
                 >
-                  <span>{selectedClients.length ? `${selectedClients.length} selected` : 'Choose clients…'}</span>
+                  <span>{selectedClients.length ? `${selectedClients.length} client${selectedClients.length !== 1 ? 's' : ''} selected` : 'Choose clients…'}</span>
                   <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
-                    <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </div>
 
-                {/* Dropdown list */}
                 {showDropdown && (
                   <div style={{
                     position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
@@ -300,7 +379,6 @@ export default function AnnouncementModal({ announcement, onClose, onSave, loadi
                     overflow: 'hidden', display: 'flex', flexDirection: 'column',
                     maxHeight: 260,
                   }}>
-                    {/* Search */}
                     <div style={{ padding: '8px 10px', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f0f0f0'}` }}>
                       <input
                         autoFocus
@@ -311,22 +389,18 @@ export default function AnnouncementModal({ announcement, onClose, onSave, loadi
                         style={{
                           width: '100%', boxSizing: 'border-box',
                           padding: '6px 10px', borderRadius: 6,
-                          border: `1.5px solid ${dark ? '#1e3a2a' : '#e2e8f0'}`, fontSize: '0.83rem',
-                          outline: 'none', background: dark ? '#0d2619' : '#fafafa',
-                          color: dark ? '#eaf5f0' : '#1a202c',
+                          border: `1.5px solid ${dark ? '#1e3a2a' : '#e2e8f0'}`,
+                          fontSize: '0.83rem', outline: 'none',
+                          background: dark ? '#0d2619' : '#fafafa',
+                          color: dark ? '#eaf5f0' : '#0f172a',
                         }}
                       />
                     </div>
-                    {/* List */}
                     <div style={{ maxHeight: 200, overflowY: 'auto', flex: 1 }}>
                       {clientsLoading ? (
-                        <div style={{ padding: '12px 14px', fontSize: '0.83rem', color: dark ? '#4d8a6a' : '#a0aec0', textAlign: 'center' }}>
-                          Loading…
-                        </div>
+                        <div style={{ padding: '12px 14px', fontSize: '0.83rem', color: dark ? '#4d8a6a' : '#a0aec0', textAlign: 'center' }}>Loading…</div>
                       ) : filteredClients.length === 0 ? (
-                        <div style={{ padding: '12px 14px', fontSize: '0.83rem', color: dark ? '#4d8a6a' : '#a0aec0', textAlign: 'center' }}>
-                          No clients found
-                        </div>
+                        <div style={{ padding: '12px 14px', fontSize: '0.83rem', color: dark ? '#4d8a6a' : '#a0aec0', textAlign: 'center' }}>No clients found</div>
                       ) : filteredClients.map(c => {
                         const checked = selectedClients.includes(c._id);
                         return (
@@ -335,22 +409,23 @@ export default function AnnouncementModal({ announcement, onClose, onSave, loadi
                             onClick={() => toggleClient(c._id)}
                             style={{
                               padding: '9px 14px', cursor: 'pointer', fontSize: '0.875rem',
-                              background: checked ? (dark ? '#0d2619' : '#f0fdf4') : 'transparent',
-                              color: checked ? '#059669' : (dark ? '#7ab89a' : '#374151'),
+                              background: checked ? (dark ? '#1e3a2a' : '#f0fdf4') : 'transparent',
+                              color: checked ? (dark ? '#eaf5f0' : '#0d1117') : (dark ? '#7ab89a' : '#2d3748'),
                               fontWeight: checked ? 600 : 400,
                               borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f7f7f7'}`,
                               display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                              transition: 'background 0.1s',
                             }}
                             onMouseEnter={e => { if (!checked) e.currentTarget.style.background = dark ? '#132a1e' : '#f8faf9'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = checked ? (dark ? '#0d2619' : '#f0fdf4') : 'transparent'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = checked ? (dark ? '#1e3a2a' : '#f0fdf4') : 'transparent'; }}
                           >
                             <div style={{ overflow: 'hidden', minWidth: 0 }}>
-                              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.businessName}</div>
-                              <div style={{ fontSize: '0.72rem', color: dark ? '#4d8a6a' : '#9ca3af', marginTop: 1 }}>{c.email}</div>
+                              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{c.businessName}</div>
+                              <div style={{ fontSize: '0.72rem', color: dark ? '#4d8a6a' : '#718096', marginTop: 1 }}>{c.email}</div>
                             </div>
                             {checked && (
-                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                                <polyline points="2,6 5,9 10,3"/>
+                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#26a676" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                <polyline points="2,6 5,9 10,3" />
                               </svg>
                             )}
                           </div>
@@ -363,9 +438,9 @@ export default function AnnouncementModal({ announcement, onClose, onSave, loadi
             )}
 
             {/* Priority + Status */}
-            <div className="db-modal__row">
-              <div className="db-field">
-                <label style={{ color: dark ? '#4d8a6a' : undefined }}>Priority</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div>
+                <label style={labelStyle}>Priority</label>
                 <select value={priority} onChange={(e) => setPriority(e.target.value)} style={inputStyle}>
                   <option value="low">Low</option>
                   <option value="normal">Normal</option>
@@ -373,8 +448,8 @@ export default function AnnouncementModal({ announcement, onClose, onSave, loadi
                   <option value="urgent">Urgent</option>
                 </select>
               </div>
-              <div className="db-field">
-                <label style={{ color: dark ? '#4d8a6a' : undefined }}>Status</label>
+              <div>
+                <label style={labelStyle}>Status</label>
                 <select value={status} onChange={(e) => setStatus(e.target.value)} style={inputStyle}>
                   <option value="draft">Draft</option>
                   <option value="published">Published</option>
@@ -384,39 +459,60 @@ export default function AnnouncementModal({ announcement, onClose, onSave, loadi
             </div>
 
             {/* Start Date + End Date */}
-            <div className="db-modal__row">
-              <div className="db-field">
-                <label style={{ color: dark ? '#4d8a6a' : undefined }}>Start Date</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+              <div>
+                <label style={labelStyle}>Start Date</label>
                 <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={inputStyle} />
               </div>
-              <div className="db-field">
-                <label style={{ color: dark ? '#4d8a6a' : undefined }}>End Date</label>
+              <div>
+                <label style={labelStyle}>End Date</label>
                 <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={inputStyle} />
               </div>
             </div>
-          </div>
+          </form>
 
           {/* Footer */}
-          <div className="db-modal__foot" style={{ background: dark ? '#132a1e' : undefined, borderColor: dark ? '#1e3a2a' : undefined }}>
+          <div style={{
+            padding: '16px 32px 24px',
+            display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+            gap: 10,
+            borderTop: `1px solid ${dark ? '#1e3a2a' : '#f0f2f5'}`,
+            background: dark ? '#132a1e' : '#fff',
+            flexShrink: 0,
+          }}>
             <button
               type="button"
-              className="db-btn db-btn--ghost"
               onClick={onClose}
               disabled={busy}
-              style={dark ? { background: '#0d2619', color: '#7ab89a', borderColor: '#1e3a2a' } : {}}
+              style={{
+                padding: '9px 22px', borderRadius: 10,
+                border: `1.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}`,
+                background: dark ? 'transparent' : '#fff',
+                fontSize: '0.875rem', fontWeight: 600,
+                color: dark ? '#7ab89a' : '#374151',
+                cursor: busy ? 'not-allowed' : 'pointer',
+              }}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="db-btn db-btn--primary"
+              form="ann-form"
               disabled={busy || !title.trim() || !content.trim()}
+              style={{
+                padding: '9px 26px', borderRadius: 10,
+                border: 'none',
+                background: (busy || !title.trim() || !content.trim()) ? '#9ca3af' : '#0d1117',
+                fontSize: '0.875rem', fontWeight: 700, color: '#fff',
+                cursor: (busy || !title.trim() || !content.trim()) ? 'not-allowed' : 'pointer',
+                boxShadow: (busy || !title.trim() || !content.trim()) ? 'none' : '0 2px 8px rgba(13,17,23,0.18)',
+              }}
             >
               {busy ? 'Saving…' : isEdit ? 'Save Changes' : 'Create'}
             </button>
           </div>
-        </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
