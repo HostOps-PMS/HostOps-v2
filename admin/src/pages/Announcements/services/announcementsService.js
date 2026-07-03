@@ -1,4 +1,4 @@
-import { fetchWithAuth, uploadHeaders } from '../../../lib/authUtils';
+import { fetchWithAuth } from '../../../lib/authUtils';
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'https://api.hostops.online';
 
@@ -37,10 +37,9 @@ export async function createAnnouncement(data, imageFile) {
   }
   if (imageFile) formData.append('image', imageFile);
 
-  const res = await fetch(`${BASE}/api/announcements`, {
-    method:  'POST',
-    headers: uploadHeaders(),
-    body:    formData,
+  const res = await fetchWithAuth(`${BASE}/api/announcements`, {
+    method: 'POST',
+    body:   formData,
   });
 
   if (!res.ok) {
@@ -65,10 +64,9 @@ export async function updateAnnouncement(id, data, imageFile) {
   if (data.removeImage)             formData.append('removeImage', 'true');
   if (imageFile)                    formData.append('image', imageFile);
 
-  const res = await fetch(`${BASE}/api/announcements/${id}`, {
-    method:  'PATCH',
-    headers: uploadHeaders(),
-    body:    formData,
+  const res = await fetchWithAuth(`${BASE}/api/announcements/${id}`, {
+    method: 'PATCH',
+    body:   formData,
   });
 
   if (!res.ok) {

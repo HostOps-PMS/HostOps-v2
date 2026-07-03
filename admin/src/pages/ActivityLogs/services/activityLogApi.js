@@ -58,10 +58,7 @@ export async function exportActivityLogs({
     if (from)    params.set('from', from);
     if (to)      params.set('to', to);
 
-    const res = await fetch(`${BASE}/api/activity-log/all?${params.toString()}`, {
-      headers: getHeaders(),
-      credentials: 'include',
-    });
+    const res = await apiFetch(`${BASE}/api/activity-log/all?${params.toString()}`);
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
