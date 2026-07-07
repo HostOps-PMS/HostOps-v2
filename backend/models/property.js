@@ -97,6 +97,14 @@ const propertySchema = new mongoose.Schema({
     get: (val) => val ? decrypt(val) : val
   },
 
+  smoobuApiSecret: {
+    type: String,
+    select: false,
+    default: null,
+    set: (val) => val ? encrypt(val) : val,
+    get: (val) => val ? decrypt(val) : val
+  },
+
   // Set when a valid smoobuApiKey is saved/updated
   smoobuConnectedAt: {
     type: Date,
@@ -135,6 +143,7 @@ propertySchema.index({ ownerId: 1, name: 1 });
 propertySchema.methods.toJSON = function() {
   const obj = this.toObject();
   delete obj.smoobuApiKey;
+  delete obj.smoobuApiSecret;
   delete obj.__v;
   // Strip raw smoobu data from each subProperty to keep responses lean
   if (obj.subProperties) {

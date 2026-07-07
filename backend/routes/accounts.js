@@ -33,13 +33,14 @@ import { z }   from 'zod';
 import User            from '../models/user.js';
 import Staff           from '../models/staff.js';
 import RecoveryRequest from '../models/RecoveryRequest.js';
+import { getStoredApartmentImages, getStoredApartmentImagesBulk } from '../services/apartmentPhotos.js';
+import { smoobuFetch } from '../services/smoobu.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { decrypt } from '../utils/encryption.js';
 
 const router = express.Router();
 
-router.use(requireAuth);
-router.use(requireAdmin);
+router.use('/accounts', requireAuth, requireAdmin);
 
 // ─────────────────────────────────────────────────────────────────
 // GET /api/accounts
@@ -170,13 +171,8 @@ router.get('/accounts/recovery-request', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 const SMOOBU_API_BASE = 'https://login.smoobu.com/api';
 
-async function fetchSmoobuApartments(apiKey) {
-  const res = await fetch(`${SMOOBU_API_BASE}/apartments`, {
-    headers: {
-      'Api-Key': apiKey,
-      'Cache-Control': 'no-cache',
-    },
-  });
+async function fetchSmoobuApartments(creds) {
+  const res = await smoobuFetch(`/apartments`, {}, creds);
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -189,14 +185,9 @@ async function fetchSmoobuApartments(apiKey) {
   return data.apartments || [];
 }
 
-async function fetchSmoobuApartmentDetail(apiKey, apartmentId) {
+async function fetchSmoobuApartmentDetail(creds, apartmentId) {
   try {
-    const res = await fetch(`${SMOOBU_API_BASE}/apartments/${apartmentId}`, {
-      headers: {
-        'Api-Key': apiKey,
-        'Cache-Control': 'no-cache',
-      },
-    });
+    const res = await smoobuFetch(`/apartments/${apartmentId}`, {}, creds);
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -256,6 +247,7 @@ router.get('/accounts/:clientId/smoobu-apartments', async (req, res, next) => {
     const propertyResults = await Promise.all(
       targets.map(async ({ prop, idx }) => {
         const apiKey = prop.smoobuApiKey; // already decrypted by mongoose getter
+        const apiSecret = prop.smoobuApiSecret; // already decrypted by mongoose getter
         const propName = prop.propertyName || `Property ${idx + 1}`;
 
         if (!apiKey || !apiKey.trim()) {
@@ -269,12 +261,13 @@ router.get('/accounts/:clientId/smoobu-apartments', async (req, res, next) => {
         }
 
         try {
-          const rawApartments = await fetchSmoobuApartments(apiKey);
+          const creds = { apiKey, apiSecret };
+          const rawApartments = await fetchSmoobuApartments(creds);
 
           // Fetch detail (location / lat-lng) for each apartment in parallel
           const apartments = await Promise.all(
             rawApartments.map(async (apt) => {
-              const detail = await fetchSmoobuApartmentDetail(apiKey, apt.id);
+              const detail = await fetchSmoobuApartmentDetail(creds, apt.id);
               const loc = detail?.location || {};
               const lat = parseFloat(loc.latitude);
               const lng = parseFloat(loc.longitude);

@@ -11,7 +11,7 @@ const INITIAL_FORM = {
   pin:          '',
 };
 
-const newProperty = () => ({ name: '', smoobuApiKey: '', pictureFile: null, pictureUrl: null, originalPictureUrl: null, cropData: null });
+const newProperty = () => ({ name: '', smoobuApiKey: '', smoobuApiSecret: '', pictureFile: null, pictureUrl: null, originalPictureUrl: null, cropData: null });
 
 function Field({ label, required, children }) {
   return (
@@ -106,6 +106,7 @@ export default function AddClientModal({ onClose, onSuccess }) {
         properties:   payloadProperties.map((p) => ({
             propertyName: p.name.trim(),
             smoobuApiKey: p.smoobuApiKey.trim() || '',
+            smoobuApiSecret: p.smoobuApiSecret.trim() || '',
           })),
       });
 
@@ -293,7 +294,8 @@ export default function AddClientModal({ onClose, onSuccess }) {
                 {prop.name && /[^a-zA-Z\s.,'&()-]/.test(prop.name) && (
                   <span style={{ color: '#ef4444', fontSize: '.65rem', fontWeight: 600, textAlign: 'center', display: 'block' }}>⚠ Letters only.</span>
                 )}
-                  <input type="text" placeholder="Smoobu API Key (optional)" value={prop.smoobuApiKey} onChange={setProp(index, 'smoobuApiKey')} maxLength={512} className="cl-edit-input" style={{ fontSize: '.75rem', background: dark ? '#132a1e' : '#fff', color: dark ? '#eaf5f0' : '#0d1117', border: `1.5px solid ${dark ? '#1e3a2a' : '#d1d5db'}` }} />
+                  <input type="text" placeholder="Smoobu API Key (optional)" value={prop.smoobuApiKey} onChange={setProp(index, 'smoobuApiKey')} maxLength={512} className="cl-edit-input" style={{ fontSize: '.75rem', background: dark ? '#132a1e' : '#fff', color: dark ? '#eaf5f0' : '#0d1117', border: `1.5px solid ${dark ? '#1e3a2a' : '#d1d5db'}`, marginBottom: 4 }} />
+                  <input type="text" placeholder="Smoobu API Secret (optional)" value={prop.smoobuApiSecret} onChange={setProp(index, 'smoobuApiSecret')} maxLength={512} className="cl-edit-input" style={{ fontSize: '.75rem', background: dark ? '#132a1e' : '#fff', color: dark ? '#eaf5f0' : '#0d1117', border: `1.5px solid ${dark ? '#1e3a2a' : '#d1d5db'}`, marginBottom: 6 }} />
                   <div style={{ display: 'flex', gap: 6 }}>
                     {prop.pictureUrl && (
                       <button type="button" onClick={() => { setCropImageUrl(prop.originalPictureUrl); setInitialCropData(prop.cropData); setCroppingIndex(index); }} style={{ flex: 1, fontSize: '.7rem', padding: '4px 0', border: `1px solid ${dark ? '#1e3a2a' : '#e5e9ec'}`, borderRadius: 6, background: dark ? '#0d2619' : 'white', color: '#26a676', cursor: 'pointer', fontWeight: 600 }}>Adjust</button>

@@ -15,6 +15,9 @@ function mapPropertiesForEdit(properties = []) {
     hasSmoobuKey: !!p.hasSmoobuKey,
     maskedSmoobuApiKey: p.maskedSmoobuApiKey || '',
     smoobuApiKey: p.maskedSmoobuApiKey || '',
+    hasSmoobuSecret: !!p.hasSmoobuSecret,
+    maskedSmoobuApiSecret: p.maskedSmoobuApiSecret || '',
+    smoobuApiSecret: p.maskedSmoobuApiSecret || '',
     isUnmasked: false,
     propertyPicture: p.propertyPicture || '',
     originalPictureUrl: p.propertyPictureOriginal || '',
@@ -296,7 +299,7 @@ export default function ClientModal({ client, onClose, onUpdated }) {
         setForm(f => ({
           ...f,
           properties: f.properties.map((p, i) => (
-            i === otpAction.index ? { ...p, smoobuApiKey: res.smoobuApiKey, isUnmasked: true } : p
+            i === otpAction.index ? { ...p, smoobuApiKey: res.smoobuApiKey, smoobuApiSecret: res.smoobuApiSecret, isUnmasked: true } : p
           ))
         }));
       }
@@ -354,20 +357,26 @@ export default function ClientModal({ client, onClose, onUpdated }) {
         if (p._id) {
           // Update only if changed
           const oldProp = properties.find(x => x._id === p._id);
-          const isMasked = p.smoobuApiKey === p.maskedSmoobuApiKey && p.smoobuApiKey.includes('•');
-          const finalKey = isMasked ? '' : p.smoobuApiKey.trim();
-          const needsUpdate = (oldProp.propertyName !== p.name) || finalKey;
+          const isMaskedKey = p.smoobuApiKey === p.maskedSmoobuApiKey && p.smoobuApiKey.includes('•');
+          const finalKey = isMaskedKey ? '' : p.smoobuApiKey.trim();
+          
+          const isMaskedSecret = p.smoobuApiSecret === p.maskedSmoobuApiSecret && p.smoobuApiSecret.includes('•');
+          const finalSecret = isMaskedSecret ? '' : p.smoobuApiSecret.trim();
+
+          const needsUpdate = (oldProp.propertyName !== p.name) || finalKey || finalSecret;
           if (needsUpdate) {
             await updateClientProperty(client._id, p._id, {
               propertyName: p.name.trim(),
-              ...(finalKey ? { smoobuApiKey: finalKey } : {})
+              ...(finalKey ? { smoobuApiKey: finalKey } : {}),
+              ...(finalSecret ? { smoobuApiSecret: finalSecret } : {})
             });
           }
         } else {
           // Create new
           const createdProp = await createClientProperty(client._id, {
             propertyName: p.name.trim(),
-            smoobuApiKey: p.smoobuApiKey.trim() || ''
+            smoobuApiKey: p.smoobuApiKey.trim() || '',
+            smoobuApiSecret: p.smoobuApiSecret.trim() || ''
           });
           propId = createdProp._id;
         }
@@ -715,11 +724,30 @@ export default function ClientModal({ client, onClose, onUpdated }) {
                                 position: 'absolute', right: 12, background: 'none', border: 'none',
                                 cursor: 'pointer', color: 'var(--color-muted)', display: 'flex', alignItems: 'center'
                               }}
-                              title="Show API Key"
+                              title="Show Credentials"
                             >
                               <i className="ti ti-eye" style={{ fontSize: 16 }} />
                             </button>
                           )}
+                        </div>
+                      </div>
+
+                      {/* Smoobu API Secret */}
+                      <div className="db-field" style={{ margin: 0 }}>
+                        <label style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--color-muted)', marginBottom: 4, display: 'block', textAlign: 'center' }}>
+                          {prop.hasSmoobuSecret ? "Update Smoobu API Secret" : "Smoobu API Secret"}
+                        </label>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            placeholder="Optional API Secret"
+                            value={prop.smoobuApiSecret}
+                            onChange={setProp(index, 'smoobuApiSecret')}
+                            maxLength={512}
+                            className="cl-edit-input"
+                            disabled={prop.hasSmoobuSecret && !prop.isUnmasked}
+                            style={{ paddingRight: 40, width: '100%', fontSize: '.7rem' }}
+                          />
                         </div>
                       </div>
 

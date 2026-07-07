@@ -34,6 +34,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { validateObjectId } from '../middleware/ownershipGuard.js';
 import ApartmentPhoto from '../models/apartmentPhoto.js';
 import { getStoredApartmentImages, getStoredApartmentImagesBulk } from '../services/apartmentPhotos.js';
+import { smoobuFetch } from '../services/smoobu.js';
 
 const router = Router();
 
@@ -77,13 +78,11 @@ function _setCache(key, data, ttlMs = 60_000) {
 }
 
 // ── Smoobu REST API fetch ─────────────────────────────────────────
-async function smoobuGet(path, apiKey, cacheKey) {
+async function smoobuGet(path, creds, cacheKey) {
   const cached = _getCache(cacheKey);
   if (cached) return cached;
 
-  const res = await fetch(SMOOBU_BASE + path, {
-    headers: { 'Api-Key': apiKey, 'Cache-Control': 'no-cache' },
-  });
+  const res = await smoobuFetch(path, {}, creds);
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     const err = new Error(`Smoobu ${res.status} ${path}: ${text}`);
@@ -209,9 +208,9 @@ async function scrapeApartmentImages(aptId) {
 }
 
 // ── Main fetch: list + detail + image scrape per apartment ────────
-async function fetchApartmentsForKey(apiKey, propId, propertyName, clientId, clientName) {
+async function fetchApartmentsForKey(creds, propId, propertyName, clientId, clientName) {
   // Step 1 — GET /apartments (list of IDs + names)
-  const listData = await smoobuGet('/apartments', apiKey, `${propId}:/apartments`);
+  const listData = await smoobuGet('/apartments', creds, `${propId}:/apartments`);
   const aptList  = listData?.apartments ?? [];
   console.log(`[smoobuApartments] property="${propertyName}" → ${aptList.length} apartments`);
 
@@ -224,7 +223,7 @@ async function fetchApartmentsForKey(apiKey, propId, propertyName, clientId, cli
       //  redirects to a login wall, so it always returned 0 photos and added
       //  ~10s of latency. Photos now come from the ApartmentPhoto collection.)
       const [detailResult, imagesResult] = await Promise.allSettled([
-        smoobuGet(`/apartments/${aptId}`, apiKey, `${propId}:/apartments/${aptId}`),
+        smoobuGet(`/apartments/${aptId}`, creds, `${propId}:/apartments/${aptId}`),
         getStoredApartmentImages(aptId),
       ]);
 
@@ -276,7 +275,7 @@ router.get('/:clientId/smoobu-apartments', async (req, res) => {
     }
 
     const client = await User.findById(clientId)
-      .select('businessName firstName lastName email properties')
+      .select('businessName firstName lastName email +properties.smoobuApiKey')
       .lean();
 
     if (!client) return res.status(404).json({ error: 'Client not found' });
@@ -313,8 +312,10 @@ router.get('/:clientId/smoobu-apartments', async (req, res) => {
         }
 
         let decryptedKey = '';
+        let decryptedSecret = '';
         try {
           decryptedKey = (decrypt(prop.smoobuApiKey) || '').trim();
+          decryptedSecret = prop.smoobuApiSecret ? (decrypt(prop.smoobuApiSecret) || '').trim() : '';
         } catch (e) {
           console.warn(`[smoobuApartments] decrypt failed for "${propName}":`, e.message);
           return;
@@ -327,7 +328,7 @@ router.get('/:clientId/smoobu-apartments', async (req, res) => {
 
         try {
           const apts = await fetchApartmentsForKey(
-            decryptedKey,
+            { apiKey: decryptedKey, apiSecret: decryptedSecret },
             String(prop._id),
             propName,
             String(clientId),
