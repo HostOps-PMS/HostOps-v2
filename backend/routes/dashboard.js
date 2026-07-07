@@ -333,6 +333,7 @@ router.post('/dashboard', async (req, res, next) => {
       }
 
       const propKey = matchedProp?.smoobuApiKey?.trim();
+      const propSecret = matchedProp?.smoobuApiSecret?.trim();
       if (propKey && !isEncrypted(propKey)) {
         // Spread req.user into a plain object and inject the matched property's
         // smoobuApiKey at root level so smoobu.js picks it up via MODE A.
@@ -343,6 +344,7 @@ router.post('/dashboard', async (req, res, next) => {
         userForDashboard = {
           ...baseUser,
           smoobuApiKey: propKey,
+          smoobuApiSecret: propSecret || '',
         };
         usingSelectedPropertyApiKey = true;
       }
@@ -713,11 +715,9 @@ router.get('/messages/:reservationId', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.get('/debug/threads', async (req, res, next) => {
   try {
-    const { getApiKeyForUser } = await import('../services/smoobu.js');
-    const apiKey = getApiKeyForUser(req.user);
-    const smoobuRes = await fetch('https://login.smoobu.com/api/threads?page=1&pageSize=10', {
-      headers: { 'Api-Key': apiKey, 'Cache-Control': 'no-cache' },
-    });
+    const { getApiKeyForUser, smoobuFetch } = await import('../services/smoobu.js');
+    const creds = getApiKeyForUser(req.user);
+    const smoobuRes = await smoobuFetch('/threads?page=1&pageSize=10', {}, creds);
     const text = await smoobuRes.text();
     let parsed = null;
     try { parsed = JSON.parse(text); } catch { /* non-JSON */ }

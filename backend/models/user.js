@@ -20,6 +20,13 @@ const propertySchema = new mongoose.Schema({
     set: (val) => val ? encrypt(val) : val,
     get: (val) => val ? decrypt(val) : val,
   },
+  smoobuApiSecret: {
+    type: String,
+    default: '',
+    trim: true,
+    set: (val) => val ? encrypt(val) : val,
+    get: (val) => val ? decrypt(val) : val,
+  },
   propertyPicture:         { type: String, default: '' },
   propertyPictureOriginal: { type: String, default: '' },
   propertyPictureCropData: { type: mongoose.Schema.Types.Mixed, default: null },
@@ -201,7 +208,7 @@ userSchema.methods.toJSON = function() {
   delete obj.tag;              // never expose Main Admin identity
   delete obj.__v;
   if (Array.isArray(obj.properties)) {
-    obj.properties = obj.properties.map(({ smoobuApiKey, ...rest }) => rest);
+    obj.properties = obj.properties.map(({ smoobuApiKey, smoobuApiSecret, ...rest }) => rest);
   }
   return obj;
 };

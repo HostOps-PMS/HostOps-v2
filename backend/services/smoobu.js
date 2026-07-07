@@ -11,6 +11,7 @@
 //            filtering so each user only sees their own subset.
 
 import { isEncrypted } from '../utils/encryption.js';
+import crypto from 'crypto';
 
 const BASE = 'https://login.smoobu.com/api';
 const cache = new Map();
@@ -34,7 +35,54 @@ const RETRYABLE_STATUSES = new Set([429, 502, 503]);
 const RETRY_COUNT = 3;
 const RETRY_BASE_MS = 500;
 
-async function smoobuRequest(path, apiKey, userId) {
+export async function smoobuFetch(path, options = {}, { apiKey, apiSecret }) {
+  if (!apiKey) throw new Error('API Key is required');
+  if (!apiSecret) {
+    const err = new Error('API Secret is required for HMAC authentication. Please update your Smoobu credentials.');
+    err.code = 'NO_SMOOBU_SECRET';
+    throw err;
+  }
+
+  const method = (options.method || 'GET').toUpperCase();
+
+  let urlObj;
+  if (path.startsWith('http')) {
+    urlObj = new URL(path);
+  } else {
+    urlObj = new URL(BASE + path);
+  }
+
+  const pathname = urlObj.pathname;
+  urlObj.searchParams.sort();
+  const sortedQuery = urlObj.searchParams.toString();
+
+  const timestamp = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+  const nonce = crypto.randomUUID();
+  const bodyStr = typeof options.body === 'string' ? options.body : (options.body ? JSON.stringify(options.body) : "");
+  const bodyHash = crypto.createHash("sha256").update(bodyStr).digest("hex");
+  
+  const canonical = `${method}\n${pathname}\n${sortedQuery}\n${timestamp}\n${nonce}\n${bodyHash}\n${apiKey}`;
+  const signature = crypto.createHmac("sha256", apiSecret).update(canonical).digest("base64");
+
+  const headers = {
+    ...options.headers,
+    'Cache-Control': 'no-cache',
+    'X-API-Key': apiKey,
+    'X-Timestamp': timestamp,
+    'X-Nonce': nonce,
+    'X-Signature': signature
+  };
+
+  delete headers['Api-Key'];
+  delete headers['api-key'];
+
+  return fetch(urlObj.toString(), {
+    ...options,
+    headers
+  });
+}
+
+async function smoobuRequest(path, creds, userId) {
   const cacheKey = `${userId}:${path}`;
   const cached = getCache(cacheKey);
   if (cached) return cached;
@@ -46,12 +94,13 @@ async function smoobuRequest(path, apiKey, userId) {
       console.warn(`[smoobu] retry ${attempt}/${RETRY_COUNT} for ${path} (after ${delay}ms)`);
     }
 
-    const res = await fetch(BASE + path, {
-      headers: {
-        'Api-Key': apiKey,
-        'Cache-Control': 'no-cache',
-      },
-    });
+    let res;
+    try {
+      res = await smoobuFetch(path, {}, creds);
+    } catch (err) {
+      if (err.code === 'NO_SMOOBU_SECRET') throw err;
+      throw err;
+    }
 
     const text = await res.text();
 
@@ -83,7 +132,7 @@ async function smoobuRequest(path, apiKey, userId) {
 // ─────────────────────────────────────────────────────────────────
 // PAGINATED FETCH
 // ─────────────────────────────────────────────────────────────────
-async function smoobuRequestAllPages(basePath, apiKey, userId, { showCancellation = true } = {}) {
+async function smoobuRequestAllPages(basePath, creds, userId, { showCancellation = true } = {}) {
   const allBookings = [];
   let page = 1;
   let totalPages = 1;
@@ -92,7 +141,7 @@ async function smoobuRequestAllPages(basePath, apiKey, userId, { showCancellatio
   do {
     const sep = basePath.includes('?') ? '&' : '?';
     const path = `${basePath}${sep}page=${page}&pageSize=${PAGE_SIZE}${showCancellation ? '&showCancellation=1' : ''}`;
-    const data = await smoobuRequest(path, apiKey, userId);
+    const data = await smoobuRequest(path, creds, userId);
 
     if (data.bookings && Array.isArray(data.bookings)) {
       allBookings.push(...data.bookings);
@@ -116,26 +165,30 @@ async function smoobuRequestAllPages(basePath, apiKey, userId, { showCancellatio
 export function getApiKeyForUser(user) {
   // Root-level key (MODE A — per-user Smoobu account)
   if (user.smoobuApiKey && user.smoobuApiKey.trim()) {
-    return user.smoobuApiKey.trim();
+    return {
+      apiKey: user.smoobuApiKey.trim(),
+      apiSecret: user.smoobuApiSecret ? user.smoobuApiSecret.trim() : ''
+    };
   }
 
   // Shared env key (MODE B — legacy shared account)
   const envKey = process.env.SMOOBU_API_KEY;
   if (envKey && envKey.trim()) {
-    return envKey.trim();
+    return {
+      apiKey: envKey.trim(),
+      apiSecret: process.env.SMOOBU_API_SECRET ? process.env.SMOOBU_API_SECRET.trim() : ''
+    };
   }
 
-  // Per-property key fallback: keys stored on user.properties[].smoobuApiKey.
-  // The dashboard route injects the selected property's key at root level before
-  // calling smoobu functions, but other routes (messages, etc.) may not have a
-  // propertyDbId context — fall back to the first property key found.
-  // decrypt() returns ciphertext (not null) on failure, so we must also check
-  // isEncrypted() to skip keys that failed to decrypt — otherwise ciphertext
-  // gets sent to Smoobu as the API key, which returns 401.
   for (const p of user.properties || []) {
     try {
       const k = p.smoobuApiKey?.trim();
-      if (k && !isEncrypted(k)) return k;
+      if (k && !isEncrypted(k)) {
+        return {
+          apiKey: k,
+          apiSecret: p.smoobuApiSecret ? (!isEncrypted(p.smoobuApiSecret.trim()) ? p.smoobuApiSecret.trim() : '') : ''
+        };
+      }
     } catch { /* corrupted/undecryptable key — skip this property */ }
   }
 
@@ -168,9 +221,9 @@ function getCacheUserId(user) {
 // ─────────────────────────────────────────────────────────────────
 
 export async function getApartments(user) {
-  const apiKey = getApiKeyForUser(user);
+  const creds = getApiKeyForUser(user);
   const userId = getCacheUserId(user);
-  const data = await smoobuRequest('/apartments', apiKey, userId);
+  const data = await smoobuRequest('/apartments', creds, userId);
   return { apartments: data.apartments || [] };
 }
 
@@ -180,9 +233,9 @@ export async function getApartments(user) {
 // currency, equipments and type for one apartment. Cached like the rest.
 // ─────────────────────────────────────────────────────────────────
 export async function getApartmentDetail(user, apartmentId) {
-  const apiKey = getApiKeyForUser(user);
+  const creds = getApiKeyForUser(user);
   const userId = getCacheUserId(user);
-  const data = await smoobuRequest(`/apartments/${apartmentId}`, apiKey, userId);
+  const data = await smoobuRequest(`/apartments/${apartmentId}`, creds, userId);
   return data;
 }
 
@@ -202,7 +255,7 @@ export async function getApartmentDetail(user, apartmentId) {
 // exact field names Smoobu uses for YOUR account.
 // ─────────────────────────────────────────────────────────────────
 export async function getApartmentPictures(user, apartmentId) {
-  const apiKey = getApiKeyForUser(user);
+  const creds = getApiKeyForUser(user);
   const userId = getCacheUserId(user);
 
   const paths = [
@@ -213,7 +266,7 @@ export async function getApartmentPictures(user, apartmentId) {
 
   for (const path of paths) {
     try {
-      const data = await smoobuRequest(path, apiKey, userId);
+      const data = await smoobuRequest(path, creds, userId);
 
       // Diagnostic: log the full raw shape so we know what Smoobu actually sends
       console.log(`[smoobu] getApartmentPictures apt=${apartmentId} path=${path} → keys:`, Object.keys(data || {}));
@@ -279,7 +332,7 @@ export async function getApartmentPictures(user, apartmentId) {
 }
 
 export async function getBookings(user, { from, to, apartmentId, showCancellation = true } = {}) {
-  const apiKey = getApiKeyForUser(user);
+  const creds = getApiKeyForUser(user);
   const userId = getCacheUserId(user);
 
   const params = new URLSearchParams();
@@ -288,19 +341,19 @@ export async function getBookings(user, { from, to, apartmentId, showCancellatio
   if (apartmentId) params.append('apartmentId', apartmentId);
 
   const basePath = `/reservations?${params.toString()}`;
-  const { bookings } = await smoobuRequestAllPages(basePath, apiKey, userId, { showCancellation });
+  const { bookings } = await smoobuRequestAllPages(basePath, creds, userId, { showCancellation });
 
   return { bookings, total: bookings.length };
 }
 
 export async function getRates(user, { apartmentIds, start, end }) {
-  const apiKey = getApiKeyForUser(user);
+  const creds = getApiKeyForUser(user);
   const userId = getCacheUserId(user);
 
   const idsParam = apartmentIds.map(id => `apartments[]=${id}`).join('&');
   return smoobuRequest(
     `/rates?${idsParam}&start_date=${start}&end_date=${end}`,
-    apiKey,
+    creds,
     userId
   );
 }
@@ -321,7 +374,7 @@ export async function getRates(user, { apartmentIds, start, end }) {
 // always appear in the inbox and can be messaged first.
 // ─────────────────────────────────────────────────────────────────
 export async function getInbox(user, { limit = 250 } = {}) {
-  const apiKey = getApiKeyForUser(user);
+  const creds = getApiKeyForUser(user);
   const userId = getCacheUserId(user);
 
   // ── 1. Fetch /threads (reservations with existing messages) ────────────────
@@ -338,7 +391,7 @@ export async function getInbox(user, { limit = 250 } = {}) {
     while (page <= 20) {
       const data = await smoobuRequest(
         `/threads?page=${page}&pageSize=${PAGE_SIZE}`,
-        apiKey,
+        creds,
         userId
       );
       if (page === 1) {
@@ -367,7 +420,7 @@ export async function getInbox(user, { limit = 250 } = {}) {
   try {
     const { bookings } = await smoobuRequestAllPages(
       `/reservations?from=${fmt(oneYearAgo)}&to=${fmt(oneYearAhead)}`,
-      apiKey,
+      creds,
       userId,
       { showCancellation: false } // only confirmed; cancelled guests can't be messaged
     );
@@ -618,7 +671,7 @@ export async function getDashboard(user, { from, to } = {}) {
 // MESSAGING
 // ─────────────────────────────────────────────────────────────────
 async function verifyReservationOwnership(user, reservationId) {
-  const apiKey = getApiKeyForUser(user);
+  const creds = getApiKeyForUser(user);
   const userId = getCacheUserId(user);
 
   const today = new Date();
@@ -628,7 +681,7 @@ async function verifyReservationOwnership(user, reservationId) {
 
   const { bookings } = await smoobuRequestAllPages(
     `/reservations?from=${fmt(twoYearsAgo)}&to=${fmt(twoYearsAhead)}`,
-    apiKey,
+    creds,
     userId,
     { showCancellation: true }
   );
@@ -642,10 +695,10 @@ async function verifyReservationOwnership(user, reservationId) {
 
 export async function getReservationMessages(user, reservationId) {
   await verifyReservationOwnership(user, reservationId);
-  const apiKey = getApiKeyForUser(user);
+  const creds = getApiKeyForUser(user);
   const userId = getCacheUserId(user);
   try {
-    return smoobuRequest(`/reservations/${reservationId}/messages`, apiKey, userId);
+    return smoobuRequest(`/reservations/${reservationId}/messages`, creds, userId);
   } catch (err) {
     // 404 means no message thread exists yet for this reservation — return empty.
     // All other errors (500, 502, auth errors) are real failures and should surface.
@@ -657,24 +710,27 @@ export async function getReservationMessages(user, reservationId) {
 
 export async function sendReplyToGuest(user, reservationId, { subject, messageBody }) {
   await verifyReservationOwnership(user, reservationId);
-  const apiKey = getApiKeyForUser(user);
+  const creds = getApiKeyForUser(user);
   const userId = getCacheUserId(user);
 
-  const res = await fetch(
-    `${BASE}/reservations/${reservationId}/messages/send-message-to-guest`,
-    {
-      method: 'POST',
-      headers: {
-        'Api-Key':        apiKey,
-        'Content-Type':   'application/json',
-        'Cache-Control':  'no-cache',
+  let res;
+  try {
+    res = await smoobuFetch(
+      `/reservations/${reservationId}/messages/send-message-to-guest`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject:     subject || 'Re: Your message',
+          messageBody: messageBody,
+        }),
       },
-      body: JSON.stringify({
-        subject:     subject || 'Re: Your message',
-        messageBody: messageBody,
-      }),
-    }
-  );
+      creds
+    );
+  } catch (err) {
+    if (err.code === 'NO_SMOOBU_SECRET') throw err;
+    throw err;
+  }
 
   if (!res.ok) {
     const text = await res.text();

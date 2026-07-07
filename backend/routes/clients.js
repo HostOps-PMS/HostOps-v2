@@ -133,6 +133,7 @@ router.get('/clients/:id/smoobu', requireAdmin, async (req, res, next) => {
     // getDashboard expects a user-like object with smoobuApiKey and propertyTagPrefix.
     const smoobuContext = {
       smoobuApiKey:      property.smoobuApiKey,
+      smoobuApiSecret:   property.smoobuApiSecret,
       propertyTagPrefix: user.propertyTagPrefix || '',
     };
 
@@ -163,7 +164,7 @@ router.get('/clients/:id/smoobu', requireAdmin, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.get('/clients/:id/properties', requireAdmin, async (req, res, next) => {
   try {
-    const userDoc = await User.findById(req.params.id).select('+properties.smoobuApiKey');
+    const userDoc = await User.findById(req.params.id).select('+properties.smoobuApiKey +properties.smoobuApiSecret');
     if (!userDoc) {
       return res.status(404).json({ error: 'Client not found' });
     }
@@ -181,13 +182,27 @@ router.get('/clients/:id/properties', requireAdmin, async (req, res, next) => {
           maskedKey = '•'.repeat(keyStr.length);
         }
       }
+      // Handle smoobuApiSecret
+      const { smoobuApiSecret, ...safeRest } = rest;
+      const hasSecret = !!(smoobuApiSecret && smoobuApiSecret.trim());
+      let maskedSecret = '';
+      if (hasSecret) {
+        const secretStr = smoobuApiSecret.trim();
+        if (secretStr.length > 4) {
+          maskedSecret = '•'.repeat(secretStr.length - 4) + secretStr.slice(-4);
+        } else {
+          maskedSecret = '•'.repeat(secretStr.length);
+        }
+      }
       return {
-        ...rest,
+        ...safeRest,
         hasSmoobuKey: hasKey,
         maskedSmoobuApiKey: maskedKey,
-        propertyPicture: rest.propertyPicture || '',
-        propertyPictureOriginal: rest.propertyPictureOriginal || '',
-        propertyPictureCropData: rest.propertyPictureCropData || null
+        hasSmoobuSecret: hasSecret,
+        maskedSmoobuApiSecret: maskedSecret,
+        propertyPicture: safeRest.propertyPicture || '',
+        propertyPictureOriginal: safeRest.propertyPictureOriginal || '',
+        propertyPictureCropData: safeRest.propertyPictureCropData || null
       };
     });
     res.json(safe);
@@ -206,7 +221,7 @@ router.get('/clients/:id/properties', requireAdmin, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.get('/clients/:id/properties/:propertyId/apikey', requireAdmin, async (req, res, next) => {
   try {
-    const userDoc = await User.findById(req.params.id).select('+properties.smoobuApiKey');
+    const userDoc = await User.findById(req.params.id).select('+properties.smoobuApiKey +properties.smoobuApiSecret');
     if (!userDoc) {
       return res.status(404).json({ error: 'Client not found' });
     }
@@ -217,7 +232,10 @@ router.get('/clients/:id/properties/:propertyId/apikey', requireAdmin, async (re
       return res.status(404).json({ error: 'Property not found for this client.' });
     }
 
-    res.json({ smoobuApiKey: property.smoobuApiKey || '' });
+    res.json({ 
+      smoobuApiKey: property.smoobuApiKey || '',
+      smoobuApiSecret: property.smoobuApiSecret || ''
+    });
   } catch (err) {
     if (err.name === 'CastError') {
       return res.status(400).json({ error: 'Invalid ID' });
@@ -233,6 +251,7 @@ router.get('/clients/:id/properties/:propertyId/apikey', requireAdmin, async (re
 const createPropertySchema = z.object({
   propertyName: z.string().min(1).max(150).trim(),
   smoobuApiKey: z.string().max(512).optional().default(''),
+  smoobuApiSecret: z.string().max(512).optional().default(''),
 });
 
 router.post('/clients/:id/properties', requireAdmin, async (req, res, next) => {
@@ -247,13 +266,14 @@ router.post('/clients/:id/properties', requireAdmin, async (req, res, next) => {
     user.properties.push({
       propertyName: data.propertyName,
       smoobuApiKey: data.smoobuApiKey.trim() || '',
+      smoobuApiSecret: data.smoobuApiSecret.trim() || '',
     });
 
     await user.save();
 
-    // Return the newly added property without smoobuApiKey
+    // Return the newly added property without smoobuApiKey/smoobuApiSecret
     const added = user.properties[user.properties.length - 1].toObject();
-    const { smoobuApiKey: _, ...safe } = added;
+    const { smoobuApiKey: _1, smoobuApiSecret: _2, ...safe } = added;
     res.status(201).json(safe);
   } catch (err) {
     if (err.name === 'ZodError') {
@@ -273,13 +293,14 @@ router.post('/clients/:id/properties', requireAdmin, async (req, res, next) => {
 const updatePropertySchema = z.object({
   propertyName: z.string().min(1).max(150).trim().optional(),
   smoobuApiKey: z.string().max(512).optional(),
+  smoobuApiSecret: z.string().max(512).optional(),
 });
 
 router.patch('/clients/:id/properties/:propertyId', requireAdmin, async (req, res, next) => {
   try {
     const data = updatePropertySchema.parse(req.body);
 
-    const user = await User.findById(req.params.id).select('+properties.smoobuApiKey');
+    const user = await User.findById(req.params.id).select('+properties.smoobuApiKey +properties.smoobuApiSecret');
     if (!user) {
       return res.status(404).json({ error: 'Client not found' });
     }
@@ -291,10 +312,11 @@ router.patch('/clients/:id/properties/:propertyId', requireAdmin, async (req, re
 
     if (data.propertyName !== undefined) property.propertyName = data.propertyName;
     if (data.smoobuApiKey !== undefined) property.smoobuApiKey = data.smoobuApiKey.trim();
+    if (data.smoobuApiSecret !== undefined) property.smoobuApiSecret = data.smoobuApiSecret.trim();
 
     await user.save();
 
-    const { smoobuApiKey: _, ...safe } = property.toObject();
+    const { smoobuApiKey: _1, smoobuApiSecret: _2, ...safe } = property.toObject();
     res.json(safe);
   } catch (err) {
     if (err.name === 'ZodError') {
