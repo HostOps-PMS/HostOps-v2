@@ -214,7 +214,7 @@ async function scrapeApartmentImages(aptId) {
  * Fetch bookings + apartments for a single property (smoobu api key).
  * Returns a normalized object with stats and raw lists.
  *
- * @param {{ smoobuApiKey: string, propertyTagPrefix?: string, _id: string }} propertyCtx
+ * @param {{ smoobuApiKey: string, smoobuApiSecret?: string, propertyTagPrefix?: string, _id: string }} propertyCtx
  * @param {{ from: string, to: string }}                                       dateRange
  * @param {string}                                                             clientId
  * @param {string}                                                             clientName
@@ -648,16 +648,23 @@ export async function getDashboardOverview(opts = {}) {
       // encrypted iv:enc:tag format, and safely returns the stored string if the
       // auth tag check fails — so a bad/legacy key won't crash the whole request.
       let decryptedKey = '';
+      let decryptedSecret = '';
       try {
         decryptedKey = decrypt(prop.smoobuApiKey) || '';
+        decryptedSecret = prop.smoobuApiSecret ? (decrypt(prop.smoobuApiSecret) || '') : '';
       } catch {
         decryptedKey = '';
+        decryptedSecret = '';
       }
       if (!decryptedKey || !decryptedKey.trim()) return;
 
+      // HMAC auth (smoobuFetch) requires BOTH the API key and the API secret.
+      // Without the secret, every Smoobu call throws NO_SMOOBU_SECRET and the
+      // whole property falls back to a coord-less DB stub on the map.
       const propertyCtx = {
         _id:               String(prop._id),
         smoobuApiKey:      decryptedKey.trim(),
+        smoobuApiSecret:   decryptedSecret.trim(),
         propertyTagPrefix: client.propertyTagPrefix || '',
       };
 
