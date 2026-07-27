@@ -6,6 +6,7 @@ import { useDashboard } from "../context/DashboardContext";
 import { exportDashboardPDF } from "../services/pdfExportService";
 import AccountSettingsModal from "./AccountSettingsModal";
 import SwitchAccountModal from "./SwitchAccountModal";
+import BugReportWidget from "./BugReportWidget";
 import FetchingOverlay from "./FetchingOverlay";
 import { useActivityLog } from "../hooks/useActivityLog";
 import safeStorage from "../../safeStorage";
@@ -250,6 +251,7 @@ export default function Navbar() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutJoke, setLogoutJoke] = useState('');
   const [switchConfirmOpen, setSwitchConfirmOpen] = useState(false);
+  const [bugReportOpen, setBugReportOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifTab, setNotifTab] = useState('bookings'); // bookings | reports
   const [notifications, setNotifications] = useState([]);
@@ -750,6 +752,24 @@ export default function Navbar() {
       position: "relative",
     },
     iconBtnIcon: { fontSize: "16px" },
+    /* Report-a-Bug — labelled pill so it reads as an action, not another glyph */
+    bugBtn: {
+      display: "flex",
+      alignItems: "center",
+      gap: "6px",
+      height: "34px",
+      padding: "0 12px",
+      borderRadius: "8px",
+      cursor: "pointer",
+      fontFamily: "inherit",
+      fontSize: "12.5px",
+      fontWeight: 600,
+      whiteSpace: "nowrap",
+      background: dark ? "#12301f" : "#e8f6ef",
+      border: `0.5px solid ${dark ? "#2a5c40" : "#9ed4ba"}`,
+      color: dark ? "#5fd0a3" : "#15704f",
+      transition: "background 0.15s, border-color 0.15s",
+    },
     divider: {
       width: "0.5px",
       height: "20px",
@@ -932,6 +952,16 @@ export default function Navbar() {
 
             <div style={t.rightGroup}>
 
+              {/* Icon-only on mobile — the navbar has no room for the label */}
+              <button
+                style={{ ...t.bugBtn, width: "34px", padding: 0, justifyContent: "center" }}
+                onClick={() => setBugReportOpen(true)}
+                title="Report a Bug"
+                aria-label="Report a Bug"
+              >
+                <i className="ti ti-bug" style={{ fontSize: "16px" }} aria-hidden="true" />
+              </button>
+
               <div style={{ position: 'relative' }} ref={notifRefMobile}>
                 <button
                   style={{ ...t.iconBtn, position: 'relative' }}
@@ -1111,6 +1141,10 @@ export default function Navbar() {
           </div>
         </nav>
 
+        <BugReportWidget
+          open={bugReportOpen}
+          onClose={() => setBugReportOpen(false)}
+        />
         <AccountSettingsModal
           isOpen={accountSettingsOpen}
           onClose={() => setAccountSettingsOpen(false)}
@@ -1153,6 +1187,27 @@ export default function Navbar() {
           </Link>
 
           <div style={t.rightGroup}>
+            {/* Labelled so it reads as an action, not another glyph in the row */}
+            <button
+              style={t.bugBtn}
+              onClick={() => setBugReportOpen(true)}
+              title="Report a Bug"
+              aria-label="Report a Bug"
+              onMouseEnter={e => {
+                e.currentTarget.style.background = dark ? "#18402a" : "#d7efe3";
+                e.currentTarget.style.borderColor = dark ? "#3a7a56" : "#6fc2a0";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = dark ? "#12301f" : "#e8f6ef";
+                e.currentTarget.style.borderColor = dark ? "#2a5c40" : "#9ed4ba";
+              }}
+            >
+              <i className="ti ti-bug" style={{ fontSize: "15px" }} aria-hidden="true" />
+              Report a Bug
+            </button>
+
+            <div style={t.divider} />
+
             <div style={{ position: 'relative' }} ref={notifRef}>
               <button
                 style={{ ...t.iconBtn, position: 'relative' }}
@@ -1344,6 +1399,10 @@ export default function Navbar() {
         </div>
       </nav>
 
+      <BugReportWidget
+        open={bugReportOpen}
+        onClose={() => setBugReportOpen(false)}
+      />
       <AccountSettingsModal
         isOpen={accountSettingsOpen}
         onClose={() => setAccountSettingsOpen(false)}
