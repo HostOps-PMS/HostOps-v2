@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router';
 import { logoutUser } from '../../authorization/services/authService';
 import { FaUsers, FaChartLine, FaSignOutAlt, FaCog } from "react-icons/fa";
 import { removeSecureUser } from "../../../lib/secureUserStorage";

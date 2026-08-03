@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { getSecureUser } from '../../../lib/secureUserStorage';
 import { useNotifications } from '../../../context/NotificationsContext';
 import { useTheme } from '../../../context/ThemeContext';

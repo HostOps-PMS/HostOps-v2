@@ -1,5 +1,5 @@
 // components/RecentActivities.jsx
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 // ── Static fallback activities (shown while loading or no Smoobu data) ──
 const FALLBACK_ACTIVITIES = [

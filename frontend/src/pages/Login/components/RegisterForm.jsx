@@ -3,7 +3,7 @@ import { registerUser } from '../services/authservice';
 import { useAuthSubmit } from '../hooks/useAuth';
 import { validateRegistration } from '../utils/validators';
 import PasswordStrengthIndicator from './PasswordStrengthIndicator';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 export default function RegisterForm({ showMsg, hideMsg, onSuccess }) {
   const [fields, setFields] = useState({

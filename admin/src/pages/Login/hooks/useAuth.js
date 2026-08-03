@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { login, DASHBOARD_URL } from '../services/authService';
 import { getSecureUser, setSecureUser } from '../../../lib/secureUserStorage';
 import { setSessionKey } from '../../../lib/authUtils';

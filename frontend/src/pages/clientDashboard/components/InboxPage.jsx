@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import Navbar from "./Navbar";
 import FetchingOverlay from "./FetchingOverlay";
 import { useDashboard } from "../context/DashboardContext";

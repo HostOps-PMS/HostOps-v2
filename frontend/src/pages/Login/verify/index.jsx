@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router';
 import OTPInput from '../components/OTPInput';
 import { verifyEmail, resendVerification } from './services/verifyService';
 import './Verify.css';
