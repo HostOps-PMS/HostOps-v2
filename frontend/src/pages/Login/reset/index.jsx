@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router';
 import OTPInput from '../components/OTPInput';
 import ResetPasswordForm from './components/ResetPasswordForm';
 import { verifyResetToken, resendReset, resetPassword } from './services/resetService';

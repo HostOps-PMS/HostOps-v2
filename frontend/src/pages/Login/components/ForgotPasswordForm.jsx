@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { forgotPassword } from '../services/authservice';
 import { useAuthSubmit } from '../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 export default function ForgotPasswordForm({ showMsg, onBack }) {
   const [email, setEmail] = useState('');

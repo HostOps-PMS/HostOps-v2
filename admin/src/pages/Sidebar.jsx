@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router';
 import { useState, useEffect, useRef } from 'react';
 import AccountSettingsModal from './dashboard/components/AccountSettingsModal';
 import { logoutUser } from './authorization/services/authService';

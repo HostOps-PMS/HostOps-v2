@@ -1,5 +1,5 @@
 // components/AlertsCenter.jsx
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 // ── Static fallback alerts (shown while loading or no Smoobu data) ──
 const FALLBACK_ALERTS = [

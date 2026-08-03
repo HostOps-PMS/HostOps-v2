@@ -1,5 +1,5 @@
 import React, { StrictMode } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import LoginPage from './pages/Login';
 import DashboardPage from './pages/clientDashboard';
 import InboxPage from './pages/clientDashboard/components/InboxPage';
