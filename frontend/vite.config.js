@@ -20,7 +20,6 @@ export default defineConfig(({ mode }) => ({
   build: {
 
     sourcemap: mode === 'production' ? false : true,
-    minify: 'esbuild',
     target: 'es2020',
 
     rollupOptions: {
