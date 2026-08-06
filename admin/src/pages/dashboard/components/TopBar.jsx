@@ -159,19 +159,16 @@ const SunIcon = () => (
 function NotificationDropdown({ alerts = [], activities = [], loading, onClose }) {
   const [activeTab, setActiveTab] = useState('alerts');
   const [readIds,   setReadIds]   = useState(new Set());
-  const { bugReports: ctxBugReports } = useNotifications();
-  const bugReports = ctxBugReports || [];
   const { dark } = useTheme();
   const navigate = useNavigate();
 
-  const openReports = bugReports.filter(r => r.status === 'open').length;
   const unreadAlerts = (alerts || []).filter(a => a.unread && !readIds.has(a.id)).length;
 
   const markAllRead = () => {
     setReadIds(prev => new Set([...prev, ...(alerts || []).map(a => a.id)]));
   };
 
-  const items = activeTab === 'alerts' ? (alerts || []) : activeTab === 'activities' ? (activities || []) : bugReports;
+  const items = activeTab === 'alerts' ? (alerts || []) : (activities || []);
 
   const surface   = dark ? '#132a1e' : '#fff';
   const border    = dark ? '#1e3a2a' : 'rgba(0,0,0,0.08)';
@@ -250,7 +247,6 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
           {[
             { key: 'alerts',     label: 'Alerts',   count: (alerts     || []).length },
             { key: 'activities', label: 'Activity', count: (activities || []).length },
-            { key: 'reports',    label: 'Reports',  count: bugReports.length, highlight: bugReports.some(r => r.status === 'open') },
           ].map(tab => (
             <button
               key={tab.key}
@@ -302,7 +298,7 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
               </svg>
             </div>
             <div style={{ fontSize: 12, color: textMuted }}>
-              {activeTab === 'alerts' ? 'No alerts right now' : activeTab === 'activities' ? 'No recent activity' : 'No bug reports yet'}
+              {activeTab === 'alerts' ? 'No alerts right now' : 'No recent activity'}
             </div>
           </div>
         ) : activeTab === 'alerts' ? (
@@ -368,7 +364,7 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
               </div>
             );
           })
-        ) : activeTab === 'activities' ? (
+        ) : (
           (activities || []).map((act, i) => (
             <div
               key={act.id ?? i}
@@ -401,56 +397,6 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
               </div>
             </div>
           ))
-        ) : (
-          bugReports.map((r, i) => {
-            const sevMeta = { low: { label: 'Low', bg: dark ? '#052e16' : '#f0fdf4', color: dark ? '#4ade80' : '#16a34a', border: dark ? '#166534' : '#bbf7d0' }, medium: { label: 'Medium', bg: dark ? '#2a1f0a' : '#fffbeb', color: dark ? '#fbbf24' : '#d97706', border: dark ? '#5c3a0a' : '#fde68a' }, high: { label: 'High', bg: dark ? '#2a1a0a' : '#fff7ed', color: dark ? '#fb923c' : '#ea580c', border: dark ? '#5c2a0a' : '#fed7aa' }, critical: { label: 'Critical', bg: dark ? '#2a0d0d' : '#fef2f2', color: dark ? '#f87171' : '#dc2626', border: dark ? '#5c1a1a' : '#fecaca' } };
-            const stMeta = { open: { label: 'Open', bg: dark ? '#2a1a0a' : '#fff7ed', color: dark ? '#fb923c' : '#ea580c', border: dark ? '#5c2a0a' : '#fed7aa' }, in_progress: { label: 'In Progress', bg: dark ? '#2a1f0a' : '#fffbeb', color: dark ? '#fbbf24' : '#d97706', border: dark ? '#5c3a0a' : '#fde68a' }, sent: { label: 'Sent', bg: dark ? '#0d1a2a' : '#eff6ff', color: dark ? '#60a5fa' : '#2563eb', border: dark ? '#1a3a5c' : '#bfdbfe' }, resolved: { label: 'Resolved', bg: dark ? '#052e16' : '#f0fdf4', color: dark ? '#4ade80' : '#16a34a', border: dark ? '#166534' : '#bbf7d0' }, dismissed: { label: 'Dismissed', bg: dark ? '#1f2937' : '#f3f4f6', color: dark ? '#9ca3af' : '#6b7280', border: dark ? '#374151' : '#e5e7eb' } };
-            const sev = sevMeta[r.severity] || sevMeta.high;
-            const st = stMeta[r.status] || stMeta.open;
-            const reporterName = (r.name && r.name !== r.email && !r.name.includes('@')) ? r.name : (r.email ? r.email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '?');
-            const reporterInitial = (reporterName[0] || '?').toUpperCase();
-            return (
-              <div
-                key={r._id ?? i}
-                className="notif-item"
-                onClick={() => { onClose(); navigate('/bug-reports'); }}
-                style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 10,
-                  padding: '11px 16px',
-                  borderBottom: `0.5px solid ${itemBorderB}`,
-                  cursor: 'pointer',
-                  background: r.status === 'open' ? unreadBg : readBg,
-                  transition: 'background 0.12s',
-                }}
-              >
-                <InitialsAvatar name={reporterName} size={34} radius={10} />
-
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3, flexWrap: 'wrap' }}>
-                    <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: sev.color, background: sev.bg, border: `1px solid ${sev.border}`, letterSpacing: 0.3 }}>
-                      {sev.label}
-                    </span>
-                    <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: st.color, background: st.bg, border: `1px solid ${st.border}`, letterSpacing: 0.3 }}>
-                      {st.label}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: textMain, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {r.page || 'General'}
-                  </div>
-                  <div style={{ fontSize: 11, color: textMuted, marginTop: 1 }}>
-                    {reporterName}
-                  </div>
-                </div>
-
-                <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                  <div style={{ fontSize: 10, color: textDim, whiteSpace: 'nowrap' }}>{timeAgo(r.createdAt)}</div>
-                  {r.status === 'open' && (
-                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#f97316', marginLeft: 'auto', marginTop: 5 }} />
-                  )}
-                </div>
-              </div>
-            );
-          })
         )}
       </div>
 
@@ -460,7 +406,7 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
           <button
             onClick={() => {
               onClose();
-              navigate(activeTab === 'alerts' ? '/alerts' : activeTab === 'activities' ? '/recent-activities' : '/bug-reports');
+              navigate(activeTab === 'alerts' ? '/alerts' : '/recent-activities');
             }}
             style={{ fontSize: 11, color: '#1a9e6e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0 }}
           >

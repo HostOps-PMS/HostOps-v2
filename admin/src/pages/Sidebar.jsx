@@ -74,11 +74,6 @@ const SECURITY_ITEMS = [
     label: 'Honeypot Security',
     to: '/honeypot',
   },
-  {
-    icon: <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="10" cy="10" r="8"/><path d="M10 6v5" strokeLinecap="round"/><circle cx="10" cy="14" r="0.5" fill="currentColor"/></svg>,
-    label: 'Bug Reports',
-    to: '/bug-reports',
-  },
 ];
 
 const SettingsIcon = () => (
@@ -628,7 +623,6 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
   const [mobileNotifOpen,  setMobileNotifOpen]  = useState(false);
   const [mobileActiveTab,  setMobileActiveTab]  = useState('alerts');
   const [mobileReadIds,    setMobileReadIds]    = useState(new Set());
-  const mobileBugReports = notifContext.bugReports || [];
   const location = useLocation();
 
 
@@ -1022,7 +1016,6 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                   {[
                     { key: 'alerts',     label: 'Alerts',   count: (resolvedAlerts     || []).length },
                     { key: 'activities', label: 'Activity', count: (resolvedActivities || []).length },
-                    { key: 'reports',    label: 'Reports',  count: mobileBugReports.length },
                   ].map(tab => (
                     <button
                       key={tab.key}
@@ -1093,7 +1086,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                       );
                     })
                   )
-                ) : mobileActiveTab === 'activities' ? (
+                ) : (
                   (resolvedActivities || []).length === 0 ? (
                     <div style={{ padding: '36px 0', textAlign: 'center', fontSize: 12, color: notifMuted }}>No recent activity</div>
                   ) : (
@@ -1138,53 +1131,6 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                                 })()}
                               </div>
                             )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )
-                ) : (
-                  mobileBugReports.length === 0 ? (
-                    <div style={{ padding: '36px 0', textAlign: 'center', fontSize: 12, color: notifMuted }}>No bug reports yet</div>
-                  ) : (
-                    mobileBugReports.map((r, i) => {
-                      const sevMeta = { low: { label: 'Low', bg: dark ? '#052e16' : '#f0fdf4', color: dark ? '#4ade80' : '#16a34a', border: dark ? '#166534' : '#bbf7d0' }, medium: { label: 'Medium', bg: dark ? '#2a1f0a' : '#fffbeb', color: dark ? '#fbbf24' : '#d97706', border: dark ? '#5c3a0a' : '#fde68a' }, high: { label: 'High', bg: dark ? '#2a1a0a' : '#fff7ed', color: dark ? '#fb923c' : '#ea580c', border: dark ? '#5c2a0a' : '#fed7aa' }, critical: { label: 'Critical', bg: dark ? '#2a0d0d' : '#fef2f2', color: dark ? '#f87171' : '#dc2626', border: dark ? '#5c1a1a' : '#fecaca' } };
-                      const stMeta = { open: { label: 'Open', bg: dark ? '#2a1a0a' : '#fff7ed', color: dark ? '#fb923c' : '#ea580c', border: dark ? '#5c2a0a' : '#fed7aa' }, in_progress: { label: 'In Progress', bg: dark ? '#2a1f0a' : '#fffbeb', color: dark ? '#fbbf24' : '#d97706', border: dark ? '#5c3a0a' : '#fde68a' }, sent: { label: 'Sent', bg: dark ? '#0d1a2a' : '#eff6ff', color: dark ? '#60a5fa' : '#2563eb', border: dark ? '#1a3a5c' : '#bfdbfe' }, resolved: { label: 'Resolved', bg: dark ? '#052e16' : '#f0fdf4', color: dark ? '#4ade80' : '#16a34a', border: dark ? '#166534' : '#bbf7d0' }, dismissed: { label: 'Dismissed', bg: dark ? '#1f2937' : '#f3f4f6', color: dark ? '#9ca3af' : '#6b7280', border: dark ? '#374151' : '#e5e7eb' } };
-                      const sev = sevMeta[r.severity] || sevMeta.high;
-                      const st = stMeta[r.status] || stMeta.open;
-                      const rName = (r.name && r.name !== r.email && !r.name.includes('@')) ? r.name : (r.email ? r.email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '?');
-                      const COLORS = ['#1a9e6e','#2196f3','#9c27b0','#f44336','#ff9800','#00bcd4'];
-                      let hash = 0; for (let c = 0; c < rName.length; c++) hash = rName.charCodeAt(c) + ((hash << 5) - hash);
-                      const avBg = COLORS[Math.abs(hash) % COLORS.length];
-                      return (
-                        <div key={r._id ?? i} className="mob-notif-item" style={{
-                          display: 'flex', alignItems: 'flex-start', gap: 10,
-                          padding: '11px 16px',
-                          borderBottom: `0.5px solid ${notifDiv}`,
-                          background: r.status === 'open' ? notifUnreadBg : notifReadBg,
-                        }}>
-                          <div style={{ width: 34, height: 34, borderRadius: 10, background: avBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{(rName[0] || '?').toUpperCase()}</div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', gap: 4, marginBottom: 3, flexWrap: 'wrap' }}>
-                              <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: sev.color, background: sev.bg, border: `1px solid ${sev.border}`, letterSpacing: 0.3 }}>{sev.label}</span>
-                              <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: st.color, background: st.bg, border: `1px solid ${st.border}`, letterSpacing: 0.3 }}>{st.label}</span>
-                            </div>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: notifText, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.page || 'General'}</div>
-                            <div style={{ fontSize: 11, color: notifMuted, marginTop: 1 }}>{rName}</div>
-                          </div>
-                          <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                            <div style={{ fontSize: 10, color: notifDim }}>
-                              {(() => {
-                                const d = new Date(r.createdAt);
-                                if (isNaN(d.getTime())) return '';
-                                const diff = Math.floor((Date.now() - d.getTime()) / 1000);
-                                if (diff < 0 || diff < 60) return 'just now';
-                                if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-                                if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-                                return `${Math.floor(diff / 86400)}d ago`;
-                              })()}
-                            </div>
-                            {r.status === 'open' && <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#f97316', marginLeft: 'auto', marginTop: 5 }} />}
                           </div>
                         </div>
                       );

@@ -1,12 +1,8 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { getToken, fetchWithAuth } from '../lib/authUtils';
-
-const API_BASE = (import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+import { createContext, useContext, useState, useCallback } from 'react';
 
 const NotificationsContext = createContext({
   alerts: [],
   activities: [],
-  bugReports: [],
   loading: false,
   refetch: () => {},
   setOverviewData: () => {},
@@ -15,8 +11,7 @@ const NotificationsContext = createContext({
 export function NotificationsProvider({ children }) {
   const [alerts,      setAlerts]      = useState([]);
   const [activities,  setActivities]  = useState([]);
-  const [bugReports,  setBugReports]  = useState([]);
-  const [loading,     setLoading]     = useState(false);
+  const [loading]     = useState(false);
 
   // alerts and activities are populated externally via setOverviewData
   // called by the dashboard's useStats hook after it fetches the overview
@@ -26,39 +21,12 @@ export function NotificationsProvider({ children }) {
     setActivities(data.recentActivities ?? []);
   }, []);
 
-  const bugFetchedRef = useRef(false);
-
-  const fetchBugReports = useCallback(async () => {
-    const token = getToken();
-    if (!token || bugFetchedRef.current) return;
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/api/bug-reports`);
-      if (res && res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setBugReports(data);
-          bugFetchedRef.current = true;
-        }
-      }
-    } catch (err) {
-      console.warn('[NotificationsContext] bug reports fetch failed:', err);
-    }
-  }, []);
-
-  // fetchNotifications kept for manual refetch compatibility but no longer
-  // calls getDashboardOverview — the dashboard overview is fetched once by
-  // useStats and shared here via setOverviewData to avoid duplicate calls.
-  const fetchNotifications = useCallback(() => {
-    bugFetchedRef.current = false;
-    fetchBugReports();
-  }, [fetchBugReports]);
-
-  useEffect(() => {
-    fetchBugReports();
-  }, [fetchBugReports]);
+  // fetchNotifications kept for manual refetch compatibility — alerts/activities
+  // come from useStats via setOverviewData, so there is nothing left to refetch here.
+  const fetchNotifications = useCallback(() => {}, []);
 
   return (
-    <NotificationsContext.Provider value={{ alerts, activities, bugReports, loading, refetch: fetchNotifications, refetchBugReports: fetchBugReports, setOverviewData }}>
+    <NotificationsContext.Provider value={{ alerts, activities, loading, refetch: fetchNotifications, setOverviewData }}>
       {children}
     </NotificationsContext.Provider>
   );
