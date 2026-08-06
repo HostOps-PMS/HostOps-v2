@@ -21,8 +21,9 @@ import AlertsCenterPage from './pages/AlertsCenter';
 import HoneypotDashboard from './pages/HoneypotDashboard';
 import RecentActivitiesPage from './pages/RecentActivities/index';
 import AnnouncementsPage from './pages/Announcements/index';
+import ErrorPage404 from './pages/ErrorPage404';
 
-const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'https://go.hostops.online';
 
 // ── Consume _t / _u URL params injected by the frontend login app ──────────
 (function consumeLoginParams() {
@@ -310,8 +311,10 @@ export default function App() {
         />
 
         {/* Only render the wildcard after the initial route resolution settles,
-            so it doesn't fire before real routes have had a chance to match. */}
-        {isReady && <Route path="*" element={<AdminEntryRedirect />} />}
+            so it doesn't fire before real routes have had a chance to match.
+            Unknown paths show the 404 page instead of redirecting cross-app —
+            only the dedicated /admin entry point does that redirect. */}
+        {isReady && <Route path="*" element={<ErrorPage404 />} />}
       </Routes>}
       </NotificationsProvider>
       </ThemeProvider>
