@@ -94,7 +94,7 @@ export default function Sidebar() {
             removeSecureUser();
             sessionStorage.removeItem("hp_authorized");
             // Redirect to frontend login
-            window.location.href = "http://localhost:5173/login";
+            window.location.href = `${import.meta.env.VITE_FRONTEND_URL || 'https://go.hostops.online'}/login`;
           }}
         >
           <svg
