@@ -441,7 +441,7 @@ export default function Navbar() {
         propertyName: safeStorage.getItem('hp_selected_property_name') || null,
       });
     } catch { /* ignore */ }
-    await logoutUser();
+    await logoutUser(auth.getToken());
     clear();
     window.location.href = "/";
   };

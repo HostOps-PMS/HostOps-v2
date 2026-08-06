@@ -207,17 +207,21 @@ function setRefreshCookie(res, rawRefreshToken, req) {
 // the browser only accepts it if SameSite=None; Secure are present — exactly as
 // when the cookie was first set. Omitting them leaves the old cookie in place,
 // so the next /auth/refresh sends a DB-revoked token → reuse-attack → 401.
-function clearRefreshCookie(res, req) {
+//
+// Clears every known rt cookie name (rt, rt_admin, rt_frontend), regardless of
+// which app called logout. Admin and client are separate SPAs that share the
+// same browser/origin (core.hostops.online) — without this, logging out of one
+// app leaves the other's session alive, so a user who visits /dashboard right
+// after logging out of admin gets silently signed back in under their other
+// account. "Logout" should end every HostOps session in this browser.
+function clearAllRefreshCookies(res, req) {
   const isHttps = req
     ? (req.secure || req.get('x-forwarded-proto') === 'https')
     : process.env.NODE_ENV === 'production';
   const sameSite = isHttps ? (process.env.COOKIE_SAME_SITE || 'none') : 'lax';
-  res.clearCookie(refreshCookieName(req), {
-    httpOnly: true,
-    secure:   isHttps,
-    sameSite,
-    path:     '/auth',
-  });
+  for (const name of ['rt', 'rt_admin', 'rt_frontend']) {
+    res.clearCookie(name, { httpOnly: true, secure: isHttps, sameSite, path: '/auth' });
+  }
 }
 
 // ── Helper: read + decrypt the rt cookie ────────────────────────
@@ -785,9 +789,15 @@ router.post('/refresh', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.post('/logout', async (req, res, next) => {
   try {
-    // Decrypt rt cookie → hash it → revoke in DB
-    const rawToken = getRefreshCookie(req);
-    if (rawToken) {
+    // Revoke every rt cookie present on this request (rt, rt_admin, rt_frontend),
+    // not just the one matching X-App-Client — admin and client are separate
+    // sessions sharing the same browser/origin, and "Logout" should end all of
+    // them, not just the app the user clicked logout in.
+    for (const name of ['rt', 'rt_admin', 'rt_frontend']) {
+      const blob = req.cookies?.[name];
+      if (!blob) continue;
+      const rawToken = decryptToken(blob);
+      if (!rawToken) continue;
       await RefreshToken.findOneAndUpdate(
         { token: hashToken(rawToken) },
         { revokedAt: new Date() }
@@ -809,7 +819,7 @@ router.post('/logout', async (req, res, next) => {
       }
     }
 
-    clearRefreshCookie(res, req);
+    clearAllRefreshCookies(res, req);
     res.json({ message: 'Logged out' });
   } catch (err) { next(err); }
 });
