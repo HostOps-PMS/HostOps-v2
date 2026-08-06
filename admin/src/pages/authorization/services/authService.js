@@ -13,7 +13,7 @@
  *   POST /auth/send-login-otp    { email }
  */
 
-import { fetchWithAuth } from '../../../lib/authUtils';
+import { fetchWithAuth, authHeaders } from '../../../lib/authUtils';
 import { getSecureUser } from '../../../lib/secureUserStorage';
 
 const API_KEY  = import.meta.env.VITE_API_KEY ?? '';
