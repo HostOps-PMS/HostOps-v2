@@ -253,10 +253,8 @@ export default function Navbar() {
   const [switchConfirmOpen, setSwitchConfirmOpen] = useState(false);
   const [bugReportOpen, setBugReportOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [notifTab, setNotifTab] = useState('bookings'); // bookings | reports
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [bugReports, setBugReports] = useState([]);
   const notifRef = useRef(null);
   const notifRefMobile = useRef(null);
   const prevBookingIdsRef = useRef(null);
@@ -418,20 +416,6 @@ export default function Navbar() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    if (!notifOpen || notifTab !== 'reports') return;
-    const userData = getUserData(auth);
-    const email = userData?.email;
-    if (!email) return;
-    const apiBase = (import.meta.env.VITE_API_URL || 'https://api.hostops.online').replace(/\/$/, '');
-    fetch(`${apiBase}/auth/my-reports?email=${encodeURIComponent(email)}`, {
-      headers: { 'x-api-key': import.meta.env.VITE_API_KEY || '' },
-    })
-      .then(r => r.json())
-      .then(d => { if (Array.isArray(d)) setBugReports(d); })
-      .catch(() => {});
-  }, [notifOpen, notifTab]);
 
   const pickNextJoke = () => {
     if (jokeQueueRef.current.length === 0) {
@@ -989,71 +973,30 @@ export default function Navbar() {
                     zIndex: 9999, overflow: 'hidden',
                   }}>
                     {/* Header */}
-                    <div style={{ padding: '14px 16px 0', }}>
+                    <div style={{ padding: '14px 16px 12px', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#e8f5ee'}` }}>
                       <span style={{ fontWeight: 700, fontSize: '13px', color: dark ? '#eaf5f0' : '#0c1c14' }}>Notifications</span>
                     </div>
-                    {/* Tabs */}
-                    <div style={{ display: 'flex', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#e8f5ee'}`, padding: '0 16px', gap: 0 }}>
-                      {[{ id: 'bookings', label: 'Bookings' }, { id: 'reports', label: 'Reports' }].map(t => (
-                        <button key={t.id} onClick={() => setNotifTab(t.id)} style={{
-                          flex: 1, padding: '10px 0 8px', background: 'none', border: 'none', cursor: 'pointer',
-                          fontSize: '12px', fontWeight: 600, fontFamily: 'inherit',
-                          color: notifTab === t.id ? '#26a676' : (dark ? '#7ab89a' : '#9ab8a9'),
-                          borderBottom: notifTab === t.id ? '2px solid #26a676' : '2px solid transparent',
-                          transition: 'all 0.15s',
-                        }}>{t.label}</button>
+                    <div className="scrollbar-none" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                      {notifications.length > 0 && (
+                        <div style={{ padding: '8px 16px 0', textAlign: 'right' }}>
+                          <button onClick={() => { setUnreadCount(0); setNotifications(prev => prev.map(n => ({ ...n, read: true }))); }} style={{ fontSize: '11px', color: '#26a676', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>Read All</button>
+                        </div>
+                      )}
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: '28px 16px', textAlign: 'center', color: '#9ab8a9', fontSize: '13px' }}>No bookings yet</div>
+                      ) : notifications.map((n, i) => (
+                        <div key={n.id || i} style={{ padding: '12px 16px', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f0f9f4'}`, background: n.read ? 'transparent' : (dark ? '#132a1e' : '#f5fdf8') }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#26a676', flexShrink: 0, opacity: n.read ? 0 : 1 }} />
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: dark ? '#eaf5f0' : '#0c1c14' }}>New Booking</span>
+                            <span style={{ fontSize: '11px', color: '#9ab8a9', marginLeft: 'auto' }}>{n.time.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          <div style={{ fontSize: '12px', color: dark ? '#b0cfc0' : '#3a5a48', paddingLeft: '16px' }}><strong>{n.guest}</strong> · {n.property}</div>
+                          <div style={{ fontSize: '11px', color: '#26a676', paddingLeft: '16px', marginTop: '2px' }}>PHP {Number(n.price || 0).toLocaleString()} · {n.channel}</div>
+                          {n.arrival && <div style={{ fontSize: '11px', color: '#9ab8a9', paddingLeft: '16px', marginTop: '1px' }}>Check-in: {new Date(n.arrival).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</div>}
+                        </div>
                       ))}
                     </div>
-                    {/* Bookings tab */}
-                    {notifTab === 'bookings' && (
-                      <div className="scrollbar-none" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                        {notifications.length > 0 && (
-                          <div style={{ padding: '8px 16px 0', textAlign: 'right' }}>
-                            <button onClick={() => { setUnreadCount(0); setNotifications(prev => prev.map(n => ({ ...n, read: true }))); }} style={{ fontSize: '11px', color: '#26a676', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>Read All</button>
-                          </div>
-                        )}
-                        {notifications.length === 0 ? (
-                          <div style={{ padding: '28px 16px', textAlign: 'center', color: '#9ab8a9', fontSize: '13px' }}>No bookings yet</div>
-                        ) : notifications.map((n, i) => (
-                          <div key={n.id || i} style={{ padding: '12px 16px', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f0f9f4'}`, background: n.read ? 'transparent' : (dark ? '#132a1e' : '#f5fdf8') }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#26a676', flexShrink: 0, opacity: n.read ? 0 : 1 }} />
-                              <span style={{ fontSize: '12px', fontWeight: 700, color: dark ? '#eaf5f0' : '#0c1c14' }}>New Booking</span>
-                              <span style={{ fontSize: '11px', color: '#9ab8a9', marginLeft: 'auto' }}>{n.time.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</span>
-                            </div>
-                            <div style={{ fontSize: '12px', color: dark ? '#b0cfc0' : '#3a5a48', paddingLeft: '16px' }}><strong>{n.guest}</strong> · {n.property}</div>
-                            <div style={{ fontSize: '11px', color: '#26a676', paddingLeft: '16px', marginTop: '2px' }}>PHP {Number(n.price || 0).toLocaleString()} · {n.channel}</div>
-                            {n.arrival && <div style={{ fontSize: '11px', color: '#9ab8a9', paddingLeft: '16px', marginTop: '1px' }}>Check-in: {new Date(n.arrival).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</div>}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {/* Reports tab */}
-                    {notifTab === 'reports' && (
-                      <div className="scrollbar-none" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                        {bugReports.length === 0 ? (
-                          <div style={{ padding: '28px 16px', textAlign: 'center', color: '#9ab8a9', fontSize: '13px' }}>No bug reports yet</div>
-                        ) : bugReports.map(r => {
-                          const stColors = { open: '#f97316', in_progress: '#f59e0b', resolved: '#22c55e', dismissed: '#6b7280' };
-                          const stLabels = { open: 'Open', in_progress: 'In Progress', resolved: 'Approved', dismissed: 'Declined' };
-                          return (
-                            <div key={r._id} style={{ padding: '12px 16px', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f0f9f4'}` }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                <span style={{ display: 'inline-block', padding: '1px 8px', borderRadius: 12, fontSize: '10px', fontWeight: 700, color: '#fff', background: stColors[r.status] || '#6b7280' }}>{stLabels[r.status] || r.status}</span>
-                                <span style={{ fontSize: '11px', color: '#9ab8a9', marginLeft: 'auto' }}>{new Date(r.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}</span>
-                              </div>
-                              <div style={{ fontSize: '12px', fontWeight: 600, color: dark ? '#eaf5f0' : '#0c1c14', marginBottom: 2 }}>{r.page || 'General'}</div>
-                              <div style={{ fontSize: '11px', color: dark ? '#7ab89a' : '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>
-                              {r.status === 'dismissed' && r.resolvedNote && (
-                                <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, background: dark ? '#2a0d0d' : '#fef2f2', border: `1px solid ${dark ? '#5c1a1a' : '#fecaca'}`, fontSize: '11px', color: dark ? '#f87171' : '#dc2626', lineHeight: 1.4 }}>
-                                  <strong>Reason:</strong> {r.resolvedNote}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -1242,71 +1185,30 @@ export default function Navbar() {
                   zIndex: 999, overflow: 'hidden',
                 }}>
                   {/* Header */}
-                  <div style={{ padding: '14px 16px 0' }}>
+                  <div style={{ padding: '14px 16px 12px', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#e8f5ee'}` }}>
                     <span style={{ fontWeight: 700, fontSize: '13px', color: dark ? '#eaf5f0' : '#0c1c14' }}>Notifications</span>
                   </div>
-                  {/* Tabs */}
-                  <div style={{ display: 'flex', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#e8f5ee'}`, padding: '0 16px', gap: 0 }}>
-                    {[{ id: 'bookings', label: 'Bookings' }, { id: 'reports', label: 'Reports' }].map(t2 => (
-                      <button key={t2.id} onClick={() => setNotifTab(t2.id)} style={{
-                        flex: 1, padding: '10px 0 8px', background: 'none', border: 'none', cursor: 'pointer',
-                        fontSize: '12px', fontWeight: 600, fontFamily: 'inherit',
-                        color: notifTab === t2.id ? '#26a676' : (dark ? '#7ab89a' : '#9ab8a9'),
-                        borderBottom: notifTab === t2.id ? '2px solid #26a676' : '2px solid transparent',
-                        transition: 'all 0.15s',
-                      }}>{t2.label}</button>
+                  <div className="scrollbar-none" style={{ maxHeight: '360px', overflowY: 'auto' }}>
+                    {notifications.length > 0 && (
+                      <div style={{ padding: '8px 16px 0', textAlign: 'right' }}>
+                        <button onClick={() => { setUnreadCount(0); setNotifications(prev => prev.map(n => ({ ...n, read: true }))); }} style={{ fontSize: '11px', color: '#26a676', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>Read all</button>
+                      </div>
+                    )}
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: '32px 16px', textAlign: 'center', color: '#9ab8a9', fontSize: '13px' }}>No bookings yet</div>
+                    ) : notifications.map((n, i) => (
+                      <div key={n.id || i} style={{ padding: '12px 16px', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f0f9f4'}`, background: n.read ? 'transparent' : (dark ? '#132a1e' : '#f5fdf8') }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#26a676', flexShrink: 0, opacity: n.read ? 0 : 1 }} />
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: dark ? '#eaf5f0' : '#0c1c14' }}>New Booking</span>
+                          <span style={{ fontSize: '11px', color: '#9ab8a9', marginLeft: 'auto' }}>{n.time.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <div style={{ fontSize: '12px', color: dark ? '#b0cfc0' : '#3a5a48', paddingLeft: '16px' }}><strong>{n.guest}</strong> · {n.property}</div>
+                        <div style={{ fontSize: '11px', color: '#26a676', paddingLeft: '16px', marginTop: '2px' }}>PHP {Number(n.price || 0).toLocaleString()} · {n.channel}</div>
+                        {n.arrival && <div style={{ fontSize: '11px', color: '#9ab8a9', paddingLeft: '16px', marginTop: '1px' }}>Check-in: {new Date(n.arrival).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</div>}
+                      </div>
                     ))}
                   </div>
-                  {/* Bookings tab */}
-                  {notifTab === 'bookings' && (
-                    <div className="scrollbar-none" style={{ maxHeight: '360px', overflowY: 'auto' }}>
-                      {notifications.length > 0 && (
-                        <div style={{ padding: '8px 16px 0', textAlign: 'right' }}>
-                          <button onClick={() => { setUnreadCount(0); setNotifications(prev => prev.map(n => ({ ...n, read: true }))); }} style={{ fontSize: '11px', color: '#26a676', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>Read all</button>
-                        </div>
-                      )}
-                      {notifications.length === 0 ? (
-                        <div style={{ padding: '32px 16px', textAlign: 'center', color: '#9ab8a9', fontSize: '13px' }}>No bookings yet</div>
-                      ) : notifications.map((n, i) => (
-                        <div key={n.id || i} style={{ padding: '12px 16px', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f0f9f4'}`, background: n.read ? 'transparent' : (dark ? '#132a1e' : '#f5fdf8') }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#26a676', flexShrink: 0, opacity: n.read ? 0 : 1 }} />
-                            <span style={{ fontSize: '12px', fontWeight: 700, color: dark ? '#eaf5f0' : '#0c1c14' }}>New Booking</span>
-                            <span style={{ fontSize: '11px', color: '#9ab8a9', marginLeft: 'auto' }}>{n.time.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</span>
-                          </div>
-                          <div style={{ fontSize: '12px', color: dark ? '#b0cfc0' : '#3a5a48', paddingLeft: '16px' }}><strong>{n.guest}</strong> · {n.property}</div>
-                          <div style={{ fontSize: '11px', color: '#26a676', paddingLeft: '16px', marginTop: '2px' }}>PHP {Number(n.price || 0).toLocaleString()} · {n.channel}</div>
-                          {n.arrival && <div style={{ fontSize: '11px', color: '#9ab8a9', paddingLeft: '16px', marginTop: '1px' }}>Check-in: {new Date(n.arrival).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</div>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {/* Reports tab */}
-                  {notifTab === 'reports' && (
-                    <div className="scrollbar-none" style={{ maxHeight: '360px', overflowY: 'auto' }}>
-                      {bugReports.length === 0 ? (
-                        <div style={{ padding: '32px 16px', textAlign: 'center', color: '#9ab8a9', fontSize: '13px' }}>No bug reports yet</div>
-                      ) : bugReports.map(r => {
-                        const stColors = { open: '#f97316', in_progress: '#f59e0b', resolved: '#22c55e', dismissed: '#6b7280' };
-                        const stLabels = { open: 'Open', in_progress: 'In Progress', resolved: 'Approved', dismissed: 'Declined' };
-                        return (
-                          <div key={r._id} style={{ padding: '12px 16px', borderBottom: `1px solid ${dark ? '#1e3a2a' : '#f0f9f4'}` }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                              <span style={{ display: 'inline-block', padding: '1px 8px', borderRadius: 12, fontSize: '10px', fontWeight: 700, color: '#fff', background: stColors[r.status] || '#6b7280' }}>{stLabels[r.status] || r.status}</span>
-                              <span style={{ fontSize: '11px', color: '#9ab8a9', marginLeft: 'auto' }}>{new Date(r.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}</span>
-                            </div>
-                            <div style={{ fontSize: '12px', fontWeight: 600, color: dark ? '#eaf5f0' : '#0c1c14', marginBottom: 2 }}>{r.page || 'General'}</div>
-                            <div style={{ fontSize: '11px', color: dark ? '#7ab89a' : '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>
-                            {r.status === 'dismissed' && r.resolvedNote && (
-                              <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, background: dark ? '#2a0d0d' : '#fef2f2', border: `1px solid ${dark ? '#5c1a1a' : '#fecaca'}`, fontSize: '11px', color: dark ? '#f87171' : '#dc2626', lineHeight: 1.4 }}>
-                                <strong>Reason:</strong> {r.resolvedNote}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
                 </div>
               )}
             </div>

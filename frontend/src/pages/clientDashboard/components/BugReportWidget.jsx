@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDashboard } from '../context/DashboardContext';
 
-const REPORT_URL = 'https://api.texionix.telexph.com/report/hostops.html';
+const REPORT_URL = 'https://api.texionix.telexph.com/report/wanderwave.html';
 
 /* ─── Leaving-the-page quips — cycled in order, one per modal open ── */
 const LEAVING_LINES = [
@@ -60,7 +60,7 @@ export default function BugReportWidget({ open, onClose }) {
 
   if (!open) return null;
 
-  // HostOps theme — same tokens as BugReportModal
+  // HostOps theme
   const brand   = '#1e8760';
   const brandDk = '#157a55';
   const surface = dark ? '#0f1f17' : '#ffffff';
