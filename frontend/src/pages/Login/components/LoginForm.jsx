@@ -31,9 +31,10 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
   const [appealReason, setAppealReason]         = useState('');
   const [appealLoading, setAppealLoading]       = useState(false);
   const [appealSubmitted, setAppealSubmitted]   = useState(false);
+  const [appealError, setAppealError]           = useState('');
   const [hasPendingAppeal, setHasPendingAppeal] = useState(false);
 
-  const API_BASE = import.meta.env.VITE_API_URL || 'https://api.hostops.online';
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   // When the disabled screen appears, check if this email already has a pending appeal.
   React.useEffect(() => {
@@ -47,8 +48,9 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
     if (!appealReason.trim() || appealReason.trim().length < 10) return;
     if (!email.trim()) return;
     setAppealLoading(true);
+    setAppealError('');
     try {
-      await fetch(`${API_BASE}/auth/recovery-request`, {
+      const res = await fetch(`${API_BASE}/auth/recovery-request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -60,12 +62,19 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
           requestType: 'account_disabled',
         }),
       });
+      // The server answers 201 even for unknown emails (no enumeration), so a
+      // non-OK status is a real failure — don't pretend the appeal was sent.
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setAppealError(data.error || 'Could not submit your appeal. Please try again.');
+        return;
+      }
       const key = `hp_pending_req_${email.trim().toLowerCase()}_disabled`;
       sessionStorage.setItem(key, '1');
       setHasPendingAppeal(true);
       setAppealSubmitted(true);
     } catch {
-      setAppealSubmitted(true);
+      setAppealError('Network error. Please check your connection and try again.');
     } finally {
       setAppealLoading(false);
     }
@@ -74,7 +83,7 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
   const { submit, loading } = useAuthSubmit(loginUser, {
     onSuccess: (data) => {
       if (data.requiresOtp) {
-        onRequiresOtp(email, rememberMe, data.totpEnabled || false);
+        onRequiresOtp(email, rememberMe, data.totpEnabled || false, data.mfaToken);
         return;
       }
 
@@ -309,9 +318,10 @@ export default function LoginForm({ showMsg, hideMsg, onForgot, onRequiresOtp, o
           reason={appealReason}
           onReasonChange={setAppealReason}
           onSubmit={handleAppealSubmit}
-          onClose={() => { if (!appealLoading) { setShowAppealModal(false); if (appealSubmitted) setAppealReason(''); } }}
+          onClose={() => { if (!appealLoading) { setShowAppealModal(false); setAppealError(''); if (appealSubmitted) setAppealReason(''); } }}
           loading={appealLoading}
           submitted={appealSubmitted}
+          error={appealError}
           title="Contact Administrator"
           description="Explain why your account should be re-enabled. An administrator will review your appeal."
           label="Why should your account be re-enabled?"

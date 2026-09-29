@@ -40,17 +40,22 @@ import { decrypt } from '../utils/encryption.js';
 
 const router = express.Router();
 
-router.use('/accounts', requireAuth, requireAdmin);
+// Apartment-photo routes also live under /api/accounts but are served by
+// smoobuApartments.js, which allows admins AND team leaders and applies its
+// own requireAuth — let those skip this admin-only router.
+const PHOTO_ROUTE = /^\/(apartment-photos\/bulk|[^/]+\/smoobu-apartments\/[^/]+\/photos)\/?$/;
+router.use('/accounts', (req, res, next) => (PHOTO_ROUTE.test(req.path) ? next('router') : next()), requireAuth, requireAdmin);
 
 // ─────────────────────────────────────────────────────────────────
 // GET /api/accounts
-// Returns all users and staffs with PIN lockout info.
+// Returns all active (non-archived) users and staffs with PIN lockout info.
+// Archived accounts are listed separately in the admin Archives view.
 // Sensitive fields (password, tokens, pin hash) are excluded.
 // ─────────────────────────────────────────────────────────────────
 router.get('/accounts', async (req, res, next) => {
   try {
     const [users, staffs] = await Promise.all([
-      User.find({})
+      User.find({ isArchive: { $ne: true } })
         .select(
           '_id email businessName firstName lastName role ' +
           'pinAttempts pinLockedUntil pinPermanentlyLocked ' +
@@ -60,7 +65,7 @@ router.get('/accounts', async (req, res, next) => {
         .sort({ createdAt: -1 })
         .lean(),
 
-      Staff.find({})
+      Staff.find({ isArchive: { $ne: true } })
         .select(
           '_id email firstName lastName clientId staffRole isActive ' +
           'pinAttempts pinLockedUntil pinPermanentlyLocked ' +
@@ -74,7 +79,7 @@ router.get('/accounts', async (req, res, next) => {
     const sanitizedUsers = users.map((u) => ({
       ...u,
       properties: Array.isArray(u.properties)
-        ? u.properties.map(({ smoobuApiKey, ...rest }) => rest)
+        ? u.properties.map(({ smoobuApiKey, smoobuApiSecret, ...rest }) => rest)
         : [],
     }));
 
@@ -102,7 +107,7 @@ router.get('/accounts', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.get('/accounts/recovery-request', async (req, res, next) => {
   try {
-    const email = (req.query.email || '').toLowerCase().trim();
+    const email = String(req.query.email || '').toLowerCase().trim();
     if (!email) {
       return res.status(400).json({ error: 'email query param is required' });
     }

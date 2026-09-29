@@ -6,7 +6,7 @@ import { useAuth } from '../../AuthContext';
 import OTPInput from './OTPInput';
 import LockoutTimer from './LockoutTimer';
 
-export default function LoginOTPForm({ email, rememberMe, showMsg, hideMsg, onBack, onAuthSuccess }) {
+export default function LoginOTPForm({ email, rememberMe, mfaToken, showMsg, hideMsg, onBack, onAuthSuccess }) {
   const navigate = useNavigate();
   const auth = useAuth();
   const [lockoutTimer, setLockoutTimer] = useState(() => {
@@ -72,7 +72,7 @@ export default function LoginOTPForm({ email, rememberMe, showMsg, hideMsg, onBa
   const handleOTPComplete = (otpValue) => {
     hideMsg();
     const deviceId = localStorage.getItem('hp_device_id');
-    submit({ email, otp: otpValue, deviceId, rememberMe });
+    submit({ email, otp: otpValue, deviceId, rememberMe, mfaToken });
   };
 
   return (

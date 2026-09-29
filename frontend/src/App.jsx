@@ -26,11 +26,29 @@ import ProtectedRoute from './pages/ProtectedRoute';
 // The real fix is ensuring ProtectedRoute resolves before any redirect,
 // which is handled in ProtectedRoute.jsx via the isReady flag.
 
+// Last-resort guard: a render error anywhere below shows a recovery message
+// instead of unmounting the whole app into a blank page.
+class ErrorBoundary extends React.Component {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(error, info) { console.error('[ErrorBoundary]', error, info.componentStack); }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div role="alert" style={{ padding: 32, textAlign: 'center', fontFamily: 'sans-serif' }}>
+        <h2>Something went wrong.</h2>
+        <button onClick={() => window.location.reload()}>Reload</button>
+      </div>
+    );
+  }
+}
+
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <StrictMode>
+        <ErrorBoundary>
         <Routes>
           <Route path="/" element={<LoginPage />} />
           <Route path="/verify-email" element={<VerifyPage />} />
@@ -58,6 +76,7 @@ function App() {
           {/* Wildcard: only matches truly unknown paths — not /inbox or /dashboard */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </ErrorBoundary>
         </StrictMode>
       </AuthProvider>
     </BrowserRouter>

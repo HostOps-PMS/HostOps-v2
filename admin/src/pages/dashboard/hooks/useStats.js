@@ -15,7 +15,8 @@ import { getDashboardOverview } from '../services/dashboardService';
 import { useNotifications } from '../../../context/NotificationsContext';
 
 function formatRevenue(value) {
-  if (value >= 1_000_000) return '₱' + (value / 1_000_000).toFixed(1) + 'M';
+  // Compare against the rounding threshold so 999,600 shows "₱1.0M", not "₱1000K".
+  if (value >= 999_500)   return '₱' + (value / 1_000_000).toFixed(1) + 'M';
   if (value >= 1_000)     return '₱' + (value / 1_000).toFixed(0) + 'K';
   return '₱' + value.toLocaleString();
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchWithAuth } from '../../../lib/authUtils';
 
-const API = import.meta.env.VITE_API_URL || 'https://api.hostops.online';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export async function fetchRecoveryRequest(email) {
   const res = await fetchWithAuth(`${API}/api/accounts/recovery-request?email=${encodeURIComponent(email)}`);
@@ -55,12 +55,12 @@ export function useAccounts() {
 
   const combined = [
     ...users
-      .filter(u => u.role !== 'admin')
+      .filter(u => u.role !== 'admin' && !u.isArchive)
       .map(u => ({
         ...u, accountType: 'user',
         name: u.businessName || [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email,
       })),
-    ...staffs.map(s => ({
+    ...staffs.filter(s => !s.isArchive).map(s => ({
       ...s, accountType: 'staff',
       name: [s.firstName, s.lastName].filter(Boolean).join(' ') || s.email,
     })),

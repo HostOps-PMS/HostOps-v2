@@ -600,8 +600,14 @@ function ExpandablePropertyList({ properties }) {
 }
 
 // ── Main component ───────────────────────────────────────────────
-export default function ClientSmoobuView({ client, property, onClose }) {
-  if (!client || !property) return null;
+// Guard lives in a wrapper so every hook in ClientSmoobuViewContent runs
+// unconditionally (Rules of Hooks).
+export default function ClientSmoobuView(props) {
+  if (!props.client || !props.property) return null;
+  return <ClientSmoobuViewContent {...props} />;
+}
+
+function ClientSmoobuViewContent({ client, property, onClose }) {
 
   const { dark } = useTheme();
 

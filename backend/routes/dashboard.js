@@ -547,8 +547,39 @@ router.get('/rates', async (req, res, next) => {
 // In MODE B: verify the reservation's apartment is in the user's prefix set.
 // In MODE C (staff): verify the reservation's apartment is in staffPropertyIds.
 // ─────────────────────────────────────────────────────────────────
+// Per-property Smoobu credential injection for the message endpoints. Same as
+// GET /api/dashboard: when ?propertyDbId= is given, put that property's key
+// AND secret at root level so getApiKeyForUser() picks them up (HMAC auth needs
+// both — a key without its secret throws NO_SMOOBU_SECRET → 500).
+// Key injection only — not a security boundary. assertReservationOwnership is
+// the real access gate. An unknown propertyDbId (e.g. stale from localStorage)
+// just skips injection. Returns false only for a malformed id.
+function injectPropertyCreds(req) {
+  const propertyDbId = req.query.propertyDbId;
+  if (!propertyDbId) return true;
+  if (!mongoose.Types.ObjectId.isValid(propertyDbId)) return false;
+
+  const matchedProp = (req.user.properties || []).find(
+    (p) => String(p._id) === String(propertyDbId)
+  );
+  const staffHasDbAccess = !req.isStaff || req.staffPropertyDbIds?.includes(String(propertyDbId));
+  const key = matchedProp?.smoobuApiKey?.trim();
+  if (matchedProp && staffHasDbAccess && key && !isEncrypted(key)) {
+    const baseUser = typeof req.user.toObject === 'function' ? req.user.toObject() : { ...req.user };
+    req.user = { ...baseUser, smoobuApiKey: key, smoobuApiSecret: matchedProp.smoobuApiSecret?.trim() || '' };
+    req.usingPropertyKey = true;
+  }
+  return true;
+}
+
 async function assertReservationOwnership(req, reservationId) {
   const user = req.user;
+
+  // Smoobu reservation ids are numeric. The id is put into the Smoobu URL path,
+  // so anything else (e.g. "..%2F..%2Fapartments") could reach other endpoints.
+  if (!/^\d+$/.test(String(reservationId))) {
+    const err = new Error('Reservation not found'); err.status = 404; throw err;
+  }
 
   // Wide date window — getBookings() with no from/to defaults to Smoobu's
   // narrow current-month window, missing past/future reservations → 404.
@@ -562,6 +593,11 @@ async function assertReservationOwnership(req, reservationId) {
   // MODE C: staff ownership check — must be one of their assigned properties
   if (req.isStaff) {
     if (!req.staffPropertyIds?.length) {
+      // Staff assigned a whole property whose rooms were never synced has no
+      // Smoobu apartment ids. Same fallback as the dashboard's
+      // allowCurrentPropertyApiScope: that assigned property's own Smoobu key
+      // scopes access (the service 404s any reservation outside that account).
+      if (req.usingPropertyKey) return;
       const err = new Error('No properties assigned to this staff account'); err.status = 403; throw err;
     }
     const allowedStrIds = new Set(req.staffPropertyIds.map(String));
@@ -623,6 +659,7 @@ router.post('/messages/reply', async (req, res, next) => {
     if (!reservationId || !messageBody) {
       return res.status(400).json({ error: 'reservationId and messageBody are required' });
     }
+    if (!injectPropertyCreds(req)) return res.status(400).json({ error: 'Invalid property ID' });
 
     await assertReservationOwnership(req, reservationId);
 
@@ -648,30 +685,7 @@ router.get('/messages/:reservationId', async (req, res, next) => {
     // Same logic as GET /api/dashboard: when the frontend passes ?propertyDbId=
     // the user has per-property smoobuApiKeys stored on user.properties[].
     // We inject the matching key at root level so getApiKeyForUser() picks it up.
-    const propertyDbId = req.query.propertyDbId;
-    if (propertyDbId) {
-      if (!mongoose.Types.ObjectId.isValid(propertyDbId)) {
-        return res.status(400).json({ error: 'Invalid property ID' });
-      }
-      // Key injection only — not a security boundary. assertReservationOwnership
-      // below is the real access gate (checks Smoobu apartment IDs for staff,
-      // propertyTagPrefix for MODE B users). If the propertyDbId doesn't match
-      // (e.g. stale from localStorage) just skip injection and fall through to
-      // getApiKeyForUser's MODE A/B resolution.
-      const matchedProp = (req.user.properties || []).find(
-        (p) => String(p._id) === String(propertyDbId)
-      );
-      const staffHasDbAccess = !req.isStaff || req.staffPropertyDbIds?.includes(String(propertyDbId));
-      if (matchedProp && staffHasDbAccess) {
-        const msgPropKey = matchedProp.smoobuApiKey?.trim();
-        if (msgPropKey && !isEncrypted(msgPropKey)) {
-          const baseUser = typeof req.user.toObject === 'function'
-            ? req.user.toObject()
-            : { ...req.user };
-          req.user = { ...baseUser, smoobuApiKey: msgPropKey };
-        }
-      }
-    }
+    if (!injectPropertyCreds(req)) return res.status(400).json({ error: 'Invalid property ID' });
 
     await assertReservationOwnership(req, req.params.reservationId);
 
@@ -705,31 +719,6 @@ router.get('/messages/:reservationId', async (req, res, next) => {
     }
     next(err);
   }
-});
-
-// ─────────────────────────────────────────────────────────────────
-// GET /api/debug/threads
-// Hits Smoobu's /threads endpoint directly and returns the raw response
-// so we can see what Smoobu is actually returning (keys, count, errors).
-// Remove this endpoint after debugging is complete.
-// ─────────────────────────────────────────────────────────────────
-router.get('/debug/threads', async (req, res, next) => {
-  try {
-    const { getApiKeyForUser, smoobuFetch } = await import('../services/smoobu.js');
-    const creds = getApiKeyForUser(req.user);
-    const smoobuRes = await smoobuFetch('/threads?page=1&pageSize=10', {}, creds);
-    const text = await smoobuRes.text();
-    let parsed = null;
-    try { parsed = JSON.parse(text); } catch { /* non-JSON */ }
-    res.json({
-      status:       smoobuRes.status,
-      statusText:   smoobuRes.statusText,
-      responseKeys: parsed ? Object.keys(parsed) : null,
-      threadsCount: parsed?.threads?.length ?? null,
-      pageCount:    parsed?.page_count ?? null,
-      rawPreview:   text.slice(0, 500),
-    });
-  } catch (err) { next(err); }
 });
 
 // ─────────────────────────────────────────────────────────────────

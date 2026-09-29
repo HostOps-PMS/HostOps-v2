@@ -144,8 +144,11 @@ router.post('/contacts/upsert', bookingLimiter, async (req, res) => {
       return res.status(502).json({ error: 'Failed to create contact' });
     }
 
+    // Only the id the booking step needs. Upserting an EXISTING email returns
+    // that contact's stored CRM record (phone, address, tags…) — never echo it
+    // to an anonymous caller.
     const data = await ghlRes.json();
-    res.json(data);
+    res.json({ contact: { id: data?.contact?.id } });
   } catch (err) {
     console.error('[ghlProxy] contacts/upsert error:', err.message);
     res.status(502).json({ error: 'Failed to create contact' });

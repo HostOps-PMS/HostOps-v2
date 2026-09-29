@@ -85,9 +85,10 @@ publicRecoveryRouter.post('/recovery-request', async (req, res, next) => {
 // ═════════════════════════════════════════════════════════════════
 export const adminRecoveryRouter = express.Router();
 
-// Apply auth middleware to all routes in this router
-adminRecoveryRouter.use(requireAuth);
-adminRecoveryRouter.use(requireAdmin);
+// Scoped to /recovery-requests: this router is mounted at /api, and an
+// unscoped router.use(requireAdmin) would 403 every /api route mounted after
+// it (e.g. the client announcements feed).
+adminRecoveryRouter.use('/recovery-requests', requireAuth, requireAdmin);
 
 // ─────────────────────────────────────────────────────────────────
 // GET /api/recovery-requests

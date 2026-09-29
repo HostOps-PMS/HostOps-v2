@@ -30,6 +30,19 @@ const propertySchema = new mongoose.Schema({
   propertyPicture:         { type: String, default: '' },
   propertyPictureOriginal: { type: String, default: '' },
   propertyPictureCropData: { type: mongoose.Schema.Types.Mixed, default: null },
+
+  // Smoobu apartments (rooms/units) synced via POST /api/clients/:id/properties/:pid/sync.
+  // Staff can be assigned a single room by its smoobuId (see requireAuth), and the
+  // Smoobu webhook maps bookings to owners through subProperties.smoobuId.
+  // `type` is wrapped because a bare `type` key would be read as the field's type.
+  subProperties: [{
+    _id:          false,
+    smoobuId:     { type: String, required: true },
+    name:         { type: String, default: '' },
+    type:         { type: String, default: '' },
+    lastSyncedAt: { type: Date,   default: null },
+  }],
+  lastSyncedAt: { type: Date, default: null },
 }, { _id: true, toJSON: { getters: true }, toObject: { getters: true } });
 
 const userSchema = new mongoose.Schema({
@@ -71,6 +84,12 @@ const userSchema = new mongoose.Schema({
   // Login OTP (Device verification)
   loginOtp:       { type: String, select: false },
   loginOtpExpiry: { type: Date,   select: false },
+
+  // Wrong guesses against the active reset code (burned at 5, see auth.js)
+  codeAttempts: { type: Number, default: 0, select: false },
+
+  // Last successful OTP/TOTP verification — step-up proof for revealing secrets
+  lastMfaAt: { type: Date, default: null },
 
   role: {
     type: String,
@@ -144,11 +163,19 @@ totpDevices: [{ name: { type: String, default: 'Authenticator App' }, addedAt: {
 });
 
 // ── Auto-populate businessName for legacy users ───────────────────
-userSchema.pre('save', function(next) {
+// Must be pre('validate'): the `required` check on businessName runs before
+// any pre('save') hook, so filling it in on save was too late.
+userSchema.pre('validate', function(next) {
   if (!this.businessName && this.firstName) {
     this.businessName = [this.firstName, this.lastName].filter(Boolean).join(' ').trim() || this.firstName;
   }
   next();
+});
+
+// Remember the stored tag so the guard below can restore it. `this.tag`
+// already holds the NEW value by the time pre('save') runs.
+userSchema.post('init', function(doc) {
+  doc.$locals.originalTag = doc.tag;
 });
 
 // ── SECURITY: Protect role and tag at the database level ──────────
@@ -158,9 +185,10 @@ userSchema.pre('save', function(next) {
   // Guard 1: 'tag' can never be changed once set (protects Main Admin identity).
   // Only allow setting tag on brand-new documents (isNew).
   if (!this.isNew && this.isModified('tag')) {
-    // Revert to the original value — the DB value is authoritative.
-    this.tag = this.get('tag', null, { getters: false });
-    // If Mongoose still thinks it's modified (edge case), unmark it.
+    // Revert to the stored value — the DB value is authoritative. If the tag
+    // was never loaded, fall back to '' (no privilege) rather than trusting
+    // the new value.
+    this.tag = this.$locals.originalTag ?? '';
     this.unmarkModified('tag');
   }
 

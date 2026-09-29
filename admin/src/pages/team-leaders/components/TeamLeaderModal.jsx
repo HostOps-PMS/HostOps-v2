@@ -38,8 +38,12 @@ export default function TeamLeaderModal({ mode, teamLeader, clients, onClose, on
     lastName:  teamLeader?.lastName  || '',
     email:     teamLeader?.email     || '',
     password:  '',
+    pin:       '',
     serverId:  teamLeader?.serverId?._id || teamLeader?.serverId || '',
   });
+
+  // Business accounts created by admins only carry businessName.
+  const clientLabel = (c) => c.businessName || [c.firstName, c.lastName].filter(Boolean).join(' ') || c.email;
 
   const [saving, setSaving]           = useState(false);
   const [error, setError]             = useState('');
@@ -57,17 +61,26 @@ try {
           setSaving(false);
           return;
         }
+        if (!/^\d{6}$/.test(form.pin)) {
+          setError('PIN must be exactly 6 digits.');
+          setSaving(false);
+          return;
+        }
       }
 
+      // The backend keys every account on businessName; for a team leader
+      // that is their full name.
       const body = {
-        firstName: form.firstName,
-        lastName:  form.lastName,
-        serverId:  form.serverId,
+        firstName:    form.firstName,
+        lastName:     form.lastName,
+        businessName: [form.firstName, form.lastName].map((s) => s.trim()).filter(Boolean).join(' ') || form.email,
+        serverId:     form.serverId,
       };
 
       if (!isEdit) {
         body.email = form.email;
         body.password = form.password;
+        body.pin = form.pin;
         body.role = 'team_leader';
         await createClient(body);
         toast.success(`${form.firstName} ${form.lastName} has been added.`, { title: 'Team Leader Created' });
@@ -161,7 +174,7 @@ try {
           {form.serverId && (() => {
             const c = clients.find(x => x._id === form.serverId);
             if (!c) return null;
-            const parts = `${c.firstName} ${c.lastName}`.trim().split(/\s+/);
+            const parts = clientLabel(c).trim().split(/\s+/);
             const ini = parts.length === 1 ? (parts[0][0] ?? '').toUpperCase() : `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
             return (
               <div style={{
@@ -177,7 +190,7 @@ try {
                   color: '#fff', fontWeight: 700, fontSize: '0.95rem', flexShrink: 0,
                 }}>{ini}</div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: dark ? '#eaf5f0' : '#0d1117' }}>{c.firstName} {c.lastName}</div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: dark ? '#eaf5f0' : '#0d1117' }}>{clientLabel(c)}</div>
                   <div style={{ fontSize: '0.78rem', color: dark ? '#4d8a6a' : '#9ca3af', marginTop: 1 }}>{c.email}</div>
                 </div>
               </div>
@@ -197,7 +210,7 @@ try {
                 <option value="" disabled>Select a server</option>
                 {clients.map(client => (
                   <option key={client._id} value={client._id}>
-                    {client.firstName} {client.lastName} ({client.email})
+                    {clientLabel(client)} ({client.email})
                   </option>
                 ))}
               </select>
@@ -289,6 +302,23 @@ try {
                   <i className={`ti ${showPassword ? 'ti-eye-off' : 'ti-eye'}`} style={{ fontSize: 16 }} />
                 </button>
               </div>
+            </div>
+          )}
+
+          {!isEdit && (
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Temporary 6-Digit PIN *</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={form.pin}
+                onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, '') })}
+                required
+                style={inputStyle}
+                placeholder="Exactly 6 digits"
+                autoComplete="off"
+              />
             </div>
           )}
 

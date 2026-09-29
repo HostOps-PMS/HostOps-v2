@@ -21,13 +21,26 @@ import {
   encryptToken,
   decryptToken,
   verifyAccessToken,
+  signMfaToken,
+  verifyMfaToken,
 } from '../utils/tokens.js';
 import { sendVerificationEmail, sendResetEmail } from '../services/email.js';
 import { requireAuth } from '../middleware/auth.js';
 import ActivityLog from '../models/activityLog.js';
 import { validateObjectId } from '../middleware/ownershipGuard.js';
+import { clientLogError } from './activityLog.js';
 
 const router = express.Router();
+
+// Handlers below call string methods on these fields: a non-string (e.g. an
+// array or object) gets a 400 here instead of a TypeError → 500.
+router.use((req, res, next) => {
+  for (const k of ['email', 'token', 'newPassword']) {
+    const v = req.body?.[k];
+    if (v !== undefined && typeof v !== 'string') return res.status(400).json({ error: `Invalid ${k}` });
+  }
+  next();
+});
 
 // ── Helper: build image proxy URL ────────────────────────────────
 // Replaces raw Cloudinary URLs with our backend proxy endpoint.
@@ -39,14 +52,14 @@ const router = express.Router();
 // origin, not the backend, causing a 404.
 //
 // Priority:
-//   1. API_BASE_URL env var  (e.g. "https://api.hostops.online")
+//   1. API_BASE_URL env var  (e.g. "http://localhost:5000")
 //   2. RENDER_EXTERNAL_URL   (set automatically on Render.com deployments)
 //   3. Fallback to hardcoded production URL — change this if your backend
 //      URL is different.
 const API_BASE_INTERNAL = (
   process.env.API_BASE_URL ||
   process.env.RENDER_EXTERNAL_URL ||
-  'https://api.hostops.online'
+  'http://localhost:5000'
 ).replace(/\/$/, ''); // strip trailing slash
 
 function proxyImageUrl(userId, propertyId) {
@@ -234,12 +247,86 @@ function getRefreshCookie(req) {
   return decryptToken(blob); // no-op if somehow already plain
 }
 
+// ── Helper: whose second factor is this? ─────────────────────────
+// OTP/TOTP verification (and OTP sending) must be tied to a password-verified
+// login: the short-lived mfaToken returned by /auth/login, or a live session of
+// the same user (the admin panel's OTP gate). Without this, an emailed code or
+// an authenticator code alone would open a session. Returns a user id or null.
+function secondFactorUserId(req) {
+  const fromTicket = verifyMfaToken(req.body?.mfaToken);
+  if (fromTicket) return fromTicket;
+  const header = req.headers.authorization || '';
+  if (!header.startsWith('Bearer ')) return null;
+  try {
+    const d = verifyAccessToken(header.slice(7));
+    return d.role === 'staff' || d.pinPending ? null : d.sub;
+  } catch {
+    return null;
+  }
+}
+
+const MFA_REQUIRED = { error: 'Your sign-in session expired. Please sign in again.', code: 'MFA_REQUIRED' };
+
+// For staff, requireAuth sets req.user to the OWNER's account. Self-service
+// routes that act on req.user (profile, 2FA, Smoobu key, …) must not let a
+// staff session change the owner's account.
+function requireOwner(req, res, next) {
+  if (req.isStaff) return res.status(403).json({ error: 'Not available for staff accounts' });
+  next();
+}
+
+// Wrong guesses allowed per emailed code (reset / verification) before it is burned.
+const CODE_MAX_ATTEMPTS = 5;
+
+// Counts a wrong guess against the active code stored in `field` on the account
+// with this email; the 5th wrong guess deletes the code, so a 6-digit code
+// can't be brute-forced within its lifetime. No-op when no code is active.
+async function registerCodeFailure(Model, email, field) {
+  const doc = await Model.findOneAndUpdate(
+    { email, [field]: { $exists: true } },
+    { $inc: { codeAttempts: 1 } },
+    { new: true, projection: { codeAttempts: 1 } }
+  );
+  if (doc && doc.codeAttempts >= CODE_MAX_ATTEMPTS) {
+    await Model.updateOne({ _id: doc._id }, { $unset: { [field]: '', [`${field}Expiry`]: '', codeAttempts: '' } });
+  }
+}
+
+// Checks a current authenticator code or an unused backup code (a backup code
+// is consumed atomically). `user` must be loaded with +totpSecret +backupCodes.
+// Returns { ok, usedBackupCode, user } — user is the updated doc after a backup code.
+async function checkSecondFactor(user, code) {
+  const clean = String(code ?? '').replace(/[\s-]/g, '');
+  if (!clean || !user?.totpSecret) return { ok: false };
+
+  const speakeasy = await import('speakeasy');
+  if (speakeasy.default.totp.verify({ secret: user.totpSecret, encoding: 'base32', token: clean, window: 1 })) {
+    return { ok: true, usedBackupCode: false, user };
+  }
+  const codes = user.backupCodes || [];
+  for (let i = 0; i < codes.length; i++) {
+    if (codes[i].used || !(await bcrypt.compare(clean.toUpperCase(), codes[i].hash))) continue;
+    const updated = await User.findOneAndUpdate(
+      { _id: user._id, [`backupCodes.${i}.used`]: false },
+      { $set: { [`backupCodes.${i}.used`]: true } },
+      { new: true }
+    ).select('+totpSecret +backupCodes');
+    return updated ? { ok: true, usedBackupCode: true, user: updated } : { ok: false };
+  }
+  return { ok: false };
+}
+
+const SECOND_FACTOR_REQUIRED = { error: 'Enter a code from your authenticator app (or a backup code) to confirm.', code: 'SECOND_FACTOR_REQUIRED' };
+
 // Validation schemas
+// Names end up in emails and third-party (GHL) templates: no markup.
+const NO_HTML = /^[^<>]*$/;
+
 const registerSchema = z.object({
   email:             z.string().email().max(254),
   password:          z.string().min(8).max(128),
-  firstName:         z.string().min(1).max(50),
-  lastName:          z.string().max(50).optional().default(''),
+  firstName:         z.string().min(1).max(50).regex(NO_HTML, 'Name cannot contain < or >'),
+  lastName:          z.string().max(50).regex(NO_HTML, 'Name cannot contain < or >').optional().default(''),
   propertyTagPrefix: z.string().optional().default(''),
   smoobuApiKey:      z.string().max(512).optional().default(''),
 });
@@ -258,7 +345,9 @@ router.post('/register', async (req, res, next) => {
     const data = registerSchema.parse(req.body);
 
     const existing = await User.findOne({ email: data.email.toLowerCase() });
-    if (existing) return res.status(409).json({ error: 'Email already registered' });
+    // Same answer as a new sign-up, so the form can't be used to find out
+    // which emails have accounts. The owner can use "Forgot password".
+    if (existing) return res.status(201).json({ message: 'Account created. Please check your email to verify.' });
 
     const rawToken = randomToken();
     const hashed   = hashToken(rawToken);
@@ -302,7 +391,7 @@ router.post('/register', async (req, res, next) => {
       console.error('Email send failed:', e);
     }
 
-    res.status(201).json({ message: 'Account created. Please check your email to verify.', userId: user._id });
+    res.status(201).json({ message: 'Account created. Please check your email to verify.' });
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ error: 'Validation failed', details: err.errors });
     next(err);
@@ -379,8 +468,14 @@ router.post('/login', honeypotGateway, async (req, res, next) => {
     const { email, password, deviceId } = data;
 
     // ── 1. Try Staff login first ──────────────────────────────────
-    const staff = await Staff.findOne({ email: email.toLowerCase() });
+    // Staff sign in with email + PIN (admins create them without a password).
+    // If a password HAS been set it must match. Either way the token issued here
+    // only unlocks the PIN step (pinPending); /auth/verify-pin issues the real one.
+    const staff = await Staff.findOne({ email: email.toLowerCase() }).select('+password');
     if (staff) {
+      if (staff.password && !(await staff.comparePassword(password))) {
+        return res.status(401).json({ error: 'Invalid email or password' });
+      }
       if (staff.isArchive) {
         return res.status(403).json({ error: 'This account has been disabled. Please contact your administrator.', accountDisabled: true });
       }
@@ -388,14 +483,15 @@ router.post('/login', honeypotGateway, async (req, res, next) => {
         return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
       }
 
-      const { encAccessToken, rawRefresh, accessJti } = await issueTokenPair(
-        signStaffAccessToken, signStaffRefreshToken, staff, req
+      const { encAccessToken, accessJti } = await issueTokenPair(
+        (s, r) => signStaffAccessToken(s, r, { pinPending: true }), signStaffRefreshToken, staff, req
       );
 
       staff.lastLoginAt = new Date();
       await staff.save();
 
-      setRefreshCookie(res, rawRefresh, req);
+      // No refresh cookie: a page reload must not turn the PIN-pending session
+      // into a full one. The cookie is set by /auth/verify-pin.
       const staffSk = createSessionKey(accessJti, accessTokenExpiryMs());
 
       return res.json({
@@ -404,6 +500,7 @@ router.post('/login', honeypotGateway, async (req, res, next) => {
         mustChangePassword: staff.mustChangePassword,
         mustChangePin:      staff.mustChangePin,
         isStaff:            true,
+        pinRequired:        true,
         ...(staffSk ? { sk: staffSk } : {}),
       });
     }
@@ -434,7 +531,10 @@ router.post('/login', honeypotGateway, async (req, res, next) => {
       }
     }
 
-    if (!isAdmin && !isTrusted) {
+    // Every role — admins included — needs a second factor unless this device
+    // was trusted via "Remember me". Tokens are only issued by /verify-login-otp
+    // or /totp/verify, which require the mfaToken returned here.
+    if (!isTrusted) {
       const rawOtp = randomToken();
       user.loginOtp       = hashToken(rawOtp);
       user.loginOtpExpiry = new Date(Date.now() + 10 * 60 * 1000);
@@ -443,7 +543,7 @@ router.post('/login', honeypotGateway, async (req, res, next) => {
       try { await sendVerificationEmail(user.email, user.firstName || user.businessName, rawOtp); }
       catch (e) { console.error('Login OTP email send failed:', e); }
 
-      return res.json({ requiresOtp: true, totpEnabled: user.totpEnabled || false });
+      return res.json({ requiresOtp: true, totpEnabled: user.totpEnabled || false, mfaToken: signMfaToken(user) });
     }
 
     // ── Always issue a fresh token pair on login ──────────────────
@@ -495,7 +595,7 @@ router.post('/staff-login', async (req, res, next) => {
     }).parse(req.body);
 
     const staff = await Staff.findOne({ email: email.toLowerCase() }).select('+password');
-    if (!staff || !(await staff.comparePassword(password))) {
+    if (!staff || !staff.password || !(await staff.comparePassword(password))) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     if (staff.isArchive) {
@@ -505,14 +605,14 @@ router.post('/staff-login', async (req, res, next) => {
       return res.status(403).json({ error: 'Your account has been deactivated. Please contact your manager.' });
     }
 
-    const { encAccessToken, rawRefresh, accessJti: staffLoginJti } = await issueTokenPair(
-      signStaffAccessToken, signStaffRefreshToken, staff, req
+    // Same as /auth/login: PIN-pending until /auth/verify-pin.
+    const { encAccessToken, accessJti: staffLoginJti } = await issueTokenPair(
+      (s, r) => signStaffAccessToken(s, r, { pinPending: true }), signStaffRefreshToken, staff, req
     );
 
     staff.lastLoginAt = new Date();
     await staff.save();
 
-    setRefreshCookie(res, rawRefresh, req);
     const staffLoginSk = createSessionKey(staffLoginJti, accessTokenExpiryMs());
 
     res.json({
@@ -536,13 +636,17 @@ router.post('/verify-login-otp', async (req, res, next) => {
     const { email, otp, deviceId, rememberMe } = req.body;
     if (!email || !otp || !deviceId) return res.status(400).json({ error: 'Missing required fields' });
 
-    const normalizedEmail = email.toLowerCase();
-    const hashedOtp       = hashToken(otp);
+    const boundUserId = secondFactorUserId(req);
+    if (!boundUserId) return res.status(401).json(MFA_REQUIRED);
+
+    const normalizedEmail = String(email).toLowerCase();
+    const hashedOtp       = hashToken(String(otp));
     const now             = new Date();
 
     // Atomic OTP consumption: only one concurrent request can match and clear the OTP
     const user = await User.findOneAndUpdate(
       {
+        _id:            boundUserId,
         email:          normalizedEmail,
         loginOtp:       hashedOtp,
         loginOtpExpiry: { $gt: now },
@@ -581,6 +685,7 @@ router.post('/verify-login-otp', async (req, res, next) => {
       );
 
       user.lastLoginAt = new Date();
+      user.lastMfaAt   = new Date(); // step-up proof for sensitive admin actions
       user.activityLog = user.activityLog || [];
       user.activityLog.push({
         action:      'login',
@@ -610,9 +715,14 @@ router.post('/send-login-otp', async (req, res, next) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
 
+    // Only the password-verified / signed-in user can (re)issue their own OTP;
+    // otherwise anyone could spam codes to any address or reset a pending one.
+    const boundUserId = secondFactorUserId(req);
+    if (!boundUserId) return res.status(401).json(MFA_REQUIRED);
+
     const rawOtp  = randomToken();
     const account = await User.findOneAndUpdate(
-      { email: email.toLowerCase() },
+      { _id: boundUserId, email: String(email).toLowerCase() },
       { $set: { loginOtp: hashToken(rawOtp), loginOtpExpiry: new Date(Date.now() + 10 * 60 * 1000) } },
       { new: true }
     );
@@ -633,9 +743,14 @@ router.post('/resend-login-otp', async (req, res, next) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
 
+    // Only the password-verified / signed-in user can (re)issue their own OTP;
+    // otherwise anyone could spam codes to any address or reset a pending one.
+    const boundUserId = secondFactorUserId(req);
+    if (!boundUserId) return res.status(401).json(MFA_REQUIRED);
+
     const rawOtp  = randomToken();
     const account = await User.findOneAndUpdate(
-      { email: email.toLowerCase() },
+      { _id: boundUserId, email: String(email).toLowerCase() },
       { $set: { loginOtp: hashToken(rawOtp), loginOtpExpiry: new Date(Date.now() + 10 * 60 * 1000) } },
       { new: true }
     );
@@ -812,9 +927,7 @@ router.post('/logout', async (req, res, next) => {
       try { decoded = verifyAccessToken(accessBlob); } catch {}
       const jti = decoded?.jti;
       if (jti) {
-        if (decoded?.tag !== 'Main Admin') {
-          await revokeAccessJti(jti, req.user?._id || 'unknown', 'logout');
-        }
+        await revokeAccessJti(jti, decoded?.sub || 'unknown', 'logout');
         deleteSessionKey(jti);
       }
     }
@@ -849,7 +962,7 @@ router.post('/revoke-token', async (req, res, next) => {
     let decoded = null;
     try { decoded = verifyAccessToken(token); } catch {}
     const jti = decoded?.jti;
-    if (jti && decoded?.tag !== 'Main Admin') {
+    if (jti) {
       await revokeAccessJti(jti, 'beacon', 'tab_close');
     }
 
@@ -870,10 +983,11 @@ router.get('/me', requireAuth, (req, res) => {
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/log-activity
 // ─────────────────────────────────────────────────────────────────
-router.post('/log-activity', requireAuth, async (req, res, next) => {
+router.post('/log-activity', requireAuth, requireOwner, async (req, res, next) => {
   try {
     const { action, meta = {} } = req.body;
-    if (!action) return res.status(400).json({ error: 'action required' });
+    const invalid = clientLogError(action, meta);
+    if (invalid) return res.status(400).json({ error: invalid });
 
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -892,7 +1006,7 @@ router.post('/log-activity', requireAuth, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 // GET /auth/activity-log
 // ─────────────────────────────────────────────────────────────────
-router.get('/activity-log', requireAuth, async (req, res, next) => {
+router.get('/activity-log', requireAuth, requireOwner, async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id).select('activityLog');
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -1074,11 +1188,11 @@ router.post('/change-pin', requireAuth, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 // PATCH /auth/profile
 // ─────────────────────────────────────────────────────────────────
-router.patch('/profile', requireAuth, async (req, res, next) => {
+router.patch('/profile', requireAuth, requireOwner, async (req, res, next) => {
   try {
     const data = z.object({
-      firstName:         z.string().min(1).max(50).trim(),
-      lastName:          z.string().max(50).trim().optional().default(''),
+      firstName:         z.string().min(1).max(50).regex(NO_HTML, 'Name cannot contain < or >').trim(),
+      lastName:          z.string().max(50).regex(NO_HTML, 'Name cannot contain < or >').trim().optional().default(''),
       propertyTagPrefix: z.string().max(100).trim().optional().default(''),
     }).parse(req.body);
 
@@ -1102,7 +1216,7 @@ router.patch('/profile', requireAuth, async (req, res, next) => {
 // PATCH /auth/admin-remember-me
 // Toggles the allowAdminRememberMe setting.
 // ─────────────────────────────────────────────────────────────────
-router.patch('/admin-remember-me', requireAuth, async (req, res, next) => {
+router.patch('/admin-remember-me', requireAuth, requireOwner, async (req, res, next) => {
   try {
     const { enabled } = z.object({ enabled: z.boolean() }).parse(req.body);
 
@@ -1127,7 +1241,7 @@ router.patch('/admin-remember-me', requireAuth, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 // PATCH /auth/smoobu-key
 // ─────────────────────────────────────────────────────────────────
-router.patch('/smoobu-key', requireAuth, async (req, res, next) => {
+router.patch('/smoobu-key', requireAuth, requireOwner, async (req, res, next) => {
   try {
     const { smoobuApiKey } = req.body;
     if (!smoobuApiKey || typeof smoobuApiKey !== 'string' || !smoobuApiKey.trim()) {
@@ -1154,7 +1268,7 @@ router.post('/forgot-password', async (req, res, next) => {
 
     const user = await User.findOneAndUpdate(
       { email: normalizedEmail },
-      { $set: { resetToken: hashToken(rawToken), resetTokenExpiry: new Date(Date.now() + 60 * 60 * 1000) } },
+      { $set: { resetToken: hashToken(rawToken), resetTokenExpiry: new Date(Date.now() + 60 * 60 * 1000), codeAttempts: 0 } },
       { new: true }
     );
     if (user) {
@@ -1165,7 +1279,7 @@ router.post('/forgot-password', async (req, res, next) => {
 
     const staff = await Staff.findOneAndUpdate(
       { email: normalizedEmail },
-      { $set: { loginOtp: hashToken(rawToken), loginOtpExpiry: new Date(Date.now() + 60 * 60 * 1000) } },
+      { $set: { loginOtp: hashToken(rawToken), loginOtpExpiry: new Date(Date.now() + 60 * 60 * 1000), codeAttempts: 0 } },
       { new: true }
     );
     if (staff) {
@@ -1198,7 +1312,10 @@ router.post('/reset-password', async (req, res, next) => {
       { new: true }
     );
 
-    if (!user) return res.status(400).json({ error: 'Invalid or expired token' });
+    if (!user) {
+      await registerCodeFailure(User, email.toLowerCase(), 'resetToken');
+      return res.status(400).json({ error: 'Invalid or expired token' });
+    }
 
     user.password = newPassword;
     await user.save();
@@ -1227,6 +1344,8 @@ router.post('/verify-reset-token', async (req, res, next) => {
 
     const staff = await Staff.findOne({ email: normalizedEmail }).select('+loginOtp +loginOtpExpiry');
     if (!staff || staff.loginOtp !== hashed || !staff.loginOtpExpiry || staff.loginOtpExpiry < now) {
+      await registerCodeFailure(User, normalizedEmail, 'resetToken');
+      await registerCodeFailure(Staff, normalizedEmail, 'loginOtp');
       return res.status(400).json({ error: 'Invalid or expired code' });
     }
 
@@ -1282,7 +1401,7 @@ router.post('/resend-reset', async (req, res, next) => {
 
     const user = await User.findOneAndUpdate(
       { email: normalizedEmail },
-      { $set: { resetToken: hashToken(rawToken), resetTokenExpiry: new Date(Date.now() + 60 * 60 * 1000) } },
+      { $set: { resetToken: hashToken(rawToken), resetTokenExpiry: new Date(Date.now() + 60 * 60 * 1000), codeAttempts: 0 } },
       { new: true }
     );
     if (user) {
@@ -1293,7 +1412,7 @@ router.post('/resend-reset', async (req, res, next) => {
 
     const staff = await Staff.findOneAndUpdate(
       { email: normalizedEmail },
-      { $set: { loginOtp: hashToken(rawToken), loginOtpExpiry: new Date(Date.now() + 60 * 60 * 1000) } },
+      { $set: { loginOtp: hashToken(rawToken), loginOtpExpiry: new Date(Date.now() + 60 * 60 * 1000), codeAttempts: 0 } },
       { new: true }
     );
     if (staff) {
@@ -1317,7 +1436,7 @@ router.post('/send-change-password-otp', requireAuth, async (req, res, next) => 
     if (req.isStaff) {
       const staff = await Staff.findByIdAndUpdate(
         req.staff._id,
-        { $set: { loginOtp: hashed, loginOtpExpiry: expiry } },
+        { $set: { loginOtp: hashed, loginOtpExpiry: expiry, codeAttempts: 0 } },
         { new: true }
       );
       if (!staff) return res.status(404).json({ error: 'Staff account not found.' });
@@ -1328,7 +1447,7 @@ router.post('/send-change-password-otp', requireAuth, async (req, res, next) => 
 
     const user = await User.findByIdAndUpdate(
       req.user._id,
-      { $set: { resetToken: hashed, resetTokenExpiry: expiry } },
+      { $set: { resetToken: hashed, resetTokenExpiry: expiry, codeAttempts: 0 } },
       { new: true }
     );
     if (!user) return res.status(404).json({ error: 'User not found.' });
@@ -1379,31 +1498,47 @@ async function evaluatePinLockState(doc, now, contactNote) {
   return null;
 }
 
-async function registerPinFailure(doc, now, contactNote) {
-  doc.pinAttempts   = (doc.pinAttempts || 0) + 1;
-  doc.lastPinFailAt = now;
-  const attempts    = doc.pinAttempts;
-
-  if (attempts >= PIN_PERMANENT_THRESHOLD) {
-    doc.pinPermanentlyLocked = true;
-    await doc.save();
-    return { status: 423, body: { error: `Your account has been locked. Please contact your ${contactNote}.`, permanentlyLocked: true } };
-  }
-  const lockDuration = getPinLockDuration(attempts);
-  if (lockDuration !== null) {
-    doc.pinLockedUntil = new Date(now.getTime() + lockDuration);
-    await doc.save();
-    return { status: 423, body: { error: 'Incorrect PIN. Account locked. Please try again later.', lockedUntil: doc.pinLockedUntil.toISOString() } };
-  }
-  await doc.save();
-  const attemptsLeft = PIN_FIRST_LOCK_AT - attempts;
-  return { status: 403, body: { error: `Incorrect PIN. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining before lockout.` } };
+// Atomically reserves one PIN attempt BEFORE the bcrypt compare, so parallel
+// guesses each count (a read-then-save let 10 concurrent wrong PINs register
+// as ~1 failure). Refused while locked or once the permanent threshold is hit,
+// so at most PIN_PERMANENT_THRESHOLD guesses are ever evaluated.
+// Returns the new attempt count, or null when no attempt may be made.
+async function claimPinAttempt(doc, now) {
+  const claimed = await doc.constructor.findOneAndUpdate(
+    {
+      _id: doc._id,
+      pinPermanentlyLocked: { $ne: true },
+      pinAttempts: { $not: { $gte: PIN_PERMANENT_THRESHOLD } },
+      $or: [{ pinLockedUntil: null }, { pinLockedUntil: { $lte: now } }],
+    },
+    { $inc: { pinAttempts: 1 } },
+    { new: true, projection: { pinAttempts: 1 } }
+  );
+  return claimed ? claimed.pinAttempts : null;
 }
 
-function resetPinLockout(doc) {
-  doc.pinAttempts    = 0;
-  doc.pinLockedUntil = null;
-  doc.lastPinFailAt  = null;
+const PIN_LOCKED = { status: 423, body: { error: 'Too many incorrect PIN attempts. Please try again later.' } };
+
+async function registerPinFailure(doc, attempts, now, contactNote) {
+  const set = { lastPinFailAt: now };
+  let result;
+  const lockDuration = getPinLockDuration(attempts);
+  if (attempts >= PIN_PERMANENT_THRESHOLD) {
+    set.pinPermanentlyLocked = true;
+    result = { status: 423, body: { error: `Your account has been locked. Please contact your ${contactNote}.`, permanentlyLocked: true } };
+  } else if (lockDuration !== null) {
+    set.pinLockedUntil = new Date(now.getTime() + lockDuration);
+    result = { status: 423, body: { error: 'Incorrect PIN. Account locked. Please try again later.', lockedUntil: set.pinLockedUntil.toISOString() } };
+  } else {
+    const attemptsLeft = PIN_FIRST_LOCK_AT - attempts;
+    result = { status: 403, body: { error: `Incorrect PIN. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining before lockout.` } };
+  }
+  await doc.constructor.updateOne({ _id: doc._id }, { $set: set });
+  return result;
+}
+
+async function resetPinLockout(doc) {
+  await doc.constructor.updateOne({ _id: doc._id }, { $set: { pinAttempts: 0, pinLockedUntil: null, lastPinFailAt: null } });
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1418,8 +1553,23 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
     const normalizedEmail = email.trim().toLowerCase();
     const now             = new Date();
 
-    // ── 1. Try Staff ───────────────────────────────────────────────
+    // Which accounts this PIN screen may unlock:
+    //   - the signed-in account itself, or
+    //   - a staff member of the signed-in client (the owner signs in on a shared
+    //     device, then staff enter their own email + PIN here).
+    // Any other email is rejected, so a logged-in user can't take over (or lock
+    // out) an unrelated account by typing its email.
+    const signedInEmail = String((req.isStaff ? req.staff?.email : req.user?.email) || '').toLowerCase();
+    const signedInClientIds = new Set(
+      [req.isStaff ? req.staff?.clientId : req.user?._id, req.user?.serverId].filter(Boolean).map(String)
+    );
     const staff = await Staff.findOne({ email: normalizedEmail }).select('+pin +lastPinFailAt');
+    const isOwnStaff = !!staff && signedInClientIds.has(String(staff.clientId));
+    if (normalizedEmail !== signedInEmail && !isOwnStaff) {
+      return res.status(403).json({ error: 'PIN can only be verified for the signed-in account or its staff.' });
+    }
+
+    // ── 1. Try Staff ───────────────────────────────────────────────
     if (staff) {
       if (staff.isArchive) return res.status(403).json({ error: 'This account has been disabled. Please contact your administrator.', accountDisabled: true });
       if (!staff.isActive) return res.status(403).json({ error: 'Your account has been deactivated.' });
@@ -1429,11 +1579,15 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
 
       if (!propertyId) return res.status(400).json({ error: 'Property selection is required.' });
 
+      const attempts = await claimPinAttempt(staff, now);
+      if (attempts === null) return res.status(PIN_LOCKED.status).json(PIN_LOCKED.body);
+
       const pinMatch = await bcrypt.compare(String(pin), staff.pin || '');
       if (!pinMatch) {
-        const failResult = await registerPinFailure(staff, now, 'manager');
+        const failResult = await registerPinFailure(staff, attempts, now, 'manager');
         return res.status(failResult.status).json(failResult.body);
       }
+      await resetPinLockout(staff);
 
       const clientUser = await User.findById(staff.clientId).select('properties');
       let hasAccess = false;
@@ -1442,9 +1596,6 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
         hasAccess = staffCanAccessEmbeddedProperty(staff, selectedProp);
       }
       if (!hasAccess) return res.status(403).json({ error: 'You do not have access to this property' });
-
-      resetPinLockout(staff);
-      await staff.save();
 
       const { encAccessToken, rawRefresh, accessJti: pinStaffJti } = await issueTokenPair(
         signStaffAccessToken, signStaffRefreshToken, staff, req
@@ -1471,14 +1622,16 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
 
     if (!ownUser.pin) return res.status(403).json({ error: 'No PIN configured on this account.' });
 
+    const attempts = await claimPinAttempt(ownUser, now);
+    if (attempts === null) return res.status(PIN_LOCKED.status).json(PIN_LOCKED.body);
+
     const pinMatch = await bcrypt.compare(String(pin), ownUser.pin);
     if (!pinMatch) {
-      const failResult = await registerPinFailure(ownUser, now, 'administrator');
+      const failResult = await registerPinFailure(ownUser, attempts, now, 'administrator');
       return res.status(failResult.status).json(failResult.body);
     }
 
-    resetPinLockout(ownUser);
-    await ownUser.save();
+    await resetPinLockout(ownUser);
 
     const { encAccessToken, rawRefresh, accessJti: pinUserJti } = await issueTokenPair(
       signAccessToken, signRefreshToken, ownUser, req
@@ -1494,7 +1647,7 @@ router.post('/verify-pin', requireAuth, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 // GET /auth/pin-status
 // ─────────────────────────────────────────────────────────────────
-router.get('/pin-status', requireAuth, async (req, res, next) => {
+router.get('/pin-status', requireAuth, requireOwner, async (req, res, next) => {
   try {
     const user = await User.findOne({ email: req.user.email }).select('+pin');
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -1505,13 +1658,16 @@ router.get('/pin-status', requireAuth, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/totp/setup  — generate secret + QR code
 // ─────────────────────────────────────────────────────────────────
-router.post('/totp/setup', requireAuth, async (req, res, next) => {
+router.post('/totp/setup', requireAuth, requireOwner, async (req, res, next) => {
   try {
     const speakeasy = await import('speakeasy');
     const QRCode    = await import('qrcode');
 
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
+    // Re-running setup would silently replace a working authenticator (and
+    // switch 2FA off) with just a session token — disable it first (needs a code).
+    if (user.totpEnabled) return res.status(409).json({ error: 'Authenticator app is already enabled. Disable it first.' });
 
     const secret = speakeasy.default.generateSecret({
       name:   `HostOps (${user.email})`,
@@ -1532,7 +1688,7 @@ router.post('/totp/setup', requireAuth, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/totp/verify-setup  — confirm TOTP is working, enable it
 // ─────────────────────────────────────────────────────────────────
-router.post('/totp/verify-setup', requireAuth, async (req, res, next) => {
+router.post('/totp/verify-setup', requireAuth, requireOwner, async (req, res, next) => {
   try {
     const speakeasy = await import('speakeasy');
     const { token } = req.body;
@@ -1573,10 +1729,15 @@ router.post('/totp/verify-setup', requireAuth, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/totp/disable  — turn off TOTP
 // ─────────────────────────────────────────────────────────────────
-router.post('/totp/disable', requireAuth, async (req, res, next) => {
+router.post('/totp/disable', requireAuth, requireOwner, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    const found = await User.findById(req.user._id).select('+totpSecret +backupCodes');
+    if (!found) return res.status(404).json({ error: 'User not found' });
+
+    // A stolen session token alone must not be able to switch 2FA off.
+    const check = await checkSecondFactor(found, req.body?.code);
+    if (!check.ok) return res.status(403).json(SECOND_FACTOR_REQUIRED);
+    const user = check.user;
 
     user.totpSecret  = null;
     user.totpEnabled = false;
@@ -1601,12 +1762,17 @@ router.post('/totp/disable', requireAuth, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 // POST /auth/backup-codes/generate  — generate 10 backup codes
 // ─────────────────────────────────────────────────────────────────
-router.post('/backup-codes/generate', requireAuth, async (req, res, next) => {
+router.post('/backup-codes/generate', requireAuth, requireOwner, async (req, res, next) => {
   try {
     const crypto = await import('crypto');
-    const user = await User.findById(req.user._id).select('+backupCodes');
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    if (!user.totpEnabled) return res.status(400).json({ error: '2FA must be enabled first' });
+    const found = await User.findById(req.user._id).select('+totpSecret +backupCodes');
+    if (!found) return res.status(404).json({ error: 'User not found' });
+    if (!found.totpEnabled) return res.status(400).json({ error: '2FA must be enabled first' });
+
+    // New backup codes are a second factor: require a current one to mint them.
+    const check = await checkSecondFactor(found, req.body?.code);
+    if (!check.ok) return res.status(403).json(SECOND_FACTOR_REQUIRED);
+    const user = check.user;
 
     const codes = [];
     const hashed = [];
@@ -1625,7 +1791,7 @@ router.post('/backup-codes/generate', requireAuth, async (req, res, next) => {
       performedBy: { userId: user._id, email: user.email, firstName: user.firstName || '', lastName: user.lastName || '', role: user.role || 'client' },
       businessName: user.businessName || '',
       action: 'backup_codes_generated',
-      ipAddress: (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || '',
+      ipAddress: req.ip || '',
       userAgent: req.get('user-agent') || '',
     }).catch(() => {});
 
@@ -1636,7 +1802,7 @@ router.post('/backup-codes/generate', requireAuth, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 // GET /auth/backup-codes/count  — how many unused codes remain
 // ─────────────────────────────────────────────────────────────────
-router.get('/backup-codes/count', requireAuth, async (req, res, next) => {
+router.get('/backup-codes/count', requireAuth, requireOwner, async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id).select('+backupCodes');
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -1651,56 +1817,29 @@ router.get('/backup-codes/count', requireAuth, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.post('/totp/verify', async (req, res, next) => {
   try {
-    const speakeasy = await import('speakeasy');
     const { email, token } = req.body;
     if (!email || !token) return res.status(400).json({ error: 'Email and token required' });
 
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+totpSecret +backupCodes');
+    const boundUserId = secondFactorUserId(req);
+    if (!boundUserId) return res.status(401).json(MFA_REQUIRED);
+
+    // `let`: a successful backup code swaps in the atomically-updated document.
+    let user = await User.findOne({ _id: boundUserId, email: String(email).toLowerCase() }).select('+totpSecret +backupCodes');
     if (!user || !user.totpEnabled || !user.totpSecret) {
       return res.status(400).json({ error: 'TOTP not enabled for this account' });
     }
 
-    const cleanToken = token.replace(/\s/g, '');
-    let verified = speakeasy.default.totp.verify({
-      secret:   user.totpSecret,
-      encoding: 'base32',
-      token:    cleanToken,
-      window:   1,
-    });
-
-    // If TOTP failed, try backup codes with ATOMIC update
-    let usedBackupCode = false;
-    if (!verified && user.backupCodes?.length > 0) {
-      for (let i = 0; i < user.backupCodes.length; i++) {
-        const bc = user.backupCodes[i];
-        if (bc.used) continue;
-        const match = await bcrypt.compare(cleanToken.toUpperCase(), bc.hash);
-        if (match) {
-          // Atomic update — marks the specific backup code as used in a single DB operation
-          // Prevents race condition where two parallel requests use the same code
-          const atomicResult = await User.findOneAndUpdate(
-            { _id: user._id, [`backupCodes.${i}.used`]: false },
-            { $set: { [`backupCodes.${i}.used`]: true } },
-            { new: true }
-          ).select('+backupCodes');
-          if (atomicResult) {
-            verified = true;
-            usedBackupCode = true;
-            user = atomicResult;
-          }
-          break;
-        }
-      }
-    }
-
-    if (!verified) return res.status(401).json({ error: 'Invalid code. Please try again.' });
+    const check = await checkSecondFactor(user, token);
+    if (!check.ok) return res.status(401).json({ error: 'Invalid code. Please try again.' });
+    user = check.user;
+    const usedBackupCode = check.usedBackupCode;
 
     const { encAccessToken, rawRefresh, accessJti: totpJti } = await issueTokenPair(
       signAccessToken, signRefreshToken, user, req
     );
 
-    // Atomic lastLoginAt update
-    await User.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } });
+    // Atomic lastLoginAt update (lastMfaAt: step-up proof for sensitive admin actions)
+    await User.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date(), lastMfaAt: new Date() } });
 
     setRefreshCookie(res, rawRefresh, req);
     const totpSk = createSessionKey(totpJti, accessTokenExpiryMs());
@@ -1711,7 +1850,7 @@ router.post('/totp/verify', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/totp/devices', requireAuth, async (req, res, next) => {
+router.get('/totp/devices', requireAuth, requireOwner, async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id).select('totpDevices');
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -1719,7 +1858,7 @@ router.get('/totp/devices', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/totp/devices/:deviceId', requireAuth, validateObjectId('deviceId'), async (req, res, next) => {
+router.delete('/totp/devices/:deviceId', requireAuth, requireOwner, validateObjectId('deviceId'), async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -1758,7 +1897,7 @@ const profileUpload = multer({
   },
 });
 
-router.post('/profile-image', requireAuth, profileUpload.single('image'), async (req, res, next) => {
+router.post('/profile-image', requireAuth, requireOwner, profileUpload.single('image'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
 
@@ -1789,7 +1928,7 @@ router.post('/profile-image', requireAuth, profileUpload.single('image'), async 
   }
 });
 
-router.delete('/profile-image', requireAuth, async (req, res, next) => {
+router.delete('/profile-image', requireAuth, requireOwner, async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });

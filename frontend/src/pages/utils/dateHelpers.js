@@ -30,12 +30,19 @@ export function dayDiff(ymd1, ymd2) {
   return Math.round((d2 - d1) / 86_400_000);
 }
 
+// JS parses "YYYY-MM-DD" as UTC midnight, which is the previous day for users
+// west of UTC. Read date-only strings (Smoobu arrival/departure) as local dates.
+function parseDate(iso) {
+  const m = typeof iso === 'string' && /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return m ? new Date(+m[1], m[2] - 1, +m[3]) : new Date(iso);
+}
+
 /**
  * Formats an ISO date string as "Mon 01.05.2025".
  */
 export function fmtDate(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
+  const d = parseDate(iso);
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   return `${days[d.getDay()]} ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 }
@@ -45,7 +52,7 @@ export function fmtDate(iso) {
  */
 export function fmtDateShort(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
+  const d = parseDate(iso);
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }

@@ -24,6 +24,9 @@ import { encrypt, decrypt } from './encryption.js';
 //   so existing deployments don't break before they run the rotation
 //   script for the first time.
 
+// Only accept the algorithm we sign with (no alg-confusion / "none").
+const HS256 = { algorithms: ['HS256'] };
+
 function getSigningSecret() {
   const secret = process.env.JWT_SECRET_CURR || process.env.JWT_ACCESS_SECRET;
   if (!secret) throw new Error('No JWT signing secret configured (JWT_SECRET_CURR or JWT_ACCESS_SECRET)');
@@ -59,7 +62,7 @@ function verifyWithRotation(raw) {
 
   for (const secret of secrets) {
     try {
-      return jwt.verify(raw, secret);
+      return jwt.verify(raw, secret, HS256);
     } catch (err) {
       lastErr = err;
       // TokenExpiredError means the signature DID match — the token is
@@ -109,7 +112,10 @@ export function signAccessToken(user, req = null) {
 }
 
 // ── Staff access tokens ──────────────────────────────────────────
-export function signStaffAccessToken(staff, req = null) {
+// pinPending: staff sign in with email (+ password if one is set) and must then
+// verify their PIN. Until then the token only unlocks the PIN step — see
+// PIN_PENDING_ALLOWED in middleware/auth.js.
+export function signStaffAccessToken(staff, req = null, { pinPending = false } = {}) {
   const payload = {
     jti:      uuidv4(),
     sub:      staff._id.toString(),
@@ -118,8 +124,34 @@ export function signStaffAccessToken(staff, req = null) {
     email:    staff.email,
     role:     'staff',
   };
+  if (pinPending) payload.pinPending = true;
   if (req) payload.fp = generateFingerprint(req);
   return jwt.sign(payload, getSigningSecret(), { expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m' });
+}
+
+// ── MFA ticket ───────────────────────────────────────────────────
+// Issued by /auth/login after the password is verified but before the second
+// factor. /verify-login-otp and /totp/verify require it (or a live session),
+// so an emailed code or TOTP alone can never open a session. Own secret +
+// purpose claim, so it can't be used as an access or refresh token.
+function mfaSecret() {
+  if (!process.env.JWT_REFRESH_SECRET) throw new Error('JWT_REFRESH_SECRET is not configured');
+  return `${process.env.JWT_REFRESH_SECRET}:login-mfa`;
+}
+
+export function signMfaToken(user) {
+  return jwt.sign({ sub: user._id.toString(), purpose: 'mfa' }, mfaSecret(), { expiresIn: '10m' });
+}
+
+// Returns the user id the ticket was issued for, or null.
+export function verifyMfaToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  try {
+    const d = jwt.verify(token, mfaSecret(), HS256);
+    return d.purpose === 'mfa' ? d.sub : null;
+  } catch {
+    return null;
+  }
 }
 
 // verifyAccessToken: decrypts the blob first, then verifies the JWT
@@ -190,7 +222,7 @@ export function signClientAccountRefreshToken(account) {
 
 export function verifyRefreshToken(tokenOrBlob) {
   const raw = decryptToken(tokenOrBlob); // no-op if already plain (isEncrypted guard)
-  return jwt.verify(raw, process.env.JWT_REFRESH_SECRET);
+  return jwt.verify(raw, process.env.JWT_REFRESH_SECRET, HS256);
 }
 
 // ── Compute expiry Date object for refresh token ─────────────────

@@ -8,7 +8,8 @@ function isPublicIP(ip) {
   const clean = ip.replace(/^::ffff:/, '');
   if (clean === '::1' || clean === '127.0.0.1' || clean === 'localhost') return false;
   if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(clean)) return false;
-  if (/^172\.(6[4-9]|7[0-1])\./.test(clean)) return false;
+  // Carrier-grade NAT 100.64.0.0/10 (100.64.x.x – 100.127.x.x) is not routable.
+  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(clean)) return false;
   return true;
 }
 
@@ -58,12 +59,19 @@ export function useIpLocations(ips = []) {
 
     if (needed.length === 0) return;
 
-    needed.forEach(ip => lookingUp.current.add(ip));
+    // Only IPs actually fetched in this run are marked as in-flight; the rest
+    // (beyond the 10-per-run cap, or left over when the run stops early) stay
+    // eligible for the next run instead of being skipped forever.
+    const batch = needed.slice(0, 10);
+    batch.forEach(ip => lookingUp.current.add(ip));
+    const pending = new Set(batch);
+    const releasePending = () => pending.forEach(ip => lookingUp.current.delete(ip));
 
     let cancelled = false;
     (async () => {
-      for (const ip of needed.slice(0, 10)) {
+      for (const ip of batch) {
         if (cancelled || rateLimited) break;
+        pending.delete(ip);
         const loc = await lookupIP(ip);
         lookingUp.current.delete(ip);
         if (!cancelled && loc) {
@@ -71,9 +79,10 @@ export function useIpLocations(ips = []) {
         }
         await new Promise(r => setTimeout(r, 500));
       }
+      releasePending();
     })();
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; releasePending(); };
   }, [ips.join(',')]);
 
   return locations;

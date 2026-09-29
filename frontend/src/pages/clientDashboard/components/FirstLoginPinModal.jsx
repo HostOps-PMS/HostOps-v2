@@ -25,7 +25,7 @@ function validateNewPin(pin) {
 export default function FirstLoginPinModal({ onComplete }) {
   const auth = useAuth();
   const { dark } = useDashboard();
-  const API_BASE = import.meta.env.VITE_API_URL || 'https://api.hostops.online';
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin]         = useState('');

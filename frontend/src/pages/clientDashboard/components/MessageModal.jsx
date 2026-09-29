@@ -6,10 +6,12 @@ import { getChannelColor, getChannelInitial } from '../utils/channelHelpers';
 import { useDashboard } from '../context/DashboardContext';
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
+// Guest messages are attacker-controlled HTML. DOMParser builds an inert
+// document: unlike a detached <div>.innerHTML it never loads <img> or runs
+// onerror handlers.
 function stripHtml(html) {
-  const div = document.createElement('div');
-  div.innerHTML = html;
-  return (div.textContent || div.innerText || '').trim();
+  const doc = new DOMParser().parseFromString(String(html ?? ''), 'text/html');
+  return (doc.body.textContent || '').trim();
 }
 
 /* Decode a JWT payload client-side (no verification — UI gating only).
@@ -89,6 +91,8 @@ const CHANNEL_META = {
 };
 
 function ChannelBadge({ channel, size = 40 }) {
+  const { dark } = useDashboard();
+  const T = mkT(dark);
   const meta = CHANNEL_META[channel] || { bg: '#f0f4f8', color: '#4a6374', label: (channel || 'G')[0] };
   return (
     <div style={{
@@ -105,6 +109,8 @@ function ChannelBadge({ channel, size = 40 }) {
 
 /* ─── Avatar initials ────────────────────────────────────────────── */
 function Avatar({ name, size = 36 }) {
+  const { dark } = useDashboard();
+  const T = mkT(dark);
   const initials = (name || 'G').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
   const hue = (name || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
   return (

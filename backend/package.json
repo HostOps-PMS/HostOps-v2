@@ -28,7 +28,6 @@
     "jspdf-autotable": "^5.0.8",
     "mongoose": "^8.4.0",
     "multer": "^2.1.1",
-    "nodemailer": "^9.0.1",
     "qrcode": "^1.5.4",
     "resend": "^3.5.0",
     "speakeasy": "^2.0.0",

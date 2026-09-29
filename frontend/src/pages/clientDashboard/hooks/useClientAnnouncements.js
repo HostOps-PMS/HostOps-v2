@@ -8,7 +8,6 @@ export function useClientAnnouncements() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('[useClientAnnouncements] isReady:', auth.isReady);
     // Wait for auth hydration (silent refresh on mount) before fetching
     if (!auth.isReady) return;
 

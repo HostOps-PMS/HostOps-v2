@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 
-export default function AccountDetailsModal({ account, onClose }) {
-  if (!account) return null;
+// Guard lives in a wrapper so every hook in AccountDetailsContent runs
+// unconditionally (Rules of Hooks).
+export default function AccountDetailsModal(props) {
+  if (!props.account) return null;
+  return <AccountDetailsContent {...props} />;
+}
+
+function AccountDetailsContent({ account, onClose }) {
 
   const [isDeactivated, setIsDeactivated] = useState(
     (account.status || '').toLowerCase() === 'locked' || 

@@ -91,7 +91,6 @@ export default function DashboardPage() {
   // Pricing modal state
 const [pricingOpen, setPricingOpen] = useState(false);
 const [profitOpen, setProfitOpen] = useState(false);
-console.log("profitOpen:", profitOpen);
 
   // Message modal state
   const [modalOpen, setModalOpen] = useState(false);

@@ -1,6 +1,6 @@
 import { fetchWithAuth as apiFetch } from '../../../lib/authUtils';
 
-const BASE = import.meta.env.VITE_API_URL || 'https://api.hostops.online';
+const BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 /**
  * Fetch all activity logs (admin only).

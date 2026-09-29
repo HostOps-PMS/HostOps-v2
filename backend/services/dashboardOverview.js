@@ -61,7 +61,9 @@ function getYearRange() {
 function getLast12MonthsRange() {
   const now  = new Date();
   const to   = now.toISOString().slice(0, 10);
-  const from = new Date(now.getFullYear() - 1, now.getMonth() + 1, 1)
+  // Built in UTC: a local-midnight Date shifted to the previous UTC day in UTC+
+  // timezones (e.g. Asia/Manila), leaking a 13th month into the chart.
+  const from = new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth() + 1, 1))
     .toISOString()
     .slice(0, 10);
   return { from, to };
@@ -324,10 +326,10 @@ async function fetchPropertyData(propertyCtx, dateRange, clientId, clientName, p
     byChannel[ch].nights   += n;
   });
 
-  // Occupancy
+  // Occupancy — the range is inclusive (Sept 1–30 is 30 days, not 29).
   const daysInRange = Math.max(
     1,
-    Math.round((new Date(to) - new Date(from)) / (1000 * 60 * 60 * 24))
+    Math.round((new Date(to) - new Date(from)) / (1000 * 60 * 60 * 24)) + 1
   );
   const availableNights = daysInRange * (apartments.length || 1);
   const occupancy = Math.min(100, Math.round((nights / availableNights) * 100));
@@ -791,8 +793,8 @@ export async function getDashboardOverview(opts = {}) {
     .sort()
     .map((month) => ({
       month,
-      // Friendly label: "Jan 25" etc.
-      label:         new Date(month + '-01').toLocaleString('en', { month: 'short', year: '2-digit' }),
+      // Friendly label: "Jan 25" etc. 'YYYY-MM-01' parses as UTC, so format in UTC.
+      label:         new Date(month + '-01').toLocaleString('en', { month: 'short', year: '2-digit', timeZone: 'UTC' }),
       revenue:       mergedRevByMonth[month] || 0,
       bookings:      mergedBkByMonth[month]  || 0,
       cancellations: mergedCxByMonth[month]  || 0,

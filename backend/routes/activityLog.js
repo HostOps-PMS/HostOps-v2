@@ -6,6 +6,24 @@ import { requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Actions only the server may record (Smoobu webhook, 2FA routes). Clients
+// logging these would forge bookings / security events in the audit trail.
+// ('login' is NOT here: the PIN screen logs it after /auth/verify-pin.)
+export const SYSTEM_ACTIONS = new Set([
+  'booking_created', 'booking_modified', 'booking_cancelled',
+  'totp_enabled', 'totp_disabled', 'totp_device_removed', 'backup_codes_generated',
+]);
+const MAX_META_BYTES = 4096;
+
+// Validates a client-submitted { action, meta }. Returns an error string or null.
+export function clientLogError(action, meta) {
+  if (!action || typeof action !== 'string' || !action.trim()) return 'action is required';
+  if (SYSTEM_ACTIONS.has(action.trim())) return 'This action is recorded by the server only';
+  if (meta !== undefined && (typeof meta !== 'object' || meta === null || Array.isArray(meta))) return 'meta must be an object';
+  if (JSON.stringify(meta ?? {}).length > MAX_META_BYTES) return 'meta is too large';
+  return null;
+}
+
 // ─────────────────────────────────────────────────────────────────
 // POST /api/activity-log
 // Called by the frontend useActivityLog hook.
@@ -15,9 +33,8 @@ const router = express.Router();
 router.post('/activity-log', requireAuth, async (req, res, next) => {
   try {
     const { action, meta = {} } = req.body;
-    if (!action || typeof action !== 'string' || !action.trim()) {
-      return res.status(400).json({ error: 'action is required' });
-    }
+    const invalid = clientLogError(action, meta);
+    if (invalid) return res.status(400).json({ error: invalid });
 
     // req.user is always the client/owner (set by requireAuth middleware).
     // req.staff is set only when a staff member is logged in.
@@ -53,7 +70,7 @@ router.post('/activity-log', requireAuth, async (req, res, next) => {
 
       action:    action.trim(),
       meta,
-      ipAddress: (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || '',
+      ipAddress: req.ip || '', // not X-Forwarded-For: client-controlled, spoofable
       userAgent: req.get('user-agent') || '',
     });
 
@@ -74,7 +91,7 @@ router.get('/activity-log', requireAuth, async (req, res, next) => {
     const skip   = (page - 1) * limit;
 
     const filter = { userId: req.user._id };
-    if (req.query.action) filter.action = req.query.action.trim();
+    if (req.query.action) filter.action = String(req.query.action).trim();
 
     const [logs, total] = await Promise.all([
       ActivityLog.find(filter)
@@ -110,7 +127,7 @@ router.get('/activity-log/all', requireAuth, requireAdmin, async (req, res, next
 
     const filter = {};
     if (req.query.userId) filter.userId = req.query.userId;
-    if (req.query.action) filter.action = req.query.action.trim();
+    if (req.query.action) filter.action = String(req.query.action).trim();
     if (req.query.from || req.query.to) {
       filter.createdAt = {};
       if (req.query.from) filter.createdAt.$gte = new Date(req.query.from);

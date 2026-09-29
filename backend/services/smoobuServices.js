@@ -15,7 +15,7 @@
  *    In this case, the route passes process.env.SMOOBU_API_KEY as apiKey.
  */
 
-const SMOOBU_BASE = 'https://api.hostops.online';
+const SMOOBU_BASE = 'http://localhost:5000';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getDefaultFrom() {

@@ -21,7 +21,12 @@ async function sendViaGHL(webhookUrl, payload) {
   return data;
 }
 
-async function sendOtpViaResend(email, firstName, otp, subject) {
+// firstName is user-controlled (sign-up form): escape it so nobody can plant
+// links/HTML in an email that really comes from us.
+const escapeHtml = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+async function sendOtpViaResend(email, rawFirstName, otp, subject) {
+  const firstName = escapeHtml(rawFirstName);
   const from = process.env.EMAIL_FROM || 'HostPilot <onboarding@resend.dev>';
   await resend.emails.send({
     from,

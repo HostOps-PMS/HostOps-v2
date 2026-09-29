@@ -1,13 +1,13 @@
 import crypto from 'crypto';
 
 const ALG = 'aes-256-gcm';
-// Ensure the key exists, otherwise provide a fallback or throw. 
-// For production, this MUST be set in .env.
-const rawKey = process.env.FIELD_ENCRYPTION_KEY;
-if (!rawKey || rawKey.length !== 64) {
-  console.warn('⚠️  WARNING: •••••••• is missing or invalid in .env (must be 64 hex chars).');
+// Fail closed: without a valid key, secrets would be "encrypted" with a
+// publicly known all-zero key. Refuse to start instead.
+const rawKey = (process.env.FIELD_ENCRYPTION_KEY || '').trim();
+if (!/^[0-9a-f]{64}$/i.test(rawKey)) {
+  throw new Error('FIELD_ENCRYPTION_KEY is missing or invalid (must be 64 hex chars).');
 }
-const KEY = rawKey ? Buffer.from(rawKey, 'hex') : Buffer.alloc(32);
+const KEY = Buffer.from(rawKey, 'hex');
 
 /**
  * Checks if a string appears to be correctly formatted encrypted data (iv:enc:tag).

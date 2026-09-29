@@ -31,6 +31,13 @@ function parseTargetClients(raw) {
   } catch { return []; }
 }
 
+function removeTempFile(file) {
+  try { if (file?.path && fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch { /* ignore */ }
+}
+
+// Schema violations (bad enum, too long, bad date) are the caller's fault → 400.
+const isBadInput = (err) => err?.name === 'ValidationError' || err?.name === 'CastError';
+
 const router = Router();
 
 // ── Client-facing: only published announcements visible to this user ──────────
@@ -39,7 +46,6 @@ router.get('/announcements/client', requireAuth, async (req, res, next) => {
     const now    = new Date();
     const userId = req.user._id;
 
-    console.log('[announcements/client] userId:', userId, 'role:', req.user.role);
 
     // endDate is informational only — admin archives to end visibility.
     // startDate controls "not yet visible" (hide until start date arrives).
@@ -66,7 +72,6 @@ router.get('/announcements/client', requireAuth, async (req, res, next) => {
       .limit(50)
       .lean();
 
-    console.log('[announcements/client] found:', announcements.length);
     res.json(announcements);
   } catch (err) { next(err); }
 });
@@ -99,25 +104,14 @@ router.post('/announcements', requireAuth, requireAdmin, (req, res, next) => {
     if (err) return res.status(400).json({ error: err.message });
     try {
       const { title, content, audience, priority, status, startDate, endDate, targetClients } = req.body;
-      if (!title || !content) return res.status(400).json({ error: 'Title and content are required' });
-
-      let image = { url: '', publicId: '' };
-      if (req.file) {
-        try {
-          const result = await cloudinary.uploader.upload(req.file.path, {
-            folder: 'hostops/announcements',
-            resource_type: 'image',
-          });
-          image = { url: result.secure_url, publicId: result.public_id };
-        } finally {
-          if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-        }
+      if (!title || !content) {
+        removeTempFile(req.file);
+        return res.status(400).json({ error: 'Title and content are required' });
       }
 
-      const doc = await Announcement.create({
+      const fields = {
         title,
         content,
-        image,
         audience:      audience  || 'all',
         targetClients: audience === 'selected' ? parseTargetClients(targetClients) : [],
         priority:      priority  || 'normal',
@@ -130,11 +124,34 @@ router.post('/announcements', requireAuth, requireAdmin, (req, res, next) => {
           email:     req.user.email,
           firstName: req.user.firstName || req.user.businessName || '',
         },
-      });
+      };
+
+      // Validate BEFORE uploading, so bad input (unknown enum, over-long
+      // title, bad date) returns 400 without leaving an orphaned image.
+      await new Announcement(fields).validate();
+
+      let image = { url: '', publicId: '' };
+      if (req.file) {
+        try {
+          const result = await cloudinary.uploader.upload(req.file.path, {
+            folder: 'hostops/announcements',
+            resource_type: 'image',
+          });
+          image = { url: result.secure_url, publicId: result.public_id };
+        } finally {
+          removeTempFile(req.file);
+        }
+      }
+
+      const doc = await Announcement.create({ ...fields, image });
 
       const populated = await doc.populate('targetClients', 'businessName email');
       res.status(201).json(populated);
-    } catch (err) { next(err); }
+    } catch (err) {
+      removeTempFile(req.file);
+      if (isBadInput(err)) return res.status(400).json({ error: err.message });
+      next(err);
+    }
   });
 });
 
@@ -143,6 +160,7 @@ router.patch('/announcements/:id', requireAuth, requireAdmin, (req, res, next) =
     if (err) return res.status(400).json({ error: err.message });
     try {
       if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        removeTempFile(req.file);
         return res.status(400).json({ error: 'Invalid announcement ID' });
       }
 
@@ -161,6 +179,10 @@ router.patch('/announcements/:id', requireAuth, requireAdmin, (req, res, next) =
         update.status = status;
         if (status === 'published') update.publishedAt = new Date();
       }
+
+      // Validate the changed fields BEFORE touching Cloudinary: an invalid edit
+      // must not delete the current image or upload an orphan.
+      if (Object.keys(update).length) await new Announcement(update).validate(Object.keys(update));
 
       if (req.file) {
         const existing = await Announcement.findById(req.params.id).select('image').lean();
@@ -188,7 +210,11 @@ router.patch('/announcements/:id', requireAuth, requireAdmin, (req, res, next) =
         .populate('targetClients', 'businessName email');
       if (!doc) return res.status(404).json({ error: 'Announcement not found' });
       res.json(doc);
-    } catch (err) { next(err); }
+    } catch (err) {
+      removeTempFile(req.file);
+      if (isBadInput(err)) return res.status(400).json({ error: err.message });
+      next(err);
+    }
   });
 });
 

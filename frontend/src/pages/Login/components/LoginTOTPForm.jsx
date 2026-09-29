@@ -5,7 +5,7 @@ import { useAuth } from '../../AuthContext';
 import OTPInput from './OTPInput';
 import LockoutTimer from './LockoutTimer';
 
-export default function LoginTOTPForm({ email, showMsg, hideMsg, onBack, onAuthSuccess, backupMode = false }) {
+export default function LoginTOTPForm({ email, mfaToken, showMsg, hideMsg, onBack, onAuthSuccess, backupMode = false }) {
   const auth = useAuth();
   const [useBackup, setUseBackup] = useState(backupMode);
   const [backupCode, setBackupCode] = useState('');
@@ -71,14 +71,14 @@ export default function LoginTOTPForm({ email, showMsg, hideMsg, onBack, onAuthS
 
   const handleCodeComplete = (code) => {
     hideMsg();
-    submit({ email, token: code });
+    submit({ email, token: code, mfaToken });
   };
 
   const handleBackupSubmit = (e) => {
     e.preventDefault();
     if (backupCode.replace(/-/g, '').length < 8 || loading) return;
     hideMsg();
-    submit({ email, token: backupCode.replace(/-/g, '') });
+    submit({ email, token: backupCode.replace(/-/g, ''), mfaToken });
   };
 
   return (

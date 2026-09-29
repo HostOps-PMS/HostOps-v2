@@ -171,14 +171,9 @@ export function getApiKeyForUser(user) {
     };
   }
 
-  // Shared env key (MODE B — legacy shared account)
-  const envKey = process.env.SMOOBU_API_KEY;
-  if (envKey && envKey.trim()) {
-    return {
-      apiKey: envKey.trim(),
-      apiSecret: process.env.SMOOBU_API_SECRET ? process.env.SMOOBU_API_SECRET.trim() : ''
-    };
-  }
+  // No shared SMOOBU_API_KEY fallback: that legacy mode filtered one shared
+  // account by propertyTagPrefix, which users choose themselves — so a user
+  // with no (or someone else's) prefix could read other clients' bookings.
 
   for (const p of user.properties || []) {
     try {
@@ -698,7 +693,8 @@ export async function getReservationMessages(user, reservationId) {
   const creds = getApiKeyForUser(user);
   const userId = getCacheUserId(user);
   try {
-    return smoobuRequest(`/reservations/${reservationId}/messages`, creds, userId);
+    // `await` so a rejection lands in this catch (a bare return skips it).
+    return await smoobuRequest(`/reservations/${reservationId}/messages`, creds, userId);
   } catch (err) {
     // 404 means no message thread exists yet for this reservation — return empty.
     // All other errors (500, 502, auth errors) are real failures and should surface.
@@ -732,9 +728,11 @@ export async function sendReplyToGuest(user, reservationId, { subject, messageBo
     throw err;
   }
 
+  const text = await res.text();
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Smoobu send failed ${res.status}: ${text}`);
+    const err = new Error(`Smoobu send failed ${res.status}: ${text}`);
+    err.status = 502; // upstream failure, not ours — and never a 401 (would trigger a session refresh)
+    throw err;
   }
 
   // Invalidate message and thread cache for this user
@@ -744,5 +742,7 @@ export async function sendReplyToGuest(user, reservationId, { subject, messageBo
     }
   }
 
-  return res.json();
+  // The message is already sent here; an empty/non-JSON success body must not
+  // turn that into a 500.
+  try { return text ? JSON.parse(text) : {}; } catch { return {}; }
 }

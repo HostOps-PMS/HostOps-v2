@@ -14,51 +14,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { verifyOtp, resendOtp, sendLoginOtp, verifyTotp, checkTrustedDevice } from '../services/authService';
-import { getSecureUser, setSecureUser } from '../../../lib/secureUserStorage';
+import { getSecureUser } from '../../../lib/secureUserStorage';
 import { setToken, setSessionKey } from '../../../lib/authUtils';
 
 const RESEND_COOLDOWN_SEC = 60;
-
-/**
- * Parses _t (accessToken) and _u (user JSON) from the URL query string
- * and persists them to sessionStorage so the rest of the app (including
- * getAdminEmail() in authService.js) can read them without re-parsing.
- *
- * After storing, the params are stripped from the URL to avoid them
- * being bookmarked or leaking via the browser history.
- */
-function bootstrapSessionFromUrlParams() {
-  const params = new URLSearchParams(window.location.search);
-  const token  = params.get('_t');
-  const userRaw = params.get('_u');
-
-  if (token) {
-    sessionStorage.setItem('hp_access_token', token);
-  }
-
-  if (userRaw) {
-    try {
-      // Validate it's parseable before storing — avoids corrupt sessionStorage.
-      JSON.parse(userRaw);
-      try {
-        setSecureUser(JSON.parse(userRaw));
-      } catch (e) {
-        setSecureUser(userRaw);
-      }
-    } catch {
-      console.error('[useAuthorization] Failed to parse _u URL param');
-    }
-  }
-
-  // Clean up URL so token is not exposed in browser history / bookmarks.
-  if (token || userRaw) {
-    params.delete('_t');
-    params.delete('_u');
-    const newSearch = params.toString();
-    const cleanUrl  = window.location.pathname + (newSearch ? `?${newSearch}` : '');
-    window.history.replaceState({}, '', cleanUrl);
-  }
-}
 
 export function useAuthorization(onAuthorized) {
   const [loading, setLoading]               = useState(false);
@@ -99,14 +58,8 @@ export function useAuthorization(onAuthorized) {
     return () => clearInterval(interval);
   }, [lockoutTimer]);
 
-  // 1. Bootstrap session from URL params (_t / _u) if present.
-  //    Must run synchronously before sendLoginOtp so getAdminEmail()
-  //    can read hp_user from secure storage.
-  // 2. Auto-send OTP only for email-only users. TOTP users choose their
-  //    method first; the OTP is sent when they explicitly pick Email OTP.
-  useEffect(() => {
-    bootstrapSessionFromUrlParams();
-  }, []);
+  // The login hand-off (_t/_u in the URL fragment) is consumed once in App.jsx;
+  // tokens are never read from the query string (it reaches server logs/Referer).
 
   function showMessage(text, type = 'error') {
     setMessage({ text, type });
