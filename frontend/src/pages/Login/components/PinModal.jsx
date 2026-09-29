@@ -5,7 +5,7 @@ import safeStorage from '../../safeStorage';
 import { setSecureUser } from '../../../lib/secureUserStorage';
 import RecoveryModal from './RecoveryModal';
 
-const API_BASE = import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_URL || 'https://api.hostops.online';
+const API_BASE = import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const PIN_LENGTH = 6;
 
 const PIN_TIPS = [
@@ -65,6 +65,9 @@ export default function PinModal({
   const auth = useAuth();
   const navigate = useNavigate();
 
+  // Prefilled with the signed-in account. Staff on a shared device replace it
+  // with their own email; the backend only accepts the signed-in account or a
+  // staff member of the same client.
   const [email, setEmail] = useState(() => userData?.email || auth.getUser()?.email || '');
   const [digits, setDigits] = useState(Array(PIN_LENGTH).fill(''));
   const [loading, setLoading] = useState(false);
@@ -91,6 +94,7 @@ export default function PinModal({
   const [recoveryReason, setRecoveryReason]       = useState('');
   const [recoveryLoading, setRecoveryLoading]     = useState(false);
   const [recoverySubmitted, setRecoverySubmitted] = useState(false);
+  const [recoveryError, setRecoveryError]         = useState('');
 
   // ── One-shot pending flags — persist in sessionStorage so re-opening
   //    the page doesn't reset the "already submitted" state.
@@ -373,6 +377,7 @@ export default function PinModal({
     }
 
     setRecoveryLoading(true);
+    setRecoveryError('');
     try {
       const res = await fetch(`${API_BASE}/auth/recovery-request`, {
         method: 'POST',
@@ -387,14 +392,20 @@ export default function PinModal({
         }),
       });
 
-      // We always show success to prevent email enumeration
+      // The server already answers 201 for unknown emails (no enumeration),
+      // so a non-OK status is a real failure — don't pretend it was sent.
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setRecoveryError(data.error || 'Could not submit your request. Please try again.');
+        return;
+      }
       setRecoverySubmitted(true);
       const key = `hp_pending_req_${email.trim().toLowerCase()}_${isDisabled ? 'disabled' : 'pin'}`;
       sessionStorage.setItem(key, '1');
       if (isDisabled) setHasPendingDisabledAppeal(true);
       else            setHasPendingPinRecovery(true);
     } catch {
-      setRecoverySubmitted(true); // still show success UI on network error
+      setRecoveryError('Network error. Please check your connection and try again.');
     } finally {
       setRecoveryLoading(false);
     }
@@ -404,6 +415,7 @@ export default function PinModal({
     setShowRecoveryModal(false);
     setRecoveryReason('');
     setRecoverySubmitted(false);
+    setRecoveryError('');
   };
 
   const filled    = digits.filter(Boolean).length;
@@ -560,6 +572,7 @@ export default function PinModal({
           onClose={handleCloseRecovery}
           loading={recoveryLoading}
           submitted={recoverySubmitted}
+          error={recoveryError}
           title="Contact Administrator"
           description="Explain why your account should be re-enabled. An administrator will review your appeal."
           label="Why should your account be re-enabled?"
@@ -740,6 +753,7 @@ export default function PinModal({
           onClose={handleCloseRecovery}
           loading={recoveryLoading}
           submitted={recoverySubmitted}
+          error={recoveryError}
         />
 
         {/* ── Keyframes for permanent lock screen ── */}
@@ -999,6 +1013,7 @@ export default function PinModal({
         onClose={handleCloseRecovery}
         loading={recoveryLoading}
         submitted={recoverySubmitted}
+        error={recoveryError}
       />
 
       {/* ── Keyframes ── */}

@@ -235,7 +235,7 @@ export default function TeamLeaderTable({
                       {/* Team Leader name + email */}
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ fontWeight: 600, fontSize: '0.875rem', color: dark ? '#eaf5f0' : '#111827' }}>
-                          {tl.firstName} {tl.lastName}
+                          {[tl.firstName, tl.lastName].filter(Boolean).join(' ') || tl.businessName}
                         </div>
                         <div style={{ fontSize: '0.78rem', color: dark ? '#4d8a6a' : '#9ca3af', marginTop: 2 }}>{tl.email}</div>
                       </td>
@@ -243,7 +243,7 @@ export default function TeamLeaderTable({
                       {/* Assigned Server */}
                       <td style={{ padding: '12px 16px', fontSize: '0.83rem', color: dark ? '#7ab89a' : '#4a5568' }}>
                         {client
-                          ? `${client.firstName} ${client.lastName}`
+                          ? (client.businessName || `${client.firstName} ${client.lastName}`)
                           : <span style={{ color: '#d1d5db' }}>—</span>}
                       </td>
 

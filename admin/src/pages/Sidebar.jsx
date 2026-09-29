@@ -619,10 +619,9 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
   const resolvedActivities = notifContext.activities;
   const resolvedLoading    = notifContext.loading;
 
-  const unreadCount = (resolvedAlerts || []).filter(a => a.unread).length;
+  const unreadCount = (resolvedAlerts || []).filter(notifContext.isUnread).length;
   const [mobileNotifOpen,  setMobileNotifOpen]  = useState(false);
   const [mobileActiveTab,  setMobileActiveTab]  = useState('alerts');
-  const [mobileReadIds,    setMobileReadIds]    = useState(new Set());
   const location = useLocation();
 
 
@@ -1004,7 +1003,7 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                     )}
                   </div>
                   <button
-                    onClick={() => setMobileReadIds(new Set((resolvedAlerts || []).map(a => a.id)))}
+                    onClick={() => notifContext.markRead(resolvedAlerts || [])}
                     style={{ fontSize: 11, color: notifDim, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                   >
                     Mark all read
@@ -1053,9 +1052,9 @@ export default function Sidebar({ onExport, exportLoading = false, alerts }) {
                     <div style={{ padding: '36px 0', textAlign: 'center', fontSize: 12, color: notifMuted }}>No alerts right now</div>
                   ) : (
                     (resolvedAlerts || []).map((alert, i) => {
-                      const isRead = mobileReadIds.has(alert.id) || !alert.unread;
+                      const isRead = !notifContext.isUnread(alert);
                       return (
-                        <div key={alert.id ?? i} className="mob-notif-item" style={{
+                        <div key={alert.id ?? i} className="mob-notif-item" onClick={() => !isRead && notifContext.markRead(alert)} style={{
                           display: 'flex', alignItems: 'flex-start', gap: 10,
                           padding: '11px 16px',
                           borderBottom: `0.5px solid ${notifDiv}`,

@@ -13,9 +13,9 @@
 
   // ─── CONFIG ──────────────────────────────────────────────────────
   // Palitan mo ito ng URL ng deployed proxy mo sa Render
-  const PROXY_BASE = 'https://api.hostops.online';
+  const PROXY_BASE = 'http://localhost:5000';
 
-  // Para sa local testing: 'https://api.hostops.online'
+  // Para sa local testing: 'http://localhost:5000'
 
   // ─── HELPERS ─────────────────────────────────────────────────────
   const $  = sel => document.querySelector(sel);

@@ -307,7 +307,6 @@ export default function StaffModal({ mode, staff, clients, onClose, onSaved }) {
                           width: "100%",
                           padding: "6px 10px",
                           borderRadius: 6,
-                          border: "1.5px solid #e2e8f0",
                           fontSize: "0.83rem",
                           outline: "none",
                           boxSizing: "border-box",

@@ -16,7 +16,7 @@ async function getDeviceFingerprint() {
   }
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://api.hostops.online';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // ─────────────────────────────────────────────────────────────────
 // loginUser
@@ -36,7 +36,7 @@ export async function loginUser({ email, password, deviceId }) {
     },
     body:        JSON.stringify({ email, password, deviceId }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Login failed');
   return data;
 }
@@ -45,14 +45,16 @@ export async function loginUser({ email, password, deviceId }) {
 // verifyLoginOtp
 // Returns { accessToken, user, isAdmin }
 // ─────────────────────────────────────────────────────────────────
-export async function verifyLoginOtp({ email, otp, deviceId, rememberMe }) {
+// mfaToken: the ticket /auth/login returned after the password check — the
+// backend only accepts a second factor that is bound to it.
+export async function verifyLoginOtp({ email, otp, deviceId, rememberMe, mfaToken }) {
   const res = await fetch(`${API_BASE}/auth/verify-login-otp`, {
     method:      'POST',
     credentials: 'include',
     headers:     { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY, 'X-App-Client': 'frontend' },
-    body:        JSON.stringify({ email, otp, deviceId, rememberMe }),
+    body:        JSON.stringify({ email, otp, deviceId, rememberMe, mfaToken }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(data.error || 'OTP verification failed');
     err.status = res.status;
@@ -75,7 +77,7 @@ export async function staffLogin({ email, password }) {
     headers:     { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY, 'X-App-Client': 'frontend' },
     body:        JSON.stringify({ email, password }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Staff login failed');
   return data;
 }
@@ -89,7 +91,7 @@ export async function registerUser({ firstName, lastName, email, password, smoob
     headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
     body:    JSON.stringify({ firstName, lastName, email, password, smoobuApiKey, propertyTagPrefix }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Registration failed');
   return data;
 }
@@ -103,7 +105,7 @@ export async function forgotPassword({ email }) {
     headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY },
     body:    JSON.stringify({ email }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Something went wrong');
   return data;
 }
@@ -184,7 +186,8 @@ export async function logoutUser(currentToken) {
     try { localStorage.removeItem('hostpilot_user'); } catch { /* ignore */ }
     try { sessionStorage.removeItem('hp_must_change_password'); } catch { /* ignore */ }
     try { sessionStorage.removeItem('hp_must_change_pin'); } catch { /* ignore */ }
-    try { sessionStorage.removeItem('hp_selected_property_id'); } catch { /* ignore */ }
+    safeStorage.removeItem('hp_selected_property_id');
+    safeStorage.removeItem('hp_selected_property_name');
   }
 }
 
@@ -204,7 +207,7 @@ export async function changePassword({ currentPassword, newPassword }, currentTo
     },
     body: JSON.stringify({ currentPassword, newPassword }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Password change failed');
   return data;
 }
@@ -214,14 +217,14 @@ export async function changePassword({ currentPassword, newPassword }, currentTo
 // Called after email OTP when the user has TOTP enabled.
 // Returns { accessToken, user, isAdmin } — same shape as verifyLoginOtp.
 // ─────────────────────────────────────────────────────────────────
-export async function verifyTotpLogin({ email, token }) {
+export async function verifyTotpLogin({ email, token, mfaToken }) {
   const res = await fetch(`${API_BASE}/auth/totp/verify`, {
     method:      'POST',
     credentials: 'include',
     headers:     { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_API_KEY, 'X-App-Client': 'frontend' },
-    body:        JSON.stringify({ email, token }),
+    body:        JSON.stringify({ email, token, mfaToken }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(data.error || 'Invalid authenticator code');
     err.status = res.status;
@@ -248,7 +251,7 @@ export async function changePin({ currentPin, newPin }, currentToken) {
     },
     body: JSON.stringify({ currentPin, newPin }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'PIN change failed');
   return data;
 }

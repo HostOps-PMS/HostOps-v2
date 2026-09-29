@@ -143,8 +143,6 @@ return (
                 onClick={() => setActiveTab(tab.label)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 7,
-                  padding: '8px 16px 9px', border: '1px solid',
-                  display: 'inline-flex', alignItems: 'center', gap: 7,
                   padding: '9px 18px 10px',
                   border: '1px solid',
                   borderColor: isActive ? (dark ? '#1e3a2a' : '#e8ecf0') : 'transparent',

@@ -9,10 +9,12 @@ import { fetchMessages, sendReply } from "../services/dashboardService";
 import { timeAgo, fmtDate } from "../../utils/dateHelpers";
 import { useActivityLog } from "../hooks/useActivityLog";
 
+// Guest messages are attacker-controlled HTML. DOMParser builds an inert
+// document: unlike a detached <div>.innerHTML it never loads <img> or runs
+// onerror handlers.
 function stripHtml(html) {
-  const div = document.createElement("div");
-  div.innerHTML = html;
-  return (div.textContent || div.innerText || "").trim();
+  const doc = new DOMParser().parseFromString(String(html ?? ""), "text/html");
+  return (doc.body.textContent || "").trim();
 }
 
 const CHANNEL_META = {
@@ -277,7 +279,7 @@ export default function InboxPage() {
     setSending(true);
     try {
       const res = await sendReply({ reservationId: selected.reservationId, subject: "Re: Your message", messageBody: msg }, auth);
-      if (!res?.ok) throw new Error("Send failed");
+      if (!res?.ok) throw new Error((await res?.json().catch(() => null))?.error || "Send failed");
       setReplyText("");
       logActivity('sent_message', { guest: selected.guestName, property: selected.property, channel: selected.channel || 'Direct' });
       setTimeout(() => {

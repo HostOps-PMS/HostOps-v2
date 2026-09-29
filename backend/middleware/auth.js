@@ -6,6 +6,10 @@ import Staff        from '../models/staff.js';
 import RevokedToken from '../models/revokedToken.js';
 import RefreshToken from '../models/refreshToken.js';
 
+// A staff token issued by /auth/login before the PIN is verified may only
+// reach the PIN step (property picker + PIN check). Everything else needs the
+// full token that /auth/verify-pin returns.
+const PIN_PENDING_ALLOWED = new Set(['/auth/my-properties', '/auth/verify-pin', '/auth/me']);
 
 export async function requireAuth(req, res, next) {
   try {
@@ -28,6 +32,16 @@ export async function requireAuth(req, res, next) {
     const isRevoked = await RevokedToken.exists({ jti: decoded.jti });
     if (isRevoked) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // ── 5b. PIN-pending staff token → PIN step only ─────────────
+    // 403 (not 401) so clients don't try a silent refresh on it.
+    if (decoded.pinPending) {
+      const path = req.originalUrl.split('?')[0].replace(/\/+$/, '');
+      if (!PIN_PENDING_ALLOWED.has(path)) {
+        return res.status(403).json({ error: 'PIN verification required', code: 'PIN_REQUIRED' });
+      }
+      req.pinPending = true;
     }
 
     // ── 5a. Session fingerprint check ────────────────────────────

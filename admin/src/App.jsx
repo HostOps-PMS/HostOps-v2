@@ -27,8 +27,9 @@ const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'https://go.hostops.on
 
 // ── Consume _t / _u URL params injected by the frontend login app ──────────
 (function consumeLoginParams() {
-  const rawParams = window.location.hash ? window.location.hash.substring(1) : window.location.search;
-  const params = new URLSearchParams(rawParams);
+  // Fragment only (the frontend sends #_t=…): a fragment never reaches servers,
+  // logs or Referer headers, unlike a ?query string.
+  const params = new URLSearchParams(window.location.hash.substring(1));
   const token   = params.get('_t');
   const userRaw = params.get('_u');
   const rmRaw   = params.get('_rm');
@@ -47,8 +48,12 @@ const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'https://go.hostops.on
   if (token || userRaw) {
     window.history.replaceState({}, '', window.location.pathname);
     // ── Clear any previous authorization so the OTP gate always fires
-    // for a fresh login, even if the user had already passed it before.
+    // for a fresh login, even if the user had already passed it before…
     sessionStorage.removeItem('hp_authorized');
+    // …unless the login app just completed OTP/TOTP (_2fa=1). The backend only
+    // issues an admin token after a second factor (or on a trusted device), so
+    // asking for a second code here would be redundant.
+    if (token && params.get('_2fa') === '1') sessionStorage.setItem('hp_authorized', '1');
   }
 
   if (userRaw) {
@@ -76,7 +81,9 @@ function PrivateRoute({ children }) {
     if (user.role === 'team_leader') {
       return <Navigate to="/team-leader/staffs" replace />;
     }
-    if (user.role === 'client') {
+    // Admin pages are admin-only: client, staff, clientAccount and any other
+    // role go back to the client app instead of seeing the admin shell.
+    if (user.role && user.role !== 'admin') {
       window.location.href = `${FRONTEND_URL}/dashboard`;
       return null;
     }
@@ -300,15 +307,6 @@ export default function App() {
           <Route path="staffs" element={<TeamLeaderStaffs />} />
           <Route index element={<Navigate to="staffs" replace />} />
         </Route>
-
-        <Route
-          path="/team-leaders"
-          element={
-            <PrivateRoute>
-              <TeamLeaders />
-            </PrivateRoute>
-          }
-        />
 
         {/* Only render the wildcard after the initial route resolution settles,
             so it doesn't fire before real routes have had a chance to match.

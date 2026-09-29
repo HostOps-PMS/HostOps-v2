@@ -1,6 +1,6 @@
-import { fetchWithAuth, uploadHeaders } from '../../../lib/authUtils';
+import { fetchWithAuth } from '../../../lib/authUtils';
 
-const BASE = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'https://api.hostops.online';
+const BASE = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:5000';
 
 async function request(path, options = {}) {
   const res = await fetchWithAuth(`${BASE}${path}`, options);
@@ -181,10 +181,10 @@ export async function uploadPropertyPicture(clientId, propertyId, file, cropData
   if (file) formData.append('picture', file);
   if (cropData) formData.append('cropData', JSON.stringify(cropData));
 
-  // Use raw fetch since we need to send FormData and NOT set Content-Type to application/json
-  const res = await fetch(`${BASE}/api/clients/${clientId}/properties/${propertyId}/picture`, {
+  // fetchWithAuth sends FormData without a JSON Content-Type (browser sets the
+  // multipart boundary) and adds token refresh + response decryption.
+  const res = await fetchWithAuth(`${BASE}/api/clients/${clientId}/properties/${propertyId}/picture`, {
     method: 'POST',
-    headers: uploadHeaders(),
     body: formData,
   });
 

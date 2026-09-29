@@ -150,8 +150,14 @@ function PropertiesPanel({ properties: rawProperties, loading, error, onViewSmoo
   );
 }
 
-export default function ClientModal({ client, onClose, onUpdated }) {
-  if (!client) return null;
+// Guard lives in a wrapper so every hook in ClientModalContent runs
+// unconditionally (Rules of Hooks).
+export default function ClientModal(props) {
+  if (!props.client) return null;
+  return <ClientModalContent {...props} />;
+}
+
+function ClientModalContent({ client, onClose, onUpdated }) {
 
   const [isEditing,        setIsEditing]        = useState(false);
   const [smoobuProperty,   setSmoobuProperty]   = useState(null);

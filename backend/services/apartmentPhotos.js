@@ -16,12 +16,15 @@ import ApartmentPhoto from '../models/apartmentPhoto.js';
 /**
  * Get stored photos for a single apartment.
  * @param {string|number} apartmentId
+ * @param {{ clientId?: string|null }} [opts] — only return photos stored for this client
  * @returns {Promise<Array<{ id: string|null, url: string }>>}
  */
-export async function getStoredApartmentImages(apartmentId) {
+export async function getStoredApartmentImages(apartmentId, { clientId = null } = {}) {
   if (apartmentId === null || apartmentId === undefined || apartmentId === '') return [];
   try {
-    const doc = await ApartmentPhoto.findOne({ apartmentId: String(apartmentId) }).lean();
+    const filter = { apartmentId: String(apartmentId) };
+    if (clientId) filter.clientId = clientId;
+    const doc = await ApartmentPhoto.findOne(filter).lean();
     if (!doc || !Array.isArray(doc.images)) return [];
     return doc.images
       .filter((im) => im && im.url)
@@ -35,14 +38,17 @@ export async function getStoredApartmentImages(apartmentId) {
 /**
  * Bulk variant — one query for many apartment ids.
  * @param {Array<string|number>} apartmentIds
+ * @param {{ clientId?: string|null }} [opts] — only return photos stored for this client
  * @returns {Promise<Map<string, Array<{ id: string|null, url: string }>>>}
  */
-export async function getStoredApartmentImagesBulk(apartmentIds = []) {
+export async function getStoredApartmentImagesBulk(apartmentIds = [], { clientId = null } = {}) {
   const out = new Map();
   const ids = [...new Set(apartmentIds.filter((x) => x !== null && x !== undefined && x !== '').map(String))];
   if (ids.length === 0) return out;
   try {
-    const docs = await ApartmentPhoto.find({ apartmentId: { $in: ids } }).lean();
+    const filter = { apartmentId: { $in: ids } };
+    if (clientId) filter.clientId = clientId;
+    const docs = await ApartmentPhoto.find(filter).lean();
     docs.forEach((doc) => {
       const imgs = Array.isArray(doc.images)
         ? doc.images.filter((im) => im && im.url).map((im) => ({ id: im.publicId || null, url: im.url }))

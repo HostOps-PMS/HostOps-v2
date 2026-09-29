@@ -11,11 +11,11 @@ export default defineConfig(({ mode }) => ({
 
     proxy: {
       '/api': {
-        target: 'https://api.hostops.online',
+        target: 'http://localhost:5000',
         changeOrigin: true,
       },
       '/auth': {
-        target: 'https://api.hostops.online',
+        target: 'http://localhost:5000',
         changeOrigin: true,
       },
     },

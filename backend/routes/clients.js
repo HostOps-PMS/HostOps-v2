@@ -41,6 +41,15 @@ const upload = multer({
 
 const router = express.Router();
 
+// 24-hex ObjectId, or '' to clear. Rejecting malformed ids in the schema
+// returns a clean 400 instead of a Mongoose CastError → 500.
+const objectIdOrEmpty = z.string().trim().regex(/^([a-f0-9]{24})?$/i, 'Invalid id');
+
+// Client reads (.lean() skips toJSON): never send credentials — not even
+// encrypted — the Main Admin tag, or the embedded login/IP history.
+const CLIENT_SAFE_FIELDS = '-password -verifyToken -verifyTokenExpiry -resetToken -resetTokenExpiry -__v '
+  + '-tag -activityLog -properties.smoobuApiKey -properties.smoobuApiSecret';
+
 // All routes require authentication
 router.use(requireAuth);
 
@@ -59,7 +68,7 @@ router.get('/clients', requireAdminOrTeamLeader, async (req, res, next) => {
       : { isArchive: showArchived ? true : { $ne: true } };
 
     const clients = await User.find(filter)
-      .select('-password -verifyToken -verifyTokenExpiry -resetToken -resetTokenExpiry -__v')
+      .select(CLIENT_SAFE_FIELDS)
       .sort({ createdAt: -1 })
       .lean();
 
@@ -76,7 +85,7 @@ router.get('/clients', requireAdminOrTeamLeader, async (req, res, next) => {
 router.get('/clients/:id', requireAdmin, validateObjectId('id'), logSuspiciousAccess, async (req, res, next) => {
   try {
     const client = await User.findById(req.params.id)
-      .select('-password -verifyToken -verifyTokenExpiry -resetToken -resetTokenExpiry -__v')
+      .select(CLIENT_SAFE_FIELDS)
       .lean();
 
     if (!client) {
@@ -217,10 +226,20 @@ router.get('/clients/:id/properties', requireAdmin, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 // GET /api/clients/:id/properties/:propertyId/apikey
 // Admin fetches the unmasked API key for a property.
-// Should be protected by frontend OTP verification.
+// Step-up enforced here, not just in the UI: the admin must have passed an
+// OTP/TOTP check (verify-login-otp / totp/verify set lastMfaAt) in the last
+// few minutes — a stolen access token alone can't read client credentials.
 // ─────────────────────────────────────────────────────────────────
+const STEP_UP_WINDOW_MS = 5 * 60 * 1000;
+
 router.get('/clients/:id/properties/:propertyId/apikey', requireAdmin, async (req, res, next) => {
   try {
+    const lastMfaAt = req.user.lastMfaAt ? new Date(req.user.lastMfaAt).getTime() : 0;
+    if (Date.now() - lastMfaAt > STEP_UP_WINDOW_MS) {
+      return res.status(403).json({ error: 'Please verify with a one-time code first.', code: 'STEP_UP_REQUIRED' });
+    }
+    console.warn('[apikey-reveal]', { admin: req.user.email, clientId: req.params.id, propertyId: req.params.propertyId });
+
     const userDoc = await User.findById(req.params.id).select('+properties.smoobuApiKey +properties.smoobuApiSecret');
     if (!userDoc) {
       return res.status(404).json({ error: 'Client not found' });
@@ -473,13 +492,15 @@ router.post('/clients/:id/properties/:propertyId/sync', requireAdmin, async (req
       ? smoobuData
       : (smoobuData.apartments ?? []);
 
-    const synced = apartments.map((apt) => ({
-      smoobuId:     apt.id,
-      name:         apt.name ?? apt.title ?? `Room ${apt.id}`,
-      type:         apt.type ?? '',
-      smoobuData:   apt,
-      lastSyncedAt: new Date(),
-    }));
+    // Smoobu sometimes returns `type` as an object ({ id, name }).
+    const synced = apartments
+      .filter((apt) => apt && apt.id !== undefined && apt.id !== null)
+      .map((apt) => ({
+        smoobuId:     String(apt.id),
+        name:         String(apt.name ?? apt.title ?? `Room ${apt.id}`),
+        type:         typeof apt.type === 'string' ? apt.type : String(apt.type?.name ?? ''),
+        lastSyncedAt: new Date(),
+      }));
 
     property.subProperties = synced;
     property.lastSyncedAt  = new Date();
@@ -488,7 +509,7 @@ router.post('/clients/:id/properties/:propertyId/sync', requireAdmin, async (req
     res.json({
       message:  `Synced ${synced.length} sub-properties from Smoobu.`,
       count:    synced.length,
-      subProperties: synced.map(({ smoobuData: _sd, ...rest }) => rest),
+      subProperties: synced,
     });
   } catch (err) {
     if (err.name === 'CastError') {
@@ -533,15 +554,18 @@ router.delete('/clients/:id/properties/:propertyId', requireAdmin, async (req, r
 // ─────────────────────────────────────────────────────────────────
 const createClientSchema = z.object({
   businessName:      z.string().min(1).max(150).trim(),
+  firstName:         z.string().max(50).trim().optional().default(''),
+  lastName:          z.string().max(50).trim().optional().default(''),
   email:             z.string().email().max(254),
   password:          z.string().min(8).max(128),
   pin:               z.string().length(6, "PIN must be exactly 6 digits").regex(/^\d+$/, "PIN must contain only numbers"),
   role:              z.enum(['client', 'admin', 'team_leader']).optional().default('client'),
   propertyTagPrefix: z.string().max(100).trim().optional().default(''),
-  serverId:          z.string().optional(),
+  serverId:          objectIdOrEmpty.optional(),
   properties: z.array(z.object({
-    propertyName: z.string().min(1).max(150).trim(),
-    smoobuApiKey: z.string().max(512).optional().default(''),
+    propertyName:    z.string().min(1).max(150).trim(),
+    smoobuApiKey:    z.string().max(512).optional().default(''),
+    smoobuApiSecret: z.string().max(512).optional().default(''),
   })).optional().default([]),
 });
 
@@ -580,6 +604,8 @@ router.post('/clients', requireAdmin, async (req, res, next) => {
 
     const user = await User.create({
       businessName:       data.businessName,
+      firstName:          data.firstName,
+      lastName:           data.lastName,
       email:              data.email.toLowerCase(),
       password:           data.password,
       pin:                data.pin,
@@ -591,8 +617,9 @@ router.post('/clients', requireAdmin, async (req, res, next) => {
       mustChangePassword: true,
       mustChangePin:      true,
       properties:         data.properties.map((p) => ({
-        propertyName: p.propertyName,
-        smoobuApiKey: p.smoobuApiKey.trim() || '',
+        propertyName:    p.propertyName,
+        smoobuApiKey:    p.smoobuApiKey.trim() || '',
+        smoobuApiSecret: p.smoobuApiSecret.trim() || '',
       })),
     });
 
@@ -623,6 +650,9 @@ router.post('/clients', requireAdmin, async (req, res, next) => {
     if (err.name === 'ZodError') {
       return res.status(400).json({ error: 'Validation failed', details: err.errors });
     }
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
     next(err);
   }
 });
@@ -633,7 +663,9 @@ router.post('/clients', requireAdmin, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 const updateClientSchema = z.object({
   businessName:      z.string().min(1).max(150).trim().optional(),
-  serverId:          z.string().optional(),
+  firstName:         z.string().max(50).trim().optional(),
+  lastName:          z.string().max(50).trim().optional(),
+  serverId:          objectIdOrEmpty.optional(),
   role:              z.enum(['client', 'admin', 'team_leader']).optional(),
   propertyTagPrefix: z.string().max(100).trim().optional(),
   password:          z.string().min(8).max(128).optional(),
@@ -666,7 +698,9 @@ router.patch('/clients/:id', requireAdmin, async (req, res, next) => {
     // them as modified — critical for the pre-save bcrypt hooks to fire
     // correctly for password and pin.
     if (data.businessName      !== undefined) client.businessName      = data.businessName;
-    if (data.serverId          !== undefined) client.serverId          = data.serverId || null;
+    if (data.firstName         !== undefined) client.firstName         = data.firstName;
+    if (data.lastName          !== undefined) client.lastName          = data.lastName;
+    if (data.serverId         !== undefined) client.serverId          = data.serverId || null;
     if (data.role              !== undefined) client.role              = callerIsMainAdmin ? data.role : 'client';
     if (data.propertyTagPrefix !== undefined) client.propertyTagPrefix = data.propertyTagPrefix;
     if (data.password          !== undefined) {
@@ -738,10 +772,16 @@ router.patch('/clients/:id/unarchive', requireAdmin, async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────
 router.delete('/clients/:id', requireAdmin, async (req, res, next) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
-    if (!user) {
+    const target = await User.findById(req.params.id).select('tag');
+    if (!target) {
       return res.status(404).json({ error: 'Client not found' });
     }
+    // Deleting the Main Admin (or yourself) would lock everyone out of the
+    // admin panel with no way back short of a database seed.
+    if (target.tag === 'Main Admin' || String(target._id) === String(req.user._id)) {
+      return res.status(403).json({ error: 'The Main Admin account cannot be deleted.' });
+    }
+    await User.findByIdAndDelete(req.params.id);
     res.json({ message: 'User deleted successfully' });
   } catch (err) {
     if (err.name === 'CastError') {

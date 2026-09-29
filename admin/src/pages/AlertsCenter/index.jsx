@@ -45,7 +45,7 @@ function timeAgo(iso) {
 }
 
 function SeverityIcon({ severity }) {
-  const s = { width: 14, height: 14, flexShrink: 0 };
+  const s = { width: 14, height: 14, style: { flexShrink: 0 } };
   if (severity === 'critical') return (
     <svg {...s} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
       <circle cx="10" cy="10" r="8"/><path d="M10 6v5M10 13.5v.5" strokeLinecap="round"/>
@@ -148,7 +148,12 @@ export default function AlertsCenter() {
     setExportLoading(true);
     const rows = [['Severity','Title','Message','Source','Time','Status'],
       ...filtered.map(a => [a.severity, a.title, a.message, a.source, new Date(a.time).toLocaleString(), a.status])];
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    // Leading = + - @ would run as a spreadsheet formula; prefix a quote.
+    const cell = (c) => {
+      const s = String(c);
+      return `"${(/^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`;
+    };
+    const csv = rows.map(r => r.map(cell).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
     const link = document.createElement('a');

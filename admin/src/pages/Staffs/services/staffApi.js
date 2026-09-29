@@ -1,6 +1,6 @@
 import { fetchWithAuth } from '../../../lib/authUtils';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'https://api.hostops.online';
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:5000';
 
 export function apiFetch(path, opts = {}) {
   return fetchWithAuth(`${API_BASE}${path}`, opts);
@@ -13,49 +13,49 @@ export async function fetchStaffs(filterClient, { archived = false } = {}) {
   const query = params.toString();
   const url = `/api/staffs${query ? `?${query}` : ''}`;
   const res = await apiFetch(url);
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Failed to load staffs.');
   return data;
 }
 
 export async function archiveStaff(id) {
   const res = await apiFetch(`/api/staffs/${id}/archive`, { method: 'PATCH' });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Failed to archive staff.');
   return data;
 }
 
 export async function unarchiveStaff(id) {
   const res = await apiFetch(`/api/staffs/${id}/unarchive`, { method: 'PATCH' });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Failed to unarchive staff.');
   return data;
 }
 
 export async function fetchClients() {
   const res = await apiFetch('/api/clients');
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Failed to load clients.');
   return data;
 }
 
 export async function fetchClientProperties(clientId) {
   const res = await apiFetch(`/api/clients/${clientId}/staff-properties`);
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error('Failed to load properties.');
   return data;
 }
 
 export async function createStaff(body) {
   const res = await apiFetch('/api/staffs', { method: 'POST', body: JSON.stringify(body) });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Something went wrong.');
   return data;
 }
 
 export async function updateStaff(id, body) {
   const res = await apiFetch(`/api/staffs/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Something went wrong.');
   return data;
 }
@@ -63,7 +63,7 @@ export async function updateStaff(id, body) {
 export async function deleteStaff(id) {
   const res = await apiFetch(`/api/staffs/${id}`, { method: 'DELETE' });
   if (!res.ok) {
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     throw new Error(data.error || 'Failed to delete.');
   }
 }

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../AuthContext";
 import { useActivityLog } from "../hooks/useActivityLog";
 import { useDashboard } from "../context/DashboardContext";
-const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "https://api.hostops.online";
+const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 
 function getEmailFromToken(token) {
   try {
@@ -124,8 +124,14 @@ async function verifyTotpSetup(auth, token6, deviceName) {
   return data;
 }
 
-async function disableTotp(auth) {
-  const res = await auth.fetchWithAuth(`${API_BASE}/auth/totp/disable`, { method: "POST" });
+// The backend requires a current authenticator (or backup) code for 2FA
+// changes, so a stolen session alone can't switch 2FA off.
+function askSecondFactorCode() {
+  return window.prompt("Enter the 6-digit code from your authenticator app (or a backup code) to confirm.")?.trim() || null;
+}
+
+async function disableTotp(auth, code) {
+  const res = await auth.fetchWithAuth(`${API_BASE}/auth/totp/disable`, { method: "POST", body: JSON.stringify({ code }) });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Failed to disable.");
   return data;
@@ -137,8 +143,8 @@ async function fetchBackupCodesCount(auth) {
   return data;
 }
 
-async function generateBackupCodesApi(auth) {
-  const res = await auth.fetchWithAuth(`${API_BASE}/auth/backup-codes/generate`, { method: 'POST' });
+async function generateBackupCodesApi(auth, code) {
+  const res = await auth.fetchWithAuth(`${API_BASE}/auth/backup-codes/generate`, { method: 'POST', body: JSON.stringify({ code }) });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Failed to generate codes');
   return data.codes || [];
@@ -644,11 +650,15 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
   }, [isOpen, totpEnabled, bcCodes]);
 
   async function handleGenerateBackupCodes() {
+    const code = askSecondFactorCode();
+    if (!code) return;
     setBcLoading(true);
     try {
-      const codes = await generateBackupCodesApi(auth);
+      const codes = await generateBackupCodesApi(auth, code);
       setBcCodes(codes);
-    } catch {} finally { setBcLoading(false); }
+    } catch (err) {
+      setTotpMsg({ text: err.message, type: 'error' });
+    } finally { setBcLoading(false); }
   }
 
   // ── Activity log ─────────────────────────────────────────────────
@@ -1282,7 +1292,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
 
           {/* ── Tabs ── */}
           <div style={{ display: "flex", borderBottom: `1px solid ${dark ? "#1e3a2a" : "#eaf3ee"}`, padding: "0 20px" }}>
-            {["profile", ...(isStaffUser ? [] : ["password"]), "pin", "security", "activity"].map((tab) => (
+            {["profile", ...(isStaffUser ? [] : ["password"]), "pin", ...(isStaffUser ? [] : ["security"]), "activity"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => {
@@ -1366,7 +1376,8 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                       {user?.firstName || ''} {user?.lastName || ''}
                     </div>
                     <div style={{ fontSize: 11, color: dark ? '#4d8a6a' : '#9ab8a9', marginTop: 1 }}>{user?.email || ''}</div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                    {/* Staff sessions act on the owner's account — the backend refuses these (403). */}
+                    {!isStaffUser && <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                       <button onClick={() => imgInputRef.current?.click()} disabled={imgUploading} style={{
                         padding: '4px 10px', borderRadius: 6, border: `1px solid ${dark ? '#1e3a2a' : '#d4e8dd'}`,
                         background: dark ? '#0d2619' : '#fff', color: dark ? '#7ab89a' : '#374151',
@@ -1393,7 +1404,7 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                           fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
                         }}>Remove</button>
                       )}
-                    </div>
+                    </div>}
                   </div>
                 </div>
                 <style>{`@keyframes acm-spin { to { transform: rotate(360deg); } }`}</style>
@@ -1846,10 +1857,12 @@ export default function AccountSettingsModal({ isOpen, onClose, onPropertySwitch
                       <button
                         disabled={totpLoading}
                         onClick={async () => {
+                          const code = askSecondFactorCode();
+                          if (!code) return;
                           setTotpLoading(true);
                           setTotpMsg(null);
                           try {
-                            await disableTotp(auth);
+                            await disableTotp(auth, code);
                             const u = { ...user, totpEnabled: false };
                             setUser(u);
                             setTotpEnabled(false);

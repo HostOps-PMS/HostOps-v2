@@ -19,7 +19,6 @@ import { publicRecoveryRouter, adminRecoveryRouter } from './routes/recoveryRequ
 import outlookInboxRouter from './routes/outlookInbox.js';
 import { requireApiKey } from './middleware/apiKeyAuth.js';
 import { encryptApiResponse } from './middleware/encryptResponse.js';
-import keyDiagnosticRoute from './routes/keyDiagnosticRoute.js';
 import smoobuApartmentsRoute   from './routes/smoobuApartments.js';
 import activityLogRoute        from './routes/activityLog.js';
 import imageProxyRoute         from './routes/imageProxy.js';
@@ -73,7 +72,7 @@ const IMAGE_PROXY_ORIGINS = process.env.ALLOWED_ORIGINS
       'https://go.hostops.online',
       'https://hostops-frontend.onrender.com',
       'https://hostops-v2-admin.onrender.com',
-      'https://api.hostops.online',
+      'http://localhost:5000',
     ];
 
 app.use(
@@ -99,8 +98,8 @@ app.use(
           CLOUDINARY_HOSTNAME,
           'https://*.tile.openstreetmap.org',
           'https://tile.openstreetmap.org',
-          'https://api.hostops.online',
-          'https://api.hostops.online',
+          'http://localhost:5000',
+          'http://localhost:5000',
         ],
         fontSrc:    ["'self'"],
         objectSrc:  ["'none'"],
@@ -139,7 +138,7 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
       'https://go.hostops.online',
       'https://hostops-frontend.onrender.com',
       'https://hostops-v2-admin.onrender.com',
-      'https://api.hostops.online',
+      'http://localhost:5000',
     ];
 
 app.use(
@@ -197,6 +196,9 @@ const logHit = (req, res, options) => {
   res.status(429).json(options.message);
 };
 
+// Per-account limiter key. String() so an array/object email can't throw.
+const emailKey = (req) => String(req.body?.email ?? '').trim().toLowerCase() || req.ip;
+
 const globalLimiter = rateLimit({
   windowMs:         1 * 60 * 1000,
   max:              30,
@@ -223,7 +225,7 @@ const authLimiterByAccount = rateLimit({
   max:             5,
   standardHeaders: true,
   legacyHeaders:   false,
-  keyGenerator: (req) => req.body?.email?.toLowerCase() || req.ip,
+  keyGenerator: emailKey,
   skipSuccessfulRequests: true,
   handler: (req, res) => logHit(req, res, {
     name: 'auth-by-account',
@@ -236,7 +238,7 @@ const otpLimiter = rateLimit({
   max:             5,
   standardHeaders: true,
   legacyHeaders:   false,
-  keyGenerator: (req) => req.body?.email?.toLowerCase() || req.ip,
+  keyGenerator: emailKey,
   skipSuccessfulRequests: true,
   handler: (req, res) => logHit(req, res, {
     name: 'otp-verification',
@@ -244,18 +246,52 @@ const otpLimiter = rateLimit({
   }),
 });
 
+// Endpoints that send an email (or queue an admin task) answer 200 whether or
+// not the account exists, so skipSuccessfulRequests would never count them.
+// This one counts every request: stops email-bombing a user and flooding the
+// admin recovery queue.
+const emailSendLimiter = rateLimit({
+  windowMs:        15 * 60 * 1000,
+  max:             10, // admin OTP prompts (key reveal, etc.) also send codes
+  standardHeaders: true,
+  legacyHeaders:   false,
+  keyGenerator:    emailKey,
+  handler: (req, res) => logHit(req, res, {
+    name: 'email-send',
+    message: { error: 'Too many requests for this email, please try again later.' },
+  }),
+});
+
+// New accounts per IP — successful sign-ups count too.
+const registerLimiter = rateLimit({
+  windowMs:        60 * 60 * 1000,
+  max:             5,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  handler: (req, res) => logHit(req, res, {
+    name: 'register',
+    message: { error: 'Too many sign-ups from this network, please try again later.' },
+  }),
+});
+
 app.use(globalLimiter);
 app.use('/auth/login',            authLimiterByIp, authLimiterByAccount);
 app.use('/auth/staff-login',      authLimiterByIp, authLimiterByAccount);
-app.use('/auth/register',         authLimiterByIp);
-app.use('/auth/forgot-password',  authLimiterByIp, authLimiterByAccount);
+app.use('/auth/register',         authLimiterByIp, registerLimiter);
+app.use('/auth/forgot-password',  authLimiterByIp, authLimiterByAccount, emailSendLimiter);
 app.use('/auth/reset-password',   authLimiterByIp, authLimiterByAccount);
-app.use('/auth/send-login-otp',   authLimiterByIp, authLimiterByAccount);
-app.use('/auth/resend-login-otp', authLimiterByIp, authLimiterByAccount);
+app.use('/auth/send-login-otp',   authLimiterByIp, authLimiterByAccount, emailSendLimiter);
+app.use('/auth/resend-login-otp', authLimiterByIp, authLimiterByAccount, emailSendLimiter);
 app.use('/auth/verify-login-otp',   otpLimiter);
 app.use('/auth/verify',             otpLimiter);
 app.use('/auth/totp/verify',        otpLimiter);
-app.use('/auth/resend-verification', authLimiterByIp, authLimiterByAccount);
+app.use('/auth/resend-verification', authLimiterByIp, authLimiterByAccount, emailSendLimiter);
+app.use('/auth/resend-reset',       authLimiterByIp, authLimiterByAccount, emailSendLimiter);
+app.use('/auth/recovery-request',   authLimiterByIp, emailSendLimiter);
+// Code/PIN checks. '/auth/verify' above does NOT cover these (Express matches
+// whole path segments), so each needs its own limiter.
+app.use('/auth/verify-reset-token', authLimiterByIp, otpLimiter);
+app.use('/auth/verify-pin',         authLimiterByIp, otpLimiter);
 
 // ── Global API Key Protection ─────────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -265,7 +301,9 @@ app.use((req, res, next) => {
   // Authorization headers. Security is enforced inside the route itself
   // (valid MongoDB ObjectIds + DB ownership check + Cloudinary-only whitelist).
   const isImageProxy    = req.path.startsWith('/api/image/');
-  const isWebhook       = req.path === '/api/smoobu-webhook';
+  // Webhooks authenticate themselves (Smoobu: optional SMOOBU_WEBHOOK_SECRET,
+  // inbox: INBOX_WEBHOOK_SECRET); the API key ships in the frontend bundle.
+  const isWebhook       = req.path === '/api/smoobu-webhook' || req.path === '/api/inbox/webhook';
   // GHL proxy endpoints are public (used by the landing page, no API key)
   const isGhlProxy      = req.path.startsWith('/api/ghl');
 
@@ -282,6 +320,11 @@ app.use('/auth', authRoutes);
 app.use('/auth', publicRecoveryRouter);
 app.use('/api',  imageProxyRoute);       // No API-key required — see middleware above
 app.use('/api/ghl', ghlProxyRoute);      // Public landing page → GHL proxy (rate-limited)
+// Public webhooks must be mounted BEFORE any router that applies
+// router.use(requireAuth) at the /api level (dashboard, clients, staffs),
+// otherwise those routers answer 401 before the webhook is reached.
+app.use('/api', smoobuWebhookRoute);     // Smoobu → no auth (idempotent, see route)
+app.use('/api',  outlookInboxRouter);    // /inbox/webhook uses its shared secret; other routes are admin-guarded
 app.use('/api',  dashboardRoutes);
 app.use('/api',  clientsRoutes);
 app.use('/api',  activityLogRoute);
@@ -291,9 +334,6 @@ app.use('/api',  accountsRoutes);
 app.use('/api/accounts', smoobuApartmentsRoute);
 app.use('/api',  dashboardOverviewRoute);
 app.use('/api',  adminRecoveryRouter);
-app.use('/api',  outlookInboxRouter);
-app.use('/api', keyDiagnosticRoute);
-app.use('/api', smoobuWebhookRoute);
 app.use('/api', announcementsRoute);
 
 app.use('/internal/ops', requireAuth, requireAdmin, opsRoutes);
@@ -301,6 +341,12 @@ app.use('/internal/ops', requireAuth, requireAdmin, opsRoutes);
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// TEMPORARY (remove once 'trust proxy' is set): shows how many proxies sit in
+// front of the app. Only echoes the caller's own IP chain back to them.
+app.get('/health/ip', (req, res) => {
+  res.json({ ip: req.ip, ips: req.ips, xForwardedFor: req.get('x-forwarded-for') || null, cfConnectingIp: req.get('cf-connecting-ip') || null });
 });
 
 // ── 404 Handler ───────────────────────────────────────────────────────────────

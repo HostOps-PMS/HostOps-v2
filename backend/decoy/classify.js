@@ -33,18 +33,23 @@ export function classify(req) {
   let classification = 'human';
   const tags = [];
 
+  // Only request DATA is pattern-matched. Standard browser headers tripped the
+  // payload patterns on every real login (UA "; Win64;" → cmd-injection,
+  // sec-ch-ua '";' → sqli, origin/referer URLs → ssrf); the UA is still checked
+  // against the scanner list below. The password is excluded as well: it is only
+  // ever hashed, and strong passwords routinely contain && ' -- or $or.
+  const dataBody = req.body && typeof req.body === 'object' ? { ...req.body, password: undefined } : req.body;
   const inspectObject = {
-    body: req.body,
+    body: dataBody,
     query: req.query,
     params: req.params,
     url: req.originalUrl || req.url,
-    headers: { ...req.headers, cookie: undefined, authorization: undefined }
   };
   const bodyStr = JSON.stringify(inspectObject);
-  
+
   const nonEmailInspectObject = {
     ...inspectObject,
-    body: typeof req.body === 'object' ? { ...req.body, email: undefined } : req.body
+    body: dataBody && typeof dataBody === 'object' ? { ...dataBody, email: undefined } : dataBody
   };
   const nonEmailBodyStr = JSON.stringify(nonEmailInspectObject);
   const emailStr = (req.body && req.body.email) ? String(req.body.email) : '';

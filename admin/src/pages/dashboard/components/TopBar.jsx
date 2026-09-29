@@ -35,7 +35,7 @@ function getInitialsAvatar(name) {
 }
 
 const TypeIcon = ({ type, size = 15 }) => {
-  const s = { width: size, height: size, flexShrink: 0 };
+  const s = { width: size, height: size, style: { flexShrink: 0 } };
   const sw = '1.9';
   switch (type) {
     case 'booking':
@@ -158,15 +158,12 @@ const SunIcon = () => (
 // ─────────────────────────────────────────────────────────────────
 function NotificationDropdown({ alerts = [], activities = [], loading, onClose }) {
   const [activeTab, setActiveTab] = useState('alerts');
-  const [readIds,   setReadIds]   = useState(new Set());
+  const { isUnread, markRead } = useNotifications();
   const { dark } = useTheme();
   const navigate = useNavigate();
 
-  const unreadAlerts = (alerts || []).filter(a => a.unread && !readIds.has(a.id)).length;
-
-  const markAllRead = () => {
-    setReadIds(prev => new Set([...prev, ...(alerts || []).map(a => a.id)]));
-  };
+  const unreadAlerts = (alerts || []).filter(isUnread).length;
+  const markAllRead = () => markRead(alerts || []);
 
   const items = activeTab === 'alerts' ? (alerts || []) : (activities || []);
 
@@ -304,16 +301,17 @@ function NotificationDropdown({ alerts = [], activities = [], loading, onClose }
         ) : activeTab === 'alerts' ? (
           (alerts || []).map((alert, i) => {
             const typeStyle = getAlertStyle(alert.type, dark);
-            const isRead    = readIds.has(alert.id) || !alert.unread;
+            const isRead    = !isUnread(alert);
             return (
               <div
                 key={alert.id ?? i}
                 className="notif-item"
+                onClick={() => !isRead && markRead(alert)}
                 style={{
                   display: 'flex', alignItems: 'flex-start', gap: 10,
                   padding: '11px 16px',
                   borderBottom: `0.5px solid ${itemBorderB}`,
-                  cursor: 'default',
+                  cursor: isRead ? 'default' : 'pointer',
                   background: isRead ? readBg : unreadBg,
                   transition: 'background 0.12s',
                 }}
@@ -450,7 +448,7 @@ const [currentUser, setCurrentUser] = useState(() => {
 
   const location = useLocation();
   const isDashboard = location.pathname === '/dashboard' || location.pathname === '/dashboard/';
-  const unreadCount = (resolvedAlerts || []).filter(a => a.unread).length;
+  const unreadCount = (resolvedAlerts || []).filter(notifContext.isUnread).length;
 
   useEffect(() => {
     if (!notifOpen) return;

@@ -23,6 +23,7 @@ export default async function honeypotGateway(req, res, next) {
       if (shouldIntercept) {
         logEvent({
           ...score,
+          confidenceScore: score.confidence, // dbLogger reads confidenceScore; classify() returns `confidence`
           sessionId: req.headers['x-session-id'] || '',
           ipAddress: req.ip,
           deviceFingerprint: fingerprint,
@@ -39,6 +40,7 @@ export default async function honeypotGateway(req, res, next) {
     if (shouldIntercept) {
       logEvent({
         ...score,
+        confidenceScore: score.confidence, // dbLogger reads confidenceScore; classify() returns `confidence`
         sessionId: req.headers['x-session-id'] || '',
         ipAddress: req.ip,
         deviceFingerprint: fingerprint,

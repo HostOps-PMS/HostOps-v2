@@ -41,9 +41,9 @@ const LOADING_ICONS = [
   // 1. House
   () => (
     <svg width="160" height="100" viewBox="0 0 160 100" style={{ overflow: "visible" }}>
-      <circle cx="118" cy="22" r="4"   fill="rgba(125,221,181,0.5)" style={{ animation: "_house_smoke 2.2s infinite" }} />
-      <circle cx="122" cy="22" r="5"   fill="rgba(125,221,181,0.5)" style={{ animation: "_house_smoke 2.2s 0.7s infinite" }} />
-      <circle cx="119" cy="22" r="3.5" fill="rgba(125,221,181,0.5)" style={{ animation: "_house_smoke 2.2s 1.4s infinite" }} />
+      <circle cx="118" cy="22" r="4"   fill="rgba(125,221,181,0.5)" className="_fo_c" style={{ animation: "_house_smoke 2.2s infinite" }} />
+      <circle cx="122" cy="22" r="5"   fill="rgba(125,221,181,0.5)" className="_fo_c" style={{ animation: "_house_smoke 2.2s 0.7s infinite" }} />
+      <circle cx="119" cy="22" r="3.5" fill="rgba(125,221,181,0.5)" className="_fo_c" style={{ animation: "_house_smoke 2.2s 1.4s infinite" }} />
       <rect x="112" y="25" width="12" height="22" fill="#1e8760" />
       <polygon points="35,48 80,12 125,48" fill="#26a676" />
       <rect x="45" y="48" width="70" height="42" fill="#1a6b44" />
@@ -88,9 +88,9 @@ const LOADING_ICONS = [
       <rect x="35" y="46" width="34" height="14" rx="3" fill="#7dddb5" />
       <rect x="30" y="83" width="6" height="12" fill="#0d3322" />
       <rect x="124" y="83" width="6" height="12" fill="#0d3322" />
-      <text x="100" y="35" fontFamily="'Sora', sans-serif" fontWeight="800" fontSize="14" fill="#56c299" style={{ animation: "_zzz_float 2.4s infinite" }}>Z</text>
-      <text x="110" y="28" fontFamily="'Sora', sans-serif" fontWeight="800" fontSize="11" fill="#56c299" style={{ animation: "_zzz_float 2.4s 0.6s infinite" }}>z</text>
-      <text x="118" y="22" fontFamily="'Sora', sans-serif" fontWeight="800" fontSize="9"  fill="#56c299" style={{ animation: "_zzz_float 2.4s 1.2s infinite" }}>z</text>
+      <text x="100" y="35" fontFamily="'Sora', sans-serif" fontWeight="800" fontSize="14" fill="#56c299" className="_fo_c" style={{ animation: "_zzz_float 2.4s infinite" }}>Z</text>
+      <text x="110" y="28" fontFamily="'Sora', sans-serif" fontWeight="800" fontSize="11" fill="#56c299" className="_fo_c" style={{ animation: "_zzz_float 2.4s 0.6s infinite" }}>z</text>
+      <text x="118" y="22" fontFamily="'Sora', sans-serif" fontWeight="800" fontSize="9"  fill="#56c299" className="_fo_c" style={{ animation: "_zzz_float 2.4s 1.2s infinite" }}>z</text>
     </svg>
   ),
   // 5. Suitcase rolling
@@ -127,7 +127,7 @@ const LOADING_ICONS = [
         ))
       ))}
       <rect x="53" y="62" width="10" height="9" rx="1.5" fill="#56c299" />
-      <g style={{ animation: "_check_pop 1.8s infinite" }}>
+      <g className="_fo_c" style={{ animation: "_check_pop 1.8s infinite" }}>
         <circle cx="113" cy="78" r="13" fill="#0d3322" stroke="#56c299" strokeWidth="2" />
         <polyline points="107,78 111,82 119,73" fill="none" stroke="#56c299" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
       </g>
@@ -158,7 +158,7 @@ const LOADING_ICONS = [
       <rect x="40" y="35" width="80" height="16" rx="8" fill="#26a676" />
       <rect x="95" y="55" width="28" height="20" rx="4" fill="#0d3322" />
       <circle cx="103" cy="65" r="4" fill="#7dddb5" style={{ animation: "_house_glow 1.6s infinite" }} />
-      <g style={{ animation: "_coin_flip 2s infinite" }}>
+      <g className="_fo_c" style={{ animation: "_coin_flip 2s infinite" }}>
         <circle cx="65" cy="22" r="10" fill="#56c299" />
         <text x="65" y="26" fontFamily="'Sora', sans-serif" fontWeight="800" fontSize="11" fill="#0d3322" textAnchor="middle">₱</text>
       </g>
@@ -182,8 +182,8 @@ const LOADING_ICONS = [
       <rect x="40" y="38" width="22" height="26" rx="6" fill="#26a676" />
       <rect x="98" y="38" width="22" height="26" rx="6" fill="#26a676" />
       <rect x="50" y="40" width="60" height="18" rx="5" fill="#3cb882" />
-      <rect x="58" y="44" width="20" height="12" rx="3" fill="#7dddb5" style={{ animation: "_pulse 2s infinite" }} />
-      <rect x="82" y="44" width="20" height="12" rx="3" fill="#7dddb5" style={{ animation: "_pulse 2s 0.4s infinite" }} />
+      <rect x="58" y="44" width="20" height="12" rx="3" fill="#7dddb5" className="_fo_c" style={{ animation: "_pulse 2s infinite" }} />
+      <rect x="82" y="44" width="20" height="12" rx="3" fill="#7dddb5" className="_fo_c" style={{ animation: "_pulse 2s 0.4s infinite" }} />
       <rect x="36" y="80" width="6" height="10" fill="#0d3322" />
       <rect x="118" y="80" width="6" height="10" fill="#0d3322" />
     </svg>
@@ -225,8 +225,12 @@ export default function FetchingOverlay({
   useEffect(() => {
     if (isVisible) {
       clearTimeout(exitTimer.current);
-      setHint(nextHint());
-      setIconIdx(nextIconIdx());
+      // Only pick a new icon/hint when coming from hidden. Re-picking on mount
+      // or while fading out swaps the icon mid-animation.
+      if (!rendered) {
+        setHint(nextHint());
+        setIconIdx(nextIconIdx());
+      }
       setRendered(true);
       setExiting(false);
     } else {
@@ -237,13 +241,16 @@ export default function FetchingOverlay({
       }, EXIT_MS);
     }
     return () => clearTimeout(exitTimer.current);
-  }, [isVisible]);
+  }, [isVisible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!rendered) return null;
 
   return (
     <>
       <style>{`
+        /* SVG transforms default to the viewBox origin (0,0); scale/rotate
+           around the element's own centre instead so icons don't fly off. */
+        ._fo_c { transform-box: fill-box; transform-origin: center; }
         @keyframes _fo_fade_in  { from { opacity: 0; } to { opacity: 1; } }
         @keyframes _fo_fade_out { from { opacity: 1; } to { opacity: 0; } }
         @keyframes _fo_up {

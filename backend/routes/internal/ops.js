@@ -15,15 +15,18 @@ router.get('/stats', async (req, res) => {
 });
 
 router.get('/logs', async (req, res) => {
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 25;
+  // Clamp paging (page ≥ 1, limit 1–100) so a request can't skip negative
+  // rows or pull the whole collection at once.
+  const page  = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 25));
   const { severity, ip, fingerprint } = req.query;
 
   try {
     const filter = {};
-    if (severity) filter.severity = severity;
-    if (ip) filter.ipAddress = { $regex: ip, $options: 'i' };
-    if (fingerprint) filter.deviceFingerprint = fingerprint;
+    if (severity) filter.severity = String(severity);
+    // Escape user input before it becomes a regex (no ReDoS / regex injection).
+    if (ip) filter.ipAddress = { $regex: String(ip).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+    if (fingerprint) filter.deviceFingerprint = String(fingerprint);
 
     const totalCount = await HoneypotEvent.countDocuments(filter);
     const totalPages = Math.ceil(totalCount / limit);
@@ -40,10 +43,14 @@ router.get('/logs', async (req, res) => {
   }
 });
 
-// Escape a single CSV cell value
+// Escape a single CSV cell value.
+// Honeypot data (UA, session id, payload) is attacker-controlled: a leading
+// = + - @ tab or CR would run as a formula when the CSV is opened in
+// Excel/Sheets, so such cells are prefixed with a quote.
 function esc(v) {
-  const s = String(v ?? '');
-  return s.includes(',') || s.includes('"') || s.includes('\n')
+  let s = String(v ?? '');
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return /[,"\n\r]/.test(s) || s.startsWith("'")
     ? `"${s.replace(/"/g, '""')}"` : s;
 }
 

@@ -73,6 +73,8 @@ const staffSchema = new mongoose.Schema({
   // ── OTP for password-change verification ─────────────────────────
   loginOtp:       { type: String, select: false },
   loginOtpExpiry: { type: Date,   select: false },
+  // Wrong guesses against the active loginOtp reset code (burned at 5, see auth.js)
+  codeAttempts:   { type: Number, default: 0, select: false },
 }, {
   timestamps: true,
 });

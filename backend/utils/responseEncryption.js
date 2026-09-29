@@ -28,8 +28,10 @@ function prune() {
 }
 
 /**
- * Derives and stores a per-session AES key using PBKDF2 (200k–600k iterations).
- * Called once per login/refresh for each new access token JTI.
+ * Derives and stores a per-session AES key with HKDF-SHA256 (master key +
+ * random salt + jti). Called once per login/refresh for each new access token JTI.
+ * HKDF, not PBKDF2: the master key is already random, so key stretching adds
+ * nothing — and pbkdf2Sync blocked the whole event loop on every login.
  * Returns the base64-encoded session key to send to the client, or null if
  * RESPONSE_MASTER_KEY is not configured.
  */
@@ -40,8 +42,7 @@ export function createSessionKey(jti, ttlMs = 8 * 3600_000) {
   prune();
 
   const salt = crypto.randomBytes(16);
-  const iterations = 200_000 + Math.floor(Math.random() * 400_001);
-  const key = crypto.pbkdf2Sync(masterKey, salt, iterations, 32, 'sha256');
+  const key = Buffer.from(crypto.hkdfSync('sha256', masterKey, salt, String(jti), 32));
 
   _store.set(jti, { key, expiresAt: Date.now() + ttlMs });
 

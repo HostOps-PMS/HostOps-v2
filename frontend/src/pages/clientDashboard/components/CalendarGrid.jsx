@@ -1,5 +1,6 @@
-import { toYMD, dayDiff, fmtMoney } from "../../utils/dateHelpers";
+import { toYMD, dayDiff, fmtMoney, fmtDateShort } from "../../utils/dateHelpers";
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useDashboard } from "../context/DashboardContext";
 import {
   getChannelPillClass,
@@ -8,7 +9,6 @@ import {
   getChannelLogo,
   getBookingColor,
 } from "../utils/channelHelpers";
-import DOMPurify from "dompurify";
 
 const MONTHS = [
   "Jan",
@@ -63,7 +63,35 @@ function ChannelBadge({ channel }) {
   );
 }
 
-function PropertyRow({ prop, allBookings, dateRange, ymdRange, todayISO }) {
+// Rendered through a portal so `position: fixed` is relative to the viewport,
+// not to a transformed/overflow ancestor. Flips above the pill near the bottom edge.
+function BookingTooltip({ booking, channel, rect }) {
+  const guests = (booking.adults || 0) + (booking.children || 0) || 1;
+  const nights = dayDiff(toYMD(booking.arrival), toYMD(booking.departure));
+  const below = rect.bottom + 200 < window.innerHeight;
+  const style = {
+    left: Math.max(8, Math.min(rect.left, window.innerWidth - 308)),
+    ...(below ? { top: rect.bottom + 6 } : { bottom: window.innerHeight - rect.top + 6 }),
+  };
+  return createPortal(
+    <div className="cal-tt" style={style}>
+      <div className="cal-tt-top">
+        <span className="cal-tt-name" title={booking["guest-name"] || "Guest"}>{booking["guest-name"] || "Guest"}</span>
+        <span className="cal-tt-chip">{channel}</span>
+      </div>
+      <div className="cal-tt-dates">
+        <div><div className="cal-tt-dl">Check-in</div><div className="cal-tt-dv">{fmtDateShort(booking.arrival)}</div></div>
+        <div><div className="cal-tt-dl">Check-out</div><div className="cal-tt-dv">{fmtDateShort(booking.departure)}</div></div>
+      </div>
+      <div className="cal-tt-row"><span className="cal-tt-rl">Guests</span><span className="cal-tt-rv">{guests}</span></div>
+      <div className="cal-tt-row"><span className="cal-tt-rl">Nights</span><span className="cal-tt-rv">{nights}</span></div>
+      <div className="cal-tt-row cal-tt-last"><span className="cal-tt-rl">Total</span><span className="cal-tt-rv cal-tt-price">{fmtMoney(booking.price)}</span></div>
+    </div>,
+    document.body,
+  );
+}
+
+function PropertyRow({ prop, allBookings, dateRange, ymdRange, todayISO, setTip }) {
   const rangeStartYMD = ymdRange[0];
   const rangeEndYMD = ymdRange[ymdRange.length - 1];
   const propBookings = allBookings.filter((b) => {
@@ -139,76 +167,15 @@ function PropertyRow({ prop, allBookings, dateRange, ymdRange, todayISO }) {
             className={`cal-pill ${pillClass}`}
             style={{ width: `calc(${renderSpan * 100}% - 6px)`, left: 3 }}
             onMouseEnter={(e) => {
-              const el = e.currentTarget;
-              if (el._ttPinned) return;
-              if (!el._ttEl) {
-                const tt = document.createElement("div");
-                tt.className = "cal-tt";
-                const g = (booking.adults || 0) + (booking.children || 0) || 1;
-                const nights = Math.round(
-                  (new Date(booking.departure) - new Date(booking.arrival)) /
-                    86400000,
-                );
-
-                const fmt = (d) =>
-                  new Date(d).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  });
-
-                tt.innerHTML = DOMPurify.sanitize(`
-                  <div class="cal-tt-top">
-                    <span class="cal-tt-name">${booking["guest-name"] || "Guest"}</span>
-                    <span class="cal-tt-chip">${channel}</span>
-                  </div>
-                  <div class="cal-tt-dates">
-                    <div><div class="cal-tt-dl">Check-in</div><div class="cal-tt-dv">${fmt(booking.arrival)}</div></div>
-                    <div><div class="cal-tt-dl">Check-out</div><div class="cal-tt-dv">${fmt(booking.departure)}</div></div>
-                  </div>
-                  <div class="cal-tt-row"><span class="cal-tt-rl">Guests</span><span class="cal-tt-rv">${g} - ${nights} nights</span></div>
-                  <div class="cal-tt-row cal-tt-last"><span class="cal-tt-rl">Total</span><span class="cal-tt-rv cal-tt-price">${fmtMoney(booking.price)}</span></div>
-                `);
-                document.body.appendChild(tt);
-                el._ttEl = tt;
-              }
-              const rect = el.getBoundingClientRect();
-              el._ttEl.style.top = `${rect.bottom + window.scrollY + 6}px`;
-              el._ttEl.style.left = `${rect.left + window.scrollX}px`;
-              el._ttEl.style.display = "block";
+              const rect = e.currentTarget.getBoundingClientRect();
+              setTip((t) => (t?.pinned ? t : { booking, channel, rect, pinned: false }));
             }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget;
-              if (el._ttPinned) return;
-              if (el._ttEl) el._ttEl.style.display = "none";
-            }}
+            onMouseLeave={() => setTip((t) => (t?.pinned ? t : null))}
             onClick={(e) => {
-              const el = e.currentTarget;
-
-              document.querySelectorAll(".cal-tt").forEach((tt) => {
-                if (tt !== el._ttEl) {
-                  tt.style.display = "none";
-                  tt._pinned = false;
-                }
-              });
-
-              document.querySelectorAll("[data-tt-pinned]").forEach((pill) => {
-                if (pill !== el) pill.removeAttribute("data-tt-pinned");
-              });
-
-              const wasOpen = el.hasAttribute("data-tt-pinned");
-              if (wasOpen) {
-                el.removeAttribute("data-tt-pinned");
-                if (el._ttEl) el._ttEl.style.display = "none";
-              } else {
-                el.setAttribute("data-tt-pinned", "1");
-                el._ttPinned = true;
-                if (el._ttEl) {
-                  const rect = el.getBoundingClientRect();
-                  el._ttEl.style.top = `${rect.bottom + window.scrollY + 6}px`;
-                  el._ttEl.style.left = `${rect.left + window.scrollX}px`;
-                  el._ttEl.style.display = "block";
-                }
-              }
+              const rect = e.currentTarget.getBoundingClientRect();
+              setTip((t) =>
+                t?.pinned && t.booking === booking ? null : { booking, channel, rect, pinned: true },
+              );
             }}
           >
             <ChannelBadge channel={channel} />
@@ -455,7 +422,7 @@ const [showBookings, setShowBookings] = useState(false);
       <div style={{ flex: 1, minWidth: 0, borderRight: `1px solid ${borderCol}` }}>
 
       {/* Month header + nav + legend */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: `1px solid ${borderCol}`, background: cardBg, flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 20px', borderBottom: `1px solid ${borderCol}`, background: cardBg, flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button onClick={() => { const d = new Date(viewYear, viewMonth - 1, 1); setViewMonth(d.getMonth()); setViewYear(d.getFullYear()); }} style={{ width: 28, height: 28, borderRadius: '50%', border: `1px solid ${borderCol}`, background: cardBg, color: textSecondary, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -710,12 +677,23 @@ const { dark } = useDashboard();
 
   const [selectedProps, setSelectedProps] = useState([]);
   const [showPropFilter, setShowPropFilter] = useState(false);
+  // Booking tooltip: { booking, channel, rect, pinned } — pinned = opened by click.
+  const [tip, setTip] = useState(null);
+
+  // A fixed tooltip would drift away from its pill on scroll, so close it.
+  useEffect(() => {
+    if (!tip) return;
+    const close = () => setTip(null);
+    window.addEventListener("scroll", close, true);
+    return () => window.removeEventListener("scroll", close, true);
+  }, [tip]);
 
   useEffect(() => {
     function handler(e) {
       if (filterPopRef.current && !filterPopRef.current.contains(e.target)) {
         setShowPropFilter(false);
       }
+      if (!e.target.closest(".cal-tt, .cal-pill")) setTip(null);
       if (!e.target.closest('.cal-sidebar')) {
         document.querySelectorAll('.prop-name-tooltip').forEach(t => t.style.display = 'none');
       }
@@ -805,46 +783,6 @@ const { dark } = useDashboard();
     onScrollToTodayConsumed?.();
   }, [shouldScrollToToday, onScrollToTodayConsumed]);
 
-  useEffect(() => {
-    const style = document.createElement("style");
-    style.id = "cal-tt-styles";
-    if (!document.getElementById("cal-tt-styles")) {
-      style.textContent = `
-        .cal-tt {
-          display: none;
-          position: fixed;
-          z-index: 9999;
-          background: #fff;
-          border: 0.5px solid #e5e7eb;
-          border-radius: 10px;
-          min-width: 220px;
-          font-family: 'DM Sans', sans-serif;
-          overflow: hidden;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.10);
-        }
-        .cal-tt-top { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 0.5px solid #e5e7eb; }
-        .cal-tt-name { font-size: 14px; font-weight: 600; color: #0c1c14; }
-        .cal-tt-chip { background: #E1F5EE; color: #0F6E56; font-size: 11px; font-weight: 500; padding: 4px 12px; border-radius: 100px; }
-        .cal-tt-dates { display: flex; border-bottom: 0.5px solid #e5e7eb; }
-        .cal-tt-dates > div { flex: 1; padding: 14px 16px; }
-        .cal-tt-dates > div + div { border-left: 0.5px solid #e5e7eb; }
-        .cal-tt-dl { font-size: 10px; font-weight: 600; color: #9ab8a9; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; }
-        .cal-tt-dv { font-size: 14px; font-weight: 600; color: #0c1c14; }
-        .cal-tt-row { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 0.5px solid #e5e7eb; font-size: 13px; }
-        .cal-tt-last { border-bottom: none; }
-        .cal-tt-rl { color: #9ab8a9; }
-        .cal-tt-rv { font-weight: 500; color: #0c1c14; }
-        .cal-tt-price { color: #0F6E56 !important; }
-      `;
-      document.head.appendChild(style);
-    }
-
-    return () => {
-      const el = document.getElementById("cal-tt-styles");
-      if (el) el.remove();
-    };
-  }, []);
-
   if (singleProp) {
     return (
       <div style={{ width: "100%" }}>
@@ -858,65 +796,16 @@ const { dark } = useDashboard();
       <style>{`
           /* ── Tooltip ── */
           .cal-tt {
-            display: none; position: fixed; z-index: 9999;
+            position: fixed; z-index: 9999;
             background: ${dark ? '#132a1e' : '#fff'}; border: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; border-radius: 10px;
-            min-width: 220px; font-family: 'DM Sans', sans-serif;
+            min-width: 220px; max-width: 300px; font-family: 'DM Sans', sans-serif;
             overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,${dark ? '0.40' : '0.10'});
+            animation: calTtIn .12s ease-out;
           }
-          .cal-tt-top { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; }
-          .cal-tt-name { font-size: 13px; font-weight: 600; color: ${dark ? '#eaf5f0' : '#0c1c14'}; }
-          .cal-tt-chip { background: ${dark ? '#1a3d28' : '#E1F5EE'}; color: ${dark ? '#56c299' : '#0F6E56'}; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 100px; }
-          .cal-tt-dates { display: flex; border-bottom: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; }
-          .cal-tt-dates > div { flex: 1; padding: 9px 14px; }
-          .cal-tt-dates > div + div { border-left: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; }
-          .cal-tt-dl { font-size: 10px; font-weight: 600; color: ${dark ? '#4d9e7a' : '#9ab8a9'}; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 3px; }
-          .cal-tt-dv { font-size: 13px; font-weight: 600; color: ${dark ? '#eaf5f0' : '#0c1c14'}; }
-          .cal-tt-row { display: flex; justify-content: space-between; padding: 8px 14px; border-bottom: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; font-size: 12px; }
-          .cal-tt-last { border-bottom: none; }
-          .cal-tt-rl { color: ${dark ? '#4d9e7a' : '#9ab8a9'}; }
-          .cal-tt-rv { font-weight: 500; color: ${dark ? '#eaf5f0' : '#0c1c14'}; }
-          .cal-tt-price { color: ${dark ? '#56c299' : '#0F6E56'} !important; }
-
-          /* ── Toolbar ── */
-          .cal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px 14px; }
-          .cal-title { font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 800; color: ${dark ? '#eaf5f0' : '#0c1c14'}; }
-          .cal-controls { display: flex; gap: 8px; align-items: center; }
-          .cal-btn { background: ${dark ? '#1a3d28' : '#f0f5f2'}; border: 1px solid ${dark ? '#2a5c3c' : '#e3ede8'}; padding: 6px 12px; border-radius: 100px; font-size: .75rem; font-weight: 600; color: ${dark ? '#a8d4bc' : '#0c1c14'}; cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
-          .cal-btn-group { background: ${dark ? '#0a1f15' : '#f0f5f2'}; border-radius: 100px; padding: 3px; display: flex; }
-          .cal-btn-group button { background: transparent; border: none; padding: 5px 12px; border-radius: 100px; font-size: .75rem; font-weight: 700; color: ${dark ? '#7aab8a' : '#6a8b7c'}; cursor: pointer; font-family: 'DM Sans', sans-serif; }
-          .cal-btn-group button.active { background: #26a676; color: #fff; }
-
-          /* ── Nav bar ── */
-          .cal-nav { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 14px 24px; border-bottom: 1px solid ${dark ? '#1e3a2a' : '#f0f5f2'}; background: ${dark ? '#0d2619' : '#f7faf8'}; flex-wrap: nowrap; white-space: nowrap; }
-          .cal-nav > * { flex-shrink: 0; }
-          .cal-nav-btn { width: 30px; height: 30px; border: 1px solid ${dark ? '#2a5c3c' : '#e3ede8'}; border-radius: 50%; background: ${dark ? '#0d2619' : '#f0f5f2'}; color: ${dark ? '#9ab8a9' : '#6a8b7c'}; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; }
-          .cal-nav-btn:hover { background: ${dark ? '#1a3d28' : '#eaf8f1'}; color: ${dark ? '#56c299' : '#1e8760'}; border-color: ${dark ? '#2a5c3c' : '#b7e4cf'}; }
-          .cal-nav-label { font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 800; color: ${dark ? '#eaf5f0' : '#0c1c14'}; padding: 0 6px; flex: 1; }
-          .cal-nav-today { padding: 6px 14px; border: 1px solid ${dark ? '#2a5c3c' : '#b7e4cf'}; background: ${dark ? '#1a3d28' : '#eaf8f1'}; color: ${dark ? '#56c299' : '#1e8760'}; border-radius: 100px; font-family: 'DM Sans', sans-serif; font-size: .75rem; font-weight: 700; cursor: pointer; margin-left: auto; }
-          .cal-nav-today:hover { background: ${dark ? '#163d28' : '#d4f0e4'}; }
-
-          /* ── Scroll container ── */
-          .cal-scroll { overflow-x: auto; overflow-y: visible; width: 100%; border-top: 1px solid ${dark ? '#1e3a2a' : '#e3ede8'}; scroll-behavior: smooth; position: relative; border-radius: 0 0 14px 14px; }
-          .cal-scroll::-webkit-scrollbar { height: 8px; }
-          .cal-scroll::-webkit-scrollbar-track { background: ${dark ? '#0a1f15' : '#f4f7f5'}; border-radius: 6px; margin: 0 4px; }
-          .cal-scroll::-webkit-scrollbar-thumb { background: ${dark ? '#2a5c3c' : '#b7e4cf'}; border-radius: 6px; border: 2px solid ${dark ? '#0a1f15' : '#f4f7f5'}; }
-          .cal-scroll::-webkit-scrollbar-thumb:hover { background: #56c299; }
-          .cal-scroll-inner { display: block; min-height: 0; }
-
-          /* ── Table ── */
-          .cal-table { width: max-content; min-width: 100%; border-collapse: collapse; }
-          .cal-table th { padding: 10px 6px; border-right: 1px solid ${dark ? '#1a3d28' : '#f0f5f2'}; border-bottom: 1px solid ${dark ? '#1e3a2a' : '#e3ede8'}; font-size: .72rem; font-weight: 600; color: #9ab8a9; text-align: center; }
-          .cal-table td { min-width: 56px; max-width: 56px; width: 56px; height: 48px; border-right: 1px solid ${dark ? '#1a3d28' : '#eef2f0'}; border-bottom: 1px solid ${dark ? '#1a3d28' : '#eef2f0'}; position: relative; padding: 0; background: var(--cal-td-bg, #fff); }
-          /* ── Tooltip ── */
-          .cal-tt {
-            display: none; position: fixed; z-index: 9999;
-            background: ${dark ? '#132a1e' : '#fff'}; border: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; border-radius: 10px;
-            min-width: 220px; font-family: 'DM Sans', sans-serif;
-            overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,${dark ? '0.40' : '0.10'});
-          }
-          .cal-tt-top { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; }
-          .cal-tt-name { font-size: 13px; font-weight: 600; color: ${dark ? '#eaf5f0' : '#0c1c14'}; }
-          .cal-tt-chip { background: ${dark ? '#1a3d28' : '#E1F5EE'}; color: ${dark ? '#56c299' : '#0F6E56'}; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 100px; }
+          @keyframes calTtIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+          .cal-tt-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; }
+          .cal-tt-name { font-size: 13px; font-weight: 600; color: ${dark ? '#eaf5f0' : '#0c1c14'}; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .cal-tt-chip { background: ${dark ? '#1a3d28' : '#E1F5EE'}; color: ${dark ? '#56c299' : '#0F6E56'}; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 100px; flex-shrink: 0; white-space: nowrap; }
           .cal-tt-dates { display: flex; border-bottom: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; }
           .cal-tt-dates > div { flex: 1; padding: 9px 14px; }
           .cal-tt-dates > div + div { border-left: 0.5px solid ${dark ? '#1e3a2a' : '#e5e7eb'}; }
@@ -1168,12 +1057,14 @@ const { dark } = useDashboard();
                 dateRange={dateRange}
                 ymdRange={ymdRange}
                 todayISO={todayISO}
+                setTip={setTip}
               />
             ))}
           </tbody>
         </table>
       </div>
       </div>
+      {tip && <BookingTooltip {...tip} />}
     </div>
   );
 }

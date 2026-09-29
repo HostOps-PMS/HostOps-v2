@@ -90,7 +90,7 @@ export function logSuspiciousAccess(req, res, next) {
         targetId,
         path:      req.originalUrl,
         method:    req.method,
-        ip:        (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip,
+        ip:        req.ip,
         timestamp: new Date().toISOString(),
       });
     }

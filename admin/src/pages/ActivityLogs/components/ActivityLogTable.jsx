@@ -208,7 +208,10 @@ function getActionMeta(action) {
  * inside it so the output is valid RFC 4180 CSV.
  */
 function csvField(value) {
-  const str = value == null ? '' : String(value);
+  let str = value == null ? '' : String(value);
+  // Business/staff names and meta are user-controlled: prefix a quote so
+  // Excel/Sheets treat a leading = + - @ as text, not a formula.
+  if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
   return `"${str.replace(/"/g, '""')}"`;
 }
 

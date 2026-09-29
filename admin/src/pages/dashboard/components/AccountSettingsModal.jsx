@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { sendLoginOtp, verifyOtp } from "../../authorization/services/authService";
 import { authHeaders, fetchWithAuth } from "../../../lib/authUtils";
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "https://api.hostops.online";
+const API_BASE = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 const API_KEY  = import.meta.env.VITE_API_KEY ?? '';
 
 async function setupTotp() {
@@ -38,7 +38,13 @@ async function verifyTotpSetup(token6, deviceName) {
   return data;
 }
 
-async function disableTotp() {
+// The backend requires a current authenticator (or backup) code for 2FA
+// changes, so a stolen session alone can't switch 2FA off.
+function askSecondFactorCode() {
+  return window.prompt("Enter the 6-digit code from your authenticator app (or a backup code) to confirm.")?.trim() || null;
+}
+
+async function disableTotp(code) {
   const token = sessionStorage.getItem("hp_access_token");
   const res = await fetch(`${API_BASE}/auth/totp/disable`, {
     method: "POST",
@@ -48,6 +54,7 @@ async function disableTotp() {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     credentials: "include",
+    body: JSON.stringify({ code }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Failed to disable.");
@@ -238,14 +245,18 @@ export default function AccountSettingsModal({ isOpen, onClose, onSaved }) {
   }, [isOpen, totpEnabled, bcCodes]);
 
   async function generateBackupCodes() {
+    const code = askSecondFactorCode();
+    if (!code) return;
     setBcLoading(true);
     try {
       const base = (import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
-      const res = await fetchWithAuth(`${base}/auth/backup-codes/generate`, { method: 'POST' });
-      if (!res?.ok) throw new Error('Failed');
-      const data = await res.json();
+      const res = await fetchWithAuth(`${base}/auth/backup-codes/generate`, { method: 'POST', body: JSON.stringify({ code }) });
+      const data = await res?.json().catch(() => ({}));
+      if (!res?.ok) throw new Error(data?.error || 'Failed to generate codes');
       if (data.codes) setBcCodes(data.codes);
-    } catch {} finally { setBcLoading(false); }
+    } catch (err) {
+      setTotpMsg({ text: err.message, type: 'error' });
+    } finally { setBcLoading(false); }
   }
 
   const overlayRef = useRef(null);
@@ -1029,10 +1040,12 @@ export default function AccountSettingsModal({ isOpen, onClose, onSaved }) {
                       <button
                         disabled={totpLoading}
                         onClick={async () => {
+                          const code = askSecondFactorCode();
+                          if (!code) return;
                           setTotpLoading(true);
                           setTotpMsg(null);
                           try {
-                            await disableTotp();
+                            await disableTotp(code);
                             const u = { ...user, totpEnabled: false };
                             setSecureUser(u);
                             setTotpEnabled(false);

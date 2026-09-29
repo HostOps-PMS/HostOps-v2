@@ -15,6 +15,18 @@ import { validateObjectId, logSuspiciousAccess } from '../middleware/ownershipGu
 
 const router = express.Router();
 
+// Keep only ids that exist on the client: an embedded property _id or a synced
+// sub-property smoobuId. Unknown ids are dropped (not rejected) so editing a
+// staff member who still carries a stale id keeps working.
+function validPropertyIds(client, ids) {
+  const known = new Set();
+  for (const p of client?.properties || []) {
+    known.add(String(p._id));
+    for (const sp of p.subProperties || []) known.add(String(sp.smoobuId));
+  }
+  return [...new Set(ids.map(String))].filter((id) => known.has(id));
+}
+
 // All routes require authentication
 router.use(requireAuth);
 
@@ -98,7 +110,7 @@ router.get('/staffs/:id', requireAdminOrTeamLeader, validateObjectId('id'), logS
 // forced to set their own PIN on first login.
 // ─────────────────────────────────────────────────────────────────
 const createStaffSchema = z.object({
-  clientId:    z.string().min(1),
+  clientId:    z.string().regex(/^[a-f0-9]{24}$/i, 'Invalid client ID'),
   firstName:   z.string().min(1).max(50).trim(),
   lastName:    z.string().max(50).trim().optional().default(''),
   email:       z.string().email().max(254),
@@ -132,7 +144,7 @@ router.post('/staffs', requireAdminOrTeamLeader, async (req, res, next) => {
       lastName:           data.lastName || '',
       email:              data.email.toLowerCase(),
       pin:                data.pin,
-      propertyIds:        data.propertyIds,
+      propertyIds:        validPropertyIds(client, data.propertyIds),
       staffRole:          data.staffRole || '',
       isActive:           true,
       mustChangePin:      true,
@@ -166,6 +178,9 @@ router.post('/staffs', requireAdminOrTeamLeader, async (req, res, next) => {
     if (err.name === 'ZodError') {
       return res.status(400).json({ error: 'Validation failed', details: err.errors });
     }
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
     next(err);
   }
 });
@@ -196,7 +211,10 @@ router.patch('/staffs/:id', requireAdminOrTeamLeader, async (req, res, next) => 
 
     if (data.firstName   !== undefined) staff.firstName   = data.firstName;
     if (data.lastName    !== undefined) staff.lastName    = data.lastName;
-    if (data.propertyIds !== undefined) staff.propertyIds = data.propertyIds;
+    if (data.propertyIds !== undefined) {
+      const client = await User.findById(staff.clientId).select('properties');
+      staff.propertyIds = validPropertyIds(client, data.propertyIds);
+    }
     if (data.staffRole   !== undefined) staff.staffRole   = data.staffRole;
     if (data.isActive    !== undefined) staff.isActive    = data.isActive;
     if (data.pin         !== undefined) {

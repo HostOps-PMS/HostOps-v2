@@ -7,6 +7,7 @@ export default function RecoveryModal({
   onClose,
   loading,
   submitted,
+  error       = '',
   title       = 'Recover Account',
   description = 'Tell us why your account was locked. Your request will be reviewed by an administrator.',
   label       = 'Why was your account locked?',
@@ -239,6 +240,10 @@ export default function RecoveryModal({
                     <span style={{ color: '#9ab8a9' }}>{reason.length}/1000</span>
                   </div>
                 </div>
+
+                {error && (
+                  <p role="alert" style={{ color: '#dc2626', fontSize: '13px', margin: '0 0 10px' }}>{error}</p>
+                )}
 
                 {/* Buttons */}
                 <button

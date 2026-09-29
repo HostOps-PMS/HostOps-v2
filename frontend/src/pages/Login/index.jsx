@@ -10,6 +10,7 @@ import Message from './components/Message';
 import bgImage from '../../assets/bg.png';
 import hostOpsLogo from '../../assets/HostOpsLOGO.png';
 import safeStorage from '../safeStorage';
+import { useAuth } from '../AuthContext';
 import './Login.css';
 
 const VIEWS = {
@@ -34,7 +35,8 @@ const SLIDES = [
 export default function LoginPage() {
   const [view,    setView]    = useState(VIEWS.LOGIN);
   const [message, setMessage] = useState({ text: '', type: '' });
-  const [otpData, setOtpData] = useState({ email: '', rememberMe: false, totpEnabled: false });
+  const auth = useAuth();
+  const [otpData, setOtpData] = useState({ email: '', rememberMe: false, totpEnabled: false, mfaToken: '' });
   const [backupMode, setBackupMode] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
 
@@ -79,6 +81,14 @@ export default function LoginPage() {
         });
         if (data.sk)         params.append('_sk', data.sk);
         if (data.rememberMe) params.append('_rm', 'true');
+        // OTP/TOTP was just completed here, so the admin panel can skip its own
+        // OTP gate (the backend only issues admin tokens after a second factor
+        // or on a trusted device).
+        if (data.secondFactorVerified) params.append('_2fa', '1');
+        // Drop the token from this app's memory before leaving: otherwise the
+        // pagehide revoke-beacon could revoke the session just handed off.
+        auth.setToken(null);
+        auth.setSessionKey(null);
         window.location.href = `${dashboardBase}/admin#${params.toString()}`;
       }, 800);
       return;
@@ -180,8 +190,8 @@ const [showLogin, setShowLogin] = useState(window.innerWidth > 768);
               showMsg={showMsg}
               hideMsg={hideMsg}
               onForgot={() => handleViewChange(VIEWS.FORGOT)}
-              onRequiresOtp={(email, rememberMe, totpEnabled) => {
-                setOtpData({ email, rememberMe, totpEnabled });
+              onRequiresOtp={(email, rememberMe, totpEnabled, mfaToken) => {
+                setOtpData({ email, rememberMe, totpEnabled, mfaToken: mfaToken || '' });
                 if (totpEnabled) {
                   handleViewChange(VIEWS.LOGIN_VERIFY_METHOD);
                   showMsg('Please verify your identity to continue.', 'success');
@@ -220,10 +230,11 @@ const [showLogin, setShowLogin] = useState(window.innerWidth > 768);
             <LoginOTPForm
               email={otpData.email}
               rememberMe={otpData.rememberMe}
+              mfaToken={otpData.mfaToken}
               showMsg={showMsg}
               hideMsg={hideMsg}
               onBack={() => handleViewChange(otpData.totpEnabled ? VIEWS.LOGIN_VERIFY_METHOD : VIEWS.LOGIN)}
-              onAuthSuccess={handleAuthSuccess}
+              onAuthSuccess={(d) => handleAuthSuccess({ ...d, secondFactorVerified: true })}
             />
           )}
 
@@ -232,8 +243,9 @@ const [showLogin, setShowLogin] = useState(window.innerWidth > 768);
               email={otpData.email}
               showMsg={showMsg}
               hideMsg={hideMsg}
+              mfaToken={otpData.mfaToken}
               onBack={() => handleViewChange(VIEWS.LOGIN_VERIFY_METHOD)}
-              onAuthSuccess={handleAuthSuccess}
+              onAuthSuccess={(d) => handleAuthSuccess({ ...d, secondFactorVerified: true })}
               backupMode={backupMode}
             />
           )}

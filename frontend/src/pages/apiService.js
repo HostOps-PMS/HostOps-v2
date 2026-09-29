@@ -2,7 +2,7 @@
 import { decryptApiResponse, generateSessionHint } from './utils/responseDecryption';
 import safeStorage from './safeStorage';
 
-const HP_API_BASE = import.meta.env.VITE_API_URL || 'https://api.hostops.online';
+const HP_API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // Wraps a fetch Response so .json() transparently decrypts encrypted envelopes.
 function withDecryption(res, auth) {
@@ -131,7 +131,10 @@ export async function fetchMessages(reservationId, auth) {
  * Sends a reply message for a reservation.
  */
 export async function sendReply({ reservationId, subject, messageBody }, auth) {
-  return authFetch('/api/messages/reply', {
+  let query = '';
+  const propertyDbId = safeStorage.getItem('hp_selected_property_id');
+  if (propertyDbId) query = `?propertyDbId=${encodeURIComponent(propertyDbId)}`;
+  return authFetch(`/api/messages/reply${query}`, {
     method: 'POST',
     body:   JSON.stringify({ reservationId, subject, messageBody }),
   }, auth);

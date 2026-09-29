@@ -1,6 +1,8 @@
 import express from 'express';
+import crypto from 'crypto';
 import ActivityLog from '../models/activityLog.js';
 import User from '../models/user.js';
+import { smoobuFetch } from '../services/smoobu.js';
 
 const router = express.Router();
 
@@ -32,8 +34,22 @@ function computeNights(arrival, departure) {
 // to prevent duplicate processing from parallel webhook calls.
 // Uses atomic MongoDB operations instead of read-then-write.
 // ═══════════════════════════════════════════════════════════════
+// Optional shared secret. Smoobu cannot sign requests, so when
+// SMOOBU_WEBHOOK_SECRET is set, register the webhook URL as
+// /api/smoobu-webhook?secret=<value> (or send x-webhook-secret).
+// Unset → accepted as before, so existing Smoobu setups keep working.
+function webhookSecretOk(req) {
+  const expected = process.env.SMOOBU_WEBHOOK_SECRET;
+  if (!expected) return true;
+  const given = String(req.query.secret || req.headers['x-webhook-secret'] || '');
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 router.post('/smoobu-webhook', async (req, res) => {
   try {
+    if (!webhookSecretOk(req)) return res.status(401).json({ error: 'Unauthorized' });
     const { action, data } = req.body;
     if (!action || !data) return res.status(200).json({ ok: true });
 
@@ -48,35 +64,51 @@ router.post('/smoobu-webhook', async (req, res) => {
 
     const resId       = data.id || data.reservationId;
     const apartmentId = data.apartment?.id || data.apartmentId;
+    if (!/^\d+$/.test(String(resId)) || !/^\d+$/.test(String(apartmentId))) return res.status(200).json({ ok: true });
 
-    // ── Idempotency check: skip if we already processed this exact event ──
     const idempotencyKey = `${action}:${resId}:${apartmentId}`;
+
+    // Full document (not .lean()) so the property's key/secret getters decrypt.
+    const owner = await User.findOne(
+      { 'properties.subProperties.smoobuId': String(apartmentId) },
+      { _id: 1, email: 1, firstName: 1, lastName: 1, businessName: 1, properties: 1 }
+    );
+    if (!owner?._id) {
+      console.warn(`[SmoobuWebhook] No owner for apartment ${apartmentId}`);
+      return res.status(200).json({ ok: true });
+    }
+
+    // Anyone can POST here and Smoobu can't sign requests, so never trust the
+    // body: re-fetch the reservation from Smoobu with the owner's own key and
+    // log Smoobu's data. A forged or foreign reservation id fails this check.
+    const property = owner.properties.find((p) => (p.subProperties || []).some((sp) => sp.smoobuId === String(apartmentId)));
+    const creds    = { apiKey: property?.smoobuApiKey, apiSecret: property?.smoobuApiSecret };
+    let booking = null;
+    try {
+      const r = await smoobuFetch(`/reservations/${resId}`, {}, creds);
+      if (r.ok) booking = await r.json();
+    } catch (err) {
+      console.warn(`[SmoobuWebhook] could not verify reservation ${resId}: ${err.message}`);
+    }
+    if (!booking || String(booking.apartment?.id ?? booking.apartmentId) !== String(apartmentId)) {
+      console.warn(`[SmoobuWebhook] Unverified event ignored: ${idempotencyKey}`);
+      return res.status(200).json({ ok: true });
+    }
+
+    // Idempotency AFTER verification, so a forged request can't mark a real
+    // event as "already processed" and suppress it.
     if (isDuplicate(idempotencyKey)) {
       console.log(`[SmoobuWebhook] Duplicate skipped: ${idempotencyKey}`);
       return res.status(200).json({ ok: true, duplicate: true });
     }
 
-    const guestName = data['guest-name'] || data.guestName || (data.firstname ? `${data.firstname || ''} ${data.lastname || ''}`.trim() : 'Guest');
-    const arrival   = data.arrival || data.check_in;
-    const departure = data.departure || data.check_out;
-    const price     = data.price || data.total_price || 0;
-    const channel   = data.channel?.name || data.channel || 'Direct';
+    const guestName = booking['guest-name'] || booking.guestName || (booking.firstname ? `${booking.firstname || ''} ${booking.lastname || ''}`.trim() : 'Guest');
+    const arrival   = booking.arrival || booking.check_in;
+    const departure = booking.departure || booking.check_out;
+    const price     = booking.price || booking.total_price || 0;
+    const channel   = booking.channel?.name || booking.channel || 'Direct';
     const nights    = computeNights(arrival, departure);
-    const propName  = data.apartment?.name || data.propertyName || '';
-
-    // ── Atomic lookup — .lean() ensures no Mongoose document overhead ──
-    let owner = null;
-    if (apartmentId) {
-      owner = await User.findOne(
-        { 'properties.subProperties.smoobuId': String(apartmentId) },
-        { _id: 1, email: 1, firstName: 1, lastName: 1, businessName: 1, properties: 1 }
-      ).lean();
-    }
-
-    if (!owner?._id) {
-      console.warn(`[SmoobuWebhook] No owner for apartment ${apartmentId}`);
-      return res.status(200).json({ ok: true });
-    }
+    const propName  = booking.apartment?.name || data.propertyName || '';
 
     // ── Atomic insert — single operation, no read-then-write ──
     await ActivityLog.create({
@@ -97,7 +129,7 @@ router.post('/smoobu-webhook', async (req, res) => {
         guestName, arrival, departure,
         propertyName: propName, apartmentId,
         price: Number(price) || 0,
-        currency: data.currency || 'PHP',
+        currency: booking.currency || data.currency || 'PHP',
         channel, nights, source: 'smoobu',
       },
       ipAddress: 'smoobu-webhook',

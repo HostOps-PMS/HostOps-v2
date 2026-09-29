@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'crypto';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import InboxEmail from '../models/InboxEmail.js';
 
@@ -9,7 +10,10 @@ const router = express.Router();
 router.post('/inbox/webhook', async (req, res) => {
   try {
     const secret = req.headers['x-webhook-secret'] || req.body?.secret;
-    if (!process.env.INBOX_WEBHOOK_SECRET || secret !== process.env.INBOX_WEBHOOK_SECRET) {
+    const expected = process.env.INBOX_WEBHOOK_SECRET;
+    const given    = Buffer.from(String(secret || ''));
+    // Constant-time compare so the secret can't be recovered by timing.
+    if (!expected || given.length !== Buffer.byteLength(expected) || !crypto.timingSafeEqual(given, Buffer.from(expected))) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 

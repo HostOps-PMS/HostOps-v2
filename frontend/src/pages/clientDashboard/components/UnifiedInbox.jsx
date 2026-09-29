@@ -4,10 +4,12 @@ import { useDashboard } from '../context/DashboardContext';
 import { getChannelColor, getChannelInitial } from '../utils/channelHelpers';
 import { useActivityLog } from '../hooks/useActivityLog';
 
+// Guest messages are attacker-controlled HTML. DOMParser builds an inert
+// document: unlike a detached <div>.innerHTML it never loads <img> or runs
+// onerror handlers.
 function stripHtml(html) {
-  const div = document.createElement('div');
-  div.innerHTML = html;
-  return (div.textContent || div.innerText || '').trim();
+  const doc = new DOMParser().parseFromString(String(html ?? ''), 'text/html');
+  return (doc.body.textContent || '').trim();
 }
 
 /**

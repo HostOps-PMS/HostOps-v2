@@ -64,6 +64,21 @@ function isAdminOrTeamLeader(req) {
   return req.user && (req.user.role === 'admin' || req.user.role === 'team_leader');
 }
 
+// Team leaders only see photos stored for their assigned client (serverId);
+// admins see everything (null = no filter). A team leader without a serverId
+// gets an id that matches nothing, never "no filter".
+function photoClientScope(req) {
+  if (req.user?.role !== 'team_leader') return null;
+  return req.user.serverId ? String(req.user.serverId) : '000000000000000000000000';
+}
+
+// Uploading/deleting photos is admin-only: a photo's apartmentId cannot be
+// tied to a client without Smoobu, so a team leader could otherwise attach
+// or remove photos on another client's apartment.
+function isAdmin(req) {
+  return req.user?.role === 'admin';
+}
+
 // ── In-process cache ──────────────────────────────────────────────
 // API responses: 60 s TTL.  Image scrapes: 10 min TTL (rarely change).
 const _cache = new Map();
@@ -383,7 +398,7 @@ router.post('/apartment-photos/bulk', requireAuth, async (req, res) => {
   try {
     if (!isAdminOrTeamLeader(req)) return res.status(403).json({ error: 'Forbidden' });
     const ids = Array.isArray(req.body?.apartmentIds) ? req.body.apartmentIds : [];
-    const map = await getStoredApartmentImagesBulk(ids);
+    const map = await getStoredApartmentImagesBulk(ids, { clientId: photoClientScope(req) });
     const photos = {};
     map.forEach((imgs, id) => { photos[id] = imgs; });
     return res.json({ photos });
@@ -398,7 +413,7 @@ router.post('/apartment-photos/bulk', requireAuth, async (req, res) => {
 router.get('/:clientId/smoobu-apartments/:apartmentId/photos', requireAuth, validateObjectId('clientId'), async (req, res) => {
   try {
     if (!isAdminOrTeamLeader(req)) return res.status(403).json({ error: 'Forbidden' });
-    const images = await getStoredApartmentImages(req.params.apartmentId);
+    const images = await getStoredApartmentImages(req.params.apartmentId, { clientId: photoClientScope(req) });
     return res.json({ apartmentId: String(req.params.apartmentId), images });
   } catch (err) {
     console.error('[apartment-photos GET] error:', err.message || err);
@@ -412,6 +427,8 @@ router.get('/:clientId/smoobu-apartments/:apartmentId/photos', requireAuth, vali
 router.post(
   '/:clientId/smoobu-apartments/:apartmentId/photos',
   requireAuth,
+  // Reject non-admins before multer writes up to 12 files to disk.
+  (req, res, next) => (isAdmin(req) ? next() : res.status(403).json({ error: 'Forbidden' })),
   photoUpload.array('photos', 12),
   async (req, res) => {
     const tempPaths = (req.files || []).map((f) => f.path);
@@ -420,7 +437,7 @@ router.post(
     });
 
     try {
-      if (!isAdminOrTeamLeader(req)) { cleanupTemps(); return res.status(403).json({ error: 'Forbidden' }); }
+      if (!isAdmin(req)) { cleanupTemps(); return res.status(403).json({ error: 'Forbidden' }); }
 
       const { clientId, apartmentId } = req.params;
       if (!req.files || req.files.length === 0) {
@@ -489,7 +506,7 @@ router.post(
 // image objects returned by GET/POST (the `id` field).
 router.delete('/:clientId/smoobu-apartments/:apartmentId/photos', requireAuth, validateObjectId('clientId'), async (req, res) => {
   try {
-    if (!isAdminOrTeamLeader(req)) return res.status(403).json({ error: 'Forbidden' });
+    if (!isAdmin(req)) return res.status(403).json({ error: 'Forbidden' });
 
     const { apartmentId } = req.params;
     const publicId = req.query.publicId ? decodeURIComponent(String(req.query.publicId)) : '';
