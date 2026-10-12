@@ -44,8 +44,13 @@ import { bootstrapSecrets, startSecretRotation } from './scripts/rotateSecrets.j
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ── Trust Proxy (required when behind Nginx / load balancer / cloud) ──────────
-app.set('trust proxy', 1);
+// ── Trust Proxy ───────────────────────────────────────────────────────────────
+// Production chain (measured): client → Cloudflare → Render LB → app, so
+// X-Forwarded-For arrives as "<client>, <cloudflare>". Trusting 2 hops makes
+// req.ip the real client (rate limits, audit logs); with 1 every user behind
+// the same Cloudflare edge shared one IP. Anything a client puts in the header
+// itself sits further left and is ignored. Re-measure if the hosting changes.
+app.set('trust proxy', 2);
 
 // ── Request ID ────────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -311,7 +316,6 @@ app.use((req, res, next) => {
   if (isImageProxy) return next();
   if (isWebhook) return next();
   if (isGhlProxy) return next();
-  console.log('[requireApiKey] fallback for:', req.path);
   requireApiKey(req, res, next);
 });
 
@@ -341,12 +345,6 @@ app.use('/internal/ops', requireAuth, requireAdmin, opsRoutes);
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// TEMPORARY (remove once 'trust proxy' is set): shows how many proxies sit in
-// front of the app. Only echoes the caller's own IP chain back to them.
-app.get('/health/ip', (req, res) => {
-  res.json({ ip: req.ip, ips: req.ips, xForwardedFor: req.get('x-forwarded-for') || null, cfConnectingIp: req.get('cf-connecting-ip') || null });
 });
 
 // ── 404 Handler ───────────────────────────────────────────────────────────────

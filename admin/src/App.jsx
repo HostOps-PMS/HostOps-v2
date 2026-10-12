@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import './App.css';
 import { getSecureUser, setSecureUser } from './lib/secureUserStorage';
@@ -6,22 +6,23 @@ import { getSecureUser, setSecureUser } from './lib/secureUserStorage';
 import { NotificationsProvider } from './context/NotificationsContext';
 import { ThemeProvider } from './context/ThemeContext';
 import ToastContainer from './components/ToastContainer';
-import Dashboard     from './pages/dashboard';
-import Clients       from './pages/clients';
-import Staffs        from './pages/Staffs/index';
-import TeamLeaders from './pages/team-leaders/index';
 import AuthorizationModal from './pages/authorization';
-import TeamLeaderLayout from './pages/TeamLeader/index';
-import TeamLeaderStaffs from './pages/TeamLeader/staffs/index';
-import TeamLeaderDashboardPlaceholder from './pages/TeamLeader/dashboard/index';
-import AccountsPage from './pages/Accounts/index';
-import ActivityLogsPage from './pages/ActivityLogs/index';
-import AlertsCenterPage from './pages/AlertsCenter';
-
-import HoneypotDashboard from './pages/HoneypotDashboard';
-import RecentActivitiesPage from './pages/RecentActivities/index';
-import AnnouncementsPage from './pages/Announcements/index';
 import ErrorPage404 from './pages/ErrorPage404';
+
+// Pages load on demand (separate chunks) so the first load stays small.
+const Dashboard            = lazy(() => import('./pages/dashboard'));
+const Clients              = lazy(() => import('./pages/clients'));
+const Staffs               = lazy(() => import('./pages/Staffs/index'));
+const TeamLeaders          = lazy(() => import('./pages/team-leaders/index'));
+const TeamLeaderLayout     = lazy(() => import('./pages/TeamLeader/index'));
+const TeamLeaderStaffs     = lazy(() => import('./pages/TeamLeader/staffs/index'));
+const TeamLeaderDashboardPlaceholder = lazy(() => import('./pages/TeamLeader/dashboard/index'));
+const AccountsPage         = lazy(() => import('./pages/Accounts/index'));
+const ActivityLogsPage     = lazy(() => import('./pages/ActivityLogs/index'));
+const AlertsCenterPage     = lazy(() => import('./pages/AlertsCenter'));
+const HoneypotDashboard    = lazy(() => import('./pages/HoneypotDashboard'));
+const RecentActivitiesPage = lazy(() => import('./pages/RecentActivities/index'));
+const AnnouncementsPage    = lazy(() => import('./pages/Announcements/index'));
 
 const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'https://go.hostops.online';
 
@@ -193,7 +194,7 @@ export default function App() {
         <AuthorizationModal onAuthorized={handleAuthorized} />
       )}
 
-      {authorized && <Routes>
+      {authorized && <Suspense fallback={null}><Routes>
         {/* ── Entry point from the login app cross-origin redirect ── */}
         <Route path="/admin" element={<AdminEntryRedirect />} />
 
@@ -313,7 +314,7 @@ export default function App() {
             Unknown paths show the 404 page instead of redirecting cross-app —
             only the dedicated /admin entry point does that redirect. */}
         {isReady && <Route path="*" element={<ErrorPage404 />} />}
-      </Routes>}
+      </Routes></Suspense>}
       </NotificationsProvider>
       </ThemeProvider>
     </BrowserRouter>

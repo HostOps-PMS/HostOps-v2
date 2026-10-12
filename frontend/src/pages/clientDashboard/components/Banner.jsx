@@ -64,6 +64,7 @@ export default function Banner({ type, message }) {
       sub: message || "Please refresh and try again",
     },
   };
+  config.demo = { ...config.live, icon: { ...config.live.icon, iconClass: "ti-eye" }, title: "Demo mode", sub: "Showing sample data, not a real account" };
 
   const c = config[type] || config.live;
 

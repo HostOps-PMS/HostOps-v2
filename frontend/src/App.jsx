@@ -8,6 +8,7 @@ import { AuthProvider } from './pages/AuthContext';
 import VerifyPage from './pages/Login/verify';
 import ResetPage from './pages/Login/reset';
 import ProtectedRoute from './pages/ProtectedRoute';
+import DemoPage from './pages/demo';
 
 // FIX: The wildcard <Route path="*"> was catching every unrecognised path —
 // including /inbox on a hard refresh before React Router had hydrated —
@@ -53,6 +54,7 @@ function App() {
           <Route path="/" element={<LoginPage />} />
           <Route path="/verify-email" element={<VerifyPage />} />
           <Route path="/reset-password" element={<ResetPage />} />
+          <Route path="/demo" element={<DemoPage />} />
           <Route
             path="/dashboard"
             element={

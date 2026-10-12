@@ -79,7 +79,7 @@ export function useDashboardData() {
         updateDashState({ from: data.period.from, to: data.period.to });
       }
 
-      setBanner({ message: 'Live data', type: 'live' });
+      setBanner(data.demo ? { message: 'Demo data', type: 'demo' } : { message: 'Live data', type: 'live' });
     } finally {
       if (isLatest()) {
         inflightKey = null;

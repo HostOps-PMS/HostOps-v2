@@ -23,7 +23,7 @@ import { useActivityLog } from "./hooks/useActivityLog";
 import "./globals.css";
 
 export default function DashboardPage() {
-  const { dashState, dark } = useDashboard();
+  const { dashState, dark, demo } = useDashboard();
   const { loadData, banner } = useDashboardData();
   const { logActivity } = useActivityLog();
 
@@ -32,7 +32,7 @@ export default function DashboardPage() {
   // The modal is shown until the user successfully changes their password,
   // at which point the backend marks the account as verified.
   const [showFirstLoginModal, setShowFirstLoginModal] = useState(() => {
-    return sessionStorage.getItem('hp_must_change_password') === 'true';
+    return !demo && sessionStorage.getItem('hp_must_change_password') === 'true';
   });
 
   const handlePasswordChanged = (updatedUser) => {
@@ -44,7 +44,7 @@ export default function DashboardPage() {
   };
 
   const [showFirstLoginPinModal, setShowFirstLoginPinModal] = useState(() => {
-    return sessionStorage.getItem('hp_must_change_pin') === 'true';
+    return !demo && sessionStorage.getItem('hp_must_change_pin') === 'true';
   });
 
   const handlePinChanged = (updatedUser) => {
@@ -172,7 +172,7 @@ const [profitOpen, setProfitOpen] = useState(false);
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
         <Navbar />
         <Banner type={banner.type} message={banner.message} />
-        {banner.type === 'live' && (
+        {(banner.type === 'live' || banner.type === 'demo') && (
           <div style={{
             display: "flex",
             alignItems: "center",
@@ -185,7 +185,7 @@ const [profitOpen, setProfitOpen] = useState(false);
           }}>
             <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: dark ? "#56c299" : "#1e8760", display: "inline-block", animation: "pulse 2s infinite", flexShrink: 0 }} />
             <span style={{ fontSize: "12px", fontWeight: 600, color: dark ? "#56c299" : "#1e8760", letterSpacing: "0.04em", textTransform: "uppercase" }}>
-              Live Data Dashboard
+              {banner.type === 'demo' ? 'Demo Dashboard · Sample Data' : 'Live Data Dashboard'}
             </span>
             <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: dark ? "#56c299" : "#1e8760", display: "inline-block", animation: "pulse 2s infinite 1s", flexShrink: 0 }} />
           </div>
