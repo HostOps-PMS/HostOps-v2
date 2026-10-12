@@ -55,6 +55,7 @@ function App() {
           <Route path="/verify-email" element={<VerifyPage />} />
           <Route path="/reset-password" element={<ResetPage />} />
           <Route path="/demo" element={<DemoPage />} />
+          <Route path="/demo/inbox" element={<DemoPage inbox />} />
           <Route
             path="/dashboard"
             element={

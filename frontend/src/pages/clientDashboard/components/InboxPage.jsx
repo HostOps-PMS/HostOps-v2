@@ -126,7 +126,8 @@ function LoadingDots() {
 }
 
 export default function InboxPage() {
-  const { dashState, dark } = useDashboard();
+  const { dashState, dark, demo } = useDashboard();
+  const home = demo ? "/demo" : "/dashboard";
   const { loadData } = useDashboardData();
   const auth = useAuth();
   const navigate = useNavigate();
@@ -238,7 +239,7 @@ export default function InboxPage() {
   // then redirect to the dashboard so its useEffect fires and loads fresh data.
   useEffect(() => {
     if (!dashState.isSwitching) return;
-    const t = setTimeout(() => navigate("/dashboard"), 300);
+    const t = setTimeout(() => navigate(home), 300);
     return () => clearTimeout(t);
   }, [dashState.isSwitching]); // eslint-disable-line
 
@@ -361,7 +362,7 @@ export default function InboxPage() {
           <div style={{ padding: "12px 16px 10px", borderBottom: `1px solid ${border}`, background: panelBg }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <button
-                onClick={() => navigate("/dashboard")}
+                onClick={() => navigate(home)}
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 4,
                   fontSize: "14px", fontWeight: 500, color: "#26a676",
