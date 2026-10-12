@@ -27,6 +27,11 @@ export default defineConfig(({ mode }) => ({
         entryFileNames: 'assets/[name].[hash].js',
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[hash].[ext]',
+        // Libraries in their own cacheable chunks (each <= ~500 kB) instead of one
+        // multi-MB index.js: faster first load, and app deploys don't re-download them.
+        codeSplitting: {
+          groups: [{ name: 'vendor', test: /node_modules/, maxSize: 500 * 1024 }],
+        },
       },
     },
   },

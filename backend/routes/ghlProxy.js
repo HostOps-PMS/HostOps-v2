@@ -113,67 +113,50 @@ router.get('/free-slots', slotsLimiter, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────
-// POST /api/ghl/contacts/upsert
-// Creates or updates a contact in GHL CRM.
+// POST /api/ghl/appointments
+// Books the walkthrough for the visitor in one server-side step:
+// creates/updates their contact, then books a free slot for it.
+// The browser never sees or chooses a contact id, title or end time,
+// so an anonymous caller cannot book for someone else's contact or
+// put their own text into the calendar invite.
 // ─────────────────────────────────────────────────────────────────
-router.post('/contacts/upsert', bookingLimiter, async (req, res) => {
+router.post('/appointments', bookingLimiter, async (req, res) => {
   try {
-    const firstName = sanitiseStr(req.body.firstName, 100);
-    const lastName  = sanitiseStr(req.body.lastName, 100);
-    const email     = sanitiseStr(req.body.email, 254);
+    const firstName  = sanitiseStr(req.body.firstName, 100);
+    const lastName   = sanitiseStr(req.body.lastName, 100);
+    const email      = sanitiseStr(req.body.email, 254);
+    const properties = sanitiseStr(req.body.properties, 100);
+    const platforms  = sanitiseStr(req.body.platforms, 300);
+    const start      = new Date(sanitiseStr(req.body.startTime, 50));
 
     if (!firstName || !email || !isValidEmail(email)) {
       return res.status(400).json({ error: 'Valid firstName and email are required' });
     }
+    if (isNaN(start) || start <= Date.now() || start - Date.now() > 90 * 864e5) {
+      return res.status(400).json({ error: 'startTime must be a future date within 90 days' });
+    }
 
-    const ghlRes = await fetch(`${GHL_BASE}/contacts/upsert`, {
+    // Only book a time GHL itself offers as free.
+    const day = 864e5;
+    const slotsRes = await fetch(
+      `${GHL_BASE}/calendars/${GHL_CALENDAR_ID}/free-slots?startDate=${start - day}&endDate=${+start + day}&timezone=Asia%2FManila`,
+      { headers: ghlHeaders('2021-04-15') },
+    );
+    const slotsData = slotsRes.ok ? await slotsRes.json() : {};
+    const offered = Object.values(slotsData || {}).flatMap((d) => (Array.isArray(d?.slots) ? d.slots : []));
+    if (!offered.some((s) => new Date(s).getTime() === start.getTime())) {
+      return res.status(409).json({ error: 'That time is no longer available. Please pick another slot.' });
+    }
+
+    const contactRes = await fetch(`${GHL_BASE}/contacts/upsert`, {
       method: 'POST',
       headers: ghlHeaders('2021-07-28'),
-      body: JSON.stringify({
-        firstName,
-        lastName,
-        email,
-        locationId: GHL_LOCATION_ID,
-        tags: ['HostPilot Lead'],
-      }),
+      body: JSON.stringify({ firstName, lastName, email, locationId: GHL_LOCATION_ID, tags: ['HostPilot Lead'] }),
     });
-
-    if (!ghlRes.ok) {
-      const errBody = await ghlRes.json().catch(() => ({}));
-      console.error('[ghlProxy] contacts/upsert GHL error:', ghlRes.status, errBody);
-      return res.status(502).json({ error: 'Failed to create contact' });
-    }
-
-    // Only the id the booking step needs. Upserting an EXISTING email returns
-    // that contact's stored CRM record (phone, address, tags…) — never echo it
-    // to an anonymous caller.
-    const data = await ghlRes.json();
-    res.json({ contact: { id: data?.contact?.id } });
-  } catch (err) {
-    console.error('[ghlProxy] contacts/upsert error:', err.message);
-    res.status(502).json({ error: 'Failed to create contact' });
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────
-// POST /api/ghl/appointments
-// Books a calendar appointment in GHL.
-// ─────────────────────────────────────────────────────────────────
-router.post('/appointments', bookingLimiter, async (req, res) => {
-  try {
-    const contactId = sanitiseStr(req.body.contactId, 100);
-    const startTime = sanitiseStr(req.body.startTime, 50);
-    const endTime   = sanitiseStr(req.body.endTime, 50);
-    const title     = sanitiseStr(req.body.title, 200);
-    const notes     = sanitiseStr(req.body.notes, 500);
-
-    if (!contactId || !startTime || !endTime) {
-      return res.status(400).json({ error: 'contactId, startTime, and endTime are required' });
-    }
-
-    // Validate ISO format loosely
-    if (!/^\d{4}-\d{2}-\d{2}T/.test(startTime) || !/^\d{4}-\d{2}-\d{2}T/.test(endTime)) {
-      return res.status(400).json({ error: 'startTime and endTime must be ISO 8601 format' });
+    const contactId = contactRes.ok ? (await contactRes.json())?.contact?.id : null;
+    if (!contactId) {
+      console.error('[ghlProxy] appointments: contact upsert failed:', contactRes.status);
+      return res.status(502).json({ error: 'Failed to book appointment' });
     }
 
     const ghlRes = await fetch(`${GHL_BASE}/calendars/events/appointments`, {
@@ -183,12 +166,14 @@ router.post('/appointments', bookingLimiter, async (req, res) => {
         calendarId: GHL_CALENDAR_ID,
         locationId: GHL_LOCATION_ID,
         contactId,
-        startTime,
-        endTime,
+        startTime: start.toISOString(),
+        endTime: new Date(+start + GHL_DURATION_MINS * 60e3).toISOString(),
         selectedTimezone: 'Asia/Manila',
-        title: title || 'Walkthrough',
+        // Fixed: the email is unverified, so typed names must not reach a stranger's invite.
+        // The name is already on the contact record.
+        title: 'Walkthrough',
         appointmentStatus: 'confirmed',
-        notes: notes || '',
+        notes: `Properties: ${properties} | Platforms: ${platforms}`,
       }),
     });
 
@@ -198,8 +183,8 @@ router.post('/appointments', bookingLimiter, async (req, res) => {
       return res.status(502).json({ error: 'Failed to book appointment' });
     }
 
-    const data = await ghlRes.json();
-    res.json(data);
+    // Nothing from GHL goes back to an anonymous caller.
+    res.json({ ok: true });
   } catch (err) {
     console.error('[ghlProxy] appointments error:', err.message);
     res.status(502).json({ error: 'Failed to book appointment' });
@@ -243,6 +228,12 @@ router.post('/webhook/demo', webhookLimiter, async (req, res) => {
   }
 });
 
+// Accepts the plan key ('starter' | 'growth') or the older label the landing page sends
+// ('Starter - $1,500/mo'): only the first word is read, the price always comes from here.
+// Null prototype: 'constructor' / '__proto__' must not count as plans.
+const PAYMENT_PLANS = { __proto__: null, starter: 'Starter - $1,500/mo', growth: 'Growth - $2,500/mo' };
+const SETUP_FEE = '$2,000.00';
+
 // ─────────────────────────────────────────────────────────────────
 // POST /api/ghl/webhook/payment
 // Fires the payment-intent webhook for the pricing wizard.
@@ -256,14 +247,15 @@ router.post('/webhook/payment', webhookLimiter, async (req, res) => {
     const firstName  = sanitiseStr(req.body.first_name, 100);
     const lastName   = sanitiseStr(req.body.last_name, 100);
     const email      = sanitiseStr(req.body.email, 254);
-    const plan       = sanitiseStr(req.body.plan, 100);
+    const plan       = PAYMENT_PLANS[sanitiseStr(req.body.plan, 100).toLowerCase().split(' ')[0]];
     const properties = sanitiseStr(req.body.properties, 100);
     const platforms  = sanitiseStr(req.body.platforms, 300);
-    const setupFee   = sanitiseStr(req.body.setup_fee, 50);
-    const source     = sanitiseStr(req.body.source, 100);
 
     if (!email || !isValidEmail(email)) {
       return res.status(400).json({ error: 'Valid email is required' });
+    }
+    if (!plan) {
+      return res.status(400).json({ error: 'Unknown plan' });
     }
 
     const ghlRes = await fetch(GHL_PAYMENT_WEBHOOK_URL, {
@@ -276,9 +268,11 @@ router.post('/webhook/payment', webhookLimiter, async (req, res) => {
         plan,
         properties,
         platforms,
+        // Price, fee and status are set here, never by the browser. This is a
+        // payment *intent*: the GHL workflow must still wait for a confirmed GCash payment.
         payment_status: 'Pending - Awaiting GCash Confirmation',
-        setup_fee: setupFee || '$2,000.00',
-        source: source || 'HostPilot Website',
+        setup_fee: SETUP_FEE,
+        source: 'HostPilot Website',
       }),
     });
 

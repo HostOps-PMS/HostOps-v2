@@ -22,6 +22,7 @@ function withDecryption(res, auth) {
  * retries once after silent refresh on 401.
  */
 export async function authFetch(path, options = {}, auth) {
+  if (auth.demoFetch) return auth.demoFetch(path, options); // /demo page: sample data, no API
   const token = auth.getToken();
   if (!token) return null;
 

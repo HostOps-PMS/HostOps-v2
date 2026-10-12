@@ -10,6 +10,7 @@ import React, {
 import safeStorage from './safeStorage';
 import { getSecureUser, setSecureUser, removeSecureUser } from '../lib/secureUserStorage';
 import { decryptApiResponse, generateSessionHint } from './utils/responseDecryption';
+import { logoutUser } from './Login/services/authservice';
 
 const HP_API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -193,6 +194,14 @@ const setUser = useCallback((u) => {
     safeStorage.removeItem('hp_selected_property_name');
   }, []);
 
+  // ── Logout: end the session on the server (revokes the refresh cookie), then locally.
+  // Components call auth.logout() instead of the service, so a non-real auth context
+  // (the public /demo page) can make it a no-op and never touch the visitor's real session.
+  const logout = useCallback(async () => {
+    await logoutUser(accessTokenRef.current);
+    clear();
+  }, [clear]);
+
   // ── Silent refresh on mount ───────────────────────────────────────
   useEffect(() => {
     const controller = new AbortController();
@@ -332,6 +341,7 @@ const setUser = useCallback((u) => {
         getUser,
         setUser,
         clear,
+        logout,
         isReady,
         refreshToken,
         fetchWithAuth,

@@ -2,16 +2,11 @@ import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-let markerClusterReady = false;
-try {
-  await import('leaflet.markercluster');
-  await import('leaflet.markercluster/dist/MarkerCluster.css');
-  await import('leaflet.markercluster/dist/MarkerCluster.Default.css');
-  markerClusterReady = true;
-} catch {
-  // Non-fatal: map works without clustering / spiderfy
-  console.warn('[PropertyMap] leaflet.markercluster not installed — using plain markers');
-}
+// Declared dependency → plain imports (the old top-level-await try/catch
+// triggered a build warning). The plugin attaches L.markerClusterGroup.
+import 'leaflet.markercluster';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -358,7 +353,7 @@ function useLeafletMap(containerRef, plottable, markerMapRef, focusedAptId, mapS
     // Prefer markercluster (real spiderfy for overlapping markers).
     // If the plugin didn't load, fall back to a plain layer group so the
     // map still renders every marker (just without clustering/spiderfy).
-    const canCluster = markerClusterReady && typeof L.markerClusterGroup === 'function';
+    const canCluster = typeof L.markerClusterGroup === 'function';
     const layer = canCluster
       ? L.markerClusterGroup({
           showCoverageOnHover:        false,  // don't draw the polygon hull

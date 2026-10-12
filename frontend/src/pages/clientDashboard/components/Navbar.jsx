@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router";
 import { useAuth } from "../../AuthContext";
-import { logoutUser } from '../../Login/services/authservice';
 import { useDashboard } from "../context/DashboardContext";
 import { exportDashboardPDF } from "../services/pdfExportService";
 import AccountSettingsModal from "./AccountSettingsModal";
@@ -236,7 +235,7 @@ function LogoutConfirmModal({ isOpen, joke, onConfirm, onCancel, dark = false })
 }
 
 export default function Navbar() {
-  const { getUser, clear } = useAuth();
+  const { getUser } = useAuth();
   const { dashState, dark, setDark, selectProperty } = useDashboard();
   const auth = useAuth();         
   const [, forceUserRefresh] = useState(0);
@@ -441,8 +440,7 @@ export default function Navbar() {
         propertyName: safeStorage.getItem('hp_selected_property_name') || null,
       });
     } catch { /* ignore */ }
-    await logoutUser(auth.getToken());
-    clear();
+    await auth.logout();
     window.location.href = "/";
   };
 

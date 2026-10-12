@@ -26,8 +26,10 @@ function readStoredProperty() {
   return { id, name };
 }
 
-export function DashboardProvider({ children }) {
-  const restoredProp = readStoredProperty();
+// demo: the public /demo page. It shares browser storage with the real app on the same
+// origin, so it neither reads nor writes the visitor's real selected property.
+export function DashboardProvider({ children, demo = false }) {
+  const restoredProp = demo ? { id: null, name: '' } : readStoredProperty();
 
   const [dashState, setDashState] = useState({
     from: defaultRange.from,
@@ -65,7 +67,9 @@ export function DashboardProvider({ children }) {
 
   const selectProperty = useCallback((id, name) => {
     // safeStorage.setItem/removeItem never throw.
-    if (id) {
+    if (demo) {
+      // keep the real app's stored property untouched
+    } else if (id) {
       safeStorage.setItem(PROP_ID_KEY,   String(id));
       safeStorage.setItem(PROP_NAME_KEY, name || '');
     } else {
@@ -81,7 +85,7 @@ export function DashboardProvider({ children }) {
       rawData:      null,
       isSwitching:  true,
     }));
-  }, []);
+  }, [demo]);
 
   const openPropertySelector = useCallback(() => {
     setDashState((prev) => ({ ...prev, showPropertySelector: true }));
@@ -93,6 +97,7 @@ export function DashboardProvider({ children }) {
       setDashState,
       updateDashState,
       dark,
+      demo,
       setDark,
       selectProperty,
       openPropertySelector,
