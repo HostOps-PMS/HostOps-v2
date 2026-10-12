@@ -72,6 +72,7 @@ function dashboard({ from, to }) {
   const today = iso(new Date());
   const inbox = BOOKINGS
     .filter((b) => b.type !== 'cancellation' && b.departure >= today)
+    .sort((a, b) => a.arrival.localeCompare(b.arrival)) // nearest stays first, across all properties
     .slice(0, 12)
     .map((b, i) => ({
       reservationId: b.id,
@@ -81,7 +82,8 @@ function dashboard({ from, to }) {
       channel: b.channel.name,
       arrival: b.arrival,
       departure: b.departure,
-      latestMessage: { body: 'Hi! What time is check-in?', subject: '', createdAt: b['created-at'], fromGuest: true },
+      // Spread over the last few days, newest first (never in the future).
+      latestMessage: { body: 'Hi! What time is check-in?', subject: '', createdAt: new Date(Date.now() - (i * 7 + 1) * 3600e3).toISOString(), fromGuest: true },
       unread: i < 3 ? 1 : 0,
       bookingType: b.type,
       hasThread: true,
@@ -102,7 +104,7 @@ function dashboard({ from, to }) {
   };
 }
 
-const json = (body) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
 export function demoFetch(path, options = {}) {
   if (path.includes('/api/dashboard')) return Promise.resolve(json(dashboard(JSON.parse(options.body || '{}'))));
@@ -115,6 +117,8 @@ export function demoFetch(path, options = {}) {
   }
   if (path.includes('/my-properties')) return Promise.resolve(json({ properties: [] }));
   if (path.includes('/announcements')) return Promise.resolve(json([]));
+  // Account actions (PIN, password, 2FA, profile): nothing is real here, so say so instead of faking success.
+  if (path.includes('/auth/')) return Promise.resolve(json({ error: 'This is a demo. Account settings are turned off.' }, 403));
   return Promise.resolve(json({})); // activity log and anything else: silent no-op
 }
 

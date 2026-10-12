@@ -236,7 +236,10 @@ function LogoutConfirmModal({ isOpen, joke, onConfirm, onCancel, dark = false })
 
 export default function Navbar() {
   const { getUser } = useAuth();
-  const { dashState, dark, setDark, selectProperty } = useDashboard();
+  const { dashState, dark, setDark, selectProperty, demo } = useDashboard();
+  // Public /demo has no session: keep its links inside the demo instead of the login-protected pages.
+  const home  = demo ? "/demo" : "/dashboard";
+  const inbox = demo ? "/demo/inbox" : "/inbox";
   const auth = useAuth();         
   const [, forceUserRefresh] = useState(0);
   const user = getUserData(auth);
@@ -925,7 +928,7 @@ export default function Navbar() {
             {/* FIX: Link to /dashboard not / — clicking the logo on /inbox
                 was navigating to LoginPage which redirected back to /inbox,
                 making it impossible to get back to /dashboard from the logo. */}
-            <Link to="/dashboard" style={t.logoWrap}>
+            <Link to={home} style={t.logoWrap}>
               <div style={t.logoBox}>
                 <img src={hostopsLogo} alt="HostOps" style={{ width: 32, height: 32, objectFit: "contain" }} />
               </div>
@@ -1001,7 +1004,7 @@ export default function Navbar() {
               {/* Export PDF */}
               {ExportButton}
 
-              <Link to="/inbox" style={{ ...t.iconBtn, textDecoration: 'none' }} aria-label="Inbox">
+              <Link to={inbox} style={{ ...t.iconBtn, textDecoration: 'none' }} aria-label="Inbox">
                 <i className="ti ti-inbox" style={t.iconBtnIcon} aria-hidden="true" />
               </Link>
 
@@ -1120,7 +1123,7 @@ export default function Navbar() {
       <nav style={{ ...t.navbar, position: "sticky", top: 0 }}>
         <div style={t.inner}>
           {/* FIX: Link to /dashboard not / — same as mobile fix above */}
-          <Link to="/dashboard" style={t.logoWrap}>
+          <Link to={home} style={t.logoWrap}>
             <div style={t.logoBox}>
               <img src={hostopsLogo} alt="HostOps" style={{ width: 28, height: 28, objectFit: "contain" }} />
             </div>
@@ -1211,7 +1214,7 @@ export default function Navbar() {
               )}
             </div>
 
-            <Link to="/inbox" style={{ ...t.iconBtn, textDecoration: 'none' }} aria-label="Inbox">
+            <Link to={inbox} style={{ ...t.iconBtn, textDecoration: 'none' }} aria-label="Inbox">
               <i className="ti ti-inbox" style={t.iconBtnIcon} aria-hidden="true" />
             </Link>
 
